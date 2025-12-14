@@ -1,0 +1,16 @@
+0. Download and install VS with CMake
+
+1. Download and install vcpkg
+   * git clone https://github.com/microsoft/vcpkg.git
+   * cd vcpkg
+   * bootstrap-vcpkg.bat
+
+2. Add vcpkg directory to PATH env variable (for example C:\vcpkg\ if you installed here)
+
+3. Run next commands:
+   - vcpkg integrate install
+   - install all dependenices via vcpkg:
+      a. vcpkg install glfw3
+      b. vcpkg install volk
+
+4. Generate sln file to use it with Rider (Rhea/bats/generate_sln.bat)
