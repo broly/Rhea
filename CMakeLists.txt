@@ -15,3 +15,12 @@ target_link_libraries(rhea
     Vulkan::Vulkan
     glfw
 )
+
+target_compile_definitions(rhea
+    PRIVATE GLFW_INCLUDE_VULKAN
+)
+
+target_include_directories(rhea
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)

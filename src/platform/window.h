@@ -20,3 +20,4 @@ namespace platform
     }
 }
 
+namespace plat = platform;
