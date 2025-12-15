@@ -2,6 +2,8 @@
 #include <vector>
 #include <GLFW/glfw3.h>
 
+#include "vk_context.h"
+#include "vk_pipeline.h"
 #include "render/render_backend.h"
 
 class VkRenderBackend final : public RenderBackend
@@ -12,19 +14,6 @@ public:
     void create_render_pass(VkSurfaceFormatKHR surfaceFormat);
     void create_framebuffers();
     
-    struct
-    {
-        VkDevice device;
-        VkSwapchainKHR swapchain;
-        VkQueue graphicsQueue;
-        VkQueue presentQueue;
-        VkSemaphore imageAvailable;
-        VkSemaphore renderFinished;
-        VkFence inFlight;
-        std::vector<VkCommandBuffer> commandBuffers;
-        VkRenderPass renderPass;
-        std::vector<VkFramebuffer> framebuffers;
-        std::vector<VkImageView> swapchainImageViews;
-        VkExtent2D extent;
-    } info = {};
+    VkContext context = {};
+    std::unique_ptr<VkPipelineObject> pipeline;
 };

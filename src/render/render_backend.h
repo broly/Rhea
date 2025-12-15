@@ -10,7 +10,7 @@ public:
     requires std::is_base_of_v<RenderBackend, T>
     static std::unique_ptr<RenderBackend> create_backend()
     {
-        return std::unique_ptr<RenderBackend>(new T());
+        return std::make_unique<T>();
     }
     
     virtual void init(void* window) = 0;
