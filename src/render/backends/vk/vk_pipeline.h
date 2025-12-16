@@ -11,13 +11,11 @@ public:
     ~VkPipelineObject() = default;
 
     VkPipeline pipeline() const { return pipeline_; }
-    VkPipelineLayout layout() const { return layout_; }
 
 private:
     VkContext& context;
 
     VkPipeline pipeline_;
-    VkPipelineLayout layout_;
     
     std::vector<VkShader> shaders;
 };

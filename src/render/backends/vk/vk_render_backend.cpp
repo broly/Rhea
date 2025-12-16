@@ -5,6 +5,8 @@
 #include <GLFW/glfw3.h>
 #include <algorithm>
 
+#include "vk_camera_ubo.h"
+#include "vk_helpers.h"
 #include "vk_macro.h"
 #include "vk_pipeline.h"
 
@@ -126,7 +128,7 @@ VkExtent2D choose_extent(
     return extent;
 }
 
-void VkRenderBackend::draw_frame()
+void VkRenderBackend::draw_frame(const Camera& camera)
 {
     auto& frame = context.frames[context.current_frame];
     
@@ -205,8 +207,9 @@ void VkRenderBackend::draw_frame()
         recreate_swapchain();
     }
     
-    
     context.current_frame = (context.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+    
+    update_camera_ubo(camera);
 }
 
 void VkRenderBackend::create_instance()
@@ -294,6 +297,7 @@ void VkRenderBackend::recreate_swapchain()
     cleanup_swapchain();
 
     create_swapchain();
+    create_depth_resources();
     create_render_pass();
     create_framebuffers();
     create_command_pool();
@@ -303,70 +307,273 @@ void VkRenderBackend::recreate_swapchain()
     create_image_sync_objects();
 }
 
+void VkRenderBackend::create_depth_resources()
+{
+    VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
+    context.depth_format = depth_format;
+
+    VkImageCreateInfo image_ci{
+        VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO
+    };
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.extent.width  = context.extent.width;
+    image_ci.extent.height = context.extent.height;
+    image_ci.extent.depth  = 1;
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.format = depth_format;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VK_CHECK(vkCreateImage(
+        context.device, &image_ci, nullptr, &context.depth_image));
+
+    VkMemoryRequirements mem_req;
+    vkGetImageMemoryRequirements(
+        context.device, context.depth_image, &mem_req);
+
+    VkMemoryAllocateInfo alloc{
+        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO
+    };
+    alloc.allocationSize = mem_req.size;
+    alloc.memoryTypeIndex =
+        vk::find_memory_type(
+            context.physical_device,
+            mem_req.memoryTypeBits,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VK_CHECK(vkAllocateMemory(
+        context.device, &alloc, nullptr, &context.depth_memory));
+
+    vkBindImageMemory(
+        context.device,
+        context.depth_image,
+        context.depth_memory,
+        0);
+
+    VkImageViewCreateInfo view_ci{
+        VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
+    };
+    view_ci.image = context.depth_image;
+    view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_ci.format = depth_format;
+    view_ci.subresourceRange.aspectMask =
+        VK_IMAGE_ASPECT_DEPTH_BIT;
+    view_ci.subresourceRange.levelCount = 1;
+    view_ci.subresourceRange.layerCount = 1;
+
+    VK_CHECK(vkCreateImageView(
+        context.device, &view_ci, nullptr,
+        &context.depth_image_view));
+}
+
+void VkRenderBackend::create_camera_ubo()
+{
+    constexpr VkDeviceSize buffer_size = sizeof(CameraUBO);
+
+    context.camera_ubos.resize(MAX_FRAMES_IN_FLIGHT);
+    context.camera_ubo_memory.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        vk::create_buffer(
+            context.device,
+            context.physical_device,
+            buffer_size,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            context.camera_ubos[i],
+            context.camera_ubo_memory[i]);
+    }
+}
+
+void VkRenderBackend::update_camera_ubo(const Camera& camera)
+{
+    CameraUBO ubo;
+    
+    const Transform hardcoded_model_transform {};
+    
+    float aspect =
+        context.extent.width /
+        (float)context.extent.height;
+    
+        ubo.mvp = 
+            camera.projection(aspect) *
+            camera.view() *
+            hardcoded_model_transform.matrix();
+
+    void* data;
+    vkMapMemory(
+        context.device,
+        context.camera_ubo_memory[context.current_frame],
+        0, sizeof(CameraUBO), 0, &data);
+
+    memcpy(data, &ubo, sizeof(CameraUBO));
+    vkUnmapMemory(context.device,
+                  context.camera_ubo_memory[context.current_frame]);
+}
+
+void VkRenderBackend::create_descriptor_set_layout()
+{
+    VkDescriptorSetLayoutBinding ubo_binding{};
+    ubo_binding.binding = 0;
+    ubo_binding.descriptorType =
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubo_binding.descriptorCount = 1;
+    ubo_binding.stageFlags =
+        VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layout_info{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
+    };
+    layout_info.bindingCount = 1;
+    layout_info.pBindings = &ubo_binding;
+
+    vkCreateDescriptorSetLayout(
+        context.device, &layout_info,
+        nullptr,
+        &context.camera_set_layout);
+}
+
+void VkRenderBackend::create_descriptor_pool()
+{
+    VkDescriptorPoolSize pool_size{};
+    pool_size.type =
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_size.descriptorCount =
+        MAX_FRAMES_IN_FLIGHT;
+
+    VkDescriptorPoolCreateInfo pool_info{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
+    };
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &pool_size;
+    pool_info.maxSets = MAX_FRAMES_IN_FLIGHT;
+
+    vkCreateDescriptorPool(
+        context.device, &pool_info,
+        nullptr, &context.descriptor_pool);
+}
+
+void VkRenderBackend::allocate_descriptor_sets()
+{
+    context.camera_descriptor_sets.resize(MAX_FRAMES_IN_FLIGHT);
+
+    std::vector<VkDescriptorSetLayout> layouts(
+        MAX_FRAMES_IN_FLIGHT,
+        context.camera_set_layout
+    );
+
+    VkDescriptorSetAllocateInfo alloc{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
+    };
+    alloc.descriptorPool = context.descriptor_pool;
+    alloc.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+    alloc.pSetLayouts = layouts.data();
+
+    VK_CHECK(vkAllocateDescriptorSets(
+        context.device,
+        &alloc,
+        context.camera_descriptor_sets.data()));
+}
+
+void VkRenderBackend::update_descriptor_sets()
+{
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        VkDescriptorBufferInfo buffer_info{};
+        buffer_info.buffer = context.camera_ubos[i];
+        buffer_info.range  = sizeof(CameraUBO);
+
+        VkWriteDescriptorSet write{
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET
+        };
+        write.dstSet = context.camera_descriptor_sets[i];
+        write.dstBinding = 0;
+        write.descriptorType =
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.descriptorCount = 1;
+        write.pBufferInfo = &buffer_info;
+
+        vkUpdateDescriptorSets(
+            context.device, 1, &write, 0, nullptr);
+    }
+}
+
 
 void VkRenderBackend::create_render_pass()
 {
-    VkAttachmentDescription color_attachment{};
-    color_attachment.format = context.surface_format.format;
-    color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    
-    VkAttachmentReference color_ref;
-    color_ref.attachment = 0;
-    color_ref.layout =
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    
-    
+    VkAttachmentDescription color{};
+    color.format = context.surface_format.format;
+    color.samples = VK_SAMPLE_COUNT_1_BIT;
+    color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentDescription depth{};
+    depth.format = context.depth_format;
+    depth.samples = VK_SAMPLE_COUNT_1_BIT;
+    depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth.finalLayout =
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference color_ref{0,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+
+    VkAttachmentReference depth_ref{1,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint =
         VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &color_ref;
-    
-    VkSubpassDependency dep{};
-    dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dep.dstSubpass = 0;
-    dep.srcStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dep.dstStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dep.dstAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    
+    subpass.pDepthStencilAttachment = &depth_ref;
+
+    VkAttachmentDescription attachments[2] = {
+        color, depth
+    };
+
     VkRenderPassCreateInfo rpci{
         VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO
     };
-    rpci.attachmentCount = 1;
-    rpci.pAttachments = &color_attachment;
+    rpci.attachmentCount = 2;
+    rpci.pAttachments = attachments;
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
-    rpci.dependencyCount = 1;
-    rpci.pDependencies = &dep;
 
-    VK_CHECK(vkCreateRenderPass(context.device, &rpci, nullptr, &context.render_pass));
+    VK_CHECK(vkCreateRenderPass(
+        context.device, &rpci, nullptr,
+        &context.render_pass));
 }
 
 void VkRenderBackend::create_framebuffers()
 {
-    context.framebuffers.resize(context.swapchain_image_views.size());
+    context.framebuffers.resize(
+        context.swapchain_image_views.size());
 
-    for (size_t i = 0; i < context.swapchain_image_views.size(); i++) {
+    for (size_t i = 0;
+         i < context.swapchain_image_views.size(); i++)
+    {
         VkImageView attachments[] = {
-            context.swapchain_image_views[i]
+            context.swapchain_image_views[i],
+            context.depth_image_view
         };
 
         VkFramebufferCreateInfo fbci{
             VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO
         };
         fbci.renderPass = context.render_pass;
-        fbci.attachmentCount = 1;
+        fbci.attachmentCount = 2;
         fbci.pAttachments = attachments;
-        fbci.width = context.extent.width;
+        fbci.width  = context.extent.width;
         fbci.height = context.extent.height;
         fbci.layers = 1;
 
@@ -458,12 +665,28 @@ void VkRenderBackend::create_swapchain()
     
 }
 
+void VkRenderBackend::create_pipeline_layout()
+{
+    VkPipelineLayoutCreateInfo plci{
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
+    };
+    plci.setLayoutCount = 1;
+    plci.pSetLayouts = &context.camera_set_layout;
+
+    VK_CHECK(vkCreatePipelineLayout(
+        context.device,
+        &plci,
+        nullptr,
+        &context.pipeline_layout));
+}
+
 void VkRenderBackend::create_pipeline()
 {
+    create_pipeline_layout();
+
     
     pipeline = std::make_unique<VkPipelineObject>(context);
     
-
 }
 
 void VkRenderBackend::create_command_pool()
@@ -519,7 +742,7 @@ void VkRenderBackend::cleanup_swapchain()
         context.command_buffers.data());
 
     vkDestroyPipeline(context.device, pipeline->pipeline(), nullptr);
-    vkDestroyPipelineLayout(context.device, pipeline->layout(), nullptr);
+    vkDestroyPipelineLayout(context.device, context.pipeline_layout, nullptr);
 
     vkDestroyRenderPass(context.device, context.render_pass, nullptr);
 
@@ -527,6 +750,25 @@ void VkRenderBackend::cleanup_swapchain()
         vkDestroyImageView(context.device, iv, nullptr);
 
     vkDestroySwapchainKHR(context.device, context.swapchain, nullptr);
+    
+    vkDestroyImageView(
+        context.device,
+        context.depth_image_view,
+        nullptr);
+
+    vkDestroyImage(
+        context.device,
+        context.depth_image,
+        nullptr);
+
+    vkFreeMemory(
+        context.device,
+        context.depth_memory,
+        nullptr);
+    
+    context.depth_image = VK_NULL_HANDLE;
+    context.depth_image_view = VK_NULL_HANDLE;
+    context.depth_memory = VK_NULL_HANDLE;
 }
 
 void VkRenderBackend::match_queue_families()
@@ -561,8 +803,9 @@ void VkRenderBackend::match_queue_families()
 void VkRenderBackend::record_command_buffers()
 {
     
-    VkClearValue clear{};
-    clear.color = { { 0.1f, 0.1f, 0.3f, 1.0f } };
+    VkClearValue clears[2]{};
+    clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
+    clears[1].depthStencil = {1.0f, 0};
     
     
     for (size_t i = 0; i < context.command_buffers.size(); ++i) {
@@ -580,8 +823,8 @@ void VkRenderBackend::record_command_buffers()
         rpbi.renderPass = context.render_pass;
         rpbi.framebuffer = context.framebuffers[i];
         rpbi.renderArea.extent = context.extent;
-        rpbi.clearValueCount = 1;
-        rpbi.pClearValues = &clear;
+        rpbi.clearValueCount = 2;
+        rpbi.pClearValues = clears;
 
         vkCmdBeginRenderPass(cmd, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -590,7 +833,18 @@ void VkRenderBackend::record_command_buffers()
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipeline->pipeline());
         
-        vkCmdDraw(cmd, 3, 1, 0, 0);
+        vkCmdBindDescriptorSets(
+            cmd,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            context.pipeline_layout,
+            0, // firstSet
+            1,
+            &context.camera_descriptor_sets[i % MAX_FRAMES_IN_FLIGHT],
+            0,
+            nullptr
+        );
+        
+        vkCmdDraw(cmd, 36, 1, 0, 0);
 
         vkCmdEndRenderPass(cmd);
         VK_CHECK(vkEndCommandBuffer(cmd));
@@ -621,8 +875,16 @@ void VkRenderBackend::init(void* in_window)
     create_device();
     
     
+    create_descriptor_set_layout();
+    create_camera_ubo();
+    create_descriptor_pool();
+    allocate_descriptor_sets();
+    update_descriptor_sets();
+    
+    
     create_swapchain();
     
+    create_depth_resources();
     create_render_pass();
     
     create_framebuffers();

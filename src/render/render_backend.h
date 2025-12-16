@@ -14,5 +14,5 @@ public:
     }
     
     virtual void init(void* window) = 0;
-    virtual void draw_frame() = 0;
+    virtual void draw_frame(const Camera& camera) = 0;
 };

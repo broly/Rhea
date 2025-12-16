@@ -49,4 +49,21 @@ struct VkContext
     VkInstance instance;
     QueueFamilies queues;
     VkCommandPool command_pool;
+    
+    
+    // camera UBO
+    std::vector<VkBuffer> camera_ubos;
+    std::vector<VkDeviceMemory> camera_ubo_memory;
+
+    // descriptors
+    VkDescriptorSetLayout camera_set_layout;
+    VkDescriptorPool descriptor_pool;
+    std::vector<VkDescriptorSet> camera_descriptor_sets;
+    
+    VkPipelineLayout pipeline_layout;
+    
+    VkImage depth_image = VK_NULL_HANDLE;
+    VkDeviceMemory depth_memory = VK_NULL_HANDLE;
+    VkImageView depth_image_view = VK_NULL_HANDLE;
+    VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
 };

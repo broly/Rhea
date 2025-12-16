@@ -7,8 +7,8 @@
 VkPipelineObject::VkPipelineObject(VkContext& ctx)
     : context(ctx)
 {
-    VkShader vert(ctx.device, "shaders/triangle.vert.spv");
-    VkShader frag(ctx.device, "shaders/triangle.frag.spv");
+    VkShader vert(ctx.device, "shaders/cube.vert.spv");
+    VkShader frag(ctx.device, "shaders/cube.frag.spv");
 
     VkPipelineShaderStageCreateInfo stages[2]{};
 
@@ -62,7 +62,7 @@ VkPipelineObject::VkPipelineObject(VkContext& ctx)
     };
     raster.polygonMode = VK_POLYGON_MODE_FILL;
     raster.lineWidth = 1.0f;
-    raster.cullMode = VK_CULL_MODE_BACK_BIT;
+    raster.cullMode = VK_CULL_MODE_NONE;
     raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
 
     VkPipelineMultisampleStateCreateInfo ms{
@@ -82,13 +82,15 @@ VkPipelineObject::VkPipelineObject(VkContext& ctx)
     };
     blend.attachmentCount = 1;
     blend.pAttachments = &color;
-
-    VkPipelineLayoutCreateInfo layout_ci{
-        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
+    
+    VkPipelineDepthStencilStateCreateInfo depth_ci{
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO
     };
-
-    VK_CHECK(vkCreatePipelineLayout(
-        ctx.device, &layout_ci, nullptr, &layout_));
+    depth_ci.depthTestEnable = VK_TRUE;
+    depth_ci.depthWriteEnable = VK_TRUE;
+    depth_ci.depthCompareOp = VK_COMPARE_OP_LESS;
+    depth_ci.depthBoundsTestEnable = VK_FALSE;
+    depth_ci.stencilTestEnable = VK_FALSE;
 
     VkGraphicsPipelineCreateInfo pci{
         VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO
@@ -101,9 +103,10 @@ VkPipelineObject::VkPipelineObject(VkContext& ctx)
     pci.pRasterizationState = &raster;
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
-    pci.layout = layout_;
+    pci.layout = context.pipeline_layout;
     pci.renderPass = ctx.render_pass;
     pci.subpass = 0;
+    pci.pDepthStencilState = &depth_ci;
 
     VK_CHECK(vkCreateGraphicsPipelines(
         ctx.device,
