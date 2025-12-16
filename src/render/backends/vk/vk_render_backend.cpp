@@ -8,15 +8,6 @@
 #include "vk_macro.h"
 #include "vk_pipeline.h"
 
-struct QueueFamilies {
-    uint32_t graphics = UINT32_MAX;
-    uint32_t present  = UINT32_MAX;
-
-    bool complete() const {
-        return graphics != UINT32_MAX &&
-               present  != UINT32_MAX;
-    }
-};
 
 struct SwapchainSupport {
     std::vector<VkPresentModeKHR> present_modes;
@@ -137,60 +128,193 @@ VkExtent2D choose_extent(
 
 void VkRenderBackend::draw_frame()
 {
-    vkWaitForFences(context.device, 1, &context.in_flight, VK_TRUE, UINT64_MAX);
-    vkResetFences(context.device, 1, &context.in_flight);
+    auto& frame = context.frames[context.current_frame];
+    
+    vkWaitForFences(context.device, 1, &frame.in_flight, VK_TRUE, UINT64_MAX);
 
     uint32_t image_index;
-    vkAcquireNextImageKHR(
+    VkResult res = vkAcquireNextImageKHR(
         context.device,
         context.swapchain,
         UINT64_MAX,
-        context.image_available,
+        frame.image_available,
         VK_NULL_HANDLE,
         &image_index);
 
-    constexpr VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    if (res == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        recreate_swapchain();
+        return;
+    }
+    else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+    {
+        throw std::runtime_error("failed to acquire swapchain image");
+    }
+    
+    if (context.images_in_flight[image_index] != VK_NULL_HANDLE)
+    {
+        vkWaitForFences(
+            context.device, 1,
+            &context.images_in_flight[image_index],
+            VK_TRUE,
+            UINT64_MAX);
+    }
+    
+    context.images_in_flight[image_index] = frame.in_flight;
+    
+    vkResetFences(context.device, 1, &frame.in_flight);
+    
 
+    constexpr VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    
+    VkSemaphore render_finished =
+        context.render_finished_per_image[image_index];
+    
     VkSubmitInfo submit{
         VK_STRUCTURE_TYPE_SUBMIT_INFO
+        
     };
     submit.waitSemaphoreCount = 1;
-    submit.pWaitSemaphores = &context.image_available;
+    submit.pWaitSemaphores = &frame.image_available;
     submit.pWaitDstStageMask = &wait_stage;
     submit.commandBufferCount = 1;
     submit.pCommandBuffers =
         &context.command_buffers[image_index];
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &context.render_finished;
+    submit.pSignalSemaphores = &render_finished;
 
     VK_CHECK(vkQueueSubmit(
-        context.graphics_queue, 1, &submit, context.in_flight));
+        context.graphics_queue, 1, &submit, frame.in_flight));
 
     VkPresentInfoKHR present{
         VK_STRUCTURE_TYPE_PRESENT_INFO_KHR
     };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &context.render_finished;
+    present.pWaitSemaphores = &render_finished;
     present.swapchainCount = 1;
     present.pSwapchains = &context.swapchain;
     present.pImageIndices = &image_index;
+    
+    VkResult res2 = vkQueuePresentKHR(context.present_queue, &present);
 
-    vkQueuePresentKHR(context.present_queue, &present);
+    if (res2 == VK_ERROR_OUT_OF_DATE_KHR ||
+        res2 == VK_SUBOPTIMAL_KHR ||
+        framebuffer_resized)
+    {
+        framebuffer_resized = false;
+        recreate_swapchain();
+    }
+    
+    
+    context.current_frame = (context.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VkRenderBackend::create_instance()
+{
+    
+    VkApplicationInfo appInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
+    appInfo.pApplicationName = "Rhea";
+    appInfo.apiVersion = VK_API_VERSION_1_3;
+
+    VkInstanceCreateInfo ici{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+    ici.pApplicationInfo = &appInfo;
+    ici.enabledLayerCount = 1;
+    ici.ppEnabledLayerNames = VALIDATION_LAYERS;
+
+
+    uint32_t ext_count = 0;
+    const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
+    ici.enabledExtensionCount = ext_count;
+    ici.ppEnabledExtensionNames = extensions;
+
+    VK_CHECK(vkCreateInstance(&ici, nullptr, &context.instance));
+    
+}
+
+void VkRenderBackend::create_device()
+{
+    
+    float priority = 1.0f;
+
+    std::vector<VkDeviceQueueCreateInfo> queue_infos;
+    std::set<uint32_t> unique_families = {
+        context.queues.graphics,
+        context.queues.present
+    };
+    
+    VkPhysicalDeviceFeatures features{};
+    
+    for (uint32_t family : unique_families) {
+        VkDeviceQueueCreateInfo qi{
+            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO
+        };
+        qi.queueFamilyIndex = family;
+        qi.queueCount = 1;
+        qi.pQueuePriorities = &priority;
+        queue_infos.push_back(qi);
+    }
+    
+    auto& device = context.device;
+    
+    const char* device_extensions[] = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
+    
+    VkDeviceCreateInfo dci{
+        VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO
+    };
+    dci.queueCreateInfoCount =
+        static_cast<uint32_t>(queue_infos.size());
+    dci.pQueueCreateInfos = queue_infos.data();
+    dci.pEnabledFeatures = &features;
+    dci.enabledExtensionCount = 1;
+    dci.ppEnabledExtensionNames = device_extensions;
+
+    VK_CHECK(vkCreateDevice(
+        context.physical_device,
+        &dci,
+        nullptr,
+        &device
+    ));
+}
+
+void VkRenderBackend::recreate_swapchain()
+{
+    int w = 0, h = 0;
+    glfwGetFramebufferSize(window, &w, &h);
+    while (w == 0 || h == 0)
+    {
+        glfwGetFramebufferSize(window, &w, &h);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(context.device);
+
+    cleanup_swapchain();
+
+    create_swapchain();
+    create_render_pass();
+    create_framebuffers();
+    create_command_pool();
+    create_pipeline();
+    record_command_buffers();
+    
+    create_image_sync_objects();
 }
 
 
-void VkRenderBackend::create_render_pass(VkSurfaceFormatKHR surfaceFormat)
+void VkRenderBackend::create_render_pass()
 {
     VkAttachmentDescription color_attachment{};
-    color_attachment.format = surfaceFormat.format;
+    color_attachment.format = context.surface_format.format;
     color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    color_attachment.finalLayout =
-        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     
     VkAttachmentReference color_ref;
     color_ref.attachment = 0;
@@ -252,100 +376,13 @@ void VkRenderBackend::create_framebuffers()
     }
 }
 
-void VkRenderBackend::init(void* in_window)
+void VkRenderBackend::create_swapchain()
 {
-    GLFWwindow* window = static_cast<GLFWwindow*>(in_window);
-    VkInstance instance;
-
-    VkApplicationInfo appInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
-    appInfo.pApplicationName = "Rhea";
-    appInfo.apiVersion = VK_API_VERSION_1_3;
-
-    VkInstanceCreateInfo ici{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-    ici.pApplicationInfo = &appInfo;
-    ici.enabledLayerCount = 1;
-    ici.ppEnabledLayerNames = VALIDATION_LAYERS;
-
-
-    uint32_t ext_count = 0;
-    const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
-    ici.enabledExtensionCount = ext_count;
-    ici.ppEnabledExtensionNames = extensions;
-
-    VK_CHECK(vkCreateInstance(&ici, nullptr, &instance));
-    
-    VkSurfaceKHR surface;
-    glfwCreateWindowSurface(instance, window, nullptr, &surface);
-    
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-    
-    
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-    QueueFamilies queues;
-
-    for (auto dev : devices) {
-        auto q = find_queue_families(dev, surface);
-        if (q.complete()) {
-            physical_device = dev;
-            queues = q;
-            break;
-        }
-    }
-
-    assert(physical_device != VK_NULL_HANDLE);
-    
-    float priority = 1.0f;
-
-    std::vector<VkDeviceQueueCreateInfo> queue_infos;
-    std::set<uint32_t> unique_families = {
-        queues.graphics,
-        queues.present
-    };
-    
-    VkPhysicalDeviceFeatures features{};
-    
-    for (uint32_t family : unique_families) {
-        VkDeviceQueueCreateInfo qi{
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO
-        };
-        qi.queueFamilyIndex = family;
-        qi.queueCount = 1;
-        qi.pQueuePriorities = &priority;
-        queue_infos.push_back(qi);
-    }
-    
-    auto& device = context.device;
-    
-    const char* device_extensions[] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
-
-    
-    VkDeviceCreateInfo dci{
-        VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO
-    };
-    dci.queueCreateInfoCount =
-        static_cast<uint32_t>(queue_infos.size());
-    dci.pQueueCreateInfos = queue_infos.data();
-    dci.pEnabledFeatures = &features;
-    dci.enabledExtensionCount = 1;
-    dci.ppEnabledExtensionNames = device_extensions;
-
-    VK_CHECK(vkCreateDevice(
-        physical_device,
-        &dci,
-        nullptr,
-        &device
-    ));
-    
     SwapchainSupport support =
-    query_swapchain_support(physical_device, surface);
+    query_swapchain_support(context.physical_device, context.surface);
 
-    VkSurfaceFormatKHR surface_format = choose_surface_format(support.formats);
+    context.surface_format = choose_surface_format(support.formats);
+    
 
     VkPresentModeKHR present_mode = choose_present_mode(support.present_modes);
 
@@ -360,24 +397,19 @@ void VkRenderBackend::init(void* in_window)
     VkSwapchainCreateInfoKHR sci{
         VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR
     };
-    sci.surface = surface;
+    sci.surface = context.surface;
     sci.minImageCount = image_count;
-    sci.imageFormat = surface_format.format;
-    sci.imageColorSpace = surface_format.colorSpace;
+    sci.imageFormat = context.surface_format.format;
+    sci.imageColorSpace = context.surface_format.colorSpace;
     sci.imageExtent = context.extent;
     sci.imageArrayLayers = 1;
     sci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     
-    
-    uint32_t queue_indices[] = {
-        queues.graphics,
-        queues.present
-    };
 
-    if (queues.graphics != queues.present) {
+    if (context.graphics_queue != context.present_queue) {
         sci.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         sci.queueFamilyIndexCount = 2;
-        sci.pQueueFamilyIndices = queue_indices;
+        sci.pQueueFamilyIndices = context.queues_indices;
     } else {
         sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
@@ -390,16 +422,20 @@ void VkRenderBackend::init(void* in_window)
     
     
     auto& swapchain = context.swapchain;
-    VK_CHECK(vkCreateSwapchainKHR(device, &sci, nullptr, &swapchain));
+    VK_CHECK(vkCreateSwapchainKHR(context.device, &sci, nullptr, &swapchain));
     
     uint32_t sc_image_count = 0;
     vkGetSwapchainImagesKHR(
-        device, swapchain, &sc_image_count, nullptr);
+        context.device, swapchain, &sc_image_count, nullptr);
 
     std::vector<VkImage> swapchain_images(sc_image_count);
     vkGetSwapchainImagesKHR(
-        device, swapchain, &sc_image_count,
+        context.device, swapchain, &sc_image_count,
         swapchain_images.data());
+    
+    context.images_count = sc_image_count;
+    context.images_in_flight.clear();
+    context.images_in_flight.resize(sc_image_count, VK_NULL_HANDLE);
     
     
 
@@ -411,62 +447,123 @@ void VkRenderBackend::init(void* in_window)
         };
         ivci.image = swapchain_images[i];
         ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        ivci.format = surface_format.format;
+        ivci.format = context.surface_format.format;
         ivci.subresourceRange.aspectMask =
             VK_IMAGE_ASPECT_COLOR_BIT;
         ivci.subresourceRange.levelCount = 1;
         ivci.subresourceRange.layerCount = 1;
 
-        VK_CHECK(vkCreateImageView(device, &ivci, nullptr, &context.swapchain_image_views[i]));
+        VK_CHECK(vkCreateImageView(context.device, &ivci, nullptr, &context.swapchain_image_views[i]));
     }
     
-    create_render_pass(surface_format);
+}
+
+void VkRenderBackend::create_pipeline()
+{
     
-    create_framebuffers();
+    pipeline = std::make_unique<VkPipelineObject>(context);
     
+
+}
+
+void VkRenderBackend::create_command_pool()
+{
     vkGetDeviceQueue(
-        device,
-        queues.graphics,
+        context.device,
+        context.queues.graphics,
         0,
         &context.graphics_queue
     );
     
     vkGetDeviceQueue(
-        device,
-        queues.present,
+        context.device,
+        context.queues.present,
         0,
         &context.present_queue
     );
     
-    
-    VkCommandPool command_pool;
 
     VkCommandPoolCreateInfo cpci{
         VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO
     };
-    cpci.queueFamilyIndex = queues.graphics;
+    cpci.queueFamilyIndex = context.queues.graphics;
     cpci.flags =
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    VK_CHECK(vkCreateCommandPool(device, &cpci, nullptr, &command_pool));
+    VK_CHECK(vkCreateCommandPool(context.device, &cpci, nullptr, &context.command_pool));
     
     context.command_buffers.resize(context.swapchain_image_views.size());
 
     VkCommandBufferAllocateInfo cbai{
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO
     };
-    cbai.commandPool = command_pool;
+    cbai.commandPool = context.command_pool;
     cbai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cbai.commandBufferCount =
         static_cast<uint32_t>(context.command_buffers.size());
 
     VK_CHECK(vkAllocateCommandBuffers(
-        device, &cbai, context.command_buffers.data()));
+        context.device, &cbai, context.command_buffers.data()));
+    
+}
+
+void VkRenderBackend::cleanup_swapchain()
+{
+    for (auto fb : context.framebuffers)
+        vkDestroyFramebuffer(context.device, fb, nullptr);
+
+    vkFreeCommandBuffers(
+        context.device,
+        context.command_pool,
+        context.command_buffers.size(),
+        context.command_buffers.data());
+
+    vkDestroyPipeline(context.device, pipeline->pipeline(), nullptr);
+    vkDestroyPipelineLayout(context.device, pipeline->layout(), nullptr);
+
+    vkDestroyRenderPass(context.device, context.render_pass, nullptr);
+
+    for (auto iv : context.swapchain_image_views)
+        vkDestroyImageView(context.device, iv, nullptr);
+
+    vkDestroySwapchainKHR(context.device, context.swapchain, nullptr);
+}
+
+void VkRenderBackend::match_queue_families()
+{
+    
+    
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(context.instance, &deviceCount, nullptr);
+
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(context.instance, &deviceCount, devices.data());
+    
+
+    for (auto device : devices) {
+        auto q = find_queue_families(device, context.surface);
+        if (q.complete()) {
+            context.physical_device = device;
+            context.queues = q;
+            break;
+        }
+    }
+    
+    
+
+    assert(context.physical_device != VK_NULL_HANDLE);
+    
+    
+    context.queues_indices[0] = context.queues.graphics;
+    context.queues_indices[1] = context.queues.present;
+}
+
+void VkRenderBackend::record_command_buffers()
+{
     
     VkClearValue clear{};
     clear.color = { { 0.1f, 0.1f, 0.3f, 1.0f } };
     
-    pipeline = std::make_unique<VkPipelineObject>(context);
     
     for (size_t i = 0; i < context.command_buffers.size(); ++i) {
         VkCommandBuffer cmd = context.command_buffers[i];
@@ -475,7 +572,7 @@ void VkRenderBackend::init(void* in_window)
             VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
         };
 
-       VK_CHECK( vkBeginCommandBuffer(cmd, &bi));
+        VK_CHECK( vkBeginCommandBuffer(cmd, &bi));
 
         VkRenderPassBeginInfo rpbi{
             VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO
@@ -497,24 +594,87 @@ void VkRenderBackend::init(void* in_window)
 
         vkCmdEndRenderPass(cmd);
         VK_CHECK(vkEndCommandBuffer(cmd));
-        i++;
     }
+}
 
+void VkRenderBackend::init(void* in_window)
+{
+    window = static_cast<GLFWwindow*>(in_window);
+    
+    glfwSetWindowUserPointer(window, this);
+
+    glfwSetFramebufferSizeCallback(window,
+    [](GLFWwindow* win, int, int)
+    {
+        auto backend = static_cast<VkRenderBackend*>(
+            glfwGetWindowUserPointer(win));
+        backend->framebuffer_resized = true;
+    });
+    
+    create_instance();
+    
+    glfwCreateWindowSurface(context.instance, window, nullptr, &context.surface);
+    
+    
+    match_queue_families();
+    
+    create_device();
+    
+    
+    create_swapchain();
+    
+    create_render_pass();
+    
+    create_framebuffers();
+    
+    create_command_pool();
+    
+    create_pipeline();
+    record_command_buffers();
+    create_frame_sync_objects();
+    create_image_sync_objects();
+    
+}
+
+
+
+void VkRenderBackend::create_frame_sync_objects()
+{
+    
     VkSemaphoreCreateInfo sem_ci{
         VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
     };
-
-    VkFenceCreateInfo fci{
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
-    };
-    fci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-    VK_CHECK(vkCreateSemaphore(
-        device, &sem_ci, nullptr, &context.image_available));
-    VK_CHECK(vkCreateSemaphore(
-        device, &sem_ci, nullptr, &context.render_finished));
-    VK_CHECK(vkCreateFence(
-        device, &fci, nullptr, &context.in_flight));
     
+    for (auto& frame : context.frames)
+    {
+        VK_CHECK(vkCreateSemaphore(context.device, &sem_ci, nullptr, &frame.image_available));
+
+        VkFenceCreateInfo fci{
+            VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
+        };
+        fci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        VK_CHECK(
+            vkCreateFence(context.device, &fci, nullptr, &frame.in_flight);
+        );
+    }
+}
+
+void VkRenderBackend::create_image_sync_objects()
+{
+    VkSemaphoreCreateInfo sem_ci{
+        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
+    
+    for (auto sem : context.render_finished_per_image)
+        vkDestroySemaphore(context.device, sem, nullptr);
+
+    context.render_finished_per_image.clear();
+    context.render_finished_per_image.resize(context.images_count);
+    
+    
+    for (auto& sem : context.render_finished_per_image) {
+        VK_CHECK(vkCreateSemaphore(context.device, &sem_ci, nullptr, &sem));
+    }
     
 }
