@@ -1,69 +1,112 @@
 ﻿#pragma once
 
+#include <array>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-struct FrameSync
+namespace vk
 {
-    VkSemaphore image_available = VK_NULL_HANDLE;
-    VkFence in_flight = VK_NULL_HANDLE;
-};
+    struct FrameContext {
+        VkCommandBuffer cmd = VK_NULL_HANDLE;
+
+        VkSemaphore image_available = VK_NULL_HANDLE;
+        VkFence in_flight = VK_NULL_HANDLE;
+
+        VkBuffer camera_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory camera_memory = VK_NULL_HANDLE;
+        VkDescriptorSet camera_set = VK_NULL_HANDLE;
+    };
 
 
-constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
-constexpr uint32_t MAX_QUEUES = 2;
+    constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+    constexpr uint32_t MAX_QUEUES = 2;
 
 
-struct QueueFamilies {
-    uint32_t graphics = UINT32_MAX;
-    uint32_t present  = UINT32_MAX;
+    struct QueueFamilies {
+        uint32_t graphics = UINT32_MAX;
+        uint32_t present  = UINT32_MAX;
 
-    bool complete() const {
-        return graphics != UINT32_MAX &&
-               present  != UINT32_MAX;
-    }
-};
+        bool complete() const {
+            return graphics != UINT32_MAX &&
+                   present  != UINT32_MAX;
+        }
+    };
 
-struct VkContext
-{
-    VkDevice device;
-    VkSwapchainKHR swapchain;
-    VkQueue graphics_queue;
-    VkQueue present_queue;
     
-    uint32_t queues_indices[MAX_QUEUES];
+    struct InstanceContext
+    {
+        VkInstance instance;
+        VkDevice device;
+        VkPhysicalDevice physical_device;
+        VkQueue graphics_queue;
+        VkQueue present_queue;
+        QueueFamilies queues;
     
-    FrameSync frames[MAX_FRAMES_IN_FLIGHT] = {FrameSync{}};
-    std::vector<VkSemaphore> render_finished_per_image;
-    std::vector<VkFence> images_in_flight;
-    uint32_t current_frame = 0;
-    std::vector<VkCommandBuffer> command_buffers;
-    VkRenderPass render_pass;
-    std::vector<VkFramebuffer> framebuffers;
-    std::vector<VkImageView> swapchain_image_views;
-    VkExtent2D extent;
-    uint32_t images_count;
-    VkSurfaceKHR surface;
-    VkSurfaceFormatKHR surface_format;
-    VkPhysicalDevice physical_device;
-    VkInstance instance;
-    QueueFamilies queues;
-    VkCommandPool command_pool;
+        uint32_t queues_indices[MAX_QUEUES];
+        VkSurfaceKHR surface;
+    };
     
-    
-    // camera UBO
-    std::vector<VkBuffer> camera_ubos;
-    std::vector<VkDeviceMemory> camera_ubo_memory;
+    struct SwapchainContext {
+        VkSwapchainKHR swapchain;
+        VkExtent2D extent;
 
-    // descriptors
-    VkDescriptorSetLayout camera_set_layout;
-    VkDescriptorPool descriptor_pool;
-    std::vector<VkDescriptorSet> camera_descriptor_sets;
+        std::vector<VkImageView> image_views;
+
+        VkRenderPass render_pass;
+        std::vector<VkFramebuffer> framebuffers;
+
     
-    VkPipelineLayout pipeline_layout;
+        VkImage depth_image = VK_NULL_HANDLE;
+        VkDeviceMemory depth_memory = VK_NULL_HANDLE;
+        VkImageView depth_image_view = VK_NULL_HANDLE;
+        VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
+        
+        
+        VkSurfaceFormatKHR surface_format;
+    };
+
+    struct DescriptorContext
+    {
+        VkDescriptorSetLayout camera_set_layout;
+        VkDescriptorPool pool;
+    };
+    struct PipelineContext
+    {
+        VkPipeline pipeline;
+        VkPipelineLayout layout;
+    };
     
-    VkImage depth_image = VK_NULL_HANDLE;
-    VkDeviceMemory depth_memory = VK_NULL_HANDLE;
-    VkImageView depth_image_view = VK_NULL_HANDLE;
-    VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
-};
+    struct FrameScheduleContext
+    {
+        std::array<FrameContext, MAX_FRAMES_IN_FLIGHT> frames;
+        uint32_t current_frame;
+    };
+    
+    
+    struct CommandContext
+    {
+        VkCommandPool command_pool;
+    };
+    
+    struct ImageContext
+    {
+        // swapchain image related
+        VkImage image;
+        VkImageView image_view;
+
+        VkFramebuffer framebuffer;
+
+        // synchronization
+        VkSemaphore render_finished;    // signal -> present
+        VkFence in_flight;              // image is used by which frame
+    };
+
+
+    struct Context
+    {
+        
+        // descriptors
+        std::vector<VkDescriptorSet> camera_descriptor_sets;
+    
+    };
+}

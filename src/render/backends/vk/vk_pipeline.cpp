@@ -4,11 +4,30 @@
 #include "vk_shader.h"
 
 
-VkPipelineObject::VkPipelineObject(VkContext& ctx)
-    : context(ctx)
+VkPipelineObject::VkPipelineObject(
+    vk::InstanceContext& in_instance_context, 
+    vk::SwapchainContext& in_swapchain_context,
+    const VkDescriptorSetLayout camera_set_layout)
+    : instance_context(in_instance_context)
+    , swapchain_context(in_swapchain_context)
 {
-    VkShader vert(ctx.device, "shaders/cube.vert.spv");
-    VkShader frag(ctx.device, "shaders/cube.frag.spv");
+    VkPipelineLayoutCreateInfo plci{
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
+    };
+    plci.setLayoutCount = 1;
+    plci.pSetLayouts = &camera_set_layout;
+
+    VK_CHECK(vkCreatePipelineLayout(
+        instance_context.device,
+        &plci,
+        nullptr,
+        &pipeline_layout));
+    
+    
+    
+    
+    VkShader vert(in_instance_context.device, "shaders/cube.vert.spv");
+    VkShader frag(in_instance_context.device, "shaders/cube.frag.spv");
 
     VkPipelineShaderStageCreateInfo stages[2]{};
 
@@ -30,7 +49,7 @@ VkPipelineObject::VkPipelineObject(VkContext& ctx)
         "main"
     };
 
-
+    // fixed-function (minimal)
     VkPipelineVertexInputStateCreateInfo vertex_input{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
     };
@@ -42,12 +61,12 @@ VkPipelineObject::VkPipelineObject(VkContext& ctx)
 
     VkViewport viewport{
         0, 0,
-        (float)ctx.extent.width,
-        (float)ctx.extent.height,
+        (float)in_swapchain_context.extent.width,
+        (float)in_swapchain_context.extent.height,
         0.0f, 1.0f
     };
 
-    VkRect2D scissor{{0,0}, ctx.extent};
+    VkRect2D scissor{{0,0}, in_swapchain_context.extent};
 
     VkPipelineViewportStateCreateInfo viewport_state{
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
@@ -103,13 +122,13 @@ VkPipelineObject::VkPipelineObject(VkContext& ctx)
     pci.pRasterizationState = &raster;
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
-    pci.layout = context.pipeline_layout;
-    pci.renderPass = ctx.render_pass;
+    pci.layout = pipeline_layout;
+    pci.renderPass = in_swapchain_context.render_pass;
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
 
     VK_CHECK(vkCreateGraphicsPipelines(
-        ctx.device,
+        in_instance_context.device,
         VK_NULL_HANDLE,
         1,
         &pci,
@@ -119,4 +138,13 @@ VkPipelineObject::VkPipelineObject(VkContext& ctx)
     
     shaders.push_back(std::move(vert));
     shaders.push_back(std::move(frag));
+}
+
+VkPipelineObject::~VkPipelineObject()
+{
+    if (pipeline_ != nullptr)
+        vkDestroyPipeline(instance_context.device, pipeline_, nullptr);
+    
+    if (pipeline_layout != nullptr)
+        vkDestroyPipelineLayout(instance_context.device, pipeline_layout, nullptr);
 }

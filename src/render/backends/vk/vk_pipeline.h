@@ -7,15 +7,26 @@
 class VkPipelineObject
 {
 public:
-    VkPipelineObject(VkContext& ctx);
-    ~VkPipelineObject() = default;
+    VkPipelineObject(
+        vk::InstanceContext& in_instance_context, 
+        vk::SwapchainContext& in_swapchain_context,
+        const VkDescriptorSetLayout camera_set_layout);
+    ~VkPipelineObject();
 
-    VkPipeline pipeline() const { return pipeline_; }
+    VkPipeline get_pipeline() const { return pipeline_; }
+    
+    VkPipelineLayout get_pipeline_layout() const
+    {
+        return pipeline_layout;
+    }
 
 private:
-    VkContext& context;
+    vk::InstanceContext& instance_context;
+    vk::SwapchainContext& swapchain_context;
 
     VkPipeline pipeline_;
+    
+    VkPipelineLayout pipeline_layout;
     
     std::vector<VkShader> shaders;
 };
