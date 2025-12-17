@@ -5,10 +5,9 @@
 #include "framework/camera.h"
 #include "framework/engine_clock.h"
 #include "framework/world.h"
-#include "math/transform.h"
 #include "platform/window.h"
-#include "render/render_backend.h"
-#include "render/backends/vk/vk_render_backend.h"
+#include "render/handle_types.h"
+#include "render/render_graph.h"
 #include "world_scripts/WorldScript_RotateAroundObject.h"
 
 
@@ -16,9 +15,10 @@ void Engine::run()
 {
     window_create(window, 1280, 720, "Rhea");
     
-    auto render_backend = RenderBackend::create_backend<VkRenderBackend>();
+    RBWindowHandle window_handle { window.handle };
     
-    render_backend->init(window.handle);
+    std::unique_ptr<RenderGraph> render_graph = std::make_unique<RenderGraph>();
+    render_graph->initialize(window_handle);
     
     std::shared_ptr<EngineClock> clock = std::make_shared<EngineClock>();
     
@@ -40,7 +40,7 @@ void Engine::run()
         world->tick();
         
         platform::window::window_poll_events();
-        render_backend->draw_frame(*world->get_camera());
+        render_graph->draw(*world->get_camera());
     }
     window_destroy(window);
 }

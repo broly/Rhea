@@ -10,15 +10,25 @@
 class VkRenderBackend final : public RenderBackend
 {
 public:
-    virtual void init(void* window) override;
-    virtual void draw_frame(const Camera& camera) override;
+    void init(RBWindowHandle window);
+    // virtual void draw_frame(const Camera& camera) override;
     
+    RBCommandList begin_commands() override;
+    void end_commands(RBCommandList cmd_list) override;
+    void begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index) override;
+    void end_render_pass(RBCommandList cmd_list) override;
+    void bind_pipeline(RBCommandList cmd_list, RBPipelineHandle pipeline_handle) override;
+    void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
+    void update_camera_ubo(const Camera& camera) override;
+    RBFramebufferId acquire_next_image() override;
+    void submit_frame(RBCommandList cmd_list) override;
     
 private: // Initialization section
     void create_instance();
     void match_queue_families();
     void create_device();
     void create_frame_sync_objects();
+    void create_image_sync_objects();
     
 private: // Re-/Initialization section
     void create_render_pass();
@@ -29,7 +39,6 @@ private: // Re-/Initialization section
     void create_pipeline();
     void create_command_pool();
     
-    void record_command_buffers(uint32_t image_index);
     void create_render_finished_semaphores();
 
 private: // Special section
@@ -46,8 +55,16 @@ private: // Camera section
     void create_descriptor_pool();
     void allocate_descriptor_sets();
     void update_descriptor_sets();
-    
 
+public:
+
+    RBPipelineHandle get_pipeline_handle() const override;
+
+    RBDescriptorSet get_camera_descriptor_set() const override;
+
+    void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors) override;
+
+private:
     vk::Context context = {};
     vk::InstanceContext instance_context = {};
     vk::SwapchainContext swapchain_context = {};
@@ -59,6 +76,8 @@ private: // Camera section
     
     
     std::unique_ptr<VkPipelineObject> pipeline;
+    
+    uint32_t current_image_index = 0;
     
     bool framebuffer_resized = false;
     
