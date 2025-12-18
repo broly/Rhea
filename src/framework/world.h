@@ -1,5 +1,6 @@
 #pragma once
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -16,6 +17,10 @@ class World : public std::enable_shared_from_this<World>
 public:
     void tick();
     void init();
+    
+    bool load_bootstrap_level();
+    
+    bool load_level(std::filesystem::path level_path);
     
     template<typename T>
     void add_script()

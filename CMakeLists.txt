@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_package(jsoncpp CONFIG REQUIRED)
 
 
 file(GLOB_RECURSE RHEA_SOURCES
@@ -25,6 +26,7 @@ target_link_libraries(rhea
 	PRIVATE
 		Vulkan::Vulkan
 		glfw
+		JsonCpp::JsonCpp
 )
 
 target_compile_definitions(rhea

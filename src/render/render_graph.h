@@ -1,6 +1,5 @@
 #pragma once
 #include "render_backend.h"
-#include "framework/world.h"
 
 class RenderGraph
 {

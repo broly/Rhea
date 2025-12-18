@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+#include <sstream>
 #include <glm/fwd.hpp>
 #include <glm/vec3.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -72,4 +74,39 @@ struct Transform {
             up()
         );
     }
+
+    static Transform make_identity()
+    {
+        return Transform();
+    }
+    
+    static Transform from_string(const std::string& input)
+    {
+        
+        glm::vec3 location;
+        glm::vec3 rotation;
+        glm::vec3 scale;
+    
+        char ch;
+        std::stringstream ss(input);
+
+        ss >> ch >> ch
+           >> location.x >> ch >> location.y >> ch >> location.z
+           >> ch >> ch
+           >> rotation.x >> ch >> rotation.y >> ch >> rotation.z
+           >> ch >> ch
+           >> scale.x >> ch >> scale.y >> ch >> scale.z;
+
+    
+        return Transform::make_from_euler(location, rotation, scale);
+    }
 };
+
+
+
+inline bool convert_from_string(Transform& target, const std::string& value)
+{
+    if (!value.empty())
+        target = Transform::from_string(value);
+    return true;
+}

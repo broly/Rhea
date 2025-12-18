@@ -1,10 +1,9 @@
-﻿#include "platform/window.h"
-#include "render/backends/vk/vk_render_backend.h"
-#include <chrono>
+﻿#include "engine.h"
+#include "common/paths.h"
 
-#include "engine.h"
 
 int main() {
+    paths::init();
     
     Engine engine;
     engine.run();

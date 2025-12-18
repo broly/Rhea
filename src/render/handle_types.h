@@ -30,7 +30,7 @@ struct RBHandle
     RBHandle(T Value)
     {
 #if _DEBUG
-        type_id = typeid(T);
+        type_id = typeid(T).name();
 #endif
         handle = reinterpret_cast<uintptr_t>(Value);
     }
@@ -96,4 +96,4 @@ using RBDescriptorSet = RBHandle<VkDescriptorSet>;
 using RBWindowHandle = RBHandle<GLFWwindow*>;
 
 using RBFramebufferId = uint32_t;
-using RBFrameHandle = uint32_t
+using RBFrameHandle = uint32_t;

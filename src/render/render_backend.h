@@ -1,8 +1,7 @@
 ﻿#pragma once
 #include <memory>
-
-#include "handle_types.h"
 #include "framework/camera.h"
+#include "handle_types.h"
 
 
 
@@ -41,7 +40,7 @@ public:
     
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) = 0;
     
-    virtual void update_camera_ubo(RBFrameHandle frame_handle, const Camera& camera) = 0;
+    virtual void update_camera_ubo(RBFrameHandle frame_handle, const struct Camera& camera) = 0;
 
     virtual RBFramebufferId acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) = 0;

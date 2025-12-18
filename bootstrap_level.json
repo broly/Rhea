@@ -1,0 +1,12 @@
+{
+	"name": "startup",
+	"actors": [
+		{
+			"name": "hello",
+			"class": "RhActor",
+			"fields": {
+				"transform": "((100, 0, 0) ,(0, 0, 0) ,(1, 1, 1))"
+			}
+		}
+	]
+}

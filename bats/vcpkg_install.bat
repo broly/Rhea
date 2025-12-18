@@ -1,3 +1,4 @@
 vcpkg install glfw3
 vcpkg install volk
 vcpkg install glm
+vcpkg install jsoncpp
