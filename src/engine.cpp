@@ -15,7 +15,7 @@ void Engine::run()
 {
     window_create(window, 1280, 720, "Rhea");
     
-    RBWindowHandle window_handle { window.handle };
+    RBWindowHandle window_handle = window.handle;
     
     std::unique_ptr<RenderGraph> render_graph = std::make_unique<RenderGraph>();
     render_graph->initialize(window_handle);

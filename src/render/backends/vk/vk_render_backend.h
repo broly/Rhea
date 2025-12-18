@@ -13,22 +13,21 @@ public:
     void init(RBWindowHandle window);
     // virtual void draw_frame(const Camera& camera) override;
     
-    RBCommandList begin_commands() override;
+    RBCommandList begin_commands(RBFrameHandle frame_handle) override;
     void end_commands(RBCommandList cmd_list) override;
     void begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index) override;
     void end_render_pass(RBCommandList cmd_list) override;
     void bind_pipeline(RBCommandList cmd_list, RBPipelineHandle pipeline_handle) override;
     void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
-    void update_camera_ubo(const Camera& camera) override;
-    RBFramebufferId acquire_next_image() override;
-    void submit_frame(RBCommandList cmd_list) override;
+    void update_camera_ubo(RBFrameHandle frame_handle, const Camera& camera) override;
+    RBFramebufferId acquire_next_image(RBFrameHandle frame_handle) override;
+    void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) override;
     
 private: // Initialization section
     void create_instance();
     void match_queue_families();
     void create_device();
     void create_frame_sync_objects();
-    void create_image_sync_objects();
     
 private: // Re-/Initialization section
     void create_render_pass();
@@ -63,6 +62,10 @@ public:
     RBDescriptorSet get_camera_descriptor_set() const override;
 
     void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors) override;
+    RBFrameHandle get_current_frame() const override;
+    
+    virtual void wait_for_frame(RBFrameHandle frame_handle) override;
+    void advance_frame() override;
 
 private:
     vk::Context context = {};

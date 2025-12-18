@@ -17,6 +17,9 @@ class RenderBackend
 {
 public:
     virtual ~RenderBackend() = default;
+    virtual RBFrameHandle get_current_frame() const = 0;
+    virtual void wait_for_frame(RBFrameHandle frame) = 0;
+    virtual void advance_frame() = 0;
 
     template<RenderBackendType T>
     static std::unique_ptr<RenderBackend> create(RBWindowHandle window_handle)
@@ -27,7 +30,7 @@ public:
     }
     
     // ---- commands section ----
-    virtual RBCommandList begin_commands() = 0;
+    virtual RBCommandList begin_commands(RBFrameHandle frame_handle) = 0;
     virtual void end_commands(RBCommandList cmd_list) = 0;
     
     // ---- pass section ----
@@ -38,19 +41,13 @@ public:
     
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) = 0;
     
-    virtual void update_camera_ubo(const Camera& camera) = 0;
+    virtual void update_camera_ubo(RBFrameHandle frame_handle, const Camera& camera) = 0;
 
-    virtual RBFramebufferId acquire_next_image() = 0;
-    virtual void submit_frame(RBCommandList cmd_list) = 0;
+    virtual RBFramebufferId acquire_next_image(RBFrameHandle frame_handle) = 0;
+    virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) = 0;
 
     
     virtual RBPipelineHandle get_pipeline_handle() const = 0;
     virtual RBDescriptorSet get_camera_descriptor_set() const = 0;
     virtual void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors) = 0;
-    
-    
-    
-
-    // virtual void init(void* window) = 0;
-    // virtual void draw_frame(const Camera& camera) = 0;
 };

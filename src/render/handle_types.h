@@ -1,59 +1,99 @@
 #pragma once
-#include <cstdint>
-#include <type_traits>
+#include <cassert>
+#include <optional>
 #include <vulkan/vulkan_core.h>
+#include <GLFW/glfw3.h>
+#include "common/type_utils.h"
 
-struct RBCommandList
+template<typename... Ts>
+struct RBHandle
 {
-    uintptr_t handle = 0;
+    using AllowedTypes = TypeList<Ts...>;
+    
+    uintptr_t handle;
+#if _DEBUG
+    std::optional<const char*> type_id = std::nullopt;
+#endif
+    
+    RBHandle()
+    {
+        handle = 0;
+    }
+    
+    RBHandle(const RBHandle& Value)
+    {
+        handle = Value.handle;
+    };
     
     template<typename T>
-    requires std::is_same_v<VkCommandBuffer, T> // || another backends types...
+    requires AllowedTypes::template contains<T>
+    RBHandle(T Value)
+    {
+#if _DEBUG
+        type_id = typeid(T);
+#endif
+        handle = reinterpret_cast<uintptr_t>(Value);
+    }
+    
+    template<typename T>
+    requires AllowedTypes::template contains<T>
     T as() const
     {
+#if _DEBUG
+        if (type_id.has_value())
+        {
+            assert(type_id.value() == typeid(T).name());  // todo: debug compare, remake it to strcmp
+        }
+#endif
         return reinterpret_cast<T>(handle);
     }
     
-};
+    friend bool operator==(RBHandle lhs, RBHandle rhs)
+    {
+#if _DEBUG
+        if (lhs.type_id.has_value() && rhs.type_id.has_value())
+        {
+            assert(lhs.type_id.value() == rhs.type_id.value());  // todo: debug compare, remake it to strcmp
+        }
+#endif
+        return lhs.handle == rhs.handle;
+    }
 
-
-struct RBPipelineHandle
-{
-    uintptr_t handle = 0;
-    
+    friend bool operator!=(RBHandle lhs, RBHandle rhs)
+    {
+        return !(lhs == rhs);
+    }
     
     template<typename T>
-    requires std::is_same_v<VkPipeline, T>  // || another backends types...
-    T as() const
+    requires AllowedTypes::template contains<T>
+    RBHandle& operator=(T rhs)
     {
-        return reinterpret_cast<T>(handle);
+#if _DEBUG
+        if (type_id.has_value())
+        {
+            assert(type_id.value() == typeid(T).name());  // todo: debug compare, remake it to strcmp
+        }
+        type_id = typeid(T);
+#endif
+        handle = rhs;
+        return *this;
+    }
+
+    template<typename T>
+    requires AllowedTypes::template contains<T>
+    operator T() const
+    {
+        return as<T>();
     }
 };
 
-struct RBDescriptorSet
-{
-    uintptr_t handle = 0;
-    
-    template<typename T>
-    requires std::is_same_v<VkDescriptorSet, T>  // || another backends types...
-    T as() const
-    {
-        return reinterpret_cast<T>(handle);
-    }
-};
 
-struct RBWindowHandle
-{
-    RBWindowHandle(void* ptr) 
-        : handle(reinterpret_cast<uintptr_t>(ptr)) {};
-    
-    template<typename T>
-    T* unsafe_as() const
-    {
-        return reinterpret_cast<T*>(handle);
-    }
-    
-    uintptr_t handle = 0;
-};
+// just universal integer handle types
+using RBCommandList = RBHandle<VkCommandBuffer>;
+using RBPipelineHandle = RBHandle<VkPipeline>;
+using RBDescriptorSet = RBHandle<VkDescriptorSet>;
+
+using RBWindowHandle = RBHandle<GLFWwindow*>;
 
 using RBFramebufferId = uint32_t;
+using RBFrameHandle = uint32_t

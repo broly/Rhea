@@ -304,7 +304,7 @@ RBPipelineHandle VkRenderBackend::get_pipeline_handle() const
 RBDescriptorSet VkRenderBackend::get_camera_descriptor_set() const
 {
     RBDescriptorSet handle { 
-        reinterpret_cast<uintptr_t>( frame_schedule_context.frames[frame_schedule_context.current_frame].camera_set ) 
+        frame_schedule_context.frames[frame_schedule_context.current_frame].camera_set
     };
     return handle;
 }
@@ -314,16 +314,35 @@ void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescr
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     VkDescriptorSet vk_set = rb_descriptors.as<VkDescriptorSet>();
 
-
     vkCmdBindDescriptorSets(
         cmd,
         VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline->get_pipeline_layout(),
-        0,
-        1,
+        0, 
+        1, 
         &vk_set,
-        0, nullptr                        // dynamic offsets
+        0, nullptr
     );
+}
+
+RBFrameHandle VkRenderBackend::get_current_frame() const
+{
+    return frame_schedule_context.current_frame;
+}
+
+void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
+{
+    auto& frame = frame_schedule_context.frames[frame_handle];
+    if (frame.in_flight != VK_NULL_HANDLE) {
+        vkWaitForFences(instance_context.device, 1, &frame.in_flight, VK_TRUE, UINT64_MAX);
+        vkResetFences(instance_context.device, 1, &frame.in_flight);
+    }
+}
+
+void VkRenderBackend::advance_frame()
+{
+    frame_schedule_context.current_frame =
+        (frame_schedule_context.current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
 }
 
 
@@ -692,7 +711,7 @@ void VkRenderBackend::create_render_finished_semaphores()
 
 void VkRenderBackend::init(RBWindowHandle in_window)
 {
-    window = in_window.unsafe_as<GLFWwindow>();
+    window = in_window.as<GLFWwindow*>();
     
     glfwSetWindowUserPointer(window, this);
 
@@ -725,9 +744,9 @@ void VkRenderBackend::init(RBWindowHandle in_window)
     create_frame_sync_objects();
 }
 
-RBCommandList VkRenderBackend::begin_commands()
+RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
 {
-    auto& frame = frame_schedule_context.frames[frame_schedule_context.current_frame];
+    auto& frame = frame_schedule_context.frames[frame_handle];
 
 
     VK_CHECK(vkResetCommandBuffer(frame.cmd, 0));
@@ -788,15 +807,15 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
     vkCmdDraw(cmd, vertex_count, 1, 0, 0);
 }
 
-void VkRenderBackend::update_camera_ubo(const Camera& camera)
+void VkRenderBackend::update_camera_ubo(RBFrameHandle frame_handle, const Camera& camera)
 {
-    auto& frame = frame_schedule_context.frames[frame_schedule_context.current_frame];
+    auto& frame = frame_schedule_context.frames[frame_handle];
     update_camera_ubo(frame, camera);
 }
 
-RBFramebufferId VkRenderBackend::acquire_next_image()
+RBFramebufferId VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 {
-    auto& frame = frame_schedule_context.frames[frame_schedule_context.current_frame];
+    auto& frame = frame_schedule_context.frames[frame_handle];
 
     uint32_t image_index = 0;
     VkResult res = vkAcquireNextImageKHR(
@@ -811,21 +830,29 @@ RBFramebufferId VkRenderBackend::acquire_next_image()
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
         recreate_swapchain();
-        return RBFramebufferId{ 0 }; // fallback
+        return RBFramebufferId{ 0 };
     }
     VK_CHECK(res);
 
     current_image_index = image_index;
+
+    auto& image = images[image_index];
+
+
+    if (image.in_flight != VK_NULL_HANDLE) {
+        vkWaitForFences(instance_context.device, 1, &image.in_flight, VK_TRUE, UINT64_MAX);
+    }
+
+
+    image.in_flight = frame.in_flight;
+
     return RBFramebufferId{ image_index };
 }
-void VkRenderBackend::submit_frame(RBCommandList cmd_list)
-{
-    auto& frame = frame_schedule_context.frames[frame_schedule_context.current_frame];
-    auto& image = images[current_image_index];
 
-    // --- Wait and reset fence before submitting ---
-    vkWaitForFences(instance_context.device, 1, &frame.in_flight, VK_TRUE, UINT64_MAX);
-    vkResetFences(instance_context.device, 1, &frame.in_flight);
+void VkRenderBackend::submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id)
+{
+    auto& frame = frame_schedule_context.frames[frame_handle];
+    auto& image = images[current_image_index];
 
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
 
@@ -840,8 +867,10 @@ void VkRenderBackend::submit_frame(RBCommandList cmd_list)
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &image.render_finished;
 
+
     VK_CHECK(vkQueueSubmit(instance_context.graphics_queue, 1, &submit, frame.in_flight));
 
+    // --- Present ---
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
     present.pWaitSemaphores = &image.render_finished;
@@ -850,7 +879,6 @@ void VkRenderBackend::submit_frame(RBCommandList cmd_list)
     present.pImageIndices = &current_image_index;
 
     VkResult res = vkQueuePresentKHR(instance_context.present_queue, &present);
-
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || framebuffer_resized)
     {
         framebuffer_resized = false;
@@ -860,9 +888,6 @@ void VkRenderBackend::submit_frame(RBCommandList cmd_list)
     {
         VK_CHECK(res);
     }
-
-    // --- Move to next frame ---
-    frame_schedule_context.current_frame = (frame_schedule_context.current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
 }
 
 
