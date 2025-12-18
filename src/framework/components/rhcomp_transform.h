@@ -8,4 +8,5 @@ public:
     Transform transform;
 };
 
-REG_REFLECT_ARGS(RhComp_Transform, transform)
+REG_REFLECT_ARGS(RhComp_Transform, RhComponent, 
+    transform)

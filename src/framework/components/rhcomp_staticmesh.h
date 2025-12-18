@@ -5,7 +5,8 @@
 class RhComp_StaticMesh : public RhComp_Transform
 {
 public:
-    
+    std::string mesh_path;
 };
 
-REG_REFLECT(RhComp_StaticMesh)
+REG_REFLECT_ARGS(RhComp_StaticMesh, RhComp_Transform, 
+    transform, mesh_path);

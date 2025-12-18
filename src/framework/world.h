@@ -12,6 +12,8 @@ namespace std::chrono
     struct steady_clock;
 }
 
+struct RhActor;
+
 class World : public std::enable_shared_from_this<World>
 {
 public:
@@ -21,6 +23,8 @@ public:
     bool load_bootstrap_level();
     
     bool load_level(std::filesystem::path level_path);
+    
+    void add_actor(std::shared_ptr<RhActor> actor);
     
     template<typename T>
     void add_script()
@@ -43,9 +47,15 @@ public:
     {
         return camera;
     }
+    
+    const std::vector<std::shared_ptr<RhActor>>& get_actors()
+    {
+        return actors;
+    }
 
 
     std::shared_ptr<Camera> camera;
     std::vector<std::unique_ptr<WorldScript>> scripts;
     std::shared_ptr<EngineClock> clock;
+    std::vector<std::shared_ptr<RhActor>> actors;
 };

@@ -55,17 +55,17 @@ bool World::load_level(std::filesystem::path level_path)
     std::string name = root["name"].asString();
     std::cout << "Name: " << name << std::endl;
 
-    const Json::Value& actors = root["actors"];
+    const Json::Value& json_actors = root["actors"];
     
-    if (!actors.isArray()) 
+    if (!json_actors.isArray()) 
     {
         std::cerr << "'actors' is not an array" << std::endl;
         return false;
     }
 
-    std::cout << "Number of actors: " << actors.size() << std::endl;
+    std::cout << "Number of actors: " << json_actors.size() << std::endl;
 
-    for (const Json::Value& actor_json_value : actors)
+    for (const Json::Value& actor_json_value : json_actors)
     {
         std::string actor_class = actor_json_value["class"].asString();
         std::cout << "Actor: " << actor_class << std::endl;
@@ -88,7 +88,9 @@ bool World::load_level(std::filesystem::path level_path)
             }
             if (obj->is_actor())
             {
-                auto actor = reinterpret_cast<RhActor*>(obj.get());
+                auto actor = std::static_pointer_cast<RhActor>(obj);
+                actor->import_from_json_object(actor_json_value);
+                actors.push_back(actor);
                 actor->start();
             }
         }
@@ -97,4 +99,9 @@ bool World::load_level(std::filesystem::path level_path)
     }
     
     return true;
+}
+
+void World::add_actor(std::shared_ptr<RhActor> actor)
+{
+    actors.push_back(actor);
 }
