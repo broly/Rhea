@@ -99,9 +99,14 @@ inline bool convert_from_string(float& target, std::string value)
     return true;
 }
 
+struct ObjectInitData
+{
+    std::string name;
+};
+
 namespace reflect
 {
-    using ObjectFactoryType = std::function<std::shared_ptr<RhObject>()>;
+    using ObjectFactoryType = std::function<std::shared_ptr<RhObject>(const ObjectInitData& init_data)>;
     using JsonSerializer = std::function<bool(const Json::Value&, RhObject* Ptr, bool is_loading)>;
     
     struct ObjectReflectionInfo
@@ -167,10 +172,11 @@ namespace reflect
     template <typename T>
     inline bool register_actor_class(std::string_view name, std::optional<JsonSerializer>&& Serializer)
     {
-        ObjectFactoryType factory = [name]()
+        ObjectFactoryType factory = [name](const ObjectInitData& init_data)
         {
             auto object = std::make_shared<T>();
             object->set_type_id(name);
+            object->set_name(init_data.name);
             return object;
         };
         std::set<std::string_view> class_bases = reflect_inner::RhObjectTraits<T>::get_bases();

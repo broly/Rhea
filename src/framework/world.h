@@ -6,6 +6,7 @@
 
 #include "engine_clock.h"
 #include "world_script.h"
+#include "render/scene_extractor.h"
 
 namespace std::chrono
 {
@@ -22,7 +23,7 @@ public:
     
     bool load_bootstrap_level();
     
-    bool load_level(std::filesystem::path level_path);
+    bool load_level(std::string level_path);
     
     void add_actor(std::shared_ptr<RhActor> actor);
     
@@ -52,10 +53,16 @@ public:
     {
         return actors;
     }
+    
+    std::shared_ptr<RenderExtractor> get_render_extractor() const
+    {
+        return render_extractor;
+    }
 
 
     std::shared_ptr<Camera> camera;
     std::vector<std::unique_ptr<WorldScript>> scripts;
     std::shared_ptr<EngineClock> clock;
     std::vector<std::shared_ptr<RhActor>> actors;
+    std::shared_ptr<RenderExtractor> render_extractor;
 };

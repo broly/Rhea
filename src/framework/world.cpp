@@ -13,8 +13,13 @@ class RhActor;
 
 void World::tick()
 {
+    double dt = clock->get_delta_seconds();
+    
     for (auto& script : scripts)
-        script->tick(clock->get_delta_seconds());
+        script->tick(dt);
+    
+    for (auto& actor : actors)
+        actor->internal_tick(dt);
 }
 
 void World::init()
@@ -32,15 +37,17 @@ void World::init()
 
 bool World::load_bootstrap_level()
 {
-    return load_level(paths::get_project_path() / "bootstrap_level.json");
+    return load_level("levels/bootstrap_level.json");
 }
 
-bool World::load_level(std::filesystem::path level_path)
+std::optional<Json::Value> load_json(std::string level_rel_path)
 {
+    std::filesystem::path level_path = paths::get_assets_path() / level_rel_path;
+    
     std::ifstream file(level_path);
     if (!file.is_open()) {
         std::cerr << "Failed to open bootstrap_level.json" << std::endl;
-        return false;
+        return std::nullopt;
     }
     
     Json::Value root;
@@ -49,8 +56,22 @@ bool World::load_level(std::filesystem::path level_path)
     
     if (!Json::parseFromStream(reader, file, &root, &errs)) {
         std::cerr << "Failed to parse JSON: " << errs << std::endl;
+        return std::nullopt;
+    }
+    
+    return root;
+}
+
+bool World::load_level(std::string level_path)
+{
+    std::optional<Json::Value> root_opt = load_json(level_path);
+    
+    if (!root_opt.has_value())
+    {
         return false;
     }
+
+    const Json::Value& root = root_opt.value();
 
     std::string name = root["name"].asString();
     std::cout << "Name: " << name << std::endl;
@@ -65,33 +86,68 @@ bool World::load_level(std::filesystem::path level_path)
 
     std::cout << "Number of actors: " << json_actors.size() << std::endl;
 
-    for (const Json::Value& actor_json_value : json_actors)
+    for (const Json::Value& level_actor_json_value : json_actors)
     {
-        std::string actor_class = actor_json_value["class"].asString();
+        std::optional<Json::Value> ref_json_value_opt;
+        if (auto ref = level_actor_json_value.find("ref"))
+        {
+            auto str = ref->asString();
+            auto opt = load_json(str);
+            if (opt.has_value())
+            {
+                ref_json_value_opt = opt.value();
+            }
+        }
+
+        std::string actor_name = level_actor_json_value["name"].asString();
+        
+        std::string actor_class = ref_json_value_opt.has_value() ? 
+            (*ref_json_value_opt)["class"].asString() :
+            level_actor_json_value["class"].asString();
+        
+        if (actor_class == "")
+            actor_class = level_actor_json_value["class"].asString();
+        
         std::cout << "Actor: " << actor_class << std::endl;
         auto reflection_info = reflect::find_object_reflection_info(actor_class);
         if ensure(reflection_info != nullptr)
         {
-            std::shared_ptr<RhObject> obj = std::invoke(reflection_info->factory);
+            ObjectInitData init_data {
+                actor_name,
+            };
             
-            ensure(actor_json_value.isObject());
+            std::shared_ptr<RhObject> obj = std::invoke(reflection_info->factory, init_data);
             
-            auto fields_object = actor_json_value.find("fields");
-            
-            
-            if (fields_object != nullptr)
+            if (ref_json_value_opt.has_value())
+            {
+                ensure(ref_json_value_opt->isObject());                
+                if ( auto ref_fields_object = ref_json_value_opt->find("fields"))
+                {
+                    if (reflection_info->serializer != std::nullopt)
+                    {
+                        std::invoke(reflection_info->serializer.value(), *ref_fields_object, obj.get(), true);
+                    }
+                }
+            }
+            ensure(level_actor_json_value.isObject());
+               
+            if ( auto level_actor_fields_object = level_actor_json_value.find("fields"))
             {
                 if (reflection_info->serializer != std::nullopt)
                 {
-                    std::invoke(reflection_info->serializer.value(), *fields_object, obj.get(), true);
+                    std::invoke(reflection_info->serializer.value(), *level_actor_fields_object, obj.get(), true);
                 }
             }
+            
             if (obj->is_actor())
             {
                 auto actor = std::static_pointer_cast<RhActor>(obj);
-                actor->import_from_json_object(actor_json_value);
+                
+                ref_json_value_opt.has_value() ?
+                    actor->import_from_json_object(*ref_json_value_opt, &level_actor_json_value) :
+                    actor->import_from_json_object(level_actor_json_value);
                 actors.push_back(actor);
-                actor->start();
+                actor->internal_start(shared_from_this());
             }
         }
         

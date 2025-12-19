@@ -45,3 +45,9 @@ std::filesystem::path paths::get_project_path()
 {
     return priv::get_paths().project;
 }
+
+std::filesystem::path paths::get_assets_path()
+{
+    return get_project_path() / "assets";
+}
+

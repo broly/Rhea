@@ -19,4 +19,5 @@ namespace paths
     
     void init();
     std::filesystem::path get_project_path();
+    std::filesystem::path get_assets_path();
 }

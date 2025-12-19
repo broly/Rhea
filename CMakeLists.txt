@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(jsoncpp CONFIG REQUIRED)
+find_package(fastgltf CONFIG REQUIRED)
 
 
 file(GLOB_RECURSE RHEA_SOURCES
@@ -27,6 +28,7 @@ target_link_libraries(rhea
 		Vulkan::Vulkan
 		glfw
 		JsonCpp::JsonCpp
+		fastgltf::fastgltf
 )
 
 target_compile_definitions(rhea

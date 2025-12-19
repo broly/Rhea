@@ -1,0 +1,14 @@
+{
+	"name": "lymphocyte",
+	"class": "RhActor",
+	"components": [
+		{
+			"name": "mesh",
+			"class": "RhComp_StaticMesh",
+			"fields": {
+				"transform": "((100, 0, 0) ,(0, 0, 0) ,(1, 1, 1))",
+				"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
+			}
+		}
+	]
+}

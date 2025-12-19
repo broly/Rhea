@@ -1,6 +1,8 @@
 #include "WorldScript_RotateAroundObject.h"
 
+#include "framework/actor.h"
 #include "framework/world.h"
+#include "framework/components/rhcomp_transform.h"
 
 void WorldScript_RotateAroundObject::tick(double dt)
 {

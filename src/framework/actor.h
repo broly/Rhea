@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "actor_component.h"
 #include "object.h"
+#include "world.h"
 #include "math/transform.h"
 
 class RhActor : public RhObject
@@ -16,11 +17,11 @@ public:
         return true;
     }
     
-    void internal_start();
+    void internal_start(const std::shared_ptr<World>& in_world);
     void internal_finish();
     void internal_tick(double dt);
     
-    void import_from_json_object(const Json::Value& object);
+    void import_from_json_object(const Json::Value& object, const Json::Value* overrides = nullptr);
     
     virtual void start() {}
     virtual void tick(const double DeltaTime) {}
@@ -43,7 +44,21 @@ public:
         return nullptr;
     }
     
+    std::shared_ptr<RhComponent> find_component_by_name(const std::string& name)
+    {
+        for (auto component : instanced_components)
+            if (component->name == name)
+                return component;
+        return nullptr;
+    }
+    
+    std::shared_ptr<World> get_world() const
+    {
+        return world;
+    }
+    
     std::vector<std::shared_ptr<RhComponent>> instanced_components;
+    std::shared_ptr<World> world;
 };
 
 REG_REFLECT(RhActor, RhObject);
