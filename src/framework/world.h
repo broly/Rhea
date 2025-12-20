@@ -1,17 +1,10 @@
 #pragma once
 #include <chrono>
-#include <filesystem>
 #include <memory>
 #include <vector>
 
 #include "engine_clock.h"
 #include "world_script.h"
-#include "render/scene_extractor.h"
-
-namespace std::chrono
-{
-    struct steady_clock;
-}
 
 struct RhActor;
 
@@ -54,15 +47,15 @@ public:
         return actors;
     }
     
-    std::shared_ptr<RenderExtractor> get_render_extractor() const
-    {
-        return render_extractor;
-    }
+    // std::shared_ptr<RenderExtractor> get_render_extractor() const
+    // {
+    //     return render_extractor;
+    // }
 
 
     std::shared_ptr<Camera> camera;
     std::vector<std::unique_ptr<WorldScript>> scripts;
     std::shared_ptr<EngineClock> clock;
     std::vector<std::shared_ptr<RhActor>> actors;
-    std::shared_ptr<RenderExtractor> render_extractor;
+    //std::shared_ptr<RenderExtractor> render_extractor;
 };

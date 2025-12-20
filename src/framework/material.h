@@ -2,6 +2,7 @@
 #include <glm/vec4.hpp>
 
 #include "assets/texture.h"
+#include "common/reflect.h"
 
 struct PBRMaterial
 {
@@ -13,3 +14,6 @@ struct PBRMaterial
     TextureHandle normal;
     TextureHandle occlusion;
 };
+
+REFLECT_STRUCT(PBRMaterial,
+    base_color, metallic, roughness, normal, occlusion);

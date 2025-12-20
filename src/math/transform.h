@@ -3,11 +3,17 @@
 #include <string>
 #include <sstream>
 #include <glm/fwd.hpp>
-#include <glm/vec3.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
-
+#include "common/reflect.h"
 #include "rhea_math.h"
+
+
+REFLECT_STRUCT(glm::vec3, x, y, z);
+REFLECT_STRUCT(glm::quat, x, y, z, w);
+REFLECT_STRUCT(glm::vec2, x, y);
+REFLECT_STRUCT(glm::vec4, x, y, z, w);
+
 
 struct Transform {
     glm::vec3 position{0.0f, 0.0f, 0.0f};
@@ -102,6 +108,8 @@ struct Transform {
     }
 };
 
+REFLECT_STRUCT(Transform, 
+    position, rotation, scale);
 
 
 inline bool convert_from_string(Transform& target, const std::string& value)

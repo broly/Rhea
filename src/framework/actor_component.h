@@ -18,4 +18,4 @@ public:
     std::shared_ptr<RhActor> owner;
 };
 
-REG_REFLECT(RhComponent, RhObject)
+REFLECT_OBJECT(RhComponent, RhObject)

@@ -3,3 +3,4 @@ vcpkg install volk
 vcpkg install glm
 vcpkg install jsoncpp
 vcpkg install fastgltf
+vcpkg install stb

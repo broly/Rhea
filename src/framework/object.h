@@ -29,4 +29,4 @@ public:
     std::string name;
 };
 
-REG_REFLECT(RhObject, void);
+REFLECT_OBJECT(RhObject, void);

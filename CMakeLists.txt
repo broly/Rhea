@@ -8,6 +8,7 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(jsoncpp CONFIG REQUIRED)
 find_package(fastgltf CONFIG REQUIRED)
+find_package(Stb REQUIRED)
 
 
 file(GLOB_RECURSE RHEA_SOURCES
@@ -32,12 +33,16 @@ target_link_libraries(rhea
 )
 
 target_compile_definitions(rhea
-    PRIVATE GLFW_INCLUDE_VULKAN
+    PRIVATE 
+        GLFW_INCLUDE_VULKAN
+        STB_IMAGE_IMPLEMENTATION
 )
 
 target_include_directories(rhea
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+	PRIVATE
+		${Stb_INCLUDE_DIR}
 )
 
 

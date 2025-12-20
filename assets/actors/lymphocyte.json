@@ -6,8 +6,19 @@
 			"name": "mesh",
 			"class": "RhComp_StaticMesh",
 			"fields": {
-				"transform": "((100, 0, 0) ,(0, 0, 0) ,(1, 1, 1))",
-				"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
+				"transform": {
+					"position": { "x": 100, "y": 0, "z": 101 },
+					"rotation": { "x": 0, "y": 0, "z": 0 },
+					"scale": { "x": 1, "y": 1, "z": 1}
+				},
+				"mesh": "meshes/lymphocyte/lymphocyte.glb",
+				"texture": "textures/lymphocyte/Lymphocyte_B.png",
+				"material": {
+					"base_color": {"x": 0.5, "y": 0.4, "z": 0.3, "w": 0.2 },
+					"metallic": 0.44,
+					"roughness": 0.41,
+					
+				}
 			}
 		}
 	]

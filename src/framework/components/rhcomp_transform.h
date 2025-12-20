@@ -12,5 +12,5 @@ public:
     Transform get_transform();
 };
 
-REG_REFLECT_ARGS(RhComp_Transform, RhComponent, 
+REFLECT_OBJECT_FIELDS(RhComp_Transform, RhComponent, 
     transform)

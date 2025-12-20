@@ -61,4 +61,4 @@ public:
     std::shared_ptr<World> world;
 };
 
-REG_REFLECT(RhActor, RhObject);
+REFLECT_OBJECT(RhActor, RhObject);

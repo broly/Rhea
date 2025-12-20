@@ -27,4 +27,4 @@ public:
     bool render_state_dirty;
 };
 
-REG_REFLECT(RhComp_Renderable, RhComp_Transform);
+REFLECT_OBJECT(RhComp_Renderable, RhComp_Transform);

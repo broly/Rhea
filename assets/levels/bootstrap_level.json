@@ -10,7 +10,11 @@
 					"name": "mesh",
 					"class": "RhComp_StaticMesh",
 					"fields": {
-						"transform": "((100, 0, 101) ,(0, 0, 90) ,(1, 1, 1))",
+						"transform": {
+							"position": { "x": 100, "y": 0, "z": 101 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
 						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
 					}
 				}

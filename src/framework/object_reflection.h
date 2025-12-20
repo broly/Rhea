@@ -1,17 +1,14 @@
 ﻿#pragma once
 
+#include <cassert>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <string_view>
 #include <json/value.h>
 #include <set>
-#include "common/foreach_macro.h"
+#include "common/reflect.h"
 
-#define REG_REFLECT_SERIALIZE_MEMBER(member_name) \
-    if (!reflect::read_member_from_json<&Class::member_name>(json_object, #member_name, CastedObjPtr, is_loading)) \
-        return false;
 
 class RhObject;
 
@@ -44,7 +41,7 @@ namespace reflect_inner
             inline static std::set<std::string_view> bases = RhObjectTraits<Name>::get_bases(); \
         }; \
 
-#define REG_REFLECT(Name, Base, ...) \
+#define REFLECT_OBJECT(Name, Base, ...) \
     namespace reflect_inner { \
         static_assert(std::is_base_of<RhObject, Name>::value, "Can't reflect non-RhObject types");\
         const bool Name##_registered = \
@@ -54,8 +51,93 @@ namespace reflect_inner
             ); \
         REFL_OBJECT_TRAITS(Name, Base) \
     } \
+    
+inline void serialize_json_value(Json::Int& target, const Json::Value& value)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asInt();
+}
+inline void serialize_json_value(Json::UInt& target, const Json::Value& value)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asUInt();
+}
+inline void serialize_json_value(Json::Int64& target, const Json::Value& value)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asInt64();
+}
+inline void serialize_json_value(Json::UInt64& target, const Json::Value& value)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asUInt64();
+}
+inline void serialize_json_value(std::string& target, const Json::Value& value)
+{
+    assert(value.isString());
+    target = value.asString();
+}
 
-#define REG_REFLECT_ARGS(Name, Base, ...) \
+
+
+
+
+
+inline void serialize_json_value(float& target, const Json::Value& value)
+{
+    assert(value.isNumeric() || value.isIntegral() || value.isDouble());
+    target = value.asFloat();
+}
+inline void serialize_json_value(double& target, const Json::Value& value)
+{
+    assert(value.isNumeric() || value.isIntegral() || value.isDouble());
+    target = value.asDouble();
+}
+inline void serialize_json_value(bool& target, const Json::Value& value)
+{
+    assert(value.isBool());
+    target = value.asBool();
+}
+    
+namespace reflect::json
+{
+    
+    template<typename T>
+    void visit_serialize(const Json::Value& json_object, T& struct_ref, bool is_loading);
+
+    template<typename T>
+    void do_serialize_json_value(T& target, const Json::Value& value, bool is_loading)
+    {
+        if constexpr (reflect::is_reflected_v<T>)
+        {
+            assert(value.isObject());
+            visit_serialize(value, target, is_loading);
+        } else
+        {
+            static_assert(requires { serialize_json_value(target, value); });
+            serialize_json_value(target, value);
+        }
+    }
+
+    template<typename T>
+    void visit_serialize(const Json::Value& json_object, T& struct_ref, bool is_loading)
+    {
+        reflect::visit<T>([&] <auto PtrToField, FixedString Name> ()
+        {
+            const std::string name = std::string(Name); // todo: inefficient
+            if (Json::Value const* json_value = json_object.find(std::string(name)))
+            {
+                auto& field_ref = struct_ref.*PtrToField;
+                do_serialize_json_value(field_ref, *json_value, is_loading);
+            }
+        });
+    }
+}
+
+
+
+#define REFLECT_OBJECT_FIELDS(Name, Base, ...) \
+    REFLECT_STRUCT(Name, __VA_ARGS__); \
     namespace reflect_inner { \
         static_assert(std::is_base_of<RhObject, Name>::value, "Can't reflect non-RhObject types");\
         const bool Name##_registered = \
@@ -64,7 +146,7 @@ namespace reflect_inner
                     [] (const Json::Value& json_object, RhObject* ObjPtr, bool is_loading) -> bool { \
                         using Class = Name;\
                         auto CastedObjPtr = reinterpret_cast<Name*>(ObjPtr); \
-                        RHEA_FOR_EACH(REG_REFLECT_SERIALIZE_MEMBER,##__VA_ARGS__); \
+                        reflect::json::visit_serialize(json_object, *CastedObjPtr, is_loading); \
                         return true; \
                     }\
                 ); \
