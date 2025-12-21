@@ -17,6 +17,7 @@
 					"base_color": {"x": 0.5, "y": 0.4, "z": 0.3, "w": 0.2 },
 					"metallic": 0.44,
 					"roughness": 0.41,
+					"normal": "textures/lymphocyte/Lymphocyte_N.png"
 					
 				}
 			}

@@ -25,6 +25,13 @@ public:
     }
     
     bool render_state_dirty;
+    
+    RenderId render_id;
+    
+    RenderId get_render_id() const
+    {
+        return render_id;
+    }
 };
 
 REFLECT_OBJECT(RhComp_Renderable, RhComp_Transform);

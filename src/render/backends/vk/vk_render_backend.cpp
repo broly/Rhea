@@ -748,7 +748,6 @@ RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
 {
     auto& frame = frame_schedule_context.frames[frame_handle];
 
-
     VK_CHECK(vkResetCommandBuffer(frame.cmd, 0));
 
     RBCommandList cmd_list;
@@ -838,11 +837,9 @@ RBFramebufferId VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 
     auto& image = images[image_index];
 
-
     if (image.in_flight != VK_NULL_HANDLE) {
         vkWaitForFences(instance_context.device, 1, &image.in_flight, VK_TRUE, UINT64_MAX);
     }
-
 
     image.in_flight = frame.in_flight;
 
@@ -866,7 +863,6 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle, RBCommandList cmd
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &image.render_finished;
-
 
     VK_CHECK(vkQueueSubmit(instance_context.graphics_queue, 1, &submit, frame.in_flight));
 

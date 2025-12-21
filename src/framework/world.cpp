@@ -8,6 +8,7 @@
 #include "object_reflection.h"
 #include "common/assertion_macros.h"
 #include "common/paths.h"
+#include "render/scene_extractor.h"
 
 class RhActor;
 
@@ -20,10 +21,14 @@ void World::tick()
     
     for (auto& actor : actors)
         actor->internal_tick(dt);
+    
+    render_extractor->perform_extraction();
 }
 
 void World::init()
 {    
+    render_extractor = std::make_shared<SceneExtractor>(shared_from_this());
+    
     load_bootstrap_level();
     
     Transform transform{ {0.f, 0.f, 0.f}};

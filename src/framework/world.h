@@ -6,7 +6,8 @@
 #include "engine_clock.h"
 #include "world_script.h"
 
-struct RhActor;
+class RhActor;
+class SceneExtractor;
 
 class World : public std::enable_shared_from_this<World>
 {
@@ -47,15 +48,15 @@ public:
         return actors;
     }
     
-    // std::shared_ptr<RenderExtractor> get_render_extractor() const
-    // {
-    //     return render_extractor;
-    // }
+    std::shared_ptr<SceneExtractor> get_render_extractor() const
+    {
+        return render_extractor;
+    }
 
 
     std::shared_ptr<Camera> camera;
     std::vector<std::unique_ptr<WorldScript>> scripts;
     std::shared_ptr<EngineClock> clock;
     std::vector<std::shared_ptr<RhActor>> actors;
-    //std::shared_ptr<RenderExtractor> render_extractor;
+    std::shared_ptr<SceneExtractor> render_extractor;
 };

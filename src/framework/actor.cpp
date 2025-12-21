@@ -103,7 +103,7 @@ void RhActor::import_from_json_object(const Json::Value& object, const Json::Val
                         }
                     }
                     
-                    if (!just_created)
+                    if (just_created)
                     {
                         auto component = std::static_pointer_cast<RhComponent>(comp_obj);
                         instanced_components.push_back(component);

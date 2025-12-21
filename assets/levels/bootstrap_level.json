@@ -2,7 +2,7 @@
 	"name": "startup",
 	"actors": [
 		{
-			"name": "hello",
+			"name": "lymphocyte",
 			"ref": "actors/lymphocyte.json",
 			
 			"components": [

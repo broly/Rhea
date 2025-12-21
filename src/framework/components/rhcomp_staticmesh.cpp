@@ -3,6 +3,6 @@
 
 void RhComp_StaticMesh::start()
 {
-    RhComp_Transform::start();
+    RhComp_Renderable::start();
     
 }

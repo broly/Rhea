@@ -1,12 +1,61 @@
 #pragma once
 #include "render_backend.h"
+#include "rg_types.h"
+
+
+struct RenderGraphPass
+{
+    std::string name;
+
+    std::vector<RGResourceHandle> reads;
+    std::vector<RGResourceHandle> writes;
+
+    std::function<void(class RenderGraphContext&)> execute;
+};
+
+class RenderGraphContext
+{
+public:
+    RenderGraphContext(
+        RenderBackend& in_backend,
+        RBCommandList in_cmd,
+        RBFramebufferId in_fb)
+        : backend(in_backend)
+        , cmd(in_cmd)
+        , framebuffer(in_fb)
+    {}
+
+    RenderBackend& backend;
+    RBCommandList  cmd;
+    RBFramebufferId framebuffer;
+};
+
+
 
 class RenderGraph
 {
 public:
-    void initialize(RBWindowHandle window_handle);
-    
-    void draw(const Camera& camera);
+    RGResourceHandle create_texture(const RGTextureDesc& desc);
+    RGResourceHandle create_buffer(const RGBufferDesc& desc);
 
-    std::unique_ptr<RenderBackend> backend;
+    RGPassId add_pass(RenderGraphPass&& pass);
+
+    void compile();
+    void execute(RenderBackend& backend);
+
+private:
+    struct Resource
+    {
+        RGResourceType type;
+    };
+
+    std::vector<Resource> resources;
+    std::vector<RenderGraphPass> passes;
+
+    std::vector<uint32_t> execution_order;
+    // void initialize(RBWindowHandle window_handle);
+    //
+    // void draw(const Camera& camera);
+    //
+    // std::unique_ptr<RenderBackend> backend;
 };
