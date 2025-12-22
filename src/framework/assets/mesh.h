@@ -19,6 +19,11 @@ struct Mesh
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
     AABB bounds;
+    
+    uint32_t get_index_count() const
+    {
+        return indices.size();
+    }
 };
 static_assert(std::is_move_constructible_v<Mesh>);
 

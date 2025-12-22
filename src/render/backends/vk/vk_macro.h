@@ -14,3 +14,5 @@
 			abort();                                                \
 		}                                                           \
 	} while (0)
+
+#define VK_LOG()

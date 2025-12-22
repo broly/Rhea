@@ -3,6 +3,9 @@
 #include <array>
 #include <vector>
 #include <vulkan/vulkan_core.h>
+#include <map>
+
+#include "render/handle_types.h"
 
 namespace vk
 {
@@ -14,7 +17,7 @@ namespace vk
 
         VkBuffer camera_buffer = VK_NULL_HANDLE;
         VkDeviceMemory camera_memory = VK_NULL_HANDLE;
-        VkDescriptorSet camera_set = VK_NULL_HANDLE;
+        std::map<RBDescriptorSetLayout, RBDescriptorSet> descriptors;
     };
 
 
@@ -67,8 +70,8 @@ namespace vk
 
     struct DescriptorContext
     {
-        VkDescriptorSetLayout camera_set_layout;
-        VkDescriptorPool pool;
+        VkDescriptorPool frame_pool = VK_NULL_HANDLE;
+        VkDescriptorPool persistent_pool = VK_NULL_HANDLE;
     };
     struct PipelineContext
     {
@@ -109,4 +112,5 @@ namespace vk
         std::vector<VkDescriptorSet> camera_descriptor_sets;
     
     };
+    
 }

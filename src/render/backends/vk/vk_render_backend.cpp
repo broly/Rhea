@@ -4,11 +4,15 @@
 #include <set>
 #include <GLFW/glfw3.h>
 #include <algorithm>
+#include <span>
 
 #include "vk_camera_ubo.h"
 #include "vk_helpers.h"
 #include "vk_macro.h"
 #include "vk_pipeline.h"
+#include "logging/log.h"
+
+DEFINE_LOGGER(LogRB, Log);
 
 constexpr const char* VALIDATION_LAYERS[] = {
     "VK_LAYER_KHRONOS_validation"
@@ -95,7 +99,6 @@ void VkRenderBackend::recreate_swapchain()
     create_render_pass();
     create_framebuffers();
     create_images_context();
-    create_pipeline();
 }
 
 void VkRenderBackend::create_images_context()
@@ -204,113 +207,142 @@ void VkRenderBackend::update_camera_ubo(
         frame.camera_memory);
 }
 
-void VkRenderBackend::create_descriptor_set_layout()
+RBDescriptorSetLayout VkRenderBackend::allocate_descriptor_layout_handle()
 {
-    VkDescriptorSetLayoutBinding ubo_binding{};
-    ubo_binding.binding = 0;
-    ubo_binding.descriptorType =
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    ubo_binding.descriptorCount = 1;
-    ubo_binding.stageFlags =
-        VK_SHADER_STAGE_VERTEX_BIT;
+    auto result = ++descriptor_set_counter;
+    RBDescriptorSetLayout layout((uintptr_t)result);    
+    return layout;
+}
 
-    VkDescriptorSetLayoutCreateInfo layout_info{
+
+RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout)
+{
+    std::vector<VkDescriptorSetLayoutBinding> vk_bindings;
+    vk_bindings.reserve(descriptor_set_layout.bindings.size());
+
+    for (const DescriptorBinding& b : descriptor_set_layout.bindings)
+    {
+        VkDescriptorSetLayoutBinding vk{};
+        vk.binding = b.binding;
+        vk.descriptorType = vk::to_vk_descriptor_type(b.type);
+        vk.descriptorCount = b.count;
+        vk.stageFlags = vk::to_vk_shader_stage_flags(b.stages);
+        vk.pImmutableSamplers = nullptr;
+
+        vk_bindings.push_back(vk);
+    }
+
+    VkDescriptorSetLayoutCreateInfo ci{
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
     };
-    layout_info.bindingCount = 1;
-    layout_info.pBindings = &ubo_binding;
+    ci.bindingCount = uint32_t(vk_bindings.size());
+    ci.pBindings = vk_bindings.data();
 
-    vkCreateDescriptorSetLayout(instance_context.device, &layout_info, nullptr, 
-        &descriptor_context.camera_set_layout);
-}
-void VkRenderBackend::create_descriptor_pool()
-{
-    VkDescriptorPoolSize pool_size{};
-    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    pool_size.descriptorCount = vk::MAX_FRAMES_IN_FLIGHT;
-
-    VkDescriptorPoolCreateInfo pool_info{
-        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
+    VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+    VK_CHECK(vkCreateDescriptorSetLayout(
+        instance_context.device,
+        &ci,
+        nullptr,
+        &layout
+    ));
+    DescriptorSetLayoutData layout_data {
+        layout, 
+        descriptor_set_layout.set_index
     };
-    pool_info.poolSizeCount = 1;
-    pool_info.pPoolSizes = &pool_size;
-    pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT;
-    pool_info.flags = 0; // without FREE_DESCRIPTOR_SET
+    RBDescriptorSetLayout handle = allocate_descriptor_layout_handle();
+    descriptor_set_layouts[handle] = layout_data;
 
-    VK_CHECK(
-        vkCreateDescriptorPool(instance_context.device, &pool_info, nullptr, &descriptor_context.pool)
-    );
-}
-
-
-void VkRenderBackend::allocate_descriptor_sets()
-{
-    context.camera_descriptor_sets.resize(vk::MAX_FRAMES_IN_FLIGHT);
-
-    std::vector<VkDescriptorSetLayout> layouts(
-        vk::MAX_FRAMES_IN_FLIGHT,
-        descriptor_context.camera_set_layout
-    );
-
-    VkDescriptorSetAllocateInfo alloc{
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
-    };
-    alloc.descriptorPool = descriptor_context.pool;
-    alloc.descriptorSetCount = vk::MAX_FRAMES_IN_FLIGHT;
-    alloc.pSetLayouts = layouts.data();
-
-    VK_CHECK(
-        vkAllocateDescriptorSets(instance_context.device, &alloc, context.camera_descriptor_sets.data())
-    );
-
-    for (uint32_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        frame_schedule_context.frames[i].camera_set =
-            context.camera_descriptor_sets[i];
-    }
-}
-
-void VkRenderBackend::update_descriptor_sets()
-{
-    for (uint32_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        auto& frame = frame_schedule_context.frames[i];
-
-        VkDescriptorBufferInfo buffer_info{};
-        buffer_info.buffer = frame.camera_buffer;
-        buffer_info.range = sizeof(CameraUBO);
-
-        VkWriteDescriptorSet write{
-            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET
-        };
-        write.dstSet = frame.camera_set;
-        write.dstBinding = 0;
-        write.descriptorType =
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.descriptorCount = 1;
-        write.pBufferInfo = &buffer_info;
-
-        vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
-    }
-}
-
-RBPipelineHandle VkRenderBackend::get_pipeline_handle() const
-{
-    RBPipelineHandle pipeline_handle;
-    pipeline_handle.handle = reinterpret_cast<uintptr_t>(pipeline->get_pipeline());
-    return pipeline_handle;
-}
-
-RBDescriptorSet VkRenderBackend::get_camera_descriptor_set() const
-{
-    RBDescriptorSet handle { 
-        frame_schedule_context.frames[frame_schedule_context.current_frame].camera_set
-    };
     return handle;
 }
 
-void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescriptorSet rb_descriptors)
+void VkRenderBackend::create_descriptor_pool()
 {
+    {
+        VkDescriptorPoolSize pool_size{};
+        pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        pool_size.descriptorCount = vk::MAX_FRAMES_IN_FLIGHT;
+
+        VkDescriptorPoolCreateInfo pool_info{
+            VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
+        };
+        pool_info.poolSizeCount = 1;
+        pool_info.pPoolSizes = &pool_size;
+        pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT;
+        pool_info.flags = 0; // without FREE_DESCRIPTOR_SET
+
+        VK_CHECK(
+            vkCreateDescriptorPool(instance_context.device, &pool_info, nullptr, &descriptor_context.persistent_pool)
+        );
+    }
+    {
+        VkDescriptorPoolSize pool_size{};
+        pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        pool_size.descriptorCount = vk::MAX_FRAMES_IN_FLIGHT;
+
+        VkDescriptorPoolCreateInfo pool_info{
+            VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
+        };
+        pool_info.poolSizeCount = 1;
+        pool_info.pPoolSizes = &pool_size;
+        pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT;
+        pool_info.flags = 0; // without FREE_DESCRIPTOR_SET
+
+        VK_CHECK(
+            vkCreateDescriptorPool(instance_context.device, &pool_info, nullptr, &descriptor_context.frame_pool)
+        );
+    }
+}
+
+
+void VkRenderBackend::allocate_descriptor_sets_for_layout(
+    RBDescriptorSetLayout layout_handle,
+    DescriptorPoolType pool_type)
+{
+    auto& layout_data = descriptor_set_layouts.at(layout_handle);
+    
+    if (pool_type == DescriptorPoolType::Frame)
+    {
+        for (size_t frame_index = 0; frame_index < vk::MAX_FRAMES_IN_FLIGHT; frame_index++)
+        {
+            VkDescriptorSetAllocateInfo alloc{
+                VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
+            };
+            alloc.descriptorPool = descriptor_context.frame_pool;
+            alloc.descriptorSetCount = 1;
+            alloc.pSetLayouts = &layout_data.vk_layout;
+
+            VkDescriptorSet set = VK_NULL_HANDLE;
+            VK_CHECK(vkAllocateDescriptorSets(
+                instance_context.device,
+                &alloc,
+                &set
+            ));
+            frame_schedule_context.frames[frame_index].descriptors.insert({layout_handle, set});
+        }
+    } else
+    {
+        VkDescriptorSetAllocateInfo alloc{
+            VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
+        };
+        alloc.descriptorPool = descriptor_context.persistent_pool;
+        alloc.descriptorSetCount = 1;
+        alloc.pSetLayouts = &layout_data.vk_layout;
+
+        VkDescriptorSet set = VK_NULL_HANDLE;
+        VK_CHECK(vkAllocateDescriptorSets(
+            instance_context.device,
+            &alloc,
+            &set
+        ));
+        
+        persistent_descriptors.insert({layout_handle, set});
+    }
+
+}
+
+void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle)
+{
+    auto& pipeline = pipelines[pipeline_handle];
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     VkDescriptorSet vk_set = rb_descriptors.as<VkDescriptorSet>();
 
@@ -343,6 +375,30 @@ void VkRenderBackend::advance_frame()
 {
     frame_schedule_context.current_frame =
         (frame_schedule_context.current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
+}
+
+void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshHandle mesh)
+{
+    // TODO
+}
+
+void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix)
+{
+    // TODO
+    vkCmdPushConstants(
+        cmd,
+        pipelines.begin()->second->get_pipeline_layout(), 
+        VK_SHADER_STAGE_VERTEX_BIT, 
+        0, 
+        sizeof(glm::mat4),
+        &matrix
+    );
+}
+
+void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)
+{
+    // TODO
+    vkCmdDraw(cmd, index_count, 1, 0, 0);
 }
 
 
@@ -541,11 +597,6 @@ void VkRenderBackend::create_swapchain()
     }
 }
 
-void VkRenderBackend::create_pipeline()
-{
-    pipeline = std::make_unique<VkPipelineObject>(instance_context, swapchain_context, descriptor_context.camera_set_layout);
-}
-
 void VkRenderBackend::create_command_pool()
 {
     if (command_context.command_pool != VK_NULL_HANDLE)
@@ -729,62 +780,72 @@ void VkRenderBackend::init(RBWindowHandle in_window)
     
     match_queue_families();
     create_device();
-    create_descriptor_set_layout();
     create_descriptor_pool();
     create_frame_resources();          // <-- create camera_buffer + memory
-    allocate_descriptor_sets();        // <-- frame.camera_set
-    update_descriptor_sets();          // <-- bind buffer to set
+    // for (uint32_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; ++i)
+    // {
+    //     allocate_descriptor_sets(camera_layout,
+    //                              DescriptorPoolType::Frame,
+    //                              i);
+    // }
     create_swapchain();
     create_render_finished_semaphores();
     create_depth_resources();
     create_render_pass();
     create_framebuffers();
     create_command_pool();
-    create_pipeline();
+    // create_pipeline();
     create_frame_sync_objects();
 }
 
 RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
 {
+    LogRB.Log<DisplayFn>("Begin commands");
+    
     auto& frame = frame_schedule_context.frames[frame_handle];
 
     VK_CHECK(vkResetCommandBuffer(frame.cmd, 0));
 
-    RBCommandList cmd_list;
-    cmd_list.handle = reinterpret_cast<uintptr_t>(frame.cmd);
-    return cmd_list;
+    VkCommandBufferBeginInfo begin{
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
+    };
+    VK_CHECK(vkBeginCommandBuffer(frame.cmd, &begin));
+
+    return RBCommandList{frame.cmd};
 }
 
 void VkRenderBackend::end_commands(RBCommandList cmd_list)
 {
+    LogRB.Log<DisplayFn>("End commands");
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     VK_CHECK(vkEndCommandBuffer(cmd));
 }
 
 void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index)
 {
-    VkCommandBuffer cmd = reinterpret_cast<VkCommandBuffer>(cmd_list.handle);
-    assert(cmd != VK_NULL_HANDLE);
-    assert(framebuffer_index < swapchain_context.framebuffers.size());
+    LogRB.Log("begin_render_pass");
+    
+    VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
 
     VkClearValue clears[2]{};
     clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
     clears[1].depthStencil = {1.0f, 0};
 
-    VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    VkRenderPassBeginInfo rpbi{
+        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO
+    };
     rpbi.renderPass = swapchain_context.render_pass;
     rpbi.framebuffer = swapchain_context.framebuffers[framebuffer_index];
     rpbi.renderArea.extent = swapchain_context.extent;
     rpbi.clearValueCount = 2;
     rpbi.pClearValues = clears;
 
-    VkCommandBufferBeginInfo info{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, 0 };
-    VK_CHECK(vkBeginCommandBuffer(cmd, &info));
     vkCmdBeginRenderPass(cmd, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 {
+    LogRB.Log("end_render_pass");
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdEndRenderPass(cmd);
 }
@@ -792,6 +853,8 @@ void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 
 void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, RBPipelineHandle pipeline_handle)
 {
+    LogRB.Log("bind_pipeline");
+    
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     VkPipeline pipeline_vk = pipeline_handle.as<VkPipeline>();
 
@@ -802,6 +865,8 @@ void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, RBPipelineHandle pip
 
 void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
 {
+    LogRB.Log("draw");
+    
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdDraw(cmd, vertex_count, 1, 0, 0);
 }
@@ -814,6 +879,7 @@ void VkRenderBackend::update_camera_ubo(RBFrameHandle frame_handle, const Camera
 
 RBFramebufferId VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 {
+    LogRB.Log("acquire_next_image");
     auto& frame = frame_schedule_context.frames[frame_handle];
 
     uint32_t image_index = 0;
@@ -848,6 +914,8 @@ RBFramebufferId VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 
 void VkRenderBackend::submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id)
 {
+    LogRB.Log("submit_frame");
+    
     auto& frame = frame_schedule_context.frames[frame_handle];
     auto& image = images[current_image_index];
 
@@ -886,10 +954,65 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle, RBCommandList cmd
     }
 }
 
+RBPipelineHandle VkRenderBackend::create_pipeline(GraphicsPipelineDesc desc)
+{
+    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(
+        instance_context, swapchain_context, desc, *this);
+    RBPipelineHandle handle = pipeline->get_handle();
+    
+    pipelines.insert({handle, std::move(pipeline)});
+    
+    return handle;
+}
+
+DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle)
+{
+    return descriptor_set_layouts[rb_handle];
+}
+
+RBDescriptorSet VkRenderBackend::get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, DescriptorPoolType pool_type)
+{
+    if (pool_type == DescriptorPoolType::Frame)
+        return frame_schedule_context.frames[frame_schedule_context.current_frame].descriptors[rb_descriptor_set_layout];
+    return persistent_descriptors[rb_descriptor_set_layout];
+}
+
+void VkRenderBackend::update_descriptor_set_data_impl(RBDescriptorSetLayout layout, void* buffer, size_t buffer_size)
+{
+    auto& frame = frame_schedule_context.frames[frame_schedule_context.current_frame];
+    auto it = frame.descriptors.find(layout);
+    if (it == frame.descriptors.end()) {
+        throw std::runtime_error("Descriptor set for layout not allocated");
+    }
+
+    VkDescriptorSet set = it->second.as<VkDescriptorSet>();
+
+    // TODO: for now only uniform buffers
+    VkDescriptorBufferInfo buffer_info{};
+    buffer_info.buffer = frame.camera_buffer; // TODO hardcoded, different ubos
+    buffer_info.offset = 0;
+    buffer_info.range = buffer_size;
+
+    void* mapped = nullptr;
+    VK_CHECK(vkMapMemory(instance_context.device, frame.camera_memory, 0, buffer_size, 0, &mapped));
+    std::memcpy(mapped, buffer, buffer_size);
+    vkUnmapMemory(instance_context.device, frame.camera_memory);
+
+    VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    write.dstSet = set;
+    write.dstBinding = 0; // todo: hardcode
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &buffer_info;
+
+    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+}
 
 
 void VkRenderBackend::create_frame_sync_objects()
 {
+    LogRB.Log("submit_frame");
+    
     VkSemaphoreCreateInfo sem_ci{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
     VkFenceCreateInfo fence_ci{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;

@@ -1,11 +1,13 @@
 #pragma once
 #include <algorithm>
+#include <span>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 #include "vk_context.h"
 #include "vk_macro.h"
 #include "platform/window.h"
+#include "render/graphics_pipeline.h"
 
 namespace vk
 {
@@ -191,4 +193,51 @@ namespace vk
     }
 
 
+    inline VkDescriptorType to_vk_descriptor_type(DescriptorType type)
+    {
+        switch (type)
+        {
+        case DescriptorType::UniformBuffer:
+            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+        case DescriptorType::Sampler:
+        case DescriptorType::Texture:
+            return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+        default:
+            assert(false);
+            return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+        }
+    }
+
+    inline VkShaderStageFlags to_vk_shader_stage_flags(ShaderStage stages)
+    {
+        VkShaderStageFlags flags = 0;
+
+        if (stages & ShaderStage::Vertex)
+            flags |= VK_SHADER_STAGE_VERTEX_BIT;
+
+        if (stages & ShaderStage::Fragment)
+            flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        return flags;
+    }
+    
+    inline std::vector<VkPushConstantRange> to_vk_ranges(std::span<const PushConstantRange> ranges)
+    {
+        std::vector<VkPushConstantRange> vk;
+        vk.reserve(ranges.size());
+
+        for (const PushConstantRange& r : ranges)
+        {
+            VkPushConstantRange vk_range{};
+            vk_range.stageFlags = vk::to_vk_shader_stage_flags(r.stages);
+            vk_range.offset     = r.offset;
+            vk_range.size       = r.size;
+
+            vk.push_back(vk_range);
+        }
+
+        return vk;
+    }
 }

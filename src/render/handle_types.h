@@ -4,6 +4,7 @@
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
 #include "common/type_utils.h"
+#include "common/type_macros.h"
 
 template<typename... Ts>
 struct RBHandle
@@ -11,6 +12,8 @@ struct RBHandle
     using AllowedTypes = TypeList<Ts...>;
     
     uintptr_t handle;
+    
+    AUTO_SPACESHIP(RBHandle, handle);
 #if _DEBUG
     std::optional<const char*> type_id = std::nullopt;
 #endif
@@ -32,7 +35,7 @@ struct RBHandle
 #if _DEBUG
         type_id = typeid(T).name();
 #endif
-        handle = reinterpret_cast<uintptr_t>(Value);
+        handle = (uintptr_t)(Value);
     }
     
     template<typename T>
@@ -92,6 +95,7 @@ struct RBHandle
 using RBCommandList = RBHandle<VkCommandBuffer>;
 using RBPipelineHandle = RBHandle<VkPipeline>;
 using RBDescriptorSet = RBHandle<VkDescriptorSet>;
+using RBDescriptorSetLayout = RBHandle<uint64_t>;
 
 using RBWindowHandle = RBHandle<GLFWwindow*>;
 

@@ -4,16 +4,19 @@
 #include "vk_context.h"
 #include "vk_shader.h"
 
+struct GraphicsPipelineDesc;
+
 class VkPipelineObject
 {
 public:
     VkPipelineObject(
         vk::InstanceContext& in_instance_context, 
         vk::SwapchainContext& in_swapchain_context,
-        const VkDescriptorSetLayout camera_set_layout);
+        const GraphicsPipelineDesc& desc,
+        class VkRenderBackend& backend);
     ~VkPipelineObject();
 
-    VkPipeline get_pipeline() const { return pipeline_; }
+    VkPipeline get_handle() const { return pipeline_; }
     
     VkPipelineLayout get_pipeline_layout() const
     {

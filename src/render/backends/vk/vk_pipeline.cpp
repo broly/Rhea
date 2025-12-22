@@ -1,33 +1,47 @@
 ﻿#include "vk_pipeline.h"
 
+#include "vk_helpers.h"
 #include "vk_macro.h"
+#include "vk_render_backend.h"
 #include "vk_shader.h"
+#include "render/graphics_pipeline.h"
 
+class VkRenderBackend;
 
 VkPipelineObject::VkPipelineObject(
-    vk::InstanceContext& in_instance_context, 
-    vk::SwapchainContext& in_swapchain_context,
-    const VkDescriptorSetLayout camera_set_layout)
-    : instance_context(in_instance_context)
-    , swapchain_context(in_swapchain_context)
+    vk::InstanceContext& instance,
+    vk::SwapchainContext& swapchain,
+    const GraphicsPipelineDesc& desc,
+    VkRenderBackend& backend)
+        : instance_context(instance)
+        , swapchain_context(swapchain)
 {
+    std::vector<VkDescriptorSetLayout> vk_layouts;
+
+    for (RBDescriptorSetLayout h : desc.layout.sets)
+    {
+        vk_layouts.push_back(
+            backend.get_vk_descriptor_set_layout(h).vk_layout
+        );
+    }
+
     VkPipelineLayoutCreateInfo plci{
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
     };
-    plci.setLayoutCount = 1;
-    plci.pSetLayouts = &camera_set_layout;
+    plci.setLayoutCount = uint32_t(vk_layouts.size());
+    plci.pSetLayouts = vk_layouts.data();
 
-    VK_CHECK(vkCreatePipelineLayout(
-        instance_context.device,
-        &plci,
-        nullptr,
-        &pipeline_layout));
+    // push constants
+    plci.pushConstantRangeCount = desc.layout.push_constants.size();
+    std::vector<VkPushConstantRange> push_constants = vk::to_vk_ranges(desc.layout.push_constants);
+    plci.pPushConstantRanges = push_constants.data();
+
+    vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
     
     
     
-    
-    VkShader vert(in_instance_context.device, "shaders/cube.vert.spv");
-    VkShader frag(in_instance_context.device, "shaders/cube.frag.spv");
+    VkShader vert(instance.device, "shaders/cube.vert.spv");
+    VkShader frag(instance.device, "shaders/cube.frag.spv");
 
     VkPipelineShaderStageCreateInfo stages[2]{};
 
@@ -61,12 +75,12 @@ VkPipelineObject::VkPipelineObject(
 
     VkViewport viewport{
         0, 0,
-        (float)in_swapchain_context.extent.width,
-        (float)in_swapchain_context.extent.height,
+        (float)swapchain.extent.width,
+        (float)swapchain.extent.height,
         0.0f, 1.0f
     };
 
-    VkRect2D scissor{{0,0}, in_swapchain_context.extent};
+    VkRect2D scissor{{0,0}, swapchain.extent};
 
     VkPipelineViewportStateCreateInfo viewport_state{
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
@@ -123,12 +137,12 @@ VkPipelineObject::VkPipelineObject(
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
     pci.layout = pipeline_layout;
-    pci.renderPass = in_swapchain_context.render_pass;
+    pci.renderPass = swapchain.render_pass;
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
 
     VK_CHECK(vkCreateGraphicsPipelines(
-        in_instance_context.device,
+        instance.device,
         VK_NULL_HANDLE,
         1,
         &pci,
