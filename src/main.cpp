@@ -1,14 +1,32 @@
 ﻿#include "engine.h"
 #include "globals.h"
+#include "common/json_utils.h"
 #include "common/paths.h"
 
 
 int main() {
     paths::init();
     
-    Engine engine;
-    RhGlobals::engine = &engine;
-    engine.run();
+    const char* engine_config_path = "system/engine.json";
     
+    auto value = json_utils::load_json_asset(engine_config_path);
+    if (value.has_value())
+    {
+        if (Json::Value const* engine_class_value = value->find("engine_class"))
+        {
+            std::string engine_class_name = engine_class_value->asString();
+            auto reflection_info = reflect::find_object_reflection_info(engine_class_name);
+            std::shared_ptr<Engine> engine = reflection_info->instantiate<Engine>();
+            RhGlobals::engine = engine.get();
+            engine->run();
+        }
+        else
+        {
+            std::cerr << "Could not find json section 'engine_class'" << std::endl;
+        }
+    } else
+    {
+        std::cerr << "Could not find asset " << engine_config_path << std::endl;
+    }
     return 0;
 }

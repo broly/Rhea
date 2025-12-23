@@ -40,8 +40,8 @@ VkPipelineObject::VkPipelineObject(
     
     
     
-    VkShader vert(instance.device, "shaders/cube.vert.spv");
-    VkShader frag(instance.device, "shaders/cube.frag.spv");
+    VkShader vert(instance.device, desc.vertex_shader);
+    VkShader frag(instance.device, desc.fragment_shader);
 
     VkPipelineShaderStageCreateInfo stages[2]{};
 
@@ -67,6 +67,22 @@ VkPipelineObject::VkPipelineObject(
     VkPipelineVertexInputStateCreateInfo vertex_input{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
     };
+    
+    VkVertexInputBindingDescription binding{};
+    binding.binding = 0;
+    binding.stride = sizeof(Vertex);
+    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    std::array<VkVertexInputAttributeDescription, 3> attrs{};
+    attrs[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position) };
+    attrs[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) };
+    attrs[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, tex_coord) };
+
+    vertex_input.vertexBindingDescriptionCount = 1;
+    vertex_input.pVertexBindingDescriptions = &binding;
+    vertex_input.vertexAttributeDescriptionCount = attrs.size();
+    vertex_input.pVertexAttributeDescriptions = attrs.data();
+
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO

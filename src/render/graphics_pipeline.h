@@ -15,8 +15,8 @@ enum class VertexLayout
 
 enum ShaderStage
 {
-    Vertex = 0x1,
-    Fragment = 0x2,
+    ss_Vertex = 0x1,
+    ss_Fragment = 0x2,
 };
 
 enum class DescriptorType

@@ -1,5 +1,6 @@
 #pragma once
 #include "render_backend.h"
+#include "resource_type.h"
 #include "rg_types.h"
 
 
@@ -7,8 +8,8 @@ struct RenderGraphPass
 {
     std::string name;
 
-    std::vector<RGResourceHandle> reads;
-    std::vector<RGResourceHandle> writes;
+    std::vector<RenderResource> reads;
+    std::vector<RenderResource> writes;
 
     std::function<void(class RenderGraphContext&)> execute;
 };
@@ -55,9 +56,4 @@ private:
     std::vector<RenderGraphPass> passes;
 
     std::vector<uint32_t> execution_order;
-    // void initialize(RBWindowHandle window_handle);
-    //
-    // void draw(const Camera& camera);
-    //
-    // std::unique_ptr<RenderBackend> backend;
 };

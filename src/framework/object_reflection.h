@@ -7,6 +7,7 @@
 #include <string_view>
 #include <json/value.h>
 #include <set>
+
 #include "common/reflect.h"
 
 
@@ -198,6 +199,9 @@ namespace reflect
     
         ObjectFactoryType factory;
         std::optional<JsonSerializer> serializer;
+        
+        template<typename T>
+        std::shared_ptr<T> instantiate() const;
     };
 
     extern void register_object_class_impl(
@@ -207,50 +211,7 @@ namespace reflect
         std::optional<JsonSerializer> serializer);
     
     extern const ObjectReflectionInfo* find_object_reflection_info(std::string_view name);
-    
-    inline std::string json_val_to_str(const Json::Value& value) {
-        if (value.isString()) {
-            return value.asString();
-        } else if (value.isNumeric()) {
-
-            if (value.isInt()) {
-                return std::to_string(value.asInt());
-            } else if (value.isUInt()) {
-                return std::to_string(value.asUInt());
-            } else if (value.isInt64()) {
-                return std::to_string(value.asInt64());
-            } else if (value.isDouble()) {
-
-                std::ostringstream oss;
-                oss << value.asDouble();
-                return oss.str();
-            } else if (value.isBool()) {
-                return value.asBool() ? "true" : "false";
-            }
-        } else if (value.isBool()) {
-            return value.asBool() ? "true" : "false";
-        } else if (value.isNull()) {
-            return "null";
-        }
-    
-        return value.toStyledString();
-    }
-    
-    template<auto PtrToField, typename ObjType>
-    inline bool read_member_from_json(const Json::Value& json_value, std::string_view field_name, ObjType* object_ptr, bool is_loading)
-    {
-        auto* value_ptr = &std::invoke(PtrToField, object_ptr);
-               
-        std::string field_name_str = std::string(field_name);
-        if (auto json_field_value = json_value.find(field_name_str))
-        {
-            auto string_value = json_val_to_str(*json_field_value);
-            convert_from_string(*value_ptr, string_value);
-        }
-        return true;
-    }
-    
-    
+        
     template <typename T>
     inline bool register_actor_class(std::string_view name, std::optional<JsonSerializer>&& Serializer)
     {
@@ -277,6 +238,20 @@ namespace reflect
     {
         return reflect_inner::RhObjectTraits<T>::bases;
     }
+    
+    
+    template <typename T>
+    std::shared_ptr<T> ObjectReflectionInfo::instantiate() const
+    {
+        auto type_id = reflect::get_object_type_id<T>();
+        assert(bases.contains(type_id));
+        std::string obj_name = std::string(name) + "_inst";
+        ObjectInitData init_data;
+        init_data.name = obj_name;
+        auto object = (factory)(init_data);
+        return std::static_pointer_cast<T>(object);
+    }
+
     
 }
 

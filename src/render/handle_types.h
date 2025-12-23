@@ -95,7 +95,7 @@ struct RBHandle
 using RBCommandList = RBHandle<VkCommandBuffer>;
 using RBPipelineHandle = RBHandle<VkPipeline>;
 using RBDescriptorSet = RBHandle<VkDescriptorSet>;
-using RBDescriptorSetLayout = RBHandle<uint64_t>;
+using RBDescriptorSetLayout = RBHandle<uint64_t>; // temporary
 
 using RBWindowHandle = RBHandle<GLFWwindow*>;
 

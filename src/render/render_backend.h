@@ -58,7 +58,6 @@ public:
     virtual void allocate_descriptor_sets_for_layout(
         RBDescriptorSetLayout layout_handle,
         DescriptorPoolType pool_type) = 0;
-    virtual void update_camera_ubo(RBFrameHandle frame_handle, const struct Camera& camera) = 0;
 
     virtual RBFramebufferId acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) = 0;
@@ -69,6 +68,7 @@ public:
     virtual void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) = 0;
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshHandle mesh) = 0;
-    virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix) = 0;
+    virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
+    virtual void create_mesh_buffers(MeshHandle handle) = 0;
 };

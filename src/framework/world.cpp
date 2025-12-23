@@ -7,6 +7,7 @@
 #include "object.h"
 #include "object_reflection.h"
 #include "common/assertion_macros.h"
+#include "common/json_utils.h"
 #include "common/paths.h"
 #include "render/scene_extractor.h"
 
@@ -45,31 +46,9 @@ bool World::load_bootstrap_level()
     return load_level("levels/bootstrap_level.json");
 }
 
-std::optional<Json::Value> load_json(std::string level_rel_path)
-{
-    std::filesystem::path level_path = paths::get_assets_path() / level_rel_path;
-    
-    std::ifstream file(level_path);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open bootstrap_level.json" << std::endl;
-        return std::nullopt;
-    }
-    
-    Json::Value root;
-    Json::CharReaderBuilder reader;
-    std::string errs;
-    
-    if (!Json::parseFromStream(reader, file, &root, &errs)) {
-        std::cerr << "Failed to parse JSON: " << errs << std::endl;
-        return std::nullopt;
-    }
-    
-    return root;
-}
-
 bool World::load_level(std::string level_path)
 {
-    std::optional<Json::Value> root_opt = load_json(level_path);
+    std::optional<Json::Value> root_opt = json_utils::load_json_asset(level_path);
     
     if (!root_opt.has_value())
     {
@@ -97,7 +76,7 @@ bool World::load_level(std::string level_path)
         if (auto ref = level_actor_json_value.find("ref"))
         {
             auto str = ref->asString();
-            auto opt = load_json(str);
+            auto opt = json_utils::load_json_asset(str);
             if (opt.has_value())
             {
                 ref_json_value_opt = opt.value();

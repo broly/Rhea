@@ -180,33 +180,6 @@ void VkRenderBackend::create_depth_resources()
         &swapchain_context.depth_image_view));
 }
 
-void VkRenderBackend::update_camera_ubo(
-    vk::FrameContext& frame,
-    const Camera& camera)
-{
-    CameraUBO ubo;
-
-    const float aspect =
-        static_cast<float>(swapchain_context.extent.width) /
-        static_cast<float>(swapchain_context.extent.height);
-
-    ubo.mvp =
-        camera.projection(aspect) *
-        camera.view() *
-        Transform{}.matrix();
-
-    void* data = nullptr;
-    VK_CHECK(
-        vkMapMemory(instance_context.device, frame.camera_memory, 0, sizeof(CameraUBO), 0, &data)
-    );
-
-    std::memcpy(data, &ubo, sizeof(CameraUBO));
-
-    vkUnmapMemory(
-        instance_context.device,
-        frame.camera_memory);
-}
-
 RBDescriptorSetLayout VkRenderBackend::allocate_descriptor_layout_handle()
 {
     auto result = ++descriptor_set_counter;
@@ -377,17 +350,80 @@ void VkRenderBackend::advance_frame()
         (frame_schedule_context.current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshHandle mesh)
+void VkRenderBackend::create_mesh_buffers(MeshHandle handle)
 {
-    // TODO
+    MeshGPUData data{};
+    auto& mesh = handle.get();
+
+    data.index_count = static_cast<uint32_t>(mesh.indices.size());
+
+
+    vk::create_buffer(
+        instance_context.device,
+        instance_context.physical_device,
+        mesh.vertices.size() * sizeof(Vertex),
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        data.vertex_buffer,
+        data.vertex_memory
+    );
+
+
+    void* mapped_data = nullptr;
+    vkMapMemory(
+        instance_context.device,
+        data.vertex_memory,
+        0,
+        mesh.vertices.size() * sizeof(Vertex),
+        0,
+        &mapped_data
+    );
+    memcpy(mapped_data, mesh.vertices.data(),
+        mesh.vertices.size() * sizeof(Vertex));
+    vkUnmapMemory(instance_context.device, data.vertex_memory);
+
+
+    vk::create_buffer(
+        instance_context.device,
+        instance_context.physical_device,
+        mesh.indices.size() * sizeof(uint32_t),
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        data.index_buffer,
+        data.index_memory
+    );
+
+
+    vkMapMemory(
+        instance_context.device,
+        data.index_memory,
+        0,
+        mesh.indices.size() * sizeof(uint32_t),
+        0,
+        &mapped_data
+    );
+    memcpy(mapped_data, mesh.indices.data(),
+        mesh.indices.size() * sizeof(uint32_t));
+    vkUnmapMemory(instance_context.device, data.index_memory);
+
+    mesh_map[handle] = data;
 }
 
-void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix)
+
+void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshHandle mesh)
 {
-    // TODO
+    VkBuffer vertex_buffers = mesh_map[mesh].vertex_buffer;
+    VkBuffer index_buffer = mesh_map[mesh].index_buffer;
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffers, offsets);
+    vkCmdBindIndexBuffer(cmd, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+}
+
+void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle)
+{
     vkCmdPushConstants(
         cmd,
-        pipelines.begin()->second->get_pipeline_layout(), 
+        pipelines[pipeline_handle]->get_pipeline_layout(),
         VK_SHADER_STAGE_VERTEX_BIT, 
         0, 
         sizeof(glm::mat4),
@@ -397,8 +433,7 @@ void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix)
 
 void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)
 {
-    // TODO
-    vkCmdDraw(cmd, index_count, 1, 0, 0);
+    vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 }
 
 
@@ -869,12 +904,6 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
     
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdDraw(cmd, vertex_count, 1, 0, 0);
-}
-
-void VkRenderBackend::update_camera_ubo(RBFrameHandle frame_handle, const Camera& camera)
-{
-    auto& frame = frame_schedule_context.frames[frame_handle];
-    update_camera_ubo(frame, camera);
 }
 
 RBFramebufferId VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)

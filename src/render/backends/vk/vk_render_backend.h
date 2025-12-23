@@ -15,6 +15,15 @@ struct DescriptorSetLayoutData
     uint32_t set_index;
 };
 
+struct MeshGPUData {
+    VkBuffer vertex_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
+    VkBuffer index_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory index_memory = VK_NULL_HANDLE;
+    uint32_t index_count = 0;
+    RBDescriptorSet descriptor_set;
+};
+
 class VkRenderBackend final : public RenderBackend
 {
 public:
@@ -27,7 +36,6 @@ public:
     void end_render_pass(RBCommandList cmd_list) override;
     void bind_pipeline(RBCommandList cmd_list, RBPipelineHandle pipeline_handle) override;
     void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
-    void update_camera_ubo(RBFrameHandle frame_handle, const Camera& camera) override;
     RBFramebufferId acquire_next_image(RBFrameHandle frame_handle) override;
     void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) override;
     RBPipelineHandle create_pipeline(GraphicsPipelineDesc desc) override;
@@ -59,8 +67,6 @@ private: // Special section
     void create_depth_resources();
     
 private: // Camera section
-    // void create_camera_ubo();
-    void update_camera_ubo(vk::FrameContext& FrameContext, const Camera& camera);
     RBDescriptorSetLayout allocate_descriptor_layout_handle();
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) override;
     void create_descriptor_pool();
@@ -75,8 +81,12 @@ public:
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     void advance_frame() override;
     void bind_mesh(const RBCommandList& cmd, MeshHandle mesh) override;
-    void push_constants(const RBCommandList& cmd, glm::mat4 matrix) override;
+    void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) override;
     void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
+    void create_mesh_buffers(MeshHandle handle) override;
+    
+    
+    
 
 private:
     vk::Context context = {};
@@ -87,6 +97,8 @@ private:
     vk::PipelineContext pipeline_context = {};
     vk::DescriptorContext descriptor_context = {};
     std::vector<vk::ImageContext> images;
+    
+    
     
     
     std::map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
@@ -100,4 +112,5 @@ private:
     uint64_t descriptor_set_counter = 0;
     std::map<RBDescriptorSetLayout, DescriptorSetLayoutData> descriptor_set_layouts;
     std::map<RBDescriptorSetLayout, RBDescriptorSet> persistent_descriptors;
+    std::map<MeshHandle, MeshGPUData> mesh_map;
 };
