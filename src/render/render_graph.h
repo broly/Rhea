@@ -8,8 +8,8 @@ struct RenderGraphPass
 {
     std::string name;
 
-    std::vector<RenderResource> reads;
-    std::vector<RenderResource> writes;
+    std::vector<RGResourceHandle> reads;
+    std::vector<RGResourceHandle> writes;
 
     std::function<void(class RenderGraphContext&)> execute;
 };
@@ -52,7 +52,7 @@ private:
         RGResourceType type;
     };
 
-    std::vector<Resource> resources;
+    std::vector<RGResource> resources;
     std::vector<RenderGraphPass> passes;
 
     std::vector<uint32_t> execution_order;

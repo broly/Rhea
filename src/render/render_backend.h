@@ -5,6 +5,7 @@
 #include "graphics_pipeline.h"
 #include "framework/camera.h"
 #include "handle_types.h"
+#include "rg_types.h"
 #include "scene_extractor.h"
 #include "backends/vk/vk_camera_ubo.h"
 
@@ -34,6 +35,7 @@ public:
     {
         update_uniform_buffer_impl(buffer_handle, sizeof(T), (void*)&data);
     }
+
 
     template<RenderBackendType T>
     static std::unique_ptr<RenderBackend> create(RBWindowHandle window_handle)
@@ -72,5 +74,6 @@ public:
     virtual void bind_mesh(const RBCommandList& cmd, MeshHandle mesh) = 0;
     virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
-    virtual void create_mesh_buffers(MeshHandle handle) = 0;
+    virtual void get_or_create_mesh_buffers(MeshHandle handle) = 0;
+    virtual RGTextureFormat get_swapchain_format() const = 0;
 };

@@ -3,12 +3,18 @@
 #include "backends/vk/vk_render_backend.h"
 
 
-RGResourceHandle RenderGraph::create_texture(const RGTextureDesc&)
+RGResourceHandle RenderGraph::create_texture(const RGTextureDesc& desc)
 {
-    RGResourceHandle handle;
-    handle.id = static_cast<uint32_t>(resources.size());
+    RGResourceHandle handle{
+        static_cast<uint32_t>(resources.size())
+    };
 
-    resources.push_back({ RGResourceType::Texture });
+    RGResource res{};
+    res.kind = RGResourceKind::Texture;
+    res.texture_desc = desc;
+
+    resources.push_back(std::move(res));
+
     return handle;
 }
 
@@ -17,7 +23,7 @@ RGResourceHandle RenderGraph::create_buffer(const RGBufferDesc&)
     RGResourceHandle handle;
     handle.id = static_cast<uint32_t>(resources.size());
 
-    resources.push_back({ RGResourceType::Buffer });
+    resources.push_back({ RGResourceKind::Buffer });
     return handle;
 }
 

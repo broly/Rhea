@@ -426,13 +426,15 @@ void VkRenderBackend::advance_frame()
         (frame_schedule_context.current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VkRenderBackend::create_mesh_buffers(MeshHandle handle)
+void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
 {
+    if (mesh_map.contains(handle))
+        return;
+    
     MeshGPUData data{};
     auto& mesh = handle.get();
 
     data.index_count = static_cast<uint32_t>(mesh.indices.size());
-
 
     vk::create_buffer(
         instance_context.device,
@@ -443,7 +445,6 @@ void VkRenderBackend::create_mesh_buffers(MeshHandle handle)
         data.vertex_buffer,
         data.vertex_memory
     );
-
 
     void* mapped_data = nullptr;
     vkMapMemory(
@@ -458,7 +459,6 @@ void VkRenderBackend::create_mesh_buffers(MeshHandle handle)
         mesh.vertices.size() * sizeof(Vertex));
     vkUnmapMemory(instance_context.device, data.vertex_memory);
 
-
     vk::create_buffer(
         instance_context.device,
         instance_context.physical_device,
@@ -468,7 +468,6 @@ void VkRenderBackend::create_mesh_buffers(MeshHandle handle)
         data.index_buffer,
         data.index_memory
     );
-
 
     vkMapMemory(
         instance_context.device,
@@ -483,6 +482,27 @@ void VkRenderBackend::create_mesh_buffers(MeshHandle handle)
     vkUnmapMemory(instance_context.device, data.index_memory);
 
     mesh_map[handle] = data;
+}
+
+RGTextureFormat VkRenderBackend::get_swapchain_format() const
+{
+    switch (swapchain_context.surface_format.format)
+    {
+    case VK_FORMAT_B8G8R8A8_UNORM:
+        return RGTextureFormat::RGBA8_UNORM;
+
+    case VK_FORMAT_B8G8R8A8_SRGB:
+        return RGTextureFormat::RGBA8_SRGB;
+
+    case VK_FORMAT_R8G8B8A8_UNORM:
+        return RGTextureFormat::RGBA8_UNORM;
+
+    case VK_FORMAT_R8G8B8A8_SRGB:
+        return RGTextureFormat::RGBA8_SRGB;
+
+    default:
+        throw std::runtime_error("Unsupported swapchain format");
+    }
 }
 
 

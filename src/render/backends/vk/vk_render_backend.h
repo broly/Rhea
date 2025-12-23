@@ -89,8 +89,8 @@ public:
     void bind_mesh(const RBCommandList& cmd, MeshHandle mesh) override;
     void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) override;
     void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
-    void create_mesh_buffers(MeshHandle handle) override;
-    
+    void get_or_create_mesh_buffers(MeshHandle handle) override;
+    RGTextureFormat get_swapchain_format() const override;
     
     
 

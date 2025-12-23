@@ -12,7 +12,6 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     render_graph = std::make_shared<RenderGraph>();
     
-
     DescriptorSetLayoutDesc camera_set{
         .set_index = 0,
         .bindings = {{
@@ -27,13 +26,12 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
     camera_buffer = render_backend->create_uniform_buffer(sizeof(CameraUBO), ResourceUsageType::Frame);
     render_backend->bind_buffer_to_descriptor(camera_layout, 0, camera_buffer);
 
-
-    GraphicsPipelineDesc desc{
+    GraphicsPipelineDesc geom_pipeline_desc{
         .vertex_shader = "shaders/geometry.vert.spv",
         .fragment_shader = "shaders/geometry.frag.spv",
         .vertex_layout = VertexLayout::PositionNormalTangentUV,
         .layout = {
-            .sets = { camera_layout }, // camera UBO
+            .sets = { camera_layout }, 
             .push_constants = {{
                 .stages = ShaderStage::ss_Vertex,
                 .offset = 0,
@@ -42,20 +40,24 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         }
     };
 
-    auto geometry_pipeline = render_backend->create_pipeline(desc);
+    auto geometry_pipeline = render_backend->create_pipeline(geom_pipeline_desc);
     
-    // HACK
-    std::set<MeshHandle> registered_meshes;
-    // ENDHACK
+    RGTextureDesc swapchain_desc{
+        .width  = 0,
+        .height = 0,
+        .format = render_backend->get_swapchain_format(),
+        .usage  = RGTextureUsage::ColorAttachment | RGTextureUsage::Present,
+        .external = true
+    };
 
-
+    auto swapchain_color = render_graph->create_texture(swapchain_desc);
+    
     render_graph->add_pass({
         .name = "Geometry",
-        .writes = { RenderResource::SwapchainColor },
+        .writes = { swapchain_color },
         .execute = [=](RenderGraphContext& ctx)
         {
             auto cmd = ctx.cmd;
-
 
             CameraUBO camera_ubo;
             camera_ubo.mvp = world->camera->projection(1.0) * world->camera->view();
@@ -63,7 +65,6 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
 
             ctx.backend.bind_pipeline(cmd, geometry_pipeline);
 
-            // bind camera descriptor set (set 0)
             ctx.backend.bind_descriptor_set(
                 cmd,
                 0,
@@ -71,22 +72,13 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
                 geometry_pipeline
             );
 
-
             for (const auto& ro : world->get_render_extractor()->meshes)
             {
-                // HACK
-                if (!registered_meshes.contains(ro.mesh))
-                {
-                    ctx.backend.create_mesh_buffers(ro.mesh);
-                }
-                // ENDHACK
+                ctx.backend.get_or_create_mesh_buffers(ro.mesh);
+
                 ctx.backend.bind_mesh(cmd, ro.mesh);
 
-
                 ctx.backend.push_constants(cmd, ro.world, geometry_pipeline);
-
-
-                // ctx.backend.bind_descriptor_set(cmd, 1, ro.mesh.descriptor_set, geometry_pipeline);
 
                 ctx.backend.draw_indexed(cmd, ro.mesh.get().get_index_count());
             }
