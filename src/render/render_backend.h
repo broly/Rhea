@@ -23,16 +23,18 @@ public:
     virtual RBFrameHandle get_current_frame() const = 0;
     virtual void wait_for_frame(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
-    virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, DescriptorPoolType pool_type) = 0;
+    virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) = 0;
 
+    virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) = 0;
+    virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data) = 0;
+    virtual void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) = 0;
+    
     template<typename T>
-    void update_descriptor_set_data(RBDescriptorSetLayout rb_handle, const T& buffer)
+    void update_uniform_buffer(RBBufferHandle buffer_handle, T& data)
     {
-        update_descriptor_set_data_impl(rb_handle, (void*)&buffer, sizeof(T));
+        update_uniform_buffer_impl(buffer_handle, sizeof(T), (void*)&data);
     }
-    
-    virtual void update_descriptor_set_data_impl(RBDescriptorSetLayout rb_handle, void* buffer, size_t buffer_size) = 0;
-    
+
     template<RenderBackendType T>
     static std::unique_ptr<RenderBackend> create(RBWindowHandle window_handle)
     {
@@ -57,7 +59,7 @@ public:
     
     virtual void allocate_descriptor_sets_for_layout(
         RBDescriptorSetLayout layout_handle,
-        DescriptorPoolType pool_type) = 0;
+        ResourceUsageType pool_type) = 0;
 
     virtual RBFramebufferId acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) = 0;

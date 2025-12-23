@@ -32,14 +32,9 @@ void Engine::run()
     
     init();
     
-    
     world = std::make_shared<World>();
     
     renderer->init(window_handle, world);
-    
-    // init_render_graph(*render_backend, *render_graph);
-    
-    // render_graph->initialize(window_handle);
     
     std::shared_ptr<EngineClock> clock = std::make_shared<EngineClock>();
     

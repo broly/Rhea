@@ -22,8 +22,10 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         }}
     };
 
-    RBDescriptorSetLayout camera_layout = render_backend->create_descriptor_set_layout(camera_set);
-    render_backend->allocate_descriptor_sets_for_layout(camera_layout, DescriptorPoolType::Frame);
+    camera_layout = render_backend->create_descriptor_set_layout(camera_set);
+    render_backend->allocate_descriptor_sets_for_layout(camera_layout, ResourceUsageType::Frame);
+    camera_buffer = render_backend->create_uniform_buffer(sizeof(CameraUBO), ResourceUsageType::Frame);
+    render_backend->bind_buffer_to_descriptor(camera_layout, 0, camera_buffer);
 
 
     GraphicsPipelineDesc desc{
@@ -57,7 +59,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
 
             CameraUBO camera_ubo;
             camera_ubo.mvp = world->camera->projection(1.0) * world->camera->view();
-            ctx.backend.update_descriptor_set_data(camera_layout, camera_ubo);
+            ctx.backend.update_uniform_buffer(camera_buffer, camera_ubo);
 
             ctx.backend.bind_pipeline(cmd, geometry_pipeline);
 
@@ -65,7 +67,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
             ctx.backend.bind_descriptor_set(
                 cmd,
                 0,
-                ctx.backend.get_descriptor_set(camera_layout, DescriptorPoolType::Frame),
+                ctx.backend.get_descriptor_set(camera_layout, ResourceUsageType::Frame),
                 geometry_pipeline
             );
 

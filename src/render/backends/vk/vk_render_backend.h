@@ -40,8 +40,15 @@ public:
     void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) override;
     RBPipelineHandle create_pipeline(GraphicsPipelineDesc desc) override;
     DescriptorSetLayoutData get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle);
-    virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, DescriptorPoolType pool_type) override;
-    void update_descriptor_set_data_impl(RBDescriptorSetLayout layout, void* buffer, size_t buffer_size) override;
+    virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) override;
+    RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
+    
+    
+    virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data) override;
+    void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) override;
+
+
+    vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index = 0);
     
 private: // Initialization section
     void create_instance();
@@ -52,8 +59,7 @@ private: // Initialization section
 private: // Re-/Initialization section
     void create_render_pass();
     void create_framebuffers();
-    void create_frame_resources();
-    
+
     void create_swapchain();
     void create_command_pool();
     
@@ -72,7 +78,7 @@ private: // Camera section
     void create_descriptor_pool();
     virtual void allocate_descriptor_sets_for_layout(
         RBDescriptorSetLayout layout_handle,
-        DescriptorPoolType pool_type) override;
+        ResourceUsageType usage_type) override;
 
 public:
     void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;

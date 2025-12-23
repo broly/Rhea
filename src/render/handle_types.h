@@ -3,6 +3,7 @@
 #include <optional>
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
+
 #include "common/type_utils.h"
 #include "common/type_macros.h"
 
@@ -88,6 +89,45 @@ struct RBHandle
     {
         return as<T>();
     }
+};
+
+
+enum class ResourceUsageType
+{
+    Frame,      // per-frame (camera, per-frame UBOs)
+    Persistent  // materials, textures etc.
+};
+
+struct RBBufferHandle
+{
+    RBBufferHandle(uint64_t in_handle) 
+        : handle(in_handle) {}
+    
+    RBBufferHandle(uint32_t identifier, ResourceUsageType usage_type)
+        : identifier(identifier), usage_type(usage_type) {}
+    
+    AUTO_SPACESHIP(RBBufferHandle, handle);
+    
+    ResourceUsageType get_usage_type() const
+    {
+        return usage_type;
+    }
+    
+    uint32_t get_identifier() const
+    {
+        return identifier;
+    }
+    
+protected:
+    union
+    {
+        struct
+        {
+            uint32_t identifier;
+            ResourceUsageType usage_type;
+        };
+        uint64_t handle = 0;
+    };
 };
 
 

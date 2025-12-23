@@ -69,10 +69,5 @@ struct FrameResources
     std::unordered_map<uint32_t, RBDescriptorSet> descriptor_sets;
 };
 
-enum class DescriptorPoolType
-{
-    Frame,      // per-frame (camera, per-frame UBOs)
-    Persistent  // materials, textures etc.
-};
 
 using FrameIndex = uint32_t;

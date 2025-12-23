@@ -9,14 +9,21 @@
 
 namespace vk
 {
+    struct BufferInfo
+    {
+        VkBuffer buffer;
+        VkDeviceMemory memory;
+        void* mapped_ptr;
+    };
+    
     struct FrameContext {
         VkCommandBuffer cmd = VK_NULL_HANDLE;
 
         VkSemaphore image_available = VK_NULL_HANDLE;
         VkFence in_flight = VK_NULL_HANDLE;
 
-        VkBuffer camera_buffer = VK_NULL_HANDLE;
-        VkDeviceMemory camera_memory = VK_NULL_HANDLE;
+        // VkBuffer camera_buffer = VK_NULL_HANDLE;
+        // VkDeviceMemory camera_memory = VK_NULL_HANDLE;
         std::map<RBDescriptorSetLayout, RBDescriptorSet> descriptors;
     };
 
@@ -66,6 +73,8 @@ namespace vk
         
         
         VkSurfaceFormatKHR surface_format;
+        std::map<uint32_t, BufferInfo> ubos;
+        uint32_t ubo_counter;
     };
 
     struct DescriptorContext
@@ -78,11 +87,13 @@ namespace vk
         VkPipeline pipeline;
         VkPipelineLayout layout;
     };
-    
     struct FrameScheduleContext
     {
         std::array<FrameContext, MAX_FRAMES_IN_FLIGHT> frames;
         uint32_t current_frame;
+        
+        std::map<uint32_t, std::array<BufferInfo, MAX_FRAMES_IN_FLIGHT>> ubos;
+        uint32_t ubos_counter;
     };
     
     

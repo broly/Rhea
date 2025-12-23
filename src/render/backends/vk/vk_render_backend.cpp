@@ -19,6 +19,82 @@ constexpr const char* VALIDATION_LAYERS[] = {
 };
 
 
+void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data)
+{
+    auto& buf = get_buffer(buffer_handle, frame_schedule_context.current_frame);
+    
+    memcpy(buf.mapped_ptr, data, size);
+    
+}
+
+void VkRenderBackend::bind_buffer_to_descriptor(
+    RBDescriptorSetLayout layout,
+    uint32_t binding,
+    RBBufferHandle buffer)
+{
+    auto usage = buffer.get_usage_type();
+
+    if (usage == ResourceUsageType::Frame)
+    {
+        for (uint32_t frame = 0; frame < vk::MAX_FRAMES_IN_FLIGHT; ++frame)
+        {
+            auto& buf = frame_schedule_context.ubos
+                .at(buffer.get_identifier())[frame];
+
+            VkDescriptorBufferInfo info{
+                .buffer = buf.buffer,
+                .offset = 0,
+                .range  = VK_WHOLE_SIZE
+            };
+
+            VkWriteDescriptorSet write{
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = frame_schedule_context.frames[frame]
+                    .descriptors.at(layout),
+                .dstBinding = binding,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .pBufferInfo = &info
+            };
+
+            vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+        }
+    }
+    else // Persistent
+    {
+        auto& buf = swapchain_context.ubos
+            .at(buffer.get_identifier());
+
+        VkDescriptorBufferInfo info{
+            .buffer = buf.buffer,
+            .offset = 0,
+            .range  = VK_WHOLE_SIZE
+        };
+
+        VkWriteDescriptorSet write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = persistent_descriptors.at(layout),
+            .dstBinding = binding,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &info
+        };
+
+        vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+    }
+}
+
+
+vk::BufferInfo& VkRenderBackend::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
+{
+    if (buffer_handle.get_usage_type() == ResourceUsageType::Frame)
+    {
+        size_t index = buffer_handle.get_identifier();
+        return frame_schedule_context.ubos.at(index).at(frame_index);
+    }
+    return swapchain_context.ubos[buffer_handle.get_identifier()];
+}
+
 void VkRenderBackend::create_instance()
 {
     VkApplicationInfo appInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
@@ -269,11 +345,11 @@ void VkRenderBackend::create_descriptor_pool()
 
 void VkRenderBackend::allocate_descriptor_sets_for_layout(
     RBDescriptorSetLayout layout_handle,
-    DescriptorPoolType pool_type)
+    ResourceUsageType usage_type)
 {
     auto& layout_data = descriptor_set_layouts.at(layout_handle);
     
-    if (pool_type == DescriptorPoolType::Frame)
+    if (usage_type == ResourceUsageType::Frame)
     {
         for (size_t frame_index = 0; frame_index < vk::MAX_FRAMES_IN_FLIGHT; frame_index++)
         {
@@ -519,23 +595,6 @@ void VkRenderBackend::create_framebuffers()
     }
 }
 
-void VkRenderBackend::create_frame_resources()
-{
-    constexpr VkDeviceSize size = sizeof(CameraUBO);
-
-    for (auto& frame : frame_schedule_context.frames)
-    {
-        vk::create_buffer(
-            instance_context.device,
-            instance_context.physical_device,
-            size,
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            frame.camera_buffer,
-            frame.camera_memory);
-    }
-}
 void VkRenderBackend::create_swapchain()
 {
     vk::SwapchainSupport support = vk::query_swapchain_support(
@@ -816,7 +875,6 @@ void VkRenderBackend::init(RBWindowHandle in_window)
     match_queue_families();
     create_device();
     create_descriptor_pool();
-    create_frame_resources();          // <-- create camera_buffer + memory
     // for (uint32_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; ++i)
     // {
     //     allocate_descriptor_sets(camera_layout,
@@ -999,42 +1057,60 @@ DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(const RBDe
     return descriptor_set_layouts[rb_handle];
 }
 
-RBDescriptorSet VkRenderBackend::get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, DescriptorPoolType pool_type)
+RBDescriptorSet VkRenderBackend::get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type)
 {
-    if (pool_type == DescriptorPoolType::Frame)
+    if (pool_type == ResourceUsageType::Frame)
         return frame_schedule_context.frames[frame_schedule_context.current_frame].descriptors[rb_descriptor_set_layout];
     return persistent_descriptors[rb_descriptor_set_layout];
 }
 
-void VkRenderBackend::update_descriptor_set_data_impl(RBDescriptorSetLayout layout, void* buffer, size_t buffer_size)
+RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
 {
-    auto& frame = frame_schedule_context.frames[frame_schedule_context.current_frame];
-    auto it = frame.descriptors.find(layout);
-    if (it == frame.descriptors.end()) {
-        throw std::runtime_error("Descriptor set for layout not allocated");
+    if (usage_type == ResourceUsageType::Frame)
+    {
+        frame_schedule_context.ubos_counter++;
+        
+        const RBBufferHandle handle {frame_schedule_context.ubos_counter, ResourceUsageType::Frame};
+        std::array<vk::BufferInfo, vk::MAX_FRAMES_IN_FLIGHT> buffers;
+        for (int32_t index = 0; auto& frame : frame_schedule_context.frames)
+        {
+            vk::create_buffer(
+                instance_context.device,
+                instance_context.physical_device,
+                buffer_size,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                buffers[index].buffer,
+                buffers[index].memory);
+            vkMapMemory(instance_context.device, buffers[index].memory, 0, VK_WHOLE_SIZE, 0, &buffers[index].mapped_ptr);
+            index++;
+        }
+        frame_schedule_context.ubos.emplace(handle.get_identifier(), buffers);
+        
+        return handle;
+    } else
+    {
+        swapchain_context.ubo_counter++;
+        const RBBufferHandle handle {swapchain_context.ubo_counter, ResourceUsageType::Persistent};
+        
+        vk::BufferInfo buffer_info;
+        
+        
+        vk::create_buffer(
+            instance_context.device,
+            instance_context.physical_device,
+            buffer_size,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            buffer_info.buffer,
+            buffer_info.memory);
+        vkMapMemory(instance_context.device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
+        
+        swapchain_context.ubos[handle.get_identifier()] = buffer_info;
+        return handle;
     }
-
-    VkDescriptorSet set = it->second.as<VkDescriptorSet>();
-
-    // TODO: for now only uniform buffers
-    VkDescriptorBufferInfo buffer_info{};
-    buffer_info.buffer = frame.camera_buffer; // TODO hardcoded, different ubos
-    buffer_info.offset = 0;
-    buffer_info.range = buffer_size;
-
-    void* mapped = nullptr;
-    VK_CHECK(vkMapMemory(instance_context.device, frame.camera_memory, 0, buffer_size, 0, &mapped));
-    std::memcpy(mapped, buffer, buffer_size);
-    vkUnmapMemory(instance_context.device, frame.camera_memory);
-
-    VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet = set;
-    write.dstBinding = 0; // todo: hardcode
-    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    write.descriptorCount = 1;
-    write.pBufferInfo = &buffer_info;
-
-    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
 }
 
 
