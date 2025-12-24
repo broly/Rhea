@@ -56,7 +56,7 @@ public:
     virtual void begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index) = 0;
     virtual void end_render_pass(RBCommandList cmd_list) = 0;
     
-    virtual void bind_pipeline(RBCommandList cmd_list, std::shared_ptr<PipelineObject> pipeline_object) = 0;
+    virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) = 0;
     
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) = 0;
     
@@ -69,7 +69,7 @@ public:
     virtual void acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
     
-    virtual std::shared_ptr<PipelineObject> create_pipeline(GraphicsPipelineDesc desc) = 0;
+    virtual PipelineObject* create_pipeline(GraphicsPipelineDesc desc) = 0;
 
 
     virtual void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) = 0;

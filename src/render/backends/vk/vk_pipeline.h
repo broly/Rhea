@@ -11,24 +11,25 @@ class VkPipelineObject : public PipelineObject
 {
 public:
     VkPipelineObject(
-        vk::InstanceContext& in_instance_context, 
-        vk::SwapchainContext& in_swapchain_context,
         const GraphicsPipelineDesc& desc,
-        class VkRenderBackend& backend);
+        class VkRenderBackend& in_backend);
     ~VkPipelineObject();
 
-    RBPipelineHandle get_pipeline_handle() const override { return pipeline_; }
+    RBPipelineHandle get_pipeline_handle() const override
+    {
+        assert(pipeline_ != VK_NULL_HANDLE); 
+        return pipeline_;
+    }
     
     VkPipelineLayout get_pipeline_layout() const
     {
+        assert(pipeline_ != VK_NULL_HANDLE); 
         return pipeline_layout;
     }
-    VkPipeline get_or_create_pipeline(VkRenderBackend& backend, vk::SwapchainContext& swapchain, VkRenderPass render_pass);
+    VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
 
 private:
-    vk::InstanceContext& instance_context;
-    vk::SwapchainContext& swapchain_context;
-    
+    VkRenderBackend& backend;
 
     VkPipeline pipeline_ = VK_NULL_HANDLE;
     
@@ -37,5 +38,4 @@ private:
     std::optional<VkShader> vert;
     std::optional<VkShader> frag;
     
-    // std::vector<VkShader> shaders;
 };

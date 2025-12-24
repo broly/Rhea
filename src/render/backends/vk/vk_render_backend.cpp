@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <span>
 
-#include "vk_camera_ubo.h"
 #include "vk_helpers.h"
 #include "vk_macro.h"
 #include "vk_pipeline.h"
@@ -727,7 +726,7 @@ RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle
 {
     auto& obj = *pipelines[handle];
 
-    return obj.get_or_create_pipeline(*this, swapchain_context, render_pass);
+    return obj.get_or_create_pipeline(render_pass);
     
 }
 
@@ -1095,17 +1094,27 @@ void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 }
 
 
-void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, std::shared_ptr<PipelineObject> pipeline_object)
+void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object)
 {
     LogRB.Log("bind_pipeline");
     
-    auto vk_pipeline_object = std::static_pointer_cast<VkPipelineObject>(pipeline_object);
+    auto vk_pipeline_object = static_cast<VkPipelineObject*>(pipeline_object);
     
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     assert(current_render_pass != VK_NULL_HANDLE);
-    VkPipeline pipeline_vk = vk_pipeline_object->get_or_create_pipeline(*this, swapchain_context, current_render_pass);
+    VkPipeline pipeline_vk = vk_pipeline_object->get_or_create_pipeline(current_render_pass);
+    RBPipelineHandle handle = pipeline_vk;
     
-    pipelines.emplace(pipeline_vk, vk_pipeline_object);
+    for (auto it = pending_pipelines.begin(); it != pending_pipelines.end(); ++it)
+    {
+        if (it->get() == pipeline_object)
+        {
+            std::unique_ptr<VkPipelineObject> pipeline_ptr = std::move(*it);
+            pending_pipelines.erase(it);
+            pipelines.insert({handle, std::move(pipeline_ptr)});
+            break;
+        }
+    }
 
     assert(pipeline_vk != VK_NULL_HANDLE);
     
@@ -1207,18 +1216,14 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
         VK_CHECK(res);
     }
 }
-    
 
 
-std::shared_ptr<PipelineObject> VkRenderBackend::create_pipeline(GraphicsPipelineDesc desc)
+PipelineObject* VkRenderBackend::create_pipeline(GraphicsPipelineDesc desc)
 {
-    std::shared_ptr<VkPipelineObject> pipeline = std::make_shared<VkPipelineObject>(
-        instance_context, swapchain_context, desc, *this);
-    RBPipelineHandle handle = pipeline->get_pipeline_handle();
-    
-    // pipelines.insert({handle, pipeline});
-    
-    return pipeline;
+    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(desc, *this);
+    PipelineObject* result = pipeline.get();
+    pending_pipelines.push_back(std::move(pipeline));
+    return result;
 }
 
 DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle)
@@ -1318,5 +1323,3 @@ void VkRenderBackend::create_frame_sync_objects()
         ));
     }
 }
-
-

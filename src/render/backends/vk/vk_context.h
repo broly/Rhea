@@ -63,10 +63,6 @@ namespace vk
         VkExtent2D extent;
 
         std::vector<VkImageView> image_views;
-
-        // VkRenderPass render_pass;
-        // std::vector<VkFramebuffer> framebuffers;
-
     
         VkImage depth_image = VK_NULL_HANDLE;
         VkDeviceMemory depth_memory = VK_NULL_HANDLE;
@@ -115,15 +111,6 @@ namespace vk
         // synchronization
         VkSemaphore render_finished;    // signal -> present
         VkFence in_flight;              // image is used by which frame
-    };
-
-
-    struct Context
-    {
-        
-        // descriptors
-        std::vector<VkDescriptorSet> camera_descriptor_sets;
-    
     };
     
     struct ImageResource

@@ -36,6 +36,7 @@ struct FramebufferResource
 
 class VkRenderBackend final : public RenderBackend
 {
+    friend class VkPipelineObject;
 public:
     void init(RBWindowHandle window);
     // virtual void draw_frame(const Camera& camera) override;
@@ -44,11 +45,11 @@ public:
     void end_commands(RBCommandList cmd_list) override;
     void begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index) override;
     void end_render_pass(RBCommandList cmd_list) override;
-    void bind_pipeline(RBCommandList cmd_list, std::shared_ptr<PipelineObject> pipeline_object) override;
+    void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) override;
     void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
     void acquire_next_image(RBFrameHandle frame_handle) override;
     void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
-    std::shared_ptr<PipelineObject> create_pipeline(GraphicsPipelineDesc desc) override;
+    PipelineObject* create_pipeline(GraphicsPipelineDesc desc) override;
     DescriptorSetLayoutData get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle);
     virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) override;
     RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
@@ -116,7 +117,6 @@ public:
         VkRenderPass render_pass);
 
 private:
-    vk::Context context = {};
     vk::InstanceContext instance_context = {};
     vk::SwapchainContext swapchain_context = {};
     vk::CommandContext command_context = {};
@@ -125,8 +125,11 @@ private:
     vk::DescriptorContext descriptor_context = {};
     std::vector<vk::ImageResource> image_resources;
     
+    // currently working pipelines (moving from pending_pipelines)
+    std::map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
     
-    std::map<RBPipelineHandle, std::shared_ptr<VkPipelineObject>> pipelines;
+    // pipelines objects that only have layouts, but not real pipelines yet
+    std::vector<std::unique_ptr<VkPipelineObject>> pending_pipelines;
     
     uint32_t current_image_index = 0;
     

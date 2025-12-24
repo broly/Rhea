@@ -9,12 +9,9 @@
 class VkRenderBackend;
 
 VkPipelineObject::VkPipelineObject(
-    vk::InstanceContext& instance,
-    vk::SwapchainContext& swapchain,
     const GraphicsPipelineDesc& desc,
-    VkRenderBackend& backend)
-    : instance_context(instance)
-      , swapchain_context(swapchain)
+    VkRenderBackend& in_backend)
+        : backend(in_backend)
 {
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
@@ -36,27 +33,22 @@ VkPipelineObject::VkPipelineObject(
     std::vector<VkPushConstantRange> push_constants = vk::to_vk_ranges(desc.layout.push_constants);
     plci.pPushConstantRanges = push_constants.data();
 
-    vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
-
-
-    vert.emplace(VkShader(instance.device, desc.vertex_shader));
-    frag.emplace(VkShader(instance.device, desc.fragment_shader));
-
-
-    // shaders.push_back(std::move(vert));
-    // shaders.push_back(std::move(frag));
+    vkCreatePipelineLayout(backend.instance_context.device, &plci, nullptr, &pipeline_layout);
+    
+    vert.emplace(VkShader(backend.instance_context.device, desc.vertex_shader));
+    frag.emplace(VkShader(backend.instance_context.device, desc.fragment_shader));
 }
 
 VkPipelineObject::~VkPipelineObject()
 {
     if (pipeline_ != nullptr)
-        vkDestroyPipeline(instance_context.device, pipeline_, nullptr);
+        vkDestroyPipeline(backend.instance_context.device, pipeline_, nullptr);
     
     if (pipeline_layout != nullptr)
-        vkDestroyPipelineLayout(instance_context.device, pipeline_layout, nullptr);
+        vkDestroyPipelineLayout(backend.instance_context.device, pipeline_layout, nullptr);
 }
 
-VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderBackend& backend, vk::SwapchainContext& swapchain, VkRenderPass render_pass)
+VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 {
     if (pipeline_ != nullptr)
         return pipeline_;
@@ -109,12 +101,12 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderBackend& backend, vk
 
     VkViewport viewport{
         0, 0,
-        (float)swapchain.extent.width,
-        (float)swapchain.extent.height,
+        (float)backend.swapchain_context.extent.width,
+        (float)backend.swapchain_context.extent.height,
         0.0f, 1.0f
     };
 
-    VkRect2D scissor{{0,0}, swapchain.extent};
+    VkRect2D scissor{{0,0}, backend.swapchain_context.extent};
 
     VkPipelineViewportStateCreateInfo viewport_state{
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
@@ -171,12 +163,12 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderBackend& backend, vk
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
     pci.layout = pipeline_layout;
-    pci.renderPass = render_pass;  // <--- now not available
+    pci.renderPass = render_pass;
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
 
     VK_CHECK(vkCreateGraphicsPipelines(
-        instance_context.device,
+        backend.instance_context.device,
         VK_NULL_HANDLE,
         1,
         &pci,
