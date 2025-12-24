@@ -24,6 +24,16 @@ struct MeshGPUData {
     RBDescriptorSet descriptor_set;
 };
 
+struct FramebufferResource
+{
+    VkFramebuffer framebuffer;
+    VkRenderPass  render_pass;
+    uint32_t      width;
+    uint32_t      height;
+};
+
+
+
 class VkRenderBackend final : public RenderBackend
 {
 public:
@@ -34,11 +44,11 @@ public:
     void end_commands(RBCommandList cmd_list) override;
     void begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index) override;
     void end_render_pass(RBCommandList cmd_list) override;
-    void bind_pipeline(RBCommandList cmd_list, RBPipelineHandle pipeline_handle) override;
+    void bind_pipeline(RBCommandList cmd_list, std::shared_ptr<PipelineObject> pipeline_object) override;
     void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
-    RBFramebufferId acquire_next_image(RBFrameHandle frame_handle) override;
-    void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id) override;
-    RBPipelineHandle create_pipeline(GraphicsPipelineDesc desc) override;
+    void acquire_next_image(RBFrameHandle frame_handle) override;
+    void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
+    std::shared_ptr<PipelineObject> create_pipeline(GraphicsPipelineDesc desc) override;
     DescriptorSetLayoutData get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle);
     virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) override;
     RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
@@ -46,9 +56,12 @@ public:
     
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data) override;
     void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) override;
-
+    RBSwapchainExtent get_swapchain_extent() const override;
 
     vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index = 0);
+    
+    RenderPassDesc make_render_pass_desc(const FramebufferDesc& fb) const;
+
     
 private: // Initialization section
     void create_instance();
@@ -57,18 +70,13 @@ private: // Initialization section
     void create_frame_sync_objects();
     
 private: // Re-/Initialization section
-    void create_render_pass();
-    void create_framebuffers();
 
     void create_swapchain();
     void create_command_pool();
-    
-    void create_render_finished_semaphores();
 
 private: // Special section
     void cleanup_swapchain();
     void recreate_swapchain();
-    void create_images_context();
 
     void create_depth_resources();
     
@@ -91,8 +99,21 @@ public:
     void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
     void get_or_create_mesh_buffers(MeshHandle handle) override;
     RGTextureFormat get_swapchain_format() const override;
+    RBImageHandle create_image(const RBImageDesc& desc) override;
+    RBImageView get_image_view(RBImageHandle handle, RBFrameHandle frame_handle) override;
+    RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
+    RBImageView resolve_image_view(const RGTexture& tex, RBFrameHandle frame) override;
+    RBImageView get_swapchain_image_view(RBFrameHandle frame) override;
+    RBImageHandle get_swapchain_image(RBFrameHandle frame) const override;
     
     
+    virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
+    
+    VkFormat get_image_format(RBImageHandle handle) const;
+    
+    RBPipelineHandle get_or_create_pipeline(
+        RBPipelineHandle handle,
+        VkRenderPass render_pass);
 
 private:
     vk::Context context = {};
@@ -102,12 +123,10 @@ private:
     vk::FrameScheduleContext frame_schedule_context = {};
     vk::PipelineContext pipeline_context = {};
     vk::DescriptorContext descriptor_context = {};
-    std::vector<vk::ImageContext> images;
+    std::vector<vk::ImageResource> image_resources;
     
     
-    
-    
-    std::map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
+    std::map<RBPipelineHandle, std::shared_ptr<VkPipelineObject>> pipelines;
     
     uint32_t current_image_index = 0;
     
@@ -119,4 +138,10 @@ private:
     std::map<RBDescriptorSetLayout, DescriptorSetLayoutData> descriptor_set_layouts;
     std::map<RBDescriptorSetLayout, RBDescriptorSet> persistent_descriptors;
     std::map<MeshHandle, MeshGPUData> mesh_map;
+    std::unordered_map<size_t, VkFramebuffer> framebuffer_cache;
+    std::vector<FramebufferResource> framebuffer_resources;
+    
+    std::unordered_map<RenderPassDesc, VkRenderPass, RenderPassDescHash> render_pass_cache;
+    std::vector<RBImageHandle> swapchain_image_handles;
+    VkRenderPass current_render_pass = VK_NULL_HANDLE;
 };

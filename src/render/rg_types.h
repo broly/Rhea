@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <cstdint>
 
+#include "handle_types.h"
 #include "common/type_macros.h"
 
 
@@ -25,33 +26,6 @@ enum class RGResourceKind
     Buffer,
 };
 
-enum class RGTextureFormat
-{
-    Undefined,
-
-    RGBA8_UNORM,
-    RGBA8_SRGB,
-
-    RGBA16F,
-    RGBA32F,
-
-    Depth24Stencil8,
-    Depth32F
-};
-
-enum class RGTextureUsage : uint32_t
-{
-    None            = 0,
-    ColorAttachment = 1 << 0,
-    DepthStencil    = 1 << 1,
-    Sampled         = 1 << 2,
-    Storage         = 1 << 3,
-    TransferSrc     = 1 << 4,
-    TransferDst     = 1 << 5,
-    Present         = 1 << 6
-};
-ENUM_MASK_OPS(RGTextureUsage);
-
 
 struct RGTextureDesc
 {
@@ -59,9 +33,8 @@ struct RGTextureDesc
     uint32_t height = 0;
 
     RGTextureFormat format = RGTextureFormat::Undefined;
-    RGTextureUsage  usage  = RGTextureUsage::None;
+    RenderTextureUsage::Type  usage  = RenderTextureUsage::None;
 
-    bool transient = true;   // may be allocated per-frame
     bool external  = false;  // swapchain / imported resource
 };
 
@@ -88,4 +61,45 @@ struct RGResourceHandle
 struct RGPassId
 {
     uint32_t id;
+};
+
+struct RGTexture
+{
+    RGTextureDesc desc;
+    std::optional<RBImageHandle> image;      // backend image
+};
+
+struct RGTextureHandle
+{
+    uint32_t id;
+};
+
+using RBFormat = RBHandle<VkFormat>;
+
+
+
+
+struct RenderPassDesc
+{
+    std::vector<RBFormat> color_formats;
+    RBFormat depth_format;
+    
+    bool has_depth = false;
+
+    bool operator==(const RenderPassDesc&) const = default;
+};
+
+struct RenderPassDescHash
+{
+    size_t operator()(const RenderPassDesc& d) const
+    {
+        size_t h = d.color_formats.size();
+        for (auto f : d.color_formats)
+            h ^= std::hash<uint32_t>()(f + 0x9e3779b9 + (h<<6) + (h>>2));
+
+        if (d.has_depth)
+            h ^= std::hash<uint32_t>()(d.depth_format);
+
+        return h;
+    }
 };

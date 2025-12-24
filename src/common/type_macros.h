@@ -33,4 +33,8 @@
         return static_cast<Enum>( \
             ~static_cast<std::underlying_type_t<Enum>>(a) \
         ); \
+    } \
+    operator bool(Enum Value)\
+    {\
+        return static_cast<bool>(Value);\
     }

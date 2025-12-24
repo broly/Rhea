@@ -13,8 +13,8 @@ VkPipelineObject::VkPipelineObject(
     vk::SwapchainContext& swapchain,
     const GraphicsPipelineDesc& desc,
     VkRenderBackend& backend)
-        : instance_context(instance)
-        , swapchain_context(swapchain)
+    : instance_context(instance)
+      , swapchain_context(swapchain)
 {
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
@@ -37,12 +37,30 @@ VkPipelineObject::VkPipelineObject(
     plci.pPushConstantRanges = push_constants.data();
 
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
-    
-    
-    
-    VkShader vert(instance.device, desc.vertex_shader);
-    VkShader frag(instance.device, desc.fragment_shader);
 
+
+    vert.emplace(VkShader(instance.device, desc.vertex_shader));
+    frag.emplace(VkShader(instance.device, desc.fragment_shader));
+
+
+    // shaders.push_back(std::move(vert));
+    // shaders.push_back(std::move(frag));
+}
+
+VkPipelineObject::~VkPipelineObject()
+{
+    if (pipeline_ != nullptr)
+        vkDestroyPipeline(instance_context.device, pipeline_, nullptr);
+    
+    if (pipeline_layout != nullptr)
+        vkDestroyPipelineLayout(instance_context.device, pipeline_layout, nullptr);
+}
+
+VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderBackend& backend, vk::SwapchainContext& swapchain, VkRenderPass render_pass)
+{
+    if (pipeline_ != nullptr)
+        return pipeline_;
+    
     VkPipelineShaderStageCreateInfo stages[2]{};
 
     stages[0] = {
@@ -50,7 +68,7 @@ VkPipelineObject::VkPipelineObject(
         nullptr,
         0,
         VK_SHADER_STAGE_VERTEX_BIT,
-        vert.get_module(),
+        vert->get_module(),
         "main"
     };
 
@@ -59,7 +77,7 @@ VkPipelineObject::VkPipelineObject(
         nullptr,
         0,
         VK_SHADER_STAGE_FRAGMENT_BIT,
-        frag.get_module(),
+        frag->get_module(),
         "main"
     };
 
@@ -140,7 +158,7 @@ VkPipelineObject::VkPipelineObject(
     depth_ci.depthCompareOp = VK_COMPARE_OP_LESS;
     depth_ci.depthBoundsTestEnable = VK_FALSE;
     depth_ci.stencilTestEnable = VK_FALSE;
-
+    
     VkGraphicsPipelineCreateInfo pci{
         VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO
     };
@@ -153,28 +171,16 @@ VkPipelineObject::VkPipelineObject(
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
     pci.layout = pipeline_layout;
-    pci.renderPass = swapchain.render_pass;
+    pci.renderPass = render_pass;  // <--- now not available
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
 
     VK_CHECK(vkCreateGraphicsPipelines(
-        instance.device,
+        instance_context.device,
         VK_NULL_HANDLE,
         1,
         &pci,
         nullptr,
         &pipeline_));
-
-    
-    shaders.push_back(std::move(vert));
-    shaders.push_back(std::move(frag));
-}
-
-VkPipelineObject::~VkPipelineObject()
-{
-    if (pipeline_ != nullptr)
-        vkDestroyPipeline(instance_context.device, pipeline_, nullptr);
-    
-    if (pipeline_layout != nullptr)
-        vkDestroyPipelineLayout(instance_context.device, pipeline_layout, nullptr);
+    return pipeline_;
 }

@@ -8,8 +8,8 @@ struct RenderGraphPass
 {
     std::string name;
 
-    std::vector<RGResourceHandle> reads;
-    std::vector<RGResourceHandle> writes;
+    std::vector<RGTextureHandle> reads;
+    std::vector<RGTextureHandle> writes;
 
     std::function<void(class RenderGraphContext&)> execute;
 };
@@ -36,12 +36,13 @@ public:
 class RenderGraph
 {
 public:
-    RGResourceHandle create_texture(const RGTextureDesc& desc);
+    
+    RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGResourceHandle create_buffer(const RGBufferDesc& desc);
 
     RGPassId add_pass(RenderGraphPass&& pass);
 
-    void compile();
+    void compile(RenderBackend& backend);
     void execute(RenderBackend& backend);
     
     
@@ -56,4 +57,6 @@ private:
     std::vector<RenderGraphPass> passes;
 
     std::vector<uint32_t> execution_order;
+    
+    std::vector<RGTexture> textures;
 };

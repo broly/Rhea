@@ -84,6 +84,11 @@ void VkRenderBackend::bind_buffer_to_descriptor(
     }
 }
 
+RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
+{
+    return RBSwapchainExtent{swapchain_context.extent.width, swapchain_context.extent.height};
+}
+
 
 vk::BufferInfo& VkRenderBackend::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
 {
@@ -93,6 +98,25 @@ vk::BufferInfo& VkRenderBackend::get_buffer(RBBufferHandle buffer_handle, size_t
         return frame_schedule_context.ubos.at(index).at(frame_index);
     }
     return swapchain_context.ubos[buffer_handle.get_identifier()];
+}
+
+RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb) const
+{
+    RenderPassDesc rp{};
+
+    for (auto img : fb.color_attachments)
+    {
+        VkFormat format = get_image_format(img);
+        rp.color_formats.push_back(format);
+    }
+
+    if (fb.depth_attachment)
+    {
+        auto format = get_image_format(*fb.depth_attachment);
+        rp.depth_format = format;
+    }
+
+    return rp;
 }
 
 void VkRenderBackend::create_instance()
@@ -172,32 +196,6 @@ void VkRenderBackend::recreate_swapchain()
     cleanup_swapchain();
     create_swapchain();
     create_depth_resources();
-    create_render_pass();
-    create_framebuffers();
-    create_images_context();
-}
-
-void VkRenderBackend::create_images_context()
-{
-    images.clear();
-    images.resize(swapchain_context.image_views.size());
-
-    VkSemaphoreCreateInfo sem_ci{
-        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
-    };
-
-    for (size_t i = 0; i < images.size(); i++)
-    {
-        vk::ImageContext& img = images[i];
-
-        img.image_view  = swapchain_context.image_views[i];
-        img.framebuffer = swapchain_context.framebuffers[i];
-        img.in_flight   = VK_NULL_HANDLE;
-
-        VK_CHECK(
-            vkCreateSemaphore(instance_context.device, &sem_ci, nullptr, &img.render_finished)
-        );
-    }
 }
 
 void VkRenderBackend::create_depth_resources()
@@ -484,6 +482,25 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     mesh_map[handle] = data;
 }
 
+VkFormat get_vk_format(RGTextureFormat format)
+{
+    switch (format)
+    {
+    case RGTextureFormat::RGBA8_UNORM:
+        return VK_FORMAT_B8G8R8A8_UNORM;
+    case RGTextureFormat::RGBA8_SRGB:
+        return VK_FORMAT_B8G8R8A8_SRGB;
+    case RGTextureFormat::Undefined:
+    case RGTextureFormat::RGBA16F:
+    case RGTextureFormat::RGBA32F:
+    case RGTextureFormat::Depth24Stencil8:
+    case RGTextureFormat::Depth32F:
+    default:
+        
+        throw std::runtime_error("Unsupported texture format");
+    }
+}
+
 RGTextureFormat VkRenderBackend::get_swapchain_format() const
 {
     switch (swapchain_context.surface_format.format)
@@ -503,6 +520,215 @@ RGTextureFormat VkRenderBackend::get_swapchain_format() const
     default:
         throw std::runtime_error("Unsupported swapchain format");
     }
+}
+
+RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
+{
+    vk::ImageResource res{};
+    res.width  = desc.width;
+    res.height = desc.height;
+    res.format = get_vk_format(desc.format);
+
+    VkImageUsageFlags vk_usage = 0;
+
+    if (desc.usage & RenderTextureUsage::ColorAttachment)
+        vk_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    if (desc.usage & RenderTextureUsage::DepthStencil)
+        vk_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    if (desc.usage & RenderTextureUsage::Sampled)
+        vk_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    image_info.imageType = VK_IMAGE_TYPE_2D;
+    image_info.extent = { desc.width, desc.height, 1 };
+    image_info.mipLevels = 1;
+    image_info.arrayLayers = 1;
+    image_info.format = get_vk_format(desc.format);
+    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_info.usage = vk_usage;
+    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VK_CHECK(vkCreateImage(instance_context.device, &image_info, nullptr, &res.image));
+
+    VkMemoryRequirements mem_req;
+    vkGetImageMemoryRequirements(instance_context.device, res.image, &mem_req);
+
+    VkMemoryAllocateInfo alloc_info{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    alloc_info.allocationSize = mem_req.size;
+    alloc_info.memoryTypeIndex =
+        vk::find_memory_type(
+            instance_context.physical_device,
+            mem_req.memoryTypeBits,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VK_CHECK(vkAllocateMemory(instance_context.device, &alloc_info, nullptr, &res.memory));
+    VK_CHECK(vkBindImageMemory(instance_context.device, res.image, res.memory, 0));
+
+    // ---- Image View ----
+    VkImageAspectFlags aspect =
+        (desc.usage & RenderTextureUsage::DepthStencil)
+            ? VK_IMAGE_ASPECT_DEPTH_BIT
+            : VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkImageViewCreateInfo view_info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    view_info.image = res.image;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = get_vk_format(desc.format);
+    view_info.subresourceRange = {
+        aspect, 0, 1, 0, 1
+    };
+
+    VK_CHECK(vkCreateImageView(instance_context.device, &view_info, nullptr, &res.view));
+
+    uint32_t id = static_cast<uint32_t>(image_resources.size());
+    image_resources.push_back(res);
+
+    return RBImageHandle{ id };
+}
+
+RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, RBFrameHandle frame_handle)
+{
+    return image_resources[handle.id].view;
+}
+
+size_t hash_framebuffer(
+    const std::vector<VkImageView>& attachments,
+    uint32_t width,
+    uint32_t height,
+    VkRenderPass render_pass)
+{
+    size_t h = std::hash<uint64_t>{}(reinterpret_cast<uint64_t>(render_pass));
+    h ^= std::hash<uint32_t>{}(width)  + 0x9e3779b9 + (h << 6) + (h >> 2);
+    h ^= std::hash<uint32_t>{}(height) + 0x9e3779b9 + (h << 6) + (h >> 2);
+
+    for (auto view : attachments)
+    {
+        size_t v = std::hash<uint64_t>{}(reinterpret_cast<uint64_t>(view));
+        h ^= v + 0x9e3779b9 + (h << 6) + (h >> 2);
+    }
+
+    return h;
+}
+
+
+RBImageView VkRenderBackend::resolve_image_view(const RGTexture& tex, RBFrameHandle frame)
+{
+    if (tex.desc.external)
+    {
+        // swapchain
+        return swapchain_context.image_views[current_image_index];
+    }
+
+    return image_resources[tex.image.value().id].view;
+}
+
+RBImageView VkRenderBackend::get_swapchain_image_view(RBFrameHandle frame)
+{
+    return swapchain_context.image_views[current_image_index];
+}
+
+RBImageHandle VkRenderBackend::get_swapchain_image(RBFrameHandle frame) const
+{
+    return swapchain_image_handles[current_image_index];
+}
+
+RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& fb)
+{
+    RenderPassDesc desc{};
+
+    for (RBImageHandle image : fb.color_attachments)
+    {
+        desc.color_formats.push_back(get_image_format(image));
+    }
+
+    if (fb.depth_attachment)
+    {
+        desc.has_depth = true;
+        desc.depth_format = get_image_format(*fb.depth_attachment);
+    }
+
+    auto it = render_pass_cache.find(desc);
+    if (it != render_pass_cache.end())
+        return it->second;
+
+    std::vector<VkAttachmentDescription> attachments;
+    std::vector<VkAttachmentReference> color_refs;
+
+    uint32_t index = 0;
+    for (VkFormat fmt : desc.color_formats)
+    {
+        attachments.push_back({
+            .format = fmt,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        });
+
+        color_refs.push_back({
+            .attachment = index++,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        });
+    }
+
+    VkAttachmentReference depth_ref{};
+    if (desc.has_depth)
+    {
+        attachments.push_back({
+            .format = desc.depth_format,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        });
+
+        depth_ref = {
+            .attachment = index,
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        };
+    }
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = uint32_t(color_refs.size());
+    subpass.pColorAttachments = color_refs.data();
+    if (desc.has_depth)
+        subpass.pDepthStencilAttachment = &depth_ref;
+
+    VkRenderPassCreateInfo rpci{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+    rpci.attachmentCount = uint32_t(attachments.size());
+    rpci.pAttachments = attachments.data();
+    rpci.subpassCount = 1;
+    rpci.pSubpasses = &subpass;
+
+    VkRenderPass rp;
+    VK_CHECK(vkCreateRenderPass(instance_context.device, &rpci, nullptr, &rp));
+
+    render_pass_cache[desc] = rp;
+    return rp;
+}
+
+VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
+{
+    return image_resources[handle.id].format;
+}
+
+RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle, VkRenderPass render_pass)
+{
+    auto& obj = *pipelines[handle];
+
+    return obj.get_or_create_pipeline(*this, swapchain_context, render_pass);
+    
 }
 
 
@@ -532,88 +758,6 @@ void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_coun
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 }
 
-
-void VkRenderBackend::create_render_pass()
-{
-    VkAttachmentDescription color{};
-    color.format = swapchain_context.surface_format.format;
-    color.samples = VK_SAMPLE_COUNT_1_BIT;
-    color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentDescription depth{};
-    depth.format = swapchain_context.depth_format;
-    depth.samples = VK_SAMPLE_COUNT_1_BIT;
-    depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depth.finalLayout =
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference color_ref{
-        0,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-    };
-
-    VkAttachmentReference depth_ref{
-        1,
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-    };
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint =
-        VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_ref;
-    subpass.pDepthStencilAttachment = &depth_ref;
-
-    VkAttachmentDescription attachments[2] = {
-        color, depth
-    };
-
-    VkRenderPassCreateInfo rpci{
-        VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO
-    };
-    rpci.attachmentCount = 2;
-    rpci.pAttachments = attachments;
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-
-    VK_CHECK(vkCreateRenderPass(
-        instance_context.device, &rpci, nullptr,
-        &swapchain_context.render_pass));
-}
-
-void VkRenderBackend::create_framebuffers()
-{
-    swapchain_context.framebuffers.resize(
-        swapchain_context.image_views.size());
-
-    for (size_t i = 0;
-         i < swapchain_context.image_views.size(); i++)
-    {
-        VkImageView attachments[] = {
-            swapchain_context.image_views[i],
-            swapchain_context.depth_image_view
-        };
-
-        VkFramebufferCreateInfo fbci{
-            VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO
-        };
-        fbci.renderPass = swapchain_context.render_pass;
-        fbci.attachmentCount = 2;
-        fbci.pAttachments = attachments;
-        fbci.width  = swapchain_context.extent.width;
-        fbci.height = swapchain_context.extent.height;
-        fbci.layers = 1;
-
-        VK_CHECK(vkCreateFramebuffer(
-            instance_context.device, &fbci, nullptr,
-            &swapchain_context.framebuffers[i]));
-    }
-}
 
 void VkRenderBackend::create_swapchain()
 {
@@ -677,18 +821,14 @@ void VkRenderBackend::create_swapchain()
     std::vector<VkImage> swapchain_images(sc_image_count);
     vkGetSwapchainImagesKHR(instance_context.device, swapchain_context.swapchain, 
         &sc_image_count, swapchain_images.data());
+    
+    swapchain_image_handles.clear();
+    swapchain_image_handles.resize(sc_image_count);
+    
 
-    // --- Resize contexts ---
-    images.clear();
-    images.resize(sc_image_count);
-
-    swapchain_context.image_views.resize(sc_image_count);
-
-    // --- Create image views + init ImageContext ---
     for (uint32_t i = 0; i < sc_image_count; ++i)
     {
-        images[i].image = swapchain_images[i];
-        images[i].in_flight = VK_NULL_HANDLE;
+        VkImageView view;
 
         VkImageViewCreateInfo ivci{
             VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
@@ -696,8 +836,7 @@ void VkRenderBackend::create_swapchain()
         ivci.image = swapchain_images[i];
         ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
         ivci.format = swapchain_context.surface_format.format;
-        ivci.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_COLOR_BIT;
+        ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         ivci.subresourceRange.levelCount = 1;
         ivci.subresourceRange.layerCount = 1;
 
@@ -705,10 +844,22 @@ void VkRenderBackend::create_swapchain()
             instance_context.device,
             &ivci,
             nullptr,
-            &swapchain_context.image_views[i]));
+            &view));
 
-        images[i].image_view = swapchain_context.image_views[i];
+        vk::ImageResource res{};
+        res.image  = swapchain_images[i];                 // VkImage
+        res.view   = view;                                // VkImageView
+        res.format = swapchain_context.surface_format.format;
+        res.width  = swapchain_context.extent.width;
+        res.height = swapchain_context.extent.height;
+
+        uint32_t id = static_cast<uint32_t>(image_resources.size());
+        image_resources.push_back(res);
+
+        swapchain_image_handles[i] = RBImageHandle{ id };
     }
+
+    
 }
 
 void VkRenderBackend::create_command_pool()
@@ -758,22 +909,6 @@ void VkRenderBackend::create_command_pool()
 }
 void VkRenderBackend::cleanup_swapchain()
 {
-    // --- Framebuffers ---
-    for (auto fb : swapchain_context.framebuffers)
-    {
-        if (fb != VK_NULL_HANDLE)
-        {
-            vkDestroyFramebuffer(instance_context.device, fb, nullptr);
-        }
-    }
-    swapchain_context.framebuffers.clear();
-
-    // --- Render pass ---
-    if (swapchain_context.render_pass != VK_NULL_HANDLE)
-    {
-        vkDestroyRenderPass(instance_context.device, swapchain_context.render_pass, nullptr);
-        swapchain_context.render_pass = VK_NULL_HANDLE;
-    }
 
     // --- Image views ---
     for (auto iv : swapchain_context.image_views)
@@ -812,22 +947,6 @@ void VkRenderBackend::cleanup_swapchain()
         swapchain_context.swapchain = VK_NULL_HANDLE;
     }
 
-    // --- Per-image sync (ImageContext) ---
-    for (auto& img : images)
-    {
-        if (img.render_finished != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore(instance_context.device, img.render_finished, nullptr);
-            img.render_finished = VK_NULL_HANDLE;
-        }
-
-        img.in_flight = VK_NULL_HANDLE;
-        img.image = VK_NULL_HANDLE;
-        img.image_view = VK_NULL_HANDLE;
-        img.framebuffer = VK_NULL_HANDLE;
-    }
-
-    images.clear();
 }
 
 void VkRenderBackend::match_queue_families()
@@ -853,26 +972,6 @@ void VkRenderBackend::match_queue_families()
     instance_context.queues_indices[1] = instance_context.queues.present;
 }
 
-
-void VkRenderBackend::create_render_finished_semaphores()
-{
-    VkSemaphoreCreateInfo sem_ci{
-        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
-    };
-
-    for (auto& img : images)
-    {
-        // in case of recreate_swapchain
-        if (img.render_finished != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore(instance_context.device, img.render_finished, nullptr);
-        }
-
-        VK_CHECK(
-            vkCreateSemaphore(instance_context.device, &sem_ci, nullptr, &img.render_finished)
-        );
-    }
-}
 
 void VkRenderBackend::init(RBWindowHandle in_window)
 {
@@ -902,10 +1001,7 @@ void VkRenderBackend::init(RBWindowHandle in_window)
     //                              i);
     // }
     create_swapchain();
-    create_render_finished_semaphores();
     create_depth_resources();
-    create_render_pass();
-    create_framebuffers();
     create_command_pool();
     // create_pipeline();
     create_frame_sync_objects();
@@ -936,40 +1032,80 @@ void VkRenderBackend::end_commands(RBCommandList cmd_list)
 
 void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index)
 {
-    LogRB.Log("begin_render_pass");
-    
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
+    const auto& fb = framebuffer_resources[framebuffer_index.as<uint64_t>()];
 
     VkClearValue clears[2]{};
     clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
     clears[1].depthStencil = {1.0f, 0};
 
-    VkRenderPassBeginInfo rpbi{
-        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO
-    };
-    rpbi.renderPass = swapchain_context.render_pass;
-    rpbi.framebuffer = swapchain_context.framebuffers[framebuffer_index];
-    rpbi.renderArea.extent = swapchain_context.extent;
+    VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    rpbi.renderPass  = fb.render_pass;
+    rpbi.framebuffer = fb.framebuffer;
+    rpbi.renderArea.extent = { fb.width, fb.height };
     rpbi.clearValueCount = 2;
     rpbi.pClearValues = clears;
 
     vkCmdBeginRenderPass(cmd, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+    
+    current_render_pass = fb.render_pass;
 }
+
+RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc& desc)
+{
+    VkRenderPass rp = get_or_create_render_pass(desc);
+
+    std::vector<VkImageView> attachments;
+
+    for (RBImageHandle img : desc.color_attachments)
+        attachments.push_back(image_resources[img.id].view);
+
+    if (desc.depth_attachment)
+        attachments.push_back(image_resources[desc.depth_attachment->id].view);
+
+    VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+    info.renderPass = rp;
+    info.attachmentCount = uint32_t(attachments.size());
+    info.pAttachments = attachments.data();
+    info.width  = desc.width;
+    info.height = desc.height;
+    info.layers = 1;
+
+    VkFramebuffer fb;
+    VK_CHECK(vkCreateFramebuffer(instance_context.device, &info, nullptr, &fb));
+
+    uint32_t id = framebuffer_resources.size();
+    framebuffer_resources.push_back({
+        .framebuffer = fb,
+        .render_pass = rp,
+        .width = desc.width,
+        .height = desc.height
+    });
+
+    return RBFramebufferId{ (uint64_t)id };
+}
+
 
 void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 {
     LogRB.Log("end_render_pass");
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdEndRenderPass(cmd);
+    current_render_pass = VK_NULL_HANDLE;
 }
 
 
-void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, RBPipelineHandle pipeline_handle)
+void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, std::shared_ptr<PipelineObject> pipeline_object)
 {
     LogRB.Log("bind_pipeline");
     
+    auto vk_pipeline_object = std::static_pointer_cast<VkPipelineObject>(pipeline_object);
+    
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    VkPipeline pipeline_vk = pipeline_handle.as<VkPipeline>();
+    assert(current_render_pass != VK_NULL_HANDLE);
+    VkPipeline pipeline_vk = vk_pipeline_object->get_or_create_pipeline(*this, swapchain_context, current_render_pass);
+    
+    pipelines.emplace(pipeline_vk, vk_pipeline_object);
 
     assert(pipeline_vk != VK_NULL_HANDLE);
     
@@ -984,51 +1120,52 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
     vkCmdDraw(cmd, vertex_count, 1, 0, 0);
 }
 
-RBFramebufferId VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
+void VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 {
-    LogRB.Log("acquire_next_image");
     auto& frame = frame_schedule_context.frames[frame_handle];
 
-    uint32_t image_index = 0;
+    vkWaitForFences(
+        instance_context.device,
+        1,
+        &frame.in_flight,
+        VK_TRUE,
+        UINT64_MAX
+    );
+
+    vkResetFences(
+        instance_context.device,
+        1,
+        &frame.in_flight
+    );
+
     VkResult res = vkAcquireNextImageKHR(
         instance_context.device,
         swapchain_context.swapchain,
         UINT64_MAX,
         frame.image_available,
         VK_NULL_HANDLE,
-        &image_index
+        &current_image_index
     );
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
         recreate_swapchain();
-        return RBFramebufferId{ 0 };
+        return;
     }
+
     VK_CHECK(res);
-
-    current_image_index = image_index;
-
-    auto& image = images[image_index];
-
-    if (image.in_flight != VK_NULL_HANDLE) {
-        vkWaitForFences(instance_context.device, 1, &image.in_flight, VK_TRUE, UINT64_MAX);
-    }
-
-    image.in_flight = frame.in_flight;
-
-    return RBFramebufferId{ image_index };
 }
 
-void VkRenderBackend::submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list, RBFramebufferId framebuffer_id)
+
+void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
+                                  RBCommandList cmd_list)
 {
-    LogRB.Log("submit_frame");
-    
     auto& frame = frame_schedule_context.frames[frame_handle];
-    auto& image = images[current_image_index];
 
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
 
-    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkPipelineStageFlags wait_stage =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit.waitSemaphoreCount = 1;
@@ -1037,20 +1174,30 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle, RBCommandList cmd
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &image.render_finished;
+    submit.pSignalSemaphores = &frame.render_finished;
 
-    VK_CHECK(vkQueueSubmit(instance_context.graphics_queue, 1, &submit, frame.in_flight));
+    VK_CHECK(vkQueueSubmit(
+        instance_context.graphics_queue,
+        1,
+        &submit,
+        frame.in_flight
+    ));
 
-    // --- Present ---
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &image.render_finished;
+    present.pWaitSemaphores = &frame.render_finished;
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain_context.swapchain;
     present.pImageIndices = &current_image_index;
 
-    VkResult res = vkQueuePresentKHR(instance_context.present_queue, &present);
-    if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || framebuffer_resized)
+    VkResult res = vkQueuePresentKHR(
+        instance_context.present_queue,
+        &present
+    );
+
+    if (res == VK_ERROR_OUT_OF_DATE_KHR ||
+        res == VK_SUBOPTIMAL_KHR ||
+        framebuffer_resized)
     {
         framebuffer_resized = false;
         recreate_swapchain();
@@ -1060,16 +1207,18 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle, RBCommandList cmd
         VK_CHECK(res);
     }
 }
+    
 
-RBPipelineHandle VkRenderBackend::create_pipeline(GraphicsPipelineDesc desc)
+
+std::shared_ptr<PipelineObject> VkRenderBackend::create_pipeline(GraphicsPipelineDesc desc)
 {
-    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(
+    std::shared_ptr<VkPipelineObject> pipeline = std::make_shared<VkPipelineObject>(
         instance_context, swapchain_context, desc, *this);
-    RBPipelineHandle handle = pipeline->get_handle();
+    RBPipelineHandle handle = pipeline->get_pipeline_handle();
     
-    pipelines.insert({handle, std::move(pipeline)});
+    // pipelines.insert({handle, pipeline});
     
-    return handle;
+    return pipeline;
 }
 
 DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle)
@@ -1136,16 +1285,38 @@ RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, Resour
 
 void VkRenderBackend::create_frame_sync_objects()
 {
-    LogRB.Log("submit_frame");
-    
-    VkSemaphoreCreateInfo sem_ci{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    VkFenceCreateInfo fence_ci{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    VkSemaphoreCreateInfo sem_ci{
+        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
+
+    VkFenceCreateInfo fence_ci{
+        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
+    };
     fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (auto& frame : frame_schedule_context.frames)
     {
-        VK_CHECK(vkCreateSemaphore(instance_context.device, &sem_ci, nullptr, &frame.image_available));
-        VK_CHECK(vkCreateFence(instance_context.device, &fence_ci, nullptr, &frame.in_flight));
+        VK_CHECK(vkCreateSemaphore(
+            instance_context.device,
+            &sem_ci,
+            nullptr,
+            &frame.image_available
+        ));
+
+        VK_CHECK(vkCreateSemaphore(
+            instance_context.device,
+            &sem_ci,
+            nullptr,
+            &frame.render_finished
+        ));
+
+        VK_CHECK(vkCreateFence(
+            instance_context.device,
+            &fence_ci,
+            nullptr,
+            &frame.in_flight
+        ));
     }
 }
+
 

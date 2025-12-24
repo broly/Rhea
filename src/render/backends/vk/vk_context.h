@@ -21,7 +21,9 @@ namespace vk
 
         VkSemaphore image_available = VK_NULL_HANDLE;
         VkFence in_flight = VK_NULL_HANDLE;
-
+        
+        VkSemaphore render_finished = VK_NULL_HANDLE;
+        
         // VkBuffer camera_buffer = VK_NULL_HANDLE;
         // VkDeviceMemory camera_memory = VK_NULL_HANDLE;
         std::map<RBDescriptorSetLayout, RBDescriptorSet> descriptors;
@@ -62,8 +64,8 @@ namespace vk
 
         std::vector<VkImageView> image_views;
 
-        VkRenderPass render_pass;
-        std::vector<VkFramebuffer> framebuffers;
+        // VkRenderPass render_pass;
+        // std::vector<VkFramebuffer> framebuffers;
 
     
         VkImage depth_image = VK_NULL_HANDLE;
@@ -124,4 +126,16 @@ namespace vk
     
     };
     
+    struct ImageResource
+    {
+        VkImage image = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+
+        // one view per image
+        VkImageView view = VK_NULL_HANDLE;
+
+        uint32_t width = 0;
+        uint32_t height = 0;
+        VkFormat format = VK_FORMAT_UNDEFINED;
+    };
 }

@@ -3,18 +3,12 @@
 #include "backends/vk/vk_render_backend.h"
 
 
-RGResourceHandle RenderGraph::create_texture(const RGTextureDesc& desc)
+RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
 {
-    RGResourceHandle handle{
-        static_cast<uint32_t>(resources.size())
-    };
+    RGTextureHandle handle;
+    handle.id = uint32_t(textures.size());
 
-    RGResource res{};
-    res.kind = RGResourceKind::Texture;
-    res.texture_desc = desc;
-
-    resources.push_back(std::move(res));
-
+    textures.push_back({ desc, {} });
     return handle;
 }
 
@@ -34,15 +28,24 @@ RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
     return id;
 }
 
-void RenderGraph::compile()
+void RenderGraph::compile(RenderBackend& backend)
 {
-    execution_order.clear();
-    execution_order.reserve(passes.size());
-
-    for (uint32_t i = 0; i < passes.size(); ++i)
+    for (auto& tex : textures)
     {
-        execution_order.push_back(i);
+        if (tex.desc.external)
+            continue;
+
+        tex.image = backend.create_image({
+            .width  = tex.desc.width,
+            .height = tex.desc.height,
+            .format = tex.desc.format,
+            .usage  = tex.desc.usage
+        });
     }
+
+    execution_order.clear();
+    for (uint32_t i = 0; i < passes.size(); ++i)
+        execution_order.push_back(i);
 }
 
 void RenderGraph::execute(RenderBackend& backend)
@@ -50,68 +53,48 @@ void RenderGraph::execute(RenderBackend& backend)
     RBFrameHandle frame = backend.get_current_frame();
     backend.wait_for_frame(frame);
 
-    RBFramebufferId fb = backend.acquire_next_image(frame);
     RBCommandList cmd = backend.begin_commands(frame);
-
-    RenderGraphContext ctx(backend, cmd, fb);
+    RenderGraphContext ctx(backend, cmd, {});
 
     for (uint32_t pass_index : execution_order)
     {
-        RenderGraphPass& pass = passes[pass_index];
+        auto& pass = passes[pass_index];
+        FramebufferDesc fb_desc{};
 
-        if (!pass.writes.empty())
+        for (auto handle : pass.writes)
         {
-            backend.begin_render_pass(cmd, fb);
+            const RGTexture& tex = textures[handle.id];
+            RBImageHandle image;
+
+            if (tex.desc.external)
+            {
+                image = backend.get_swapchain_image(frame);
+            }
+            else
+            {
+                image = tex.image.value();
+            }
+
+            if (tex.desc.usage & RenderTextureUsage::DepthStencil)
+                fb_desc.depth_attachment = image;
+            else
+                fb_desc.color_attachments.push_back(image);
+
+            fb_desc.width  = tex.desc.width  ? tex.desc.width  : backend.get_swapchain_extent().width;
+            fb_desc.height = tex.desc.height ? tex.desc.height : backend.get_swapchain_extent().height;
         }
 
+        // access to render pass here
+        auto rp = backend.get_or_create_render_pass(fb_desc);
+        
+        ctx.framebuffer = backend.get_or_create_framebuffer(fb_desc);
+
+        backend.begin_render_pass(cmd, ctx.framebuffer);
         pass.execute(ctx);
-
-        if (!pass.writes.empty())
-        {
-            backend.end_render_pass(cmd);
-        }
+        backend.end_render_pass(cmd);
     }
 
     backend.end_commands(cmd);
-    backend.submit_frame(frame, cmd, fb);
+    backend.submit_frame(frame, cmd);
     backend.advance_frame();
 }
-
-
-// void RenderGraph::initialize(RBWindowHandle window_handle)
-// {
-//     backend = RenderBackend::create<VkRenderBackend>(window_handle);
-//     
-// }
-//
-// void RenderGraph::draw(const Camera& camera)
-// {
-//     auto frame_id = backend->get_current_frame();
-//
-//     backend->wait_for_frame(frame_id);
-//
-//     RBFramebufferId framebuffer_index = backend->acquire_next_image(frame_id);
-//
-//     auto cmd = backend->begin_commands(frame_id);
-//
-//     backend->update_camera_ubo(frame_id, camera);
-//
-//     backend->begin_render_pass(cmd, framebuffer_index);
-//
-//     auto pipeline_handle = backend->get_pipeline_handle();
-//     backend->bind_pipeline(cmd, pipeline_handle);
-//
-//     auto camera_set = backend->get_camera_descriptor_set();
-//     backend->bind_descriptor_set(cmd, 0, camera_set);
-//
-//     backend->draw(cmd, 36);
-//
-//     backend->end_render_pass(cmd);
-//     backend->end_commands(cmd);
-//
-//     backend->submit_frame(frame_id, cmd, framebuffer_index);
-//
-//     backend->advance_frame();
-// }
-//
-

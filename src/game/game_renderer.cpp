@@ -37,6 +37,10 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
                 .offset = 0,
                 .size = sizeof(glm::mat4),
             }}
+        },
+        .rt_compat = {
+            .color_attachment_count = 1,
+            .has_depth = true
         }
     };
 
@@ -46,7 +50,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         .width  = 0,
         .height = 0,
         .format = render_backend->get_swapchain_format(),
-        .usage  = RGTextureUsage::ColorAttachment | RGTextureUsage::Present,
+        .usage  = RenderTextureUsage::Type(RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present),
         .external = true
     };
 
@@ -58,7 +62,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         .execute = [=](RenderGraphContext& ctx)
         {
             auto cmd = ctx.cmd;
-
+            
             CameraUBO camera_ubo;
             camera_ubo.mvp = world->camera->projection(1.0) * world->camera->view();
             ctx.backend.update_uniform_buffer(camera_buffer, camera_ubo);
@@ -69,7 +73,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
                 cmd,
                 0,
                 ctx.backend.get_descriptor_set(camera_layout, ResourceUsageType::Frame),
-                geometry_pipeline
+                geometry_pipeline->get_pipeline_handle()
             );
 
             for (const auto& ro : world->get_render_extractor()->meshes)
@@ -78,7 +82,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
 
                 ctx.backend.bind_mesh(cmd, ro.mesh);
 
-                ctx.backend.push_constants(cmd, ro.world, geometry_pipeline);
+                ctx.backend.push_constants(cmd, ro.world, geometry_pipeline->get_pipeline_handle());
 
                 ctx.backend.draw_indexed(cmd, ro.mesh.get().get_index_count());
             }
@@ -86,7 +90,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         }
     });
 
-    render_graph->compile();
+    render_graph->compile(*render_backend);
 }
 
 void GameRenderer::execute()

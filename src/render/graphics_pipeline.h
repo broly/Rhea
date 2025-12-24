@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "handle_types.h"
+#include "rg_types.h"
 
 enum class VertexLayout
 {
@@ -53,6 +54,12 @@ struct PipelineLayoutDesc
     std::vector<PushConstantRange> push_constants;
 };
 
+struct PipelineRenderTargetDesc
+{
+    uint32_t color_attachment_count = 0;
+    bool has_depth = false;
+};
+
 struct GraphicsPipelineDesc
 {
     std::string vertex_shader;
@@ -61,6 +68,7 @@ struct GraphicsPipelineDesc
     PipelineLayoutDesc layout;
     bool depth_test;
     
+    PipelineRenderTargetDesc rt_compat;
 };
 
 

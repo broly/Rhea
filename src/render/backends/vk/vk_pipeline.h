@@ -3,10 +3,11 @@
 
 #include "vk_context.h"
 #include "vk_shader.h"
+#include "render/pipeline_object.h"
 
 struct GraphicsPipelineDesc;
 
-class VkPipelineObject
+class VkPipelineObject : public PipelineObject
 {
 public:
     VkPipelineObject(
@@ -16,20 +17,25 @@ public:
         class VkRenderBackend& backend);
     ~VkPipelineObject();
 
-    VkPipeline get_handle() const { return pipeline_; }
+    RBPipelineHandle get_pipeline_handle() const override { return pipeline_; }
     
     VkPipelineLayout get_pipeline_layout() const
     {
         return pipeline_layout;
     }
+    VkPipeline get_or_create_pipeline(VkRenderBackend& backend, vk::SwapchainContext& swapchain, VkRenderPass render_pass);
 
 private:
     vk::InstanceContext& instance_context;
     vk::SwapchainContext& swapchain_context;
+    
 
-    VkPipeline pipeline_;
+    VkPipeline pipeline_ = VK_NULL_HANDLE;
     
-    VkPipelineLayout pipeline_layout;
+    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     
-    std::vector<VkShader> shaders;
+    std::optional<VkShader> vert;
+    std::optional<VkShader> frag;
+    
+    // std::vector<VkShader> shaders;
 };

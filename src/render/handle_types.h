@@ -3,6 +3,7 @@
 #include <optional>
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
+#include <vector>
 
 #include "common/type_utils.h"
 #include "common/type_macros.h"
@@ -49,7 +50,7 @@ struct RBHandle
             assert(type_id.value() == typeid(T).name());  // todo: debug compare, remake it to strcmp
         }
 #endif
-        return reinterpret_cast<T>(handle);
+        return (T)(handle);
     }
     
     friend bool operator==(RBHandle lhs, RBHandle rhs)
@@ -77,7 +78,7 @@ struct RBHandle
         {
             assert(type_id.value() == typeid(T).name());  // todo: debug compare, remake it to strcmp
         }
-        type_id = typeid(T);
+        type_id = typeid(T).name();
 #endif
         handle = rhs;
         return *this;
@@ -89,6 +90,26 @@ struct RBHandle
     {
         return as<T>();
     }
+    
+    operator bool() const
+    {
+        return handle != 0;
+    }
+};
+
+
+enum class RGTextureFormat
+{
+    Undefined,
+
+    RGBA8_UNORM,
+    RGBA8_SRGB,
+
+    RGBA16F,
+    RGBA32F,
+
+    Depth24Stencil8,
+    Depth32F
 };
 
 
@@ -139,5 +160,57 @@ using RBDescriptorSetLayout = RBHandle<uint64_t>; // temporary
 
 using RBWindowHandle = RBHandle<GLFWwindow*>;
 
-using RBFramebufferId = uint32_t;
+using RBFramebufferId = RBHandle<uint64_t>;
 using RBFrameHandle = uint32_t;
+
+
+
+namespace RenderTextureUsage
+{
+    enum Type : uint32_t
+    {
+        None            = 0,
+        ColorAttachment = 1 << 0,
+        DepthStencil    = 1 << 1,
+        Sampled         = 1 << 2,
+        Storage         = 1 << 3,
+        TransferSrc     = 1 << 4,
+        TransferDst     = 1 << 5,
+        Present         = 1 << 6
+    };
+}
+
+struct RBImageDesc
+{
+    uint32_t width;
+    uint32_t height;
+    RGTextureFormat format;
+    RenderTextureUsage::Type usage;
+};
+
+struct RBImageHandle
+{
+    uint32_t id = 0;
+
+    bool operator==(const RBImageHandle&) const = default;
+};
+
+using RBImageView = RBHandle<VkImageView>;
+
+
+
+struct FramebufferDesc
+{
+    std::vector<RBImageHandle> color_attachments;
+    std::optional<RBImageHandle> depth_attachment;
+
+    uint32_t width  = 0;
+    uint32_t height = 0;
+};
+
+struct RBSwapchainExtent
+{
+    uint32_t width, height;
+};
+
+using RBRenderPass = RBHandle<VkRenderPass>;
