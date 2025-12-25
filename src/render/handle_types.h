@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include <optional>
+#include <string>
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
 #include <vector>
@@ -214,3 +215,10 @@ struct RBSwapchainExtent
 };
 
 using RBRenderPass = RBHandle<VkRenderPass>;
+using RBSampler = RBHandle<VkSampler>;
+
+struct RBSamplerDesc
+{
+    bool linear = true;
+    bool clamp_to_edge = true;
+};

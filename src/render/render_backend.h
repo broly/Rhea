@@ -11,6 +11,7 @@
 #include "backends/vk/vk_camera_ubo.h"
 
 
+struct RenderGraphPass;
 class RenderBackend;
 
 template<typename T>
@@ -24,6 +25,7 @@ public:
     virtual ~RenderBackend() = default;
     virtual RBFrameHandle get_current_frame() const = 0;
     virtual void wait_for_frame(RBFrameHandle frame) = 0;
+    virtual void reset_frame_fence(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
     virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) = 0;
 
@@ -38,6 +40,7 @@ public:
     }
 
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
+    virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, RGTextureFormat format) = 0;
 
 
     template<RenderBackendType T>
@@ -66,7 +69,7 @@ public:
         RBDescriptorSetLayout layout_handle,
         ResourceUsageType pool_type) = 0;
 
-    virtual void acquire_next_image(RBFrameHandle frame_handle) = 0;
+    virtual bool acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
     
     virtual PipelineObject* create_pipeline(GraphicsPipelineDesc desc) = 0;
@@ -80,10 +83,31 @@ public:
     virtual void get_or_create_mesh_buffers(MeshHandle handle) = 0;
     virtual RGTextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
-    virtual RBImageView get_image_view(RBImageHandle handle, RBFrameHandle frame_handle) = 0;
+    virtual RBImageView get_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
     virtual RBImageView resolve_image_view(const RGTexture& tex, RBFrameHandle frame) = 0;
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) = 0;
-    virtual RBImageHandle get_swapchain_image(RBFrameHandle frame) const = 0;
+    virtual RBImageHandle get_swapchain_image() const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
+    virtual RBSampler create_sampler(const RBSamplerDesc& desc) = 0;
+    virtual void bind_image_to_descriptor(
+        RBDescriptorSetLayout layout,
+        uint32_t binding,
+        RBImageHandle image,
+        RBSampler sampler) = 0;
+    
+    virtual void CRUTCH_transition_image(
+        RBCommandList cmd,
+        RBImageHandle image,
+        RGTextureFormat format,
+        VkImageLayout old_layout,
+        VkImageLayout new_layout) = 0;
+    
+    virtual void draw_fullscreen(RBCommandList cmd) = 0;
+    
+    virtual void update_sampled_image(
+        RBDescriptorSetLayout layout,
+        uint32_t binding,
+        RBImageHandle image,
+        ResourceUsageType usage) = 0;
 };

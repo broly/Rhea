@@ -10,6 +10,7 @@
 #include "vk_macro.h"
 #include "vk_pipeline.h"
 #include "logging/log.h"
+#include "render/render_graph.h"
 
 DEFINE_LOGGER(LogRB, Log);
 
@@ -88,6 +89,92 @@ RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
     return RBSwapchainExtent{swapchain_context.extent.width, swapchain_context.extent.height};
 }
 
+bool is_depth_format(VkFormat format)
+{
+    switch (format)
+    {
+    case VK_FORMAT_D16_UNORM:
+    case VK_FORMAT_D32_SFLOAT:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void VkRenderBackend::CRUTCH_transition_image(RBCommandList cmd, RBImageHandle image, 
+    RGTextureFormat format, VkImageLayout old_layout,
+    VkImageLayout new_layout)
+{
+    auto& img = image_resources[image.id];
+
+    VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
+    barrier.image = img.image;
+
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    if (new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+    {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+    else
+    {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+
+    VkPipelineStageFlags src_stage;
+    VkPipelineStageFlags dst_stage;
+
+    if (old_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL &&
+        new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = 0;
+        src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    }
+    
+    
+    
+    if (is_depth_format(vk::get_vk_format(format)))
+    {
+        barrier.subresourceRange.aspectMask =
+            VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    else
+    {
+        barrier.subresourceRange.aspectMask =
+            VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+
+    vkCmdPipelineBarrier(
+        cmd.as<VkCommandBuffer>(),
+        src_stage,
+        dst_stage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+}
+
 
 vk::BufferInfo& VkRenderBackend::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
 {
@@ -117,6 +204,41 @@ RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb)
 
     return rp;
 }
+
+
+void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
+{
+    vkCmdDraw(
+        cmd.as<VkCommandBuffer>(),
+        3, // fullscreen triangle
+        1,
+        0,
+        0
+    );
+}
+
+void VkRenderBackend::update_sampled_image(RBDescriptorSetLayout layout, uint32_t binding, RBImageHandle image,
+    ResourceUsageType usage)
+{
+    VkDescriptorSet set = get_descriptor_set(layout, usage);
+
+
+    VkDescriptorImageInfo info{};
+    info.imageView   = get_image_view(image);
+    info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    info.sampler     = get_default_sampler();
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo = &info;
+
+    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+}
+
 
 void VkRenderBackend::create_instance()
 {
@@ -303,41 +425,40 @@ RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const Descri
 
 void VkRenderBackend::create_descriptor_pool()
 {
-    {
-        VkDescriptorPoolSize pool_size{};
-        pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        pool_size.descriptorCount = vk::MAX_FRAMES_IN_FLIGHT;
+    VkDescriptorPoolSize pool_sizes[] = {
+        {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = vk::MAX_FRAMES_IN_FLIGHT * 16
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = vk::MAX_FRAMES_IN_FLIGHT * 16
+        }
+    };
 
-        VkDescriptorPoolCreateInfo pool_info{
-            VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
-        };
-        pool_info.poolSizeCount = 1;
-        pool_info.pPoolSizes = &pool_size;
-        pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT;
-        pool_info.flags = 0; // without FREE_DESCRIPTOR_SET
+    VkDescriptorPoolCreateInfo pool_info{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
+    };
+    pool_info.poolSizeCount = uint32_t(std::size(pool_sizes));
+    pool_info.pPoolSizes = pool_sizes;
+    pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT * 16;
+    pool_info.flags = 0;
 
-        VK_CHECK(
-            vkCreateDescriptorPool(instance_context.device, &pool_info, nullptr, &descriptor_context.persistent_pool)
-        );
-    }
-    {
-        VkDescriptorPoolSize pool_size{};
-        pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        pool_size.descriptorCount = vk::MAX_FRAMES_IN_FLIGHT;
+    VK_CHECK(vkCreateDescriptorPool(
+        instance_context.device,
+        &pool_info,
+        nullptr,
+        &descriptor_context.frame_pool
+    ));
 
-        VkDescriptorPoolCreateInfo pool_info{
-            VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
-        };
-        pool_info.poolSizeCount = 1;
-        pool_info.pPoolSizes = &pool_size;
-        pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT;
-        pool_info.flags = 0; // without FREE_DESCRIPTOR_SET
-
-        VK_CHECK(
-            vkCreateDescriptorPool(instance_context.device, &pool_info, nullptr, &descriptor_context.frame_pool)
-        );
-    }
+    VK_CHECK(vkCreateDescriptorPool(
+        instance_context.device,
+        &pool_info,
+        nullptr,
+        &descriptor_context.persistent_pool
+    ));
 }
+
 
 
 void VkRenderBackend::allocate_descriptor_sets_for_layout(
@@ -410,15 +531,30 @@ RBFrameHandle VkRenderBackend::get_current_frame() const
 
 void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
 {
-    auto& frame = frame_schedule_context.frames[frame_handle];
-    if (frame.in_flight != VK_NULL_HANDLE) {
-        vkWaitForFences(instance_context.device, 1, &frame.in_flight, VK_TRUE, UINT64_MAX);
-        vkResetFences(instance_context.device, 1, &frame.in_flight);
-    }
+    LogRB.Log("wait_for_frame");
+    
+    auto& f = frame_schedule_context.frames[frame_handle];
+
+    vkWaitForFences(
+        instance_context.device,
+        1,
+        &f.in_flight,
+        VK_TRUE,
+        UINT64_MAX
+    );
+}
+
+void VkRenderBackend::reset_frame_fence(RBFrameHandle frame)
+{
+    auto& f = frame_schedule_context.frames[frame];
+
+    vkResetFences(instance_context.device, 1, &f.in_flight);
 }
 
 void VkRenderBackend::advance_frame()
 {
+    
+    LogRB.Log("advance_frame");
     frame_schedule_context.current_frame =
         (frame_schedule_context.current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
 }
@@ -481,25 +617,6 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     mesh_map[handle] = data;
 }
 
-VkFormat get_vk_format(RGTextureFormat format)
-{
-    switch (format)
-    {
-    case RGTextureFormat::RGBA8_UNORM:
-        return VK_FORMAT_B8G8R8A8_UNORM;
-    case RGTextureFormat::RGBA8_SRGB:
-        return VK_FORMAT_B8G8R8A8_SRGB;
-    case RGTextureFormat::Undefined:
-    case RGTextureFormat::RGBA16F:
-    case RGTextureFormat::RGBA32F:
-    case RGTextureFormat::Depth24Stencil8:
-    case RGTextureFormat::Depth32F:
-    default:
-        
-        throw std::runtime_error("Unsupported texture format");
-    }
-}
-
 RGTextureFormat VkRenderBackend::get_swapchain_format() const
 {
     switch (swapchain_context.surface_format.format)
@@ -523,10 +640,20 @@ RGTextureFormat VkRenderBackend::get_swapchain_format() const
 
 RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
 {
+    uint32_t width  = desc.width;
+    uint32_t height = desc.height;
+
+    if (width == 0 || height == 0)
+    {
+        auto extent = get_swapchain_extent();
+        width  = extent.width;
+        height = extent.height;
+    }
+
     vk::ImageResource res{};
-    res.width  = desc.width;
-    res.height = desc.height;
-    res.format = get_vk_format(desc.format);
+    res.width  = width;
+    res.height = height;
+    res.format = vk::get_vk_format(desc.format);
 
     VkImageUsageFlags vk_usage = 0;
 
@@ -541,10 +668,10 @@ RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
 
     VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent = { desc.width, desc.height, 1 };
+    image_info.extent = { width, height, 1 };
     image_info.mipLevels = 1;
     image_info.arrayLayers = 1;
-    image_info.format = get_vk_format(desc.format);
+    image_info.format = vk::get_vk_format(desc.format);
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_info.usage = vk_usage;
@@ -576,7 +703,7 @@ RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
     VkImageViewCreateInfo view_info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
     view_info.image = res.image;
     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = get_vk_format(desc.format);
+    view_info.format = vk::get_vk_format(desc.format);
     view_info.subresourceRange = {
         aspect, 0, 1, 0, 1
     };
@@ -589,7 +716,7 @@ RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
     return RBImageHandle{ id };
 }
 
-RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, RBFrameHandle frame_handle)
+RBImageView VkRenderBackend::get_image_view(RBImageHandle handle)
 {
     return image_resources[handle.id].view;
 }
@@ -630,7 +757,7 @@ RBImageView VkRenderBackend::get_swapchain_image_view(RBFrameHandle frame)
     return swapchain_context.image_views[current_image_index];
 }
 
-RBImageHandle VkRenderBackend::get_swapchain_image(RBFrameHandle frame) const
+RBImageHandle VkRenderBackend::get_swapchain_image() const
 {
     return swapchain_image_handles[current_image_index];
 }
@@ -728,6 +855,61 @@ RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle
 
     return obj.get_or_create_pipeline(render_pass);
     
+}
+
+void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value,
+    RGTextureFormat format)
+{
+    const auto& res = image_resources[value.id];
+    
+
+    VkDescriptorImageInfo image_info{};
+    image_info.imageView = res.view;
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image_info.sampler = get_default_sampler();
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = rb_handle.as<VkDescriptorSet>();
+    write.dstBinding = 0; // u_depth
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.descriptorCount = 1;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+}
+
+VkSampler VkRenderBackend::get_default_sampler() const
+{
+    
+    static bool created_default_sampler = false;
+    
+    static VkSampler default_sampler;
+    
+    if (!created_default_sampler)
+    {
+        created_default_sampler = true;
+        VkSamplerCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        info.magFilter = VK_FILTER_NEAREST;
+        info.minFilter = VK_FILTER_NEAREST;
+        info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+
+        info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+        info.compareEnable = VK_FALSE; // IMPORTANT
+        info.compareOp = VK_COMPARE_OP_ALWAYS;
+
+        info.minLod = 0.0f;
+        info.maxLod = 1.0f;
+        info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+
+        vkCreateSampler(instance_context.device, &info, nullptr, &default_sampler);
+    }
+    
+    return default_sampler;
 }
 
 
@@ -1031,6 +1213,7 @@ void VkRenderBackend::end_commands(RBCommandList cmd_list)
 
 void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index)
 {
+    LogRB.Log<DisplayFn>("begin_render_pass");
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     const auto& fb = framebuffer_resources[framebuffer_index.as<uint64_t>()];
 
@@ -1053,6 +1236,13 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
 RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc& desc)
 {
     VkRenderPass rp = get_or_create_render_pass(desc);
+    
+    uint32_t height = (desc.height > 0) ? desc.height : get_swapchain_extent().height;
+    uint32_t width = (desc.width > 0) ? desc.width : get_swapchain_extent().width;
+    
+    
+    assert(height > 0);
+    assert(width > 0);
 
     std::vector<VkImageView> attachments;
 
@@ -1066,8 +1256,8 @@ RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc
     info.renderPass = rp;
     info.attachmentCount = uint32_t(attachments.size());
     info.pAttachments = attachments.data();
-    info.width  = desc.width;
-    info.height = desc.height;
+    info.width  = width;
+    info.height = height;
     info.layers = 1;
 
     VkFramebuffer fb;
@@ -1077,8 +1267,8 @@ RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc
     framebuffer_resources.push_back({
         .framebuffer = fb,
         .render_pass = rp,
-        .width = desc.width,
-        .height = desc.height
+        .width = width,
+        .height = height
     });
 
     return RBFramebufferId{ (uint64_t)id };
@@ -1129,29 +1319,17 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
     vkCmdDraw(cmd, vertex_count, 1, 0, 0);
 }
 
-void VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
+bool VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 {
+    LogRB.Log("acquire_next_image");
+    
     auto& frame = frame_schedule_context.frames[frame_handle];
-
-    vkWaitForFences(
-        instance_context.device,
-        1,
-        &frame.in_flight,
-        VK_TRUE,
-        UINT64_MAX
-    );
-
-    vkResetFences(
-        instance_context.device,
-        1,
-        &frame.in_flight
-    );
 
     VkResult res = vkAcquireNextImageKHR(
         instance_context.device,
         swapchain_context.swapchain,
         UINT64_MAX,
-        frame.image_available,
+        frame.image_available, // semaphore
         VK_NULL_HANDLE,
         &current_image_index
     );
@@ -1159,16 +1337,18 @@ void VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
         recreate_swapchain();
-        return;
+        return false;
     }
 
     VK_CHECK(res);
+    return true;
 }
 
 
 void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
                                   RBCommandList cmd_list)
 {
+    LogRB.Log("submit_frame");
     auto& frame = frame_schedule_context.frames[frame_handle];
 
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
@@ -1188,7 +1368,7 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
     VK_CHECK(vkQueueSubmit(
         instance_context.graphics_queue,
         1,
-        &submit,
+        &submit, 
         frame.in_flight
     ));
 
@@ -1299,7 +1479,7 @@ void VkRenderBackend::create_frame_sync_objects()
     };
     fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    for (auto& frame : frame_schedule_context.frames)
+    for (int frame_index = 0; auto& frame : frame_schedule_context.frames)
     {
         VK_CHECK(vkCreateSemaphore(
             instance_context.device,
@@ -1321,5 +1501,53 @@ void VkRenderBackend::create_frame_sync_objects()
             nullptr,
             &frame.in_flight
         ));
+        
+        LogRB.Log("Frame %i. image_available: %p, render_finished: %p, in_flight: %p",
+            frame_index, frame.image_available, frame.render_finished, frame.in_flight);
+        
+        frame_index++;
     }
+}
+
+RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
+{
+    VkSamplerCreateInfo info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+
+    info.magFilter = desc.linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+    info.minFilter = desc.linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+
+    info.addressModeU =
+    info.addressModeV =
+    info.addressModeW = desc.clamp_to_edge
+        ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+        : VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+    info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    info.minLod = 0.0f;
+    info.maxLod = 1.0f;
+
+    VkSampler sampler;
+    VK_CHECK(vkCreateSampler(instance_context.device, &info, nullptr, &sampler));
+
+    return RBSampler{ sampler };
+}
+
+void VkRenderBackend::bind_image_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBImageHandle image,
+    RBSampler sampler)
+{
+    auto& img = image_resources[image.id];
+
+    VkDescriptorImageInfo img_info{};
+    img_info.imageView = img.view;
+    img_info.sampler   = sampler.as<VkSampler>();
+    img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    write.dstSet = get_descriptor_set(layout, ResourceUsageType::Frame).as<VkDescriptorSet>();
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo = &img_info;
+
+    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
 }

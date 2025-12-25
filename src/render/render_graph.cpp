@@ -3,6 +3,16 @@
 #include "backends/vk/vk_render_backend.h"
 
 
+void RenderGraphContext::bind_sampled_texture(RBDescriptorSetLayout layout, uint32_t binding, RGTextureHandle tex)
+{
+    backend.update_sampled_image(
+        layout,
+        binding,
+        render_graph.get_image(tex),
+        ResourceUsageType::Frame
+    );
+}
+
 RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
 {
     RGTextureHandle handle;
@@ -42,59 +52,81 @@ void RenderGraph::compile(RenderBackend& backend)
             .usage  = tex.desc.usage
         });
     }
+    
+    for (auto& pass : passes)
+    {
+        if (!pass.descriptor_set)
+            continue;
+
+        for (auto tex_handle : pass.reads)
+        {
+            const RGTexture& tex = textures[tex_handle.id];
+
+            if (!(tex.desc.usage & RenderTextureUsage::DepthStencil))
+                continue;
+
+            backend.update_depth_descriptor(
+                pass.descriptor_set,
+                tex.image.value(),
+                tex.desc.format
+            );
+        }
+    }
 
     execution_order.clear();
     for (uint32_t i = 0; i < passes.size(); ++i)
         execution_order.push_back(i);
+    
 }
 
-void RenderGraph::execute(RenderBackend& backend)
+void RenderGraph::execute(RenderBackend& backend, RBCommandList cmd, RBFrameHandle frame)
 {
-    RBFrameHandle frame = backend.get_current_frame();
-    backend.wait_for_frame(frame);
-
-    RBCommandList cmd = backend.begin_commands(frame);
-    RenderGraphContext ctx(backend, cmd, {});
+    RenderGraphContext ctx(backend, cmd, {}, *this);
 
     for (uint32_t pass_index : execution_order)
     {
         auto& pass = passes[pass_index];
         FramebufferDesc fb_desc{};
 
+        // transitions
+        for (auto tex_handle : pass.reads)
+        {
+            const RGTexture& tex = textures[tex_handle.id];
+            if (!tex.image.has_value()) continue;
+
+            backend.CRUTCH_transition_image(
+                cmd,
+                tex.image.value(),
+                tex.desc.format,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
+        
+        bool extent_set = false;
+
+        // framebuffer build
         for (auto handle : pass.writes)
         {
             const RGTexture& tex = textures[handle.id];
-            RBImageHandle image;
-
-            if (tex.desc.external)
-            {
-                image = backend.get_swapchain_image(frame);
-            }
-            else
-            {
-                image = tex.image.value();
-            }
+            RBImageHandle image =
+                tex.desc.external
+                    ? backend.get_swapchain_image()
+                    : tex.image.value();
+            
 
             if (tex.desc.usage & RenderTextureUsage::DepthStencil)
                 fb_desc.depth_attachment = image;
             else
                 fb_desc.color_attachments.push_back(image);
-
-            fb_desc.width  = tex.desc.width  ? tex.desc.width  : backend.get_swapchain_extent().width;
-            fb_desc.height = tex.desc.height ? tex.desc.height : backend.get_swapchain_extent().height;
         }
-
-        // access to render pass here
-        auto rp = backend.get_or_create_render_pass(fb_desc);
         
+        
+
         ctx.framebuffer = backend.get_or_create_framebuffer(fb_desc);
 
         backend.begin_render_pass(cmd, ctx.framebuffer);
         pass.execute(ctx);
         backend.end_render_pass(cmd);
     }
-
-    backend.end_commands(cmd);
-    backend.submit_frame(frame, cmd);
-    backend.advance_frame();
 }

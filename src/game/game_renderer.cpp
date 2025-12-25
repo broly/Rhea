@@ -46,6 +46,42 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
 
     auto geometry_pipeline = render_backend->create_pipeline(geom_pipeline_desc);
     
+    
+    
+    DescriptorSetLayoutDesc lighting_set{
+        .set_index = 0,
+        .bindings = {{
+            .binding = 0,
+            .type = DescriptorType::CombinedImageSampler,
+            .stages = ShaderStage::ss_Fragment
+        }}
+    };
+    
+    auto depth_sampler = render_backend->create_sampler({});
+    
+    auto lighting_layout = render_backend->create_descriptor_set_layout(lighting_set);
+    render_backend->allocate_descriptor_sets_for_layout(lighting_layout, ResourceUsageType::Frame);
+    
+    
+    GraphicsPipelineDesc lighting_pipeline_desc{
+        .vertex_shader   = "shaders/fullscreen.vert.spv",
+        .fragment_shader = "shaders/lighting.frag.spv",
+        .vertex_layout = VertexLayout::None,
+
+        .layout = {
+            .sets = { lighting_layout },
+            .push_constants = {}
+        },
+
+        .rt_compat = {
+            .color_attachment_count = 1,
+            .has_depth = false
+        }
+    };
+
+    auto lighting_pipeline = render_backend->create_pipeline(lighting_pipeline_desc);
+    
+    
     RGTextureDesc swapchain_desc{
         .width  = 0,
         .height = 0,
@@ -56,9 +92,31 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
 
     auto swapchain_color = render_graph->create_texture(swapchain_desc);
     
+    
+    
+    RGTextureDesc depth_desc{
+        .width  = 0,
+        .height = 0,
+        .format = RGTextureFormat::Depth24Stencil8,
+        .usage  = RenderTextureUsage::Type(RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled),
+        .external = false
+    };
+
+    RGTextureHandle depth_texture = render_graph->create_texture(depth_desc);
+    
+    RGTextureDesc color_desc{
+        .width  = 0,
+        .height = 0,
+        .format = RGTextureFormat::RGBA8_UNORM,
+        .usage  = RenderTextureUsage::Type(RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled),
+        .external = false
+    };
+
+    auto scene_color = render_graph->create_texture(color_desc);
+    
     render_graph->add_pass({
         .name = "Geometry",
-        .writes = { swapchain_color },
+        .writes = { scene_color, depth_texture },
         .execute = [=](RenderGraphContext& ctx)
         {
             auto cmd = ctx.cmd;
@@ -89,11 +147,61 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
 
         }
     });
+    
+    render_graph->add_pass({
+        .name = "Lighting",
+        .reads = { depth_texture },
+        .writes = { swapchain_color },
+        .descriptor_layout = lighting_layout,
+        .descriptor_set = render_backend->get_descriptor_set(
+            lighting_layout,
+            ResourceUsageType::Frame
+        ),
+        .execute = [=](RenderGraphContext& ctx)
+        {
+            auto cmd = ctx.cmd;
+            
+            ctx.bind_sampled_texture(
+                lighting_layout,
+                0,              // binding = 0
+                depth_texture
+            );
+
+            ctx.backend.bind_pipeline(cmd, lighting_pipeline);
+
+            ctx.backend.bind_descriptor_set(
+                cmd,
+                0,
+                ctx.backend.get_descriptor_set(lighting_layout, ResourceUsageType::Frame),
+                lighting_pipeline->get_pipeline_handle()
+            );
+
+            ctx.backend.draw_fullscreen(cmd);
+        }
+    });
 
     render_graph->compile(*render_backend);
 }
 
 void GameRenderer::execute()
 {
-    render_graph->execute(*render_backend);
+    auto& backend = *render_backend;
+    
+    RBFrameHandle frame = backend.get_current_frame();
+
+    backend.wait_for_frame(frame);
+
+    backend.reset_frame_fence(frame);
+
+    if (!backend.acquire_next_image(frame))
+        return;
+
+    RBCommandList cmd = backend.begin_commands(frame);
+    render_graph->execute(backend, cmd, frame);
+    backend.end_commands(cmd);
+
+    backend.submit_frame(frame, cmd);
+
+    backend.advance_frame();
+
 }

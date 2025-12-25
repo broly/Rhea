@@ -3,6 +3,7 @@
 
 #include "vk_context.h"
 #include "vk_shader.h"
+#include "render/graphics_pipeline.h"
 #include "render/pipeline_object.h"
 
 struct GraphicsPipelineDesc;
@@ -27,6 +28,8 @@ public:
         return pipeline_layout;
     }
     VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
+    
+    GraphicsPipelineDesc pipeline_desc;
 
 private:
     VkRenderBackend& backend;

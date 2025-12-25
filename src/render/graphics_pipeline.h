@@ -8,6 +8,7 @@
 
 enum class VertexLayout
 {
+    None,
     Position,
     PositionNormal,
     PositionNormalUV,
@@ -23,8 +24,10 @@ enum ShaderStage
 enum class DescriptorType
 {
     UniformBuffer,
+    StorageBuffer,
     Sampler,
-    Texture,
+    SampledImage,
+    CombinedImageSampler,
 };
 
 struct DescriptorBinding

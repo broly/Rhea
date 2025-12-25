@@ -47,7 +47,7 @@ public:
     void end_render_pass(RBCommandList cmd_list) override;
     void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) override;
     void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
-    void acquire_next_image(RBFrameHandle frame_handle) override;
+    bool acquire_next_image(RBFrameHandle frame_handle) override;
     void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
     PipelineObject* create_pipeline(GraphicsPipelineDesc desc) override;
     DescriptorSetLayoutData get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle);
@@ -58,11 +58,20 @@ public:
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data) override;
     void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) override;
     RBSwapchainExtent get_swapchain_extent() const override;
+    
+    void CRUTCH_transition_image(RBCommandList cmd, RBImageHandle image, 
+        RGTextureFormat format,
+        VkImageLayout old_layout, VkImageLayout new_layout) override;
 
     vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index = 0);
     
     RenderPassDesc make_render_pass_desc(const FramebufferDesc& fb) const;
-
+    void draw_fullscreen(RBCommandList cmd) override;
+    virtual void update_sampled_image(
+        RBDescriptorSetLayout layout,
+        uint32_t binding,
+        RBImageHandle image,
+        ResourceUsageType usage) override;
     
 private: // Initialization section
     void create_instance();
@@ -94,6 +103,7 @@ public:
     RBFrameHandle get_current_frame() const override;
     
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
+    void reset_frame_fence(RBFrameHandle frame) override;
     void advance_frame() override;
     void bind_mesh(const RBCommandList& cmd, MeshHandle mesh) override;
     void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) override;
@@ -101,12 +111,17 @@ public:
     void get_or_create_mesh_buffers(MeshHandle handle) override;
     RGTextureFormat get_swapchain_format() const override;
     RBImageHandle create_image(const RBImageDesc& desc) override;
-    RBImageView get_image_view(RBImageHandle handle, RBFrameHandle frame_handle) override;
+    RBImageView get_image_view(RBImageHandle handle) override;
     RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
     RBImageView resolve_image_view(const RGTexture& tex, RBFrameHandle frame) override;
     RBImageView get_swapchain_image_view(RBFrameHandle frame) override;
-    RBImageHandle get_swapchain_image(RBFrameHandle frame) const override;
-    
+    RBImageHandle get_swapchain_image() const override;
+    virtual RBSampler create_sampler(const RBSamplerDesc& desc) override;
+    void bind_image_to_descriptor(
+        RBDescriptorSetLayout layout,
+        uint32_t binding,
+        RBImageHandle image,
+        RBSampler sampler) override;
     
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     
@@ -115,6 +130,10 @@ public:
     RBPipelineHandle get_or_create_pipeline(
         RBPipelineHandle handle,
         VkRenderPass render_pass);
+    
+    void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, RGTextureFormat format) override;
+    
+    VkSampler get_default_sampler() const;
 
 private:
     vk::InstanceContext instance_context = {};

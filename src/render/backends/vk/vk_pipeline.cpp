@@ -12,6 +12,7 @@ VkPipelineObject::VkPipelineObject(
     const GraphicsPipelineDesc& desc,
     VkRenderBackend& in_backend)
         : backend(in_backend)
+        , pipeline_desc(desc)
 {
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
@@ -88,10 +89,17 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     attrs[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) };
     attrs[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, tex_coord) };
 
-    vertex_input.vertexBindingDescriptionCount = 1;
-    vertex_input.pVertexBindingDescriptions = &binding;
-    vertex_input.vertexAttributeDescriptionCount = attrs.size();
-    vertex_input.pVertexAttributeDescriptions = attrs.data();
+    if (pipeline_desc.vertex_layout == VertexLayout::None)
+    {
+        vertex_input.vertexBindingDescriptionCount = 0;
+        vertex_input.vertexAttributeDescriptionCount = 0;
+    } else
+    {
+        vertex_input.vertexBindingDescriptionCount = 1;
+        vertex_input.pVertexBindingDescriptions = &binding;
+        vertex_input.vertexAttributeDescriptionCount = attrs.size();
+        vertex_input.pVertexAttributeDescriptions = attrs.data();
+    }
 
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{
