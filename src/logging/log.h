@@ -1,4 +1,5 @@
-﻿#include <cstdint>
+﻿#pragma once
+#include <cstdint>
 #include <iostream>
 #include <ostream>
 #include <utility>
@@ -52,7 +53,7 @@ struct LogVerbosityLevelTraits
 
 
 #define DEFINE_VERBOSITY(name, level, details, printer) \
-    static constexpr auto name = LogVerbosity(level, static_cast<ELogOutputDetailsMask>(details), &printer); \
+    static inline constexpr auto name = LogVerbosity(level, static_cast<ELogOutputDetailsMask>(details), &printer); \
     template<> \
     struct LogVerbosityLevelTraits<level> \
     { \
@@ -114,8 +115,3 @@ Logger(char const (&)[Num], LogVerbosity DefaultVerbosity) -> Logger<Num - 1>;
     constexpr Logger LoggerName(#LoggerName, DefaultVerbosity)
 
 DEFINE_LOGGER(LogTemp, DisplayFn);
-
-void mainq()
-{
-    LogTemp.Log<DisplayFn>("hellpo %s");
-}

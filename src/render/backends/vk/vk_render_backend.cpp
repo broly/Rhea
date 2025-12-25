@@ -7,21 +7,16 @@
 #include <span>
 
 #include "vk_helpers.h"
+#include "vk_log.h"
 #include "vk_macro.h"
 #include "vk_pipeline.h"
 #include "logging/log.h"
 #include "render/render_graph.h"
 
-DEFINE_LOGGER(LogRB, Log);
-
-constexpr const char* VALIDATION_LAYERS[] = {
-    "VK_LAYER_KHRONOS_validation"
-};
-
 
 void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data)
 {
-    auto& buf = get_buffer(buffer_handle, frame_schedule_context.current_frame);
+    auto& buf = get_buffer(buffer_handle, swapchain.current_frame);
     
     memcpy(buf.mapped_ptr, data, size);
     
@@ -38,8 +33,7 @@ void VkRenderBackend::bind_buffer_to_descriptor(
     {
         for (uint32_t frame = 0; frame < vk::MAX_FRAMES_IN_FLIGHT; ++frame)
         {
-            auto& buf = frame_schedule_context.ubos
-                .at(buffer.get_identifier())[frame];
+            auto& buf = swapchain.frames_ubos.at(buffer.get_identifier())[frame];
 
             VkDescriptorBufferInfo info{
                 .buffer = buf.buffer,
@@ -49,7 +43,7 @@ void VkRenderBackend::bind_buffer_to_descriptor(
 
             VkWriteDescriptorSet write{
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = frame_schedule_context.frames[frame]
+                .dstSet = swapchain.frames[frame]
                     .descriptors.at(layout),
                 .dstBinding = binding,
                 .descriptorCount = 1,
@@ -57,12 +51,12 @@ void VkRenderBackend::bind_buffer_to_descriptor(
                 .pBufferInfo = &info
             };
 
-            vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+            vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
         }
     }
     else // Persistent
     {
-        auto& buf = swapchain_context.ubos
+        auto& buf = swapchain.ubos
             .at(buffer.get_identifier());
 
         VkDescriptorBufferInfo info{
@@ -80,99 +74,22 @@ void VkRenderBackend::bind_buffer_to_descriptor(
             .pBufferInfo = &info
         };
 
-        vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+        vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
     }
 }
 
 RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
 {
-    return RBSwapchainExtent{swapchain_context.extent.width, swapchain_context.extent.height};
+    return swapchain.get_extent();
 }
 
-bool is_depth_format(VkFormat format)
-{
-    switch (format)
-    {
-    case VK_FORMAT_D16_UNORM:
-    case VK_FORMAT_D32_SFLOAT:
-    case VK_FORMAT_D24_UNORM_S8_UINT:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        return true;
-    default:
-        return false;
-    }
-}
 
 void VkRenderBackend::CRUTCH_transition_image(RBCommandList cmd, RBImageHandle image, 
     RGTextureFormat format, VkImageLayout old_layout,
     VkImageLayout new_layout)
 {
-    auto& img = image_resources[image.id];
-
-    VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    barrier.oldLayout = old_layout;
-    barrier.newLayout = new_layout;
-    barrier.image = img.image;
-
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-
-    if (new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-    {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    }
-    else
-    {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    }
-
-    VkPipelineStageFlags src_stage;
-    VkPipelineStageFlags dst_stage;
-
-    if (old_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL &&
-        new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-    {
-        barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    }
-    else
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = 0;
-        src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-        dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    }
+    swapchain.CRUTCH_transition_image(cmd, image,  format,  old_layout, new_layout);
     
-    
-    
-    if (is_depth_format(vk::get_vk_format(format)))
-    {
-        barrier.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    else
-    {
-        barrier.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_COLOR_BIT;
-    }
-
-    vkCmdPipelineBarrier(
-        cmd.as<VkCommandBuffer>(),
-        src_stage,
-        dst_stage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
 }
 
 
@@ -181,9 +98,9 @@ vk::BufferInfo& VkRenderBackend::get_buffer(RBBufferHandle buffer_handle, size_t
     if (buffer_handle.get_usage_type() == ResourceUsageType::Frame)
     {
         size_t index = buffer_handle.get_identifier();
-        return frame_schedule_context.ubos.at(index).at(frame_index);
+        return swapchain.frames_ubos.at(index).at(frame_index);
     }
-    return swapchain_context.ubos[buffer_handle.get_identifier()];
+    return swapchain.ubos[buffer_handle.get_identifier()];
 }
 
 RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb) const
@@ -236,100 +153,38 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSetLayout layout, uint32_
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &info;
 
-    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+    vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
 }
 
 
-void VkRenderBackend::create_instance()
-{
-    VkApplicationInfo appInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
-    appInfo.pApplicationName = "Rhea";
-    appInfo.apiVersion = VK_API_VERSION_1_3;
-
-    VkInstanceCreateInfo ici{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-    ici.pApplicationInfo = &appInfo;
-    ici.enabledLayerCount = 1;
-    ici.ppEnabledLayerNames = VALIDATION_LAYERS;
-
-    // extensions (by GLFW)
-    uint32_t ext_count = 0;
-    const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
-    ici.enabledExtensionCount = ext_count;
-    ici.ppEnabledExtensionNames = extensions;
-
-    VK_CHECK(
-        vkCreateInstance(&ici, nullptr, &instance_context.instance)
-    );
-}
-
-void VkRenderBackend::create_device()
-{
-    float priority = 1.0f;
-
-    std::vector<VkDeviceQueueCreateInfo> queue_infos;
-    std::set<uint32_t> unique_families = {
-        instance_context.queues.graphics,
-        instance_context.queues.present
-    };
-    
-    VkPhysicalDeviceFeatures features{};
-    
-    for (uint32_t family : unique_families) {
-        VkDeviceQueueCreateInfo qi{
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO
-        };
-        qi.queueFamilyIndex = family;
-        qi.queueCount = 1;
-        qi.pQueuePriorities = &priority;
-        queue_infos.push_back(qi);
-    }
-    
-    auto& device = instance_context.device;
-    
-    const char* device_extensions[] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
-    
-    VkDeviceCreateInfo dci{
-        VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO
-    };
-    dci.queueCreateInfoCount = static_cast<uint32_t>(queue_infos.size());
-    dci.pQueueCreateInfos = queue_infos.data();
-    dci.pEnabledFeatures = &features;
-    dci.enabledExtensionCount = 1;
-    dci.ppEnabledExtensionNames = device_extensions;
-
-    VK_CHECK(
-        vkCreateDevice(instance_context.physical_device, &dci, nullptr, &device)
-    );
-}
 void VkRenderBackend::recreate_swapchain()
 {
-    int w = 0, h = 0;
-    glfwGetFramebufferSize(window, &w, &h);
-    while (w == 0 || h == 0)
-    {
-        glfwWaitEvents();
-        glfwGetFramebufferSize(window, &w, &h);
-    }
-
-    vkDeviceWaitIdle(instance_context.device);
-    cleanup_swapchain();
-    create_swapchain();
-    create_depth_resources();
+    assert(false);
+    // int w = 0, h = 0;
+    // glfwGetFramebufferSize(window, &w, &h);
+    // while (w == 0 || h == 0)
+    // {
+    //     glfwWaitEvents();
+    //     glfwGetFramebufferSize(window, &w, &h);
+    // }
+    //
+    // vkDeviceWaitIdle(instance.device);
+    // cleanup_swapchain();
+    // create_swapchain();
+    // create_depth_resources();
 }
 
 void VkRenderBackend::create_depth_resources()
 {
     VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
-    swapchain_context.depth_format = depth_format;
+    swapchain.depth_format = depth_format;
 
     VkImageCreateInfo image_ci{
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO
     };
     image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.extent.width  = swapchain_context.extent.width;
-    image_ci.extent.height = swapchain_context.extent.height;
+    image_ci.extent.width  = swapchain.extent.width;
+    image_ci.extent.height = swapchain.extent.height;
     image_ci.extent.depth  = 1;
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
@@ -341,29 +196,29 @@ void VkRenderBackend::create_depth_resources()
     image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VK_CHECK(
-        vkCreateImage(instance_context.device, &image_ci, nullptr, &swapchain_context.depth_image)
+        vkCreateImage(instance.device, &image_ci, nullptr, &swapchain.depth_image)
     );
 
     VkMemoryRequirements mem_req;
-    vkGetImageMemoryRequirements(instance_context.device, swapchain_context.depth_image, &mem_req);
+    vkGetImageMemoryRequirements(instance.device, swapchain.depth_image, &mem_req);
 
     VkMemoryAllocateInfo alloc{
         VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO
     };
     alloc.allocationSize = mem_req.size;
-    alloc.memoryTypeIndex = vk::find_memory_type(instance_context.physical_device,mem_req.memoryTypeBits,
+    alloc.memoryTypeIndex = vk::find_memory_type(instance.physical_device,mem_req.memoryTypeBits,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     VK_CHECK(
-        vkAllocateMemory(instance_context.device, &alloc, nullptr, &swapchain_context.depth_memory)
+        vkAllocateMemory(instance.device, &alloc, nullptr, &swapchain.depth_memory)
     );
 
-    vkBindImageMemory(instance_context.device, swapchain_context.depth_image, swapchain_context.depth_memory,0);
+    vkBindImageMemory(instance.device, swapchain.depth_image, swapchain.depth_memory,0);
 
     VkImageViewCreateInfo view_ci{
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
     };
-    view_ci.image = swapchain_context.depth_image;
+    view_ci.image = swapchain.depth_image;
     view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     view_ci.format = depth_format;
     view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -371,8 +226,8 @@ void VkRenderBackend::create_depth_resources()
     view_ci.subresourceRange.layerCount = 1;
 
     VK_CHECK(vkCreateImageView(
-        instance_context.device, &view_ci, nullptr,
-        &swapchain_context.depth_image_view));
+        instance.device, &view_ci, nullptr,
+        &swapchain.depth_image_view));
 }
 
 RBDescriptorSetLayout VkRenderBackend::allocate_descriptor_layout_handle()
@@ -408,7 +263,7 @@ RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const Descri
 
     VkDescriptorSetLayout layout = VK_NULL_HANDLE;
     VK_CHECK(vkCreateDescriptorSetLayout(
-        instance_context.device,
+        instance.device,
         &ci,
         nullptr,
         &layout
@@ -445,14 +300,14 @@ void VkRenderBackend::create_descriptor_pool()
     pool_info.flags = 0;
 
     VK_CHECK(vkCreateDescriptorPool(
-        instance_context.device,
+        instance.device,
         &pool_info,
         nullptr,
         &descriptor_context.frame_pool
     ));
 
     VK_CHECK(vkCreateDescriptorPool(
-        instance_context.device,
+        instance.device,
         &pool_info,
         nullptr,
         &descriptor_context.persistent_pool
@@ -480,11 +335,11 @@ void VkRenderBackend::allocate_descriptor_sets_for_layout(
 
             VkDescriptorSet set = VK_NULL_HANDLE;
             VK_CHECK(vkAllocateDescriptorSets(
-                instance_context.device,
+                instance.device,
                 &alloc,
                 &set
             ));
-            frame_schedule_context.frames[frame_index].descriptors.insert({layout_handle, set});
+            swapchain.frames[frame_index].descriptors.insert({layout_handle, set});
         }
     } else
     {
@@ -497,7 +352,7 @@ void VkRenderBackend::allocate_descriptor_sets_for_layout(
 
         VkDescriptorSet set = VK_NULL_HANDLE;
         VK_CHECK(vkAllocateDescriptorSets(
-            instance_context.device,
+            instance.device,
             &alloc,
             &set
         ));
@@ -526,37 +381,22 @@ void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescr
 
 RBFrameHandle VkRenderBackend::get_current_frame() const
 {
-    return frame_schedule_context.current_frame;
+    return swapchain.current_frame;
 }
 
 void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
 {
-    LogRB.Log("wait_for_frame");
-    
-    auto& f = frame_schedule_context.frames[frame_handle];
-
-    vkWaitForFences(
-        instance_context.device,
-        1,
-        &f.in_flight,
-        VK_TRUE,
-        UINT64_MAX
-    );
+    swapchain.wait_for_frame(frame_handle);
 }
 
 void VkRenderBackend::reset_frame_fence(RBFrameHandle frame)
 {
-    auto& f = frame_schedule_context.frames[frame];
-
-    vkResetFences(instance_context.device, 1, &f.in_flight);
+    swapchain.reset_frame_fence(frame);
 }
 
 void VkRenderBackend::advance_frame()
 {
-    
-    LogRB.Log("advance_frame");
-    frame_schedule_context.current_frame =
-        (frame_schedule_context.current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
+    swapchain.advance_frame();
 }
 
 void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
@@ -570,8 +410,8 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     data.index_count = static_cast<uint32_t>(mesh.indices.size());
 
     vk::create_buffer(
-        instance_context.device,
-        instance_context.physical_device,
+        instance.device,
+        instance.physical_device,
         mesh.vertices.size() * sizeof(Vertex),
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -581,7 +421,7 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
 
     void* mapped_data = nullptr;
     vkMapMemory(
-        instance_context.device,
+        instance.device,
         data.vertex_memory,
         0,
         mesh.vertices.size() * sizeof(Vertex),
@@ -590,11 +430,11 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     );
     memcpy(mapped_data, mesh.vertices.data(),
         mesh.vertices.size() * sizeof(Vertex));
-    vkUnmapMemory(instance_context.device, data.vertex_memory);
+    vkUnmapMemory(instance.device, data.vertex_memory);
 
     vk::create_buffer(
-        instance_context.device,
-        instance_context.physical_device,
+        instance.device,
+        instance.physical_device,
         mesh.indices.size() * sizeof(uint32_t),
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -603,7 +443,7 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     );
 
     vkMapMemory(
-        instance_context.device,
+        instance.device,
         data.index_memory,
         0,
         mesh.indices.size() * sizeof(uint32_t),
@@ -612,14 +452,14 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     );
     memcpy(mapped_data, mesh.indices.data(),
         mesh.indices.size() * sizeof(uint32_t));
-    vkUnmapMemory(instance_context.device, data.index_memory);
+    vkUnmapMemory(instance.device, data.index_memory);
 
     mesh_map[handle] = data;
 }
 
 RGTextureFormat VkRenderBackend::get_swapchain_format() const
 {
-    switch (swapchain_context.surface_format.format)
+    switch (swapchain.surface_format.format)
     {
     case VK_FORMAT_B8G8R8A8_UNORM:
         return RGTextureFormat::RGBA8_UNORM;
@@ -640,85 +480,12 @@ RGTextureFormat VkRenderBackend::get_swapchain_format() const
 
 RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
 {
-    uint32_t width  = desc.width;
-    uint32_t height = desc.height;
-
-    if (width == 0 || height == 0)
-    {
-        auto extent = get_swapchain_extent();
-        width  = extent.width;
-        height = extent.height;
-    }
-
-    vk::ImageResource res{};
-    res.width  = width;
-    res.height = height;
-    res.format = vk::get_vk_format(desc.format);
-
-    VkImageUsageFlags vk_usage = 0;
-
-    if (desc.usage & RenderTextureUsage::ColorAttachment)
-        vk_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    if (desc.usage & RenderTextureUsage::DepthStencil)
-        vk_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-    if (desc.usage & RenderTextureUsage::Sampled)
-        vk_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent = { width, height, 1 };
-    image_info.mipLevels = 1;
-    image_info.arrayLayers = 1;
-    image_info.format = vk::get_vk_format(desc.format);
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = vk_usage;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VK_CHECK(vkCreateImage(instance_context.device, &image_info, nullptr, &res.image));
-
-    VkMemoryRequirements mem_req;
-    vkGetImageMemoryRequirements(instance_context.device, res.image, &mem_req);
-
-    VkMemoryAllocateInfo alloc_info{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    alloc_info.allocationSize = mem_req.size;
-    alloc_info.memoryTypeIndex =
-        vk::find_memory_type(
-            instance_context.physical_device,
-            mem_req.memoryTypeBits,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    VK_CHECK(vkAllocateMemory(instance_context.device, &alloc_info, nullptr, &res.memory));
-    VK_CHECK(vkBindImageMemory(instance_context.device, res.image, res.memory, 0));
-
-    // ---- Image View ----
-    VkImageAspectFlags aspect =
-        (desc.usage & RenderTextureUsage::DepthStencil)
-            ? VK_IMAGE_ASPECT_DEPTH_BIT
-            : VK_IMAGE_ASPECT_COLOR_BIT;
-
-    VkImageViewCreateInfo view_info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-    view_info.image = res.image;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = vk::get_vk_format(desc.format);
-    view_info.subresourceRange = {
-        aspect, 0, 1, 0, 1
-    };
-
-    VK_CHECK(vkCreateImageView(instance_context.device, &view_info, nullptr, &res.view));
-
-    uint32_t id = static_cast<uint32_t>(image_resources.size());
-    image_resources.push_back(res);
-
-    return RBImageHandle{ id };
+    return swapchain.create_image(desc);
 }
 
 RBImageView VkRenderBackend::get_image_view(RBImageHandle handle)
 {
-    return image_resources[handle.id].view;
+    return swapchain.get_image_view(handle);
 }
 
 size_t hash_framebuffer(
@@ -743,23 +510,17 @@ size_t hash_framebuffer(
 
 RBImageView VkRenderBackend::resolve_image_view(const RGTexture& tex, RBFrameHandle frame)
 {
-    if (tex.desc.external)
-    {
-        // swapchain
-        return swapchain_context.image_views[current_image_index];
-    }
-
-    return image_resources[tex.image.value().id].view;
+    return swapchain.resolve_image_view(tex, frame);
 }
 
 RBImageView VkRenderBackend::get_swapchain_image_view(RBFrameHandle frame)
 {
-    return swapchain_context.image_views[current_image_index];
+    return swapchain.get_image_view();
 }
 
 RBImageHandle VkRenderBackend::get_swapchain_image() const
 {
-    return swapchain_image_handles[current_image_index];
+    return swapchain.get_image();
 }
 
 RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& fb)
@@ -838,7 +599,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     rpci.pSubpasses = &subpass;
 
     VkRenderPass rp;
-    VK_CHECK(vkCreateRenderPass(instance_context.device, &rpci, nullptr, &rp));
+    VK_CHECK(vkCreateRenderPass(instance.device, &rpci, nullptr, &rp));
 
     render_pass_cache[desc] = rp;
     return rp;
@@ -846,7 +607,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
 
 VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
 {
-    return image_resources[handle.id].format;
+    return swapchain.get_image_format(handle);
 }
 
 RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle, VkRenderPass render_pass)
@@ -860,23 +621,7 @@ RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle
 void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value,
     RGTextureFormat format)
 {
-    const auto& res = image_resources[value.id];
-    
-
-    VkDescriptorImageInfo image_info{};
-    image_info.imageView = res.view;
-    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_info.sampler = get_default_sampler();
-
-    VkWriteDescriptorSet write{};
-    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = rb_handle.as<VkDescriptorSet>();
-    write.dstBinding = 0; // u_depth
-    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write.descriptorCount = 1;
-    write.pImageInfo = &image_info;
-
-    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+    swapchain.update_depth_descriptior(rb_handle, value);
 }
 
 VkSampler VkRenderBackend::get_default_sampler() const
@@ -906,7 +651,7 @@ VkSampler VkRenderBackend::get_default_sampler() const
         info.maxLod = 1.0f;
         info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
-        vkCreateSampler(instance_context.device, &info, nullptr, &default_sampler);
+        vkCreateSampler(instance.device, &info, nullptr, &default_sampler);
     }
     
     return default_sampler;
@@ -940,130 +685,27 @@ void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_coun
 }
 
 
-void VkRenderBackend::create_swapchain()
-{
-    vk::SwapchainSupport support = vk::query_swapchain_support(
-        instance_context.physical_device, instance_context.surface);
-
-    // --- Surface format ---
-    swapchain_context.surface_format = vk::choose_surface_format(support.formats);
-
-    VkPresentModeKHR present_mode = vk::choose_present_mode(support.present_modes);
-
-    swapchain_context.extent = vk::choose_extent(support.caps, window);
-
-    // --- Image count ---
-    uint32_t image_count = support.caps.minImageCount + 1;
-    if (support.caps.maxImageCount > 0 &&
-        image_count > support.caps.maxImageCount)
-    {
-        image_count = support.caps.maxImageCount;
-    }
-
-    // --- Swapchain create info ---
-    VkSwapchainCreateInfoKHR sci{
-        VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR
-    };
-    sci.surface = instance_context.surface;
-    sci.minImageCount = image_count;
-    sci.imageFormat = swapchain_context.surface_format.format;
-    sci.imageColorSpace = swapchain_context.surface_format.colorSpace;
-    sci.imageExtent = swapchain_context.extent;
-    sci.imageArrayLayers = 1;
-    sci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    if (instance_context.queues.graphics !=
-        instance_context.queues.present)
-    {
-        sci.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        sci.queueFamilyIndexCount = 2;
-        sci.pQueueFamilyIndices = instance_context.queues_indices;
-    }
-    else
-    {
-        sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-
-    sci.preTransform   = support.caps.currentTransform;
-    sci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    sci.presentMode    = present_mode;
-    sci.clipped        = VK_TRUE;
-    sci.oldSwapchain   = VK_NULL_HANDLE;
-
-    VK_CHECK(
-        vkCreateSwapchainKHR(instance_context.device, &sci, nullptr, &swapchain_context.swapchain)
-    );
-
-    // --- Get swapchain images ---
-    uint32_t sc_image_count = 0;
-    vkGetSwapchainImagesKHR(instance_context.device, swapchain_context.swapchain, 
-        &sc_image_count, nullptr);
-
-    std::vector<VkImage> swapchain_images(sc_image_count);
-    vkGetSwapchainImagesKHR(instance_context.device, swapchain_context.swapchain, 
-        &sc_image_count, swapchain_images.data());
-    
-    swapchain_image_handles.clear();
-    swapchain_image_handles.resize(sc_image_count);
-    
-
-    for (uint32_t i = 0; i < sc_image_count; ++i)
-    {
-        VkImageView view;
-
-        VkImageViewCreateInfo ivci{
-            VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
-        };
-        ivci.image = swapchain_images[i];
-        ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        ivci.format = swapchain_context.surface_format.format;
-        ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        ivci.subresourceRange.levelCount = 1;
-        ivci.subresourceRange.layerCount = 1;
-
-        VK_CHECK(vkCreateImageView(
-            instance_context.device,
-            &ivci,
-            nullptr,
-            &view));
-
-        vk::ImageResource res{};
-        res.image  = swapchain_images[i];                 // VkImage
-        res.view   = view;                                // VkImageView
-        res.format = swapchain_context.surface_format.format;
-        res.width  = swapchain_context.extent.width;
-        res.height = swapchain_context.extent.height;
-
-        uint32_t id = static_cast<uint32_t>(image_resources.size());
-        image_resources.push_back(res);
-
-        swapchain_image_handles[i] = RBImageHandle{ id };
-    }
-
-    
-}
-
 void VkRenderBackend::create_command_pool()
 {
     if (command_context.command_pool != VK_NULL_HANDLE)
     {
-        vkDestroyCommandPool(instance_context.device, command_context.command_pool, nullptr);
+        vkDestroyCommandPool(instance.device, command_context.command_pool, nullptr);
     }
     
-    vkGetDeviceQueue(instance_context.device, instance_context.queues.graphics, 0, 
-        &instance_context.graphics_queue);
+    vkGetDeviceQueue(instance.device, instance.queues.graphics, 0, 
+        &instance.graphics_queue);
 
-    vkGetDeviceQueue(instance_context.device, instance_context.queues.present, 0, 
-        &instance_context.present_queue);
+    vkGetDeviceQueue(instance.device, instance.queues.present, 0, 
+        &instance.present_queue);
 
     VkCommandPoolCreateInfo cpci{
         VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO
     };
-    cpci.queueFamilyIndex = instance_context.queues.graphics;
+    cpci.queueFamilyIndex = instance.queues.graphics;
     cpci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     VK_CHECK(vkCreateCommandPool(
-        instance_context.device,
+        instance.device,
         &cpci,
         nullptr,
         &command_context.command_pool));
@@ -1079,79 +721,20 @@ void VkRenderBackend::create_command_pool()
     std::vector<VkCommandBuffer> cmds(vk::MAX_FRAMES_IN_FLIGHT);
 
     VK_CHECK(
-        vkAllocateCommandBuffers(instance_context.device, &cbai, cmds.data())
+        vkAllocateCommandBuffers(instance.device, &cbai, cmds.data())
     );
 
     for (uint32_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        frame_schedule_context.frames[i].cmd = cmds[i];
+        swapchain.frames[i].cmd = cmds[i];
     }
     
 }
 void VkRenderBackend::cleanup_swapchain()
 {
-
-    // --- Image views ---
-    for (auto iv : swapchain_context.image_views)
-    {
-        if (iv != VK_NULL_HANDLE)
-        {
-            vkDestroyImageView(instance_context.device, iv, nullptr);
-        }
-    }
-    swapchain_context.image_views.clear();
-
-    // --- Depth resources ---
-    if (swapchain_context.depth_image_view != VK_NULL_HANDLE)
-    {
-        vkDestroyImageView(instance_context.device, swapchain_context.depth_image_view, nullptr);
-    }
-
-    if (swapchain_context.depth_image != VK_NULL_HANDLE)
-    {
-        vkDestroyImage(instance_context.device, swapchain_context.depth_image, nullptr);
-    }
-
-    if (swapchain_context.depth_memory != VK_NULL_HANDLE)
-    {
-        vkFreeMemory(instance_context.device, swapchain_context.depth_memory, nullptr);
-    }
-
-    swapchain_context.depth_image = VK_NULL_HANDLE;
-    swapchain_context.depth_image_view = VK_NULL_HANDLE;
-    swapchain_context.depth_memory = VK_NULL_HANDLE;
-
-    // --- Swapchain ---
-    if (swapchain_context.swapchain != VK_NULL_HANDLE)
-    {
-        vkDestroySwapchainKHR(instance_context.device, swapchain_context.swapchain, nullptr);
-        swapchain_context.swapchain = VK_NULL_HANDLE;
-    }
-
+    swapchain.cleanup();
 }
 
-void VkRenderBackend::match_queue_families()
-{
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance_context.instance, &deviceCount, nullptr);
-
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance_context.instance, &deviceCount, devices.data());
-    
-    for (auto device : devices) {
-        auto q = vk::find_queue_families(device, instance_context.surface);
-        if (q.complete()) {
-            instance_context.physical_device = device;
-            instance_context.queues = q;
-            break;
-        }
-    }
-    
-    assert(instance_context.physical_device != VK_NULL_HANDLE);
-    
-    instance_context.queues_indices[0] = instance_context.queues.graphics;
-    instance_context.queues_indices[1] = instance_context.queues.present;
-}
 
 
 void VkRenderBackend::init(RBWindowHandle in_window)
@@ -1165,23 +748,19 @@ void VkRenderBackend::init(RBWindowHandle in_window)
         {
             auto backend = static_cast<VkRenderBackend*>(
                 glfwGetWindowUserPointer(win));
-            backend->framebuffer_resized = true;
+            backend->swapchain.framebuffer_resized = true;
         });
     
-    create_instance();
+    instance.init();
     
-    glfwCreateWindowSurface(instance_context.instance, window, nullptr, &instance_context.surface);
     
-    match_queue_families();
-    create_device();
+    glfwCreateWindowSurface(instance.instance, window, nullptr, &instance.surface);
+
+
     create_descriptor_pool();
-    // for (uint32_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; ++i)
-    // {
-    //     allocate_descriptor_sets(camera_layout,
-    //                              DescriptorPoolType::Frame,
-    //                              i);
-    // }
-    create_swapchain();
+
+    swapchain.init();
+    
     create_depth_resources();
     create_command_pool();
     // create_pipeline();
@@ -1192,7 +771,7 @@ RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
 {
     LogRB.Log<DisplayFn>("Begin commands");
     
-    auto& frame = frame_schedule_context.frames[frame_handle];
+    auto& frame = swapchain.frames[frame_handle];
 
     VK_CHECK(vkResetCommandBuffer(frame.cmd, 0));
 
@@ -1247,10 +826,10 @@ RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc
     std::vector<VkImageView> attachments;
 
     for (RBImageHandle img : desc.color_attachments)
-        attachments.push_back(image_resources[img.id].view);
+        attachments.push_back(swapchain.image_resources[img.id].view);
 
     if (desc.depth_attachment)
-        attachments.push_back(image_resources[desc.depth_attachment->id].view);
+        attachments.push_back(swapchain.image_resources[desc.depth_attachment->id].view);
 
     VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     info.renderPass = rp;
@@ -1261,7 +840,7 @@ RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc
     info.layers = 1;
 
     VkFramebuffer fb;
-    VK_CHECK(vkCreateFramebuffer(instance_context.device, &info, nullptr, &fb));
+    VK_CHECK(vkCreateFramebuffer(instance.device, &info, nullptr, &fb));
 
     uint32_t id = framebuffer_resources.size();
     framebuffer_resources.push_back({
@@ -1321,80 +900,14 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
 
 bool VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 {
-    LogRB.Log("acquire_next_image");
-    
-    auto& frame = frame_schedule_context.frames[frame_handle];
-
-    VkResult res = vkAcquireNextImageKHR(
-        instance_context.device,
-        swapchain_context.swapchain,
-        UINT64_MAX,
-        frame.image_available, // semaphore
-        VK_NULL_HANDLE,
-        &current_image_index
-    );
-
-    if (res == VK_ERROR_OUT_OF_DATE_KHR)
-    {
-        recreate_swapchain();
-        return false;
-    }
-
-    VK_CHECK(res);
-    return true;
+    return swapchain.acquire_next_image(frame_handle);
 }
 
 
 void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
                                   RBCommandList cmd_list)
 {
-    LogRB.Log("submit_frame");
-    auto& frame = frame_schedule_context.frames[frame_handle];
-
-    VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-
-    VkPipelineStageFlags wait_stage =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-    VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    submit.waitSemaphoreCount = 1;
-    submit.pWaitSemaphores = &frame.image_available;
-    submit.pWaitDstStageMask = &wait_stage;
-    submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &cmd;
-    submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &frame.render_finished;
-
-    VK_CHECK(vkQueueSubmit(
-        instance_context.graphics_queue,
-        1,
-        &submit, 
-        frame.in_flight
-    ));
-
-    VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &frame.render_finished;
-    present.swapchainCount = 1;
-    present.pSwapchains = &swapchain_context.swapchain;
-    present.pImageIndices = &current_image_index;
-
-    VkResult res = vkQueuePresentKHR(
-        instance_context.present_queue,
-        &present
-    );
-
-    if (res == VK_ERROR_OUT_OF_DATE_KHR ||
-        res == VK_SUBOPTIMAL_KHR ||
-        framebuffer_resized)
-    {
-        framebuffer_resized = false;
-        recreate_swapchain();
-    }
-    else
-    {
-        VK_CHECK(res);
-    }
+    swapchain.submit_frame(frame_handle, cmd_list);
 }
 
 
@@ -1414,7 +927,7 @@ DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(const RBDe
 RBDescriptorSet VkRenderBackend::get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type)
 {
     if (pool_type == ResourceUsageType::Frame)
-        return frame_schedule_context.frames[frame_schedule_context.current_frame].descriptors[rb_descriptor_set_layout];
+        return swapchain.frames[swapchain.current_frame].descriptors[rb_descriptor_set_layout];
     return persistent_descriptors[rb_descriptor_set_layout];
 }
 
@@ -1422,47 +935,47 @@ RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, Resour
 {
     if (usage_type == ResourceUsageType::Frame)
     {
-        frame_schedule_context.ubos_counter++;
+        swapchain.ubos_counter++;
         
-        const RBBufferHandle handle {frame_schedule_context.ubos_counter, ResourceUsageType::Frame};
+        const RBBufferHandle handle {swapchain.ubos_counter, ResourceUsageType::Frame};
         std::array<vk::BufferInfo, vk::MAX_FRAMES_IN_FLIGHT> buffers;
-        for (int32_t index = 0; auto& frame : frame_schedule_context.frames)
+        for (int32_t index = 0; auto& frame : swapchain.frames)
         {
             vk::create_buffer(
-                instance_context.device,
-                instance_context.physical_device,
+                instance.device,
+                instance.physical_device,
                 buffer_size,
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 buffers[index].buffer,
                 buffers[index].memory);
-            vkMapMemory(instance_context.device, buffers[index].memory, 0, VK_WHOLE_SIZE, 0, &buffers[index].mapped_ptr);
+            vkMapMemory(instance.device, buffers[index].memory, 0, VK_WHOLE_SIZE, 0, &buffers[index].mapped_ptr);
             index++;
         }
-        frame_schedule_context.ubos.emplace(handle.get_identifier(), buffers);
+        swapchain.frames_ubos.emplace(handle.get_identifier(), buffers);
         
         return handle;
     } else
     {
-        swapchain_context.ubo_counter++;
-        const RBBufferHandle handle {swapchain_context.ubo_counter, ResourceUsageType::Persistent};
+        swapchain.ubo_counter++;
+        const RBBufferHandle handle {swapchain.ubo_counter, ResourceUsageType::Persistent};
         
         vk::BufferInfo buffer_info;
         
         
         vk::create_buffer(
-            instance_context.device,
-            instance_context.physical_device,
+            instance.device,
+            instance.physical_device,
             buffer_size,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             buffer_info.buffer,
             buffer_info.memory);
-        vkMapMemory(instance_context.device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
+        vkMapMemory(instance.device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
         
-        swapchain_context.ubos[handle.get_identifier()] = buffer_info;
+        swapchain.ubos[handle.get_identifier()] = buffer_info;
         return handle;
     }
 }
@@ -1470,43 +983,7 @@ RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, Resour
 
 void VkRenderBackend::create_frame_sync_objects()
 {
-    VkSemaphoreCreateInfo sem_ci{
-        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
-    };
-
-    VkFenceCreateInfo fence_ci{
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
-    };
-    fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-    for (int frame_index = 0; auto& frame : frame_schedule_context.frames)
-    {
-        VK_CHECK(vkCreateSemaphore(
-            instance_context.device,
-            &sem_ci,
-            nullptr,
-            &frame.image_available
-        ));
-
-        VK_CHECK(vkCreateSemaphore(
-            instance_context.device,
-            &sem_ci,
-            nullptr,
-            &frame.render_finished
-        ));
-
-        VK_CHECK(vkCreateFence(
-            instance_context.device,
-            &fence_ci,
-            nullptr,
-            &frame.in_flight
-        ));
-        
-        LogRB.Log("Frame %i. image_available: %p, render_finished: %p, in_flight: %p",
-            frame_index, frame.image_available, frame.render_finished, frame.in_flight);
-        
-        frame_index++;
-    }
+    swapchain.create_sync_objects();
 }
 
 RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
@@ -1527,7 +1004,7 @@ RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
     info.maxLod = 1.0f;
 
     VkSampler sampler;
-    VK_CHECK(vkCreateSampler(instance_context.device, &info, nullptr, &sampler));
+    VK_CHECK(vkCreateSampler(instance.device, &info, nullptr, &sampler));
 
     return RBSampler{ sampler };
 }
@@ -1535,7 +1012,7 @@ RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
 void VkRenderBackend::bind_image_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBImageHandle image,
     RBSampler sampler)
 {
-    auto& img = image_resources[image.id];
+    auto& img = swapchain.image_resources[image.id];
 
     VkDescriptorImageInfo img_info{};
     img_info.imageView = img.view;
@@ -1549,5 +1026,5 @@ void VkRenderBackend::bind_image_to_descriptor(RBDescriptorSetLayout layout, uin
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &img_info;
 
-    vkUpdateDescriptorSets(instance_context.device, 1, &write, 0, nullptr);
+    vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
 }

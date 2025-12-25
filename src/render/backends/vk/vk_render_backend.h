@@ -4,6 +4,8 @@
 #include <vector>
 #include <GLFW/glfw3.h>
 
+#include "vk_backend_instance.h"
+#include "vk_backend_swapchain_control.h"
 #include "vk_context.h"
 #include "vk_pipeline.h"
 #include "framework/camera.h"
@@ -73,18 +75,13 @@ public:
         RBImageHandle image,
         ResourceUsageType usage) override;
     
-private: // Initialization section
-    void create_instance();
-    void match_queue_families();
-    void create_device();
+// Initialization section
     void create_frame_sync_objects();
     
-private: // Re-/Initialization section
+ // Re-/Initialization section
 
-    void create_swapchain();
     void create_command_pool();
 
-private: // Special section
     void cleanup_swapchain();
     void recreate_swapchain();
 
@@ -135,14 +132,11 @@ public:
     
     VkSampler get_default_sampler() const;
 
-private:
-    vk::InstanceContext instance_context = {};
-    vk::SwapchainContext swapchain_context = {};
+    vk::Instance instance;
+    vk::SwapchainControl swapchain {*this};
     vk::CommandContext command_context = {};
-    vk::FrameScheduleContext frame_schedule_context = {};
     vk::PipelineContext pipeline_context = {};
     vk::DescriptorContext descriptor_context = {};
-    std::vector<vk::ImageResource> image_resources;
     
     // currently working pipelines (moving from pending_pipelines)
     std::map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
@@ -150,9 +144,6 @@ private:
     // pipelines objects that only have layouts, but not real pipelines yet
     std::vector<std::unique_ptr<VkPipelineObject>> pending_pipelines;
     
-    uint32_t current_image_index = 0;
-    
-    bool framebuffer_resized = false;
     
     GLFWwindow* window = nullptr;
     
@@ -164,6 +155,5 @@ private:
     std::vector<FramebufferResource> framebuffer_resources;
     
     std::unordered_map<RenderPassDesc, VkRenderPass, RenderPassDescHash> render_pass_cache;
-    std::vector<RBImageHandle> swapchain_image_handles;
     VkRenderPass current_render_pass = VK_NULL_HANDLE;
 };
