@@ -27,55 +27,7 @@ void VkRenderBackend::bind_buffer_to_descriptor(
     uint32_t binding,
     RBBufferHandle buffer)
 {
-    auto usage = buffer.get_usage_type();
-
-    if (usage == ResourceUsageType::Frame)
-    {
-        for (uint32_t frame = 0; frame < vk::MAX_FRAMES_IN_FLIGHT; ++frame)
-        {
-            auto& buf = swapchain.frames_ubos.at(buffer.get_identifier())[frame];
-
-            VkDescriptorBufferInfo info{
-                .buffer = buf.buffer,
-                .offset = 0,
-                .range  = VK_WHOLE_SIZE
-            };
-
-            VkWriteDescriptorSet write{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = swapchain.frames[frame]
-                    .descriptors.at(layout),
-                .dstBinding = binding,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &info
-            };
-
-            vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
-        }
-    }
-    else // Persistent
-    {
-        auto& buf = swapchain.ubos
-            .at(buffer.get_identifier());
-
-        VkDescriptorBufferInfo info{
-            .buffer = buf.buffer,
-            .offset = 0,
-            .range  = VK_WHOLE_SIZE
-        };
-
-        VkWriteDescriptorSet write{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = persistent_descriptors.at(layout),
-            .dstBinding = binding,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pBufferInfo = &info
-        };
-
-        vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
-    }
+    resource_manager.bind_buffer_to_descriptor(layout, binding, buffer);
 }
 
 RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
@@ -95,12 +47,7 @@ void VkRenderBackend::CRUTCH_transition_image(RBCommandList cmd, RBImageHandle i
 
 vk::BufferInfo& VkRenderBackend::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
 {
-    if (buffer_handle.get_usage_type() == ResourceUsageType::Frame)
-    {
-        size_t index = buffer_handle.get_identifier();
-        return swapchain.frames_ubos.at(index).at(frame_index);
-    }
-    return swapchain.ubos[buffer_handle.get_identifier()];
+    return resource_manager.get_buffer(buffer_handle, frame_index);
 }
 
 RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb) const
@@ -230,88 +177,15 @@ void VkRenderBackend::create_depth_resources()
         &swapchain.depth_image_view));
 }
 
-RBDescriptorSetLayout VkRenderBackend::allocate_descriptor_layout_handle()
-{
-    auto result = ++descriptor_set_counter;
-    RBDescriptorSetLayout layout((uintptr_t)result);    
-    return layout;
-}
-
 
 RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout)
 {
-    std::vector<VkDescriptorSetLayoutBinding> vk_bindings;
-    vk_bindings.reserve(descriptor_set_layout.bindings.size());
-
-    for (const DescriptorBinding& b : descriptor_set_layout.bindings)
-    {
-        VkDescriptorSetLayoutBinding vk{};
-        vk.binding = b.binding;
-        vk.descriptorType = vk::to_vk_descriptor_type(b.type);
-        vk.descriptorCount = b.count;
-        vk.stageFlags = vk::to_vk_shader_stage_flags(b.stages);
-        vk.pImmutableSamplers = nullptr;
-
-        vk_bindings.push_back(vk);
-    }
-
-    VkDescriptorSetLayoutCreateInfo ci{
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
-    };
-    ci.bindingCount = uint32_t(vk_bindings.size());
-    ci.pBindings = vk_bindings.data();
-
-    VkDescriptorSetLayout layout = VK_NULL_HANDLE;
-    VK_CHECK(vkCreateDescriptorSetLayout(
-        instance.device,
-        &ci,
-        nullptr,
-        &layout
-    ));
-    DescriptorSetLayoutData layout_data {
-        layout, 
-        descriptor_set_layout.set_index
-    };
-    RBDescriptorSetLayout handle = allocate_descriptor_layout_handle();
-    descriptor_set_layouts[handle] = layout_data;
-
-    return handle;
+    return resource_manager.create_descriptor_set_layout(descriptor_set_layout);
 }
 
 void VkRenderBackend::create_descriptor_pool()
 {
-    VkDescriptorPoolSize pool_sizes[] = {
-        {
-            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = vk::MAX_FRAMES_IN_FLIGHT * 16
-        },
-        {
-            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = vk::MAX_FRAMES_IN_FLIGHT * 16
-        }
-    };
-
-    VkDescriptorPoolCreateInfo pool_info{
-        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
-    };
-    pool_info.poolSizeCount = uint32_t(std::size(pool_sizes));
-    pool_info.pPoolSizes = pool_sizes;
-    pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT * 16;
-    pool_info.flags = 0;
-
-    VK_CHECK(vkCreateDescriptorPool(
-        instance.device,
-        &pool_info,
-        nullptr,
-        &descriptor_context.frame_pool
-    ));
-
-    VK_CHECK(vkCreateDescriptorPool(
-        instance.device,
-        &pool_info,
-        nullptr,
-        &descriptor_context.persistent_pool
-    ));
+    resource_manager.create_descriptor_pool();
 }
 
 
@@ -320,46 +194,7 @@ void VkRenderBackend::allocate_descriptor_sets_for_layout(
     RBDescriptorSetLayout layout_handle,
     ResourceUsageType usage_type)
 {
-    auto& layout_data = descriptor_set_layouts.at(layout_handle);
-    
-    if (usage_type == ResourceUsageType::Frame)
-    {
-        for (size_t frame_index = 0; frame_index < vk::MAX_FRAMES_IN_FLIGHT; frame_index++)
-        {
-            VkDescriptorSetAllocateInfo alloc{
-                VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
-            };
-            alloc.descriptorPool = descriptor_context.frame_pool;
-            alloc.descriptorSetCount = 1;
-            alloc.pSetLayouts = &layout_data.vk_layout;
-
-            VkDescriptorSet set = VK_NULL_HANDLE;
-            VK_CHECK(vkAllocateDescriptorSets(
-                instance.device,
-                &alloc,
-                &set
-            ));
-            swapchain.frames[frame_index].descriptors.insert({layout_handle, set});
-        }
-    } else
-    {
-        VkDescriptorSetAllocateInfo alloc{
-            VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
-        };
-        alloc.descriptorPool = descriptor_context.persistent_pool;
-        alloc.descriptorSetCount = 1;
-        alloc.pSetLayouts = &layout_data.vk_layout;
-
-        VkDescriptorSet set = VK_NULL_HANDLE;
-        VK_CHECK(vkAllocateDescriptorSets(
-            instance.device,
-            &alloc,
-            &set
-        ));
-        
-        persistent_descriptors.insert({layout_handle, set});
-    }
-
+    return resource_manager.allocate_descriptor_sets_for_layout(layout_handle, usage_type);
 }
 
 void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle)
@@ -751,10 +586,8 @@ void VkRenderBackend::init(RBWindowHandle in_window)
             backend->swapchain.framebuffer_resized = true;
         });
     
-    instance.init();
     
-    
-    glfwCreateWindowSurface(instance.instance, window, nullptr, &instance.surface);
+    instance.init(window);
 
 
     create_descriptor_pool();
@@ -919,65 +752,19 @@ PipelineObject* VkRenderBackend::create_pipeline(GraphicsPipelineDesc desc)
     return result;
 }
 
-DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle)
+vk::DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layouta(RBDescriptorSetLayout descriptor_set_layout)
 {
-    return descriptor_set_layouts[rb_handle];
+    return resource_manager.get_vk_descriptor_set_layout(descriptor_set_layout);
 }
 
 RBDescriptorSet VkRenderBackend::get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type)
 {
-    if (pool_type == ResourceUsageType::Frame)
-        return swapchain.frames[swapchain.current_frame].descriptors[rb_descriptor_set_layout];
-    return persistent_descriptors[rb_descriptor_set_layout];
+    return resource_manager.get_descriptor_set(rb_descriptor_set_layout, pool_type, swapchain.current_frame);
 }
 
 RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
 {
-    if (usage_type == ResourceUsageType::Frame)
-    {
-        swapchain.ubos_counter++;
-        
-        const RBBufferHandle handle {swapchain.ubos_counter, ResourceUsageType::Frame};
-        std::array<vk::BufferInfo, vk::MAX_FRAMES_IN_FLIGHT> buffers;
-        for (int32_t index = 0; auto& frame : swapchain.frames)
-        {
-            vk::create_buffer(
-                instance.device,
-                instance.physical_device,
-                buffer_size,
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                buffers[index].buffer,
-                buffers[index].memory);
-            vkMapMemory(instance.device, buffers[index].memory, 0, VK_WHOLE_SIZE, 0, &buffers[index].mapped_ptr);
-            index++;
-        }
-        swapchain.frames_ubos.emplace(handle.get_identifier(), buffers);
-        
-        return handle;
-    } else
-    {
-        swapchain.ubo_counter++;
-        const RBBufferHandle handle {swapchain.ubo_counter, ResourceUsageType::Persistent};
-        
-        vk::BufferInfo buffer_info;
-        
-        
-        vk::create_buffer(
-            instance.device,
-            instance.physical_device,
-            buffer_size,
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            buffer_info.buffer,
-            buffer_info.memory);
-        vkMapMemory(instance.device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
-        
-        swapchain.ubos[handle.get_identifier()] = buffer_info;
-        return handle;
-    }
+    return resource_manager.create_uniform_buffer(buffer_size, usage_type);
 }
 
 

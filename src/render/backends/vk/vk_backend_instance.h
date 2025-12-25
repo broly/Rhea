@@ -8,7 +8,7 @@ namespace vk
     class Instance
     {
     public:
-        void init();
+        void init(GLFWwindow* window);
         void match_queue_families();
         
         VkInstance instance;

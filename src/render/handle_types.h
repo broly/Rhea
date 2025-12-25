@@ -222,3 +222,4 @@ struct RBSamplerDesc
     bool linear = true;
     bool clamp_to_edge = true;
 };
+

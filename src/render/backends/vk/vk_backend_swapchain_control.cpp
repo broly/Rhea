@@ -350,6 +350,9 @@ void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBComm
     VkPipelineStageFlags wait_stage =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
+    VkSemaphore render_finished =
+    render_finished_per_image[swapchain_image_index];
+
     VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit.waitSemaphoreCount = 1;
     submit.pWaitSemaphores = &frame.image_available;
@@ -357,7 +360,7 @@ void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBComm
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &frame.render_finished;
+    submit.pSignalSemaphores = &render_finished;
 
     VK_CHECK(vkQueueSubmit(
         backend.instance.graphics_queue,
@@ -366,17 +369,16 @@ void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBComm
         frame.in_flight
     ));
 
+    
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &frame.render_finished;
+    present.pWaitSemaphores = &render_finished;
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain;
     present.pImageIndices = &swapchain_image_index;
 
-    VkResult res = vkQueuePresentKHR(
-        backend.instance.present_queue,
-        &present
-    );
+    auto res = vkQueuePresentKHR(
+        backend.instance.present_queue, &present);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR ||
         res == VK_SUBOPTIMAL_KHR ||
@@ -441,44 +443,34 @@ void vk::SwapchainControl::cleanup()
 
 void vk::SwapchainControl::create_sync_objects()
 {
-    VkSemaphoreCreateInfo sem_ci{
-        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
-    };
+    VkSemaphoreCreateInfo sem_ci{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 
-    VkFenceCreateInfo fence_ci{
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
-    };
+    VkFenceCreateInfo fence_ci{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    for (int frame_index = 0; auto& frame : frames)
+    // --- frame sync ---
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
         VK_CHECK(vkCreateSemaphore(
-            backend.instance.device,
-            &sem_ci,
-            nullptr,
-            &frame.image_available
-        ));
-
-        VK_CHECK(vkCreateSemaphore(
-            backend.instance.device,
-            &sem_ci,
-            nullptr,
-            &frame.render_finished
-        ));
+            backend.instance.device, &sem_ci, nullptr,
+            &frames[i].image_available));
 
         VK_CHECK(vkCreateFence(
-            backend.instance.device,
-            &fence_ci,
-            nullptr,
-            &frame.in_flight
-        ));
-        
-        LogRB.Log("Frame %i. image_available: %p, render_finished: %p, in_flight: %p",
-            frame_index, frame.image_available, frame.render_finished, frame.in_flight);
-        
-        frame_index++;
+            backend.instance.device, &fence_ci, nullptr,
+            &frames[i].in_flight));
+    }
+
+    // --- per swapchain image sync ---
+    render_finished_per_image.resize(swapchain_image_handles.size());
+
+    for (size_t i = 0; i < render_finished_per_image.size(); ++i)
+    {
+        VK_CHECK(vkCreateSemaphore(
+            backend.instance.device, &sem_ci, nullptr,
+            &render_finished_per_image[i]));
     }
 }
+
 
 void vk::SwapchainControl::wait_for_frame(RBFrameHandle frame_handle)
 {

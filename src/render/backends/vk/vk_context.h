@@ -9,12 +9,6 @@
 
 namespace vk
 {
-    struct BufferInfo
-    {
-        VkBuffer buffer;
-        VkDeviceMemory memory;
-        void* mapped_ptr;
-    };
     
 
 
@@ -33,12 +27,6 @@ namespace vk
     };
 
     
-
-    struct DescriptorContext
-    {
-        VkDescriptorPool frame_pool = VK_NULL_HANDLE;
-        VkDescriptorPool persistent_pool = VK_NULL_HANDLE;
-    };
     struct PipelineContext
     {
         VkPipeline pipeline;

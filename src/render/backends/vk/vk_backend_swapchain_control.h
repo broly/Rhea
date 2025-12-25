@@ -11,10 +11,6 @@ namespace vk
 
         VkSemaphore image_available = VK_NULL_HANDLE;
         VkFence in_flight = VK_NULL_HANDLE;
-        
-        VkSemaphore render_finished = VK_NULL_HANDLE;
-        
-        std::map<RBDescriptorSetLayout, RBDescriptorSet> descriptors;
     };
     
     class SwapchainControl
@@ -24,7 +20,6 @@ namespace vk
             : swapchain(VK_NULL_HANDLE)
             , extent()
             , surface_format()
-            , ubo_counter(0)
             , backend(in_render_backend)
         {
         }
@@ -69,14 +64,11 @@ namespace vk
         uint32_t swapchain_image_index = 0;
         
         
-        std::map<uint32_t, BufferInfo> ubos;
-        uint32_t ubo_counter;
         
         std::array<FrameContext, MAX_FRAMES_IN_FLIGHT> frames;
-        uint32_t current_frame;
+        std::vector<VkSemaphore> render_finished_per_image;
         
-        uint32_t ubos_counter;
-        std::map<uint32_t, std::array<BufferInfo, MAX_FRAMES_IN_FLIGHT>> frames_ubos;
+        uint32_t current_frame;
         
         bool framebuffer_resized = false;
     };

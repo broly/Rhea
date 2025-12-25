@@ -6,16 +6,13 @@
 
 #include "vk_backend_instance.h"
 #include "vk_backend_swapchain_control.h"
+#include "vk_backend_resource_mgr.h"
 #include "vk_context.h"
+#include "vk_internal_types.h"
 #include "vk_pipeline.h"
 #include "framework/camera.h"
 #include "render/render_backend.h"
 
-struct DescriptorSetLayoutData
-{
-    VkDescriptorSetLayout vk_layout;
-    uint32_t set_index;
-};
 
 struct MeshGPUData {
     VkBuffer vertex_buffer = VK_NULL_HANDLE;
@@ -52,7 +49,7 @@ public:
     bool acquire_next_image(RBFrameHandle frame_handle) override;
     void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
     PipelineObject* create_pipeline(GraphicsPipelineDesc desc) override;
-    DescriptorSetLayoutData get_vk_descriptor_set_layout(const RBDescriptorSetLayout& rb_handle);
+    vk::DescriptorSetLayoutData get_vk_descriptor_set_layouta(RBDescriptorSetLayout rb_handle);
     virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) override;
     RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
     
@@ -88,7 +85,6 @@ public:
     void create_depth_resources();
     
 private: // Camera section
-    RBDescriptorSetLayout allocate_descriptor_layout_handle();
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) override;
     void create_descriptor_pool();
     virtual void allocate_descriptor_sets_for_layout(
@@ -134,9 +130,10 @@ public:
 
     vk::Instance instance;
     vk::SwapchainControl swapchain {*this};
+    vk::ResourceManager resource_manager{*this};
+    
     vk::CommandContext command_context = {};
     vk::PipelineContext pipeline_context = {};
-    vk::DescriptorContext descriptor_context = {};
     
     // currently working pipelines (moving from pending_pipelines)
     std::map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
@@ -147,9 +144,6 @@ public:
     
     GLFWwindow* window = nullptr;
     
-    uint64_t descriptor_set_counter = 0;
-    std::map<RBDescriptorSetLayout, DescriptorSetLayoutData> descriptor_set_layouts;
-    std::map<RBDescriptorSetLayout, RBDescriptorSet> persistent_descriptors;
     std::map<MeshHandle, MeshGPUData> mesh_map;
     std::unordered_map<size_t, VkFramebuffer> framebuffer_cache;
     std::vector<FramebufferResource> framebuffer_resources;

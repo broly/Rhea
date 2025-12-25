@@ -88,7 +88,6 @@ void RenderGraph::execute(RenderBackend& backend, RBCommandList cmd, RBFrameHand
         auto& pass = passes[pass_index];
         FramebufferDesc fb_desc{};
 
-        // transitions
         for (auto tex_handle : pass.reads)
         {
             const RGTexture& tex = textures[tex_handle.id];
@@ -102,26 +101,22 @@ void RenderGraph::execute(RenderBackend& backend, RBCommandList cmd, RBFrameHand
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             );
         }
-        
-        bool extent_set = false;
 
         // framebuffer build
         for (auto handle : pass.writes)
         {
             const RGTexture& tex = textures[handle.id];
+
             RBImageHandle image =
                 tex.desc.external
                     ? backend.get_swapchain_image()
                     : tex.image.value();
-            
 
             if (tex.desc.usage & RenderTextureUsage::DepthStencil)
                 fb_desc.depth_attachment = image;
             else
                 fb_desc.color_attachments.push_back(image);
         }
-        
-        
 
         ctx.framebuffer = backend.get_or_create_framebuffer(fb_desc);
 
@@ -129,4 +124,12 @@ void RenderGraph::execute(RenderBackend& backend, RBCommandList cmd, RBFrameHand
         pass.execute(ctx);
         backend.end_render_pass(cmd);
     }
+
+    backend.CRUTCH_transition_image(
+        cmd,
+        backend.get_swapchain_image(),
+        RGTextureFormat::RGBA8_UNORM,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+    );
 }

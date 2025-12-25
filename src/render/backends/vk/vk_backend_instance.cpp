@@ -9,7 +9,7 @@ constexpr const char* VALIDATION_LAYERS[] = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-void vk::Instance::init()
+void vk::Instance::init(GLFWwindow* window)
 {
     // Application and instance
     VkApplicationInfo appInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
@@ -31,6 +31,7 @@ void vk::Instance::init()
         vkCreateInstance(&ici, nullptr, &instance)
     );
     
+    glfwCreateWindowSurface(instance, window, nullptr, &surface);
     
     // physical and logical devices
     
