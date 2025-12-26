@@ -3,6 +3,7 @@
 #include <set>
 
 #include "framework/world.h"
+#include "render/ubos.h"
 #include "render/backends/vk/vk_render_backend.h"
 
 void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_world)
@@ -86,7 +87,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         .width  = 0,
         .height = 0,
         .format = render_backend->get_swapchain_format(),
-        .usage  = RenderTextureUsage::Type(RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present),
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
         .external = true
     };
 
@@ -98,7 +99,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         .width  = 0,
         .height = 0,
         .format = RGTextureFormat::Depth24Stencil8,
-        .usage  = RenderTextureUsage::Type(RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled),
+        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
         .external = false
     };
 

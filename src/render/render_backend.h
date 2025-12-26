@@ -8,7 +8,6 @@
 #include "pipeline_object.h"
 #include "rg_types.h"
 #include "scene_extractor.h"
-#include "backends/vk/vk_camera_ubo.h"
 
 
 struct RenderGraphPass;

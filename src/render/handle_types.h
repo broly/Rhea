@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 
+#include "common/enum_helpers.h"
 #include "common/type_utils.h"
 #include "common/type_macros.h"
 
@@ -186,7 +187,7 @@ struct RBImageDesc
     uint32_t width;
     uint32_t height;
     RGTextureFormat format;
-    RenderTextureUsage::Type usage;
+    Mask<RenderTextureUsage::Type> usage;
 };
 
 struct RBImageHandle

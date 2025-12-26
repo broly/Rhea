@@ -9,8 +9,6 @@
 #include "platform/window.h"
 #include "render/handle_types.h"
 #include "render/render_graph.h"
-#include "render/scene_extractor.h"
-#include "render/backends/vk/vk_camera_ubo.h"
 #include "render/backends/vk/vk_render_backend.h"
 #include "world_scripts/WorldScript_RotateAroundObject.h"
 

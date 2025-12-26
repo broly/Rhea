@@ -10,5 +10,5 @@ void main()
     float depth = texture(u_depth, v_uv).r;
 
     // simple visualization
-    out_color = vec4(vec3(depth), 1.0);
+    out_color = vec4(vec3(1.0 - depth), 1.0);
 }

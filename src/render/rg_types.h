@@ -2,6 +2,7 @@
 #include <cstdint>
 
 #include "handle_types.h"
+#include "common/enum_helpers.h"
 #include "common/type_macros.h"
 
 
@@ -30,10 +31,10 @@ enum class RGResourceKind
 struct RGTextureDesc
 {
     uint32_t width  = 0;
-    uint32_t height = 0;
+    uint32_t height = 0;    
 
     RGTextureFormat format = RGTextureFormat::Undefined;
-    RenderTextureUsage::Type  usage  = RenderTextureUsage::None;
+    Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
 
     bool external  = false;  // swapchain / imported resource
 };

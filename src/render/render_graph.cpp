@@ -1,6 +1,7 @@
 #include "render_graph.h"
 
 #include "backends/vk/vk_render_backend.h"
+#include "common/enum_helpers.h"
 
 
 void RenderGraphContext::bind_sampled_texture(RBDescriptorSetLayout layout, uint32_t binding, RGTextureHandle tex)
@@ -78,6 +79,7 @@ void RenderGraph::compile(RenderBackend& backend)
         execution_order.push_back(i);
     
 }
+
 
 void RenderGraph::execute(RenderBackend& backend, RBCommandList cmd, RBFrameHandle frame)
 {
