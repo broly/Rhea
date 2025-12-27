@@ -19,5 +19,4 @@ public:
     RBDescriptorSetLayout camera_layout;
     
     std::shared_ptr<RenderGraph> render_graph;
-    std::unique_ptr<RenderBackend> render_backend;
 };

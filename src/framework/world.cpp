@@ -26,9 +26,9 @@ void World::tick()
     render_extractor->perform_extraction();
 }
 
-void World::init()
+void World::init(const std::shared_ptr<Renderer>& in_renderer)
 {    
-    render_extractor = std::make_shared<SceneExtractor>(shared_from_this());
+    render_extractor = std::make_shared<SceneExtractor>(shared_from_this(), in_renderer);
     
     load_bootstrap_level();
     

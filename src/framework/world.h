@@ -13,7 +13,7 @@ class World : public std::enable_shared_from_this<World>
 {
 public:
     void tick();
-    void init();
+    void init(const std::shared_ptr<class Renderer>& in_renderer);
     
     bool load_bootstrap_level();
     

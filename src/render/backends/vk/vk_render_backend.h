@@ -6,7 +6,7 @@
 
 #include "vk_backend_instance.h"
 #include "vk_backend_swapchain_control.h"
-#include "vk_backend_resource_mgr.h"
+#include "vk_backend_buffer_mgr.h"
 #include "vk_context.h"
 #include "vk_internal_types.h"
 #include "vk_pipeline.h"
@@ -37,6 +37,8 @@ class VkRenderBackend final : public RenderBackend
 {
     friend class VkPipelineObject;
 public:
+    VkRenderBackend();
+    
     void init(RBWindowHandle window);
     // virtual void draw_frame(const Camera& camera) override;
     
@@ -125,12 +127,12 @@ public:
         VkRenderPass render_pass);
     
     void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, RGTextureFormat format) override;
-    
+    RBImageHandle create_texture_2d(const Texture& data) override;
     VkSampler get_default_sampler() const;
 
     vk::Instance instance;
     vk::SwapchainControl swapchain {*this};
-    vk::ResourceManager resource_manager{*this};
+    vk::BufferManager resource_manager;
     
     vk::CommandContext command_context = {};
     vk::PipelineContext pipeline_context = {};

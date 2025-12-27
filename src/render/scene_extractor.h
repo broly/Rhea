@@ -1,27 +1,16 @@
 ﻿#pragma once
-#include <cstdint>
 #include <vector>
 
+#include "renderer.h"
 #include "render_id.h"
-#include "framework/material.h"
-#include "framework/assets/mesh.h"
-#include "math/rhea_math.h"
-
-
-struct RenderObject_Mesh
-{
-    MeshHandle mesh;
-    glm::mat4 world;
-    AABB bounds;
-    PBRMaterial material;
-    std::string debug_name;
-};
+#include "framework/actor.h"
+#include "render_objects.h"
 
 class SceneExtractor
 {
 public:
     
-    SceneExtractor(std::shared_ptr<class World> in_world);
+    SceneExtractor(std::shared_ptr<class World> in_world, std::shared_ptr<class Renderer> in_renderer);
 
     void perform_extraction();
     
@@ -34,4 +23,9 @@ public:
     
     std::shared_ptr<class World> world;
     
+    RenderMaterial get_or_create_material(const MaterialKey& material_key);
+    
+    std::unordered_map<MaterialKey, RenderMaterial, MaterialKeyHash> material_cache;
+
+    std::shared_ptr<Renderer> renderer;
 };

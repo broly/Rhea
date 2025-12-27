@@ -43,7 +43,7 @@ namespace vk
         void wait_for_frame(RBFrameHandle frame_handle);
         void reset_frame_fence(uint32_t frame);
 
-        VkSwapchainKHR swapchain;
+        VkSwapchainKHR swapchain = VK_NULL_HANDLE;
         VkExtent2D extent;
 
         std::vector<VkImageView> image_views;
@@ -68,7 +68,7 @@ namespace vk
         std::array<FrameContext, MAX_FRAMES_IN_FLIGHT> frames;
         std::vector<VkSemaphore> render_finished_per_image;
         
-        uint32_t current_frame;
+        uint32_t current_frame = 0;
         
         bool framebuffer_resized = false;
     };

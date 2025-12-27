@@ -79,4 +79,22 @@ add_custom_target(shaders ALL
     DEPENDS ${SPIRV_SHADERS}
 )
 
+set(ENABLE_ASAN 1)
+
+# if (MSVC AND ENABLE_ASAN)
+#    get_filename_component(LLVM_BIN
+#        "$ENV{VCToolsInstallDir}/Llvm/x64/lib/clang/19/lib/windows"
+#        ABSOLUTE)
+#
+#    add_custom_command(TARGET rhea POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#        "${LLVM_BIN}/clang_rt.asan_dynamic-x86_64.dll"
+#        $<TARGET_FILE_DIR:rhea>)
+# endif()
+
+# if (MSVC AND ENABLE_ASAN)
+#     target_compile_options(rhea PRIVATE /fsanitize=address)
+#     target_link_options(rhea PRIVATE /fsanitize=address)
+# endif()
+
 add_dependencies(rhea shaders)

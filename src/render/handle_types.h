@@ -1,7 +1,7 @@
 #pragma once
+
 #include <cassert>
 #include <optional>
-#include <string>
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
 #include <vector>
@@ -23,7 +23,7 @@ struct RBHandle
 #endif
     
     RBHandle()
-    {
+    {        
         handle = 0;
     }
     
@@ -199,6 +199,7 @@ struct RBImageHandle
 
 using RBImageView = RBHandle<VkImageView>;
 
+using RBSampler = RBHandle<VkSampler>;
 
 
 struct FramebufferDesc

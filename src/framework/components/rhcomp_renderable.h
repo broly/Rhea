@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "rhcomp_transform.h"
 #include "framework/actor_component.h"
-#include "render/scene_extractor.h"
+#include "render/render_id.h"
 
 class RhComp_Renderable : public RhComp_Transform
 {

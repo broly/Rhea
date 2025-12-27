@@ -33,13 +33,14 @@ public:
     virtual void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) = 0;
     
     template<typename T>
-    void update_uniform_buffer(RBBufferHandle buffer_handle, T& data)
+    void update_uniform_buffer(RBBufferHandle buffer_handle, const T& data)
     {
         update_uniform_buffer_impl(buffer_handle, sizeof(T), (void*)&data);
     }
 
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
     virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, RGTextureFormat format) = 0;
+    virtual RBImageHandle create_texture_2d(const Texture& data) = 0;
 
 
     template<RenderBackendType T>

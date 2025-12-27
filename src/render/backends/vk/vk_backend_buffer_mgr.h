@@ -19,10 +19,13 @@ namespace vk
         void* mapped_ptr;
     };
     
-    class ResourceManager
+    class BufferManager
     {
     public:
-        ResourceManager(VkRenderBackend& in_render_backend);
+        BufferManager(const VkDevice& in_device, const VkPhysicalDevice& in_physical_device)
+            : device(in_device)
+            , physical_device(in_physical_device)
+        {}
     
         uint32_t persistent_ubo_counter = 0;
         std::map<uint32_t, BufferInfo> persistent_ubos;
@@ -32,8 +35,6 @@ namespace vk
         
         VkDescriptorPool frame_pool = VK_NULL_HANDLE;
         VkDescriptorPool persistent_pool = VK_NULL_HANDLE;
-        
-        VkRenderBackend& render_backend;
         
         std::array<
             std::map<RBDescriptorSetLayout, RBDescriptorSet>,
@@ -57,5 +58,11 @@ namespace vk
             ResourceUsageType resource_usage,
             uint32_t frame);
         RBBufferHandle create_uniform_buffer(size_t size, ResourceUsageType resource_usage);
+        
+        
+    private:
+        const VkDevice& device;
+        const VkPhysicalDevice& physical_device;
     };
+    
 }

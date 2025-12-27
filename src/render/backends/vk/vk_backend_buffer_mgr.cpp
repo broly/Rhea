@@ -1,16 +1,10 @@
-﻿#include "vk_backend_resource_mgr.h"
+﻿#include "vk_backend_buffer_mgr.h"
 
 #include "vk_helpers.h"
 #include "vk_macro.h"
 #include "vk_render_backend.h"
 
-vk::ResourceManager::ResourceManager(class VkRenderBackend& in_render_backend) 
-    : render_backend(in_render_backend)
-{
-    
-}
-
-void vk::ResourceManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer)
+void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer)
 {
     auto usage = buffer.get_usage_type();
 
@@ -35,7 +29,7 @@ void vk::ResourceManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout
                 .pBufferInfo = &info
             };
 
-            vkUpdateDescriptorSets(render_backend.instance.device, 1, &write, 0, nullptr);
+            vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
         }
     }
     else // Persistent
@@ -57,11 +51,11 @@ void vk::ResourceManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout
             .pBufferInfo = &info
         };
 
-        vkUpdateDescriptorSets(render_backend.instance.device, 1, &write, 0, nullptr);
+        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
     }
 }
 
-vk::BufferInfo& vk::ResourceManager::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
+vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
 {
     if (buffer_handle.get_usage_type() == ResourceUsageType::Frame)
     {
@@ -71,7 +65,7 @@ vk::BufferInfo& vk::ResourceManager::get_buffer(RBBufferHandle buffer_handle, si
     return persistent_ubos[buffer_handle.get_identifier()];
 }
 
-void vk::ResourceManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type)
+void vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type)
 {
     auto& layout_data = descriptor_set_layouts.at(layout_handle);
     
@@ -88,7 +82,7 @@ void vk::ResourceManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLay
 
             VkDescriptorSet set = VK_NULL_HANDLE;
             VK_CHECK(vkAllocateDescriptorSets(
-                render_backend.instance.device,
+                device,
                 &alloc,
                 &set
             ));
@@ -105,7 +99,7 @@ void vk::ResourceManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLay
 
         VkDescriptorSet set = VK_NULL_HANDLE;
         VK_CHECK(vkAllocateDescriptorSets(
-            render_backend.instance.device,
+            device,
             &alloc,
             &set
         ));
@@ -115,7 +109,7 @@ void vk::ResourceManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLay
 
 }
 
-void vk::ResourceManager::create_descriptor_pool()
+void vk::BufferManager::create_descriptor_pool()
 {
     VkDescriptorPoolSize pool_sizes[] = {
         {
@@ -137,28 +131,28 @@ void vk::ResourceManager::create_descriptor_pool()
     pool_info.flags = 0;
 
     VK_CHECK(vkCreateDescriptorPool(
-        render_backend.instance.device,
+        device,
         &pool_info,
         nullptr,
         &frame_pool
     ));
 
     VK_CHECK(vkCreateDescriptorPool(
-        render_backend.instance.device,
+        device,
         &pool_info,
         nullptr,
         &persistent_pool
     ));
 }
 
-RBDescriptorSetLayout vk::ResourceManager::allocate_descriptor_layout_handle()
+RBDescriptorSetLayout vk::BufferManager::allocate_descriptor_layout_handle()
 {
     auto result = ++descriptor_set_counter;
     RBDescriptorSetLayout layout((uintptr_t)result);    
     return layout;
 }
 
-RBDescriptorSetLayout vk::ResourceManager::create_descriptor_set_layout(
+RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
     const DescriptorSetLayoutDesc& descriptor_set_layout)
 {
     std::vector<VkDescriptorSetLayoutBinding> vk_bindings;
@@ -184,7 +178,7 @@ RBDescriptorSetLayout vk::ResourceManager::create_descriptor_set_layout(
 
     VkDescriptorSetLayout layout = VK_NULL_HANDLE;
     VK_CHECK(vkCreateDescriptorSetLayout(
-        render_backend.instance.device,
+        device,
         &ci,
         nullptr,
         &layout
@@ -199,12 +193,12 @@ RBDescriptorSetLayout vk::ResourceManager::create_descriptor_set_layout(
     return handle;
 }
 
-vk::DescriptorSetLayoutData vk::ResourceManager::get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle)
+vk::DescriptorSetLayoutData vk::BufferManager::get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle)
 {
     return descriptor_set_layouts[rb_handle];
 }
 
-RBDescriptorSet vk::ResourceManager::get_descriptor_set(RBDescriptorSetLayout descriptor_set_layout,
+RBDescriptorSet vk::BufferManager::get_descriptor_set(RBDescriptorSetLayout descriptor_set_layout,
     ResourceUsageType pool_type, uint32_t frame)
 {
     if (pool_type == ResourceUsageType::Frame)
@@ -212,7 +206,7 @@ RBDescriptorSet vk::ResourceManager::get_descriptor_set(RBDescriptorSetLayout de
     return persistent_descriptors[descriptor_set_layout];
 }
 
-RBBufferHandle vk::ResourceManager::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
+RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
 {
     if (usage_type == ResourceUsageType::Frame)
     {
@@ -223,15 +217,15 @@ RBBufferHandle vk::ResourceManager::create_uniform_buffer(size_t buffer_size, Re
         for (int32_t index = 0; auto& _ : buffers)
         {
             vk::create_buffer(
-                render_backend.instance.device,
-                render_backend.instance.physical_device,
+                device,
+                physical_device,
                 buffer_size,
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 buffers[index].buffer,
                 buffers[index].memory);
-            vkMapMemory(render_backend.instance.device, buffers[index].memory, 0, VK_WHOLE_SIZE, 0, &buffers[index].mapped_ptr);
+            vkMapMemory(device, buffers[index].memory, 0, VK_WHOLE_SIZE, 0, &buffers[index].mapped_ptr);
             index++;
         }
         frames_ubos.emplace(handle.get_identifier(), buffers);
@@ -246,15 +240,15 @@ RBBufferHandle vk::ResourceManager::create_uniform_buffer(size_t buffer_size, Re
         
         
         vk::create_buffer(
-            render_backend.instance.device,
-            render_backend.instance.physical_device,
+            device,
+            physical_device,
             buffer_size,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             buffer_info.buffer,
             buffer_info.memory);
-        vkMapMemory(render_backend.instance.device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
+        vkMapMemory(device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
         
         persistent_ubos[handle.get_identifier()] = buffer_info;
         return handle;

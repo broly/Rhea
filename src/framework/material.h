@@ -11,9 +11,10 @@ struct PBRMaterial
     float metallic;
     float roughness;
     
+    TextureHandle albedo;
     TextureHandle normal;
     TextureHandle occlusion;
 };
-
 REFLECT_STRUCT(PBRMaterial,
     base_color, metallic, roughness, normal, occlusion);
+

@@ -1,6 +1,7 @@
 ﻿#include "rhcomp_renderable.h"
 
 #include "framework/actor.h"
+#include "render/scene_extractor.h"
 
 void RhComp_Renderable::start()
 {

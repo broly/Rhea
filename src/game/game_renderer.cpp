@@ -26,13 +26,25 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
     render_backend->allocate_descriptor_sets_for_layout(camera_layout, ResourceUsageType::Frame);
     camera_buffer = render_backend->create_uniform_buffer(sizeof(CameraUBO), ResourceUsageType::Frame);
     render_backend->bind_buffer_to_descriptor(camera_layout, 0, camera_buffer);
+    
+    DescriptorSetLayoutDesc material_set{
+        .set_index = 1,
+        .bindings = {{
+            .binding = 0,
+            .type = DescriptorType::CombinedImageSampler,
+            .stages = ShaderStage::ss_Fragment
+        }}
+    };
+
+    // auto material_layout = render_backend->create_descriptor_set_layout(material_set);
+    // render_backend->allocate_descriptor_sets_for_layout(material_layout, ResourceUsageType::Persistent);  // todo: replace Persistent -> Static
 
     GraphicsPipelineDesc geom_pipeline_desc{
         .vertex_shader = "shaders/geometry.vert.spv",
         .fragment_shader = "shaders/geometry.frag.spv",
         .vertex_layout = VertexLayout::PositionNormalTangentUV,
         .layout = {
-            .sets = { camera_layout }, 
+            .sets = { camera_layout },//, material_layout }, 
             .push_constants = {{
                 .stages = ShaderStage::ss_Vertex,
                 .offset = 0,
@@ -134,6 +146,13 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
                 ctx.backend.get_descriptor_set(camera_layout, ResourceUsageType::Frame),
                 geometry_pipeline->get_pipeline_handle()
             );
+            
+            // ctx.backend.bind_descriptor_set(
+            //     cmd,
+            //     1,
+            //     ctx.backend.get_descriptor_set(material_layout, ResourceUsageType::Persistent),  // todo: replace Persistent -> Static
+            //     geometry_pipeline->get_pipeline_handle()
+            // );
 
             for (const auto& ro : world->get_render_extractor()->meshes)
             {

@@ -45,13 +45,14 @@ void RenderGraph::compile(RenderBackend& backend)
     {
         if (tex.desc.external)
             continue;
-
-        tex.image = backend.create_image({
+        
+        RBImageDesc desc = {
             .width  = tex.desc.width,
             .height = tex.desc.height,
             .format = tex.desc.format,
             .usage  = tex.desc.usage
-        });
+        };
+        tex.image = backend.create_image(desc);
     }
     
     for (auto& pass : passes)

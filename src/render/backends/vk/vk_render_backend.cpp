@@ -100,7 +100,7 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSetLayout layout, uint32_
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &info;
 
-    vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
+    vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
 }
 
 
@@ -115,7 +115,7 @@ void VkRenderBackend::recreate_swapchain()
     //     glfwGetFramebufferSize(window, &w, &h);
     // }
     //
-    // vkDeviceWaitIdle(instance.device);
+    // vkDeviceWaitIdle(instance.get_device());
     // cleanup_swapchain();
     // create_swapchain();
     // create_depth_resources();
@@ -143,24 +143,24 @@ void VkRenderBackend::create_depth_resources()
     image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VK_CHECK(
-        vkCreateImage(instance.device, &image_ci, nullptr, &swapchain.depth_image)
+        vkCreateImage(instance.get_device(), &image_ci, nullptr, &swapchain.depth_image)
     );
 
     VkMemoryRequirements mem_req;
-    vkGetImageMemoryRequirements(instance.device, swapchain.depth_image, &mem_req);
+    vkGetImageMemoryRequirements(instance.get_device(), swapchain.depth_image, &mem_req);
 
     VkMemoryAllocateInfo alloc{
         VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO
     };
     alloc.allocationSize = mem_req.size;
-    alloc.memoryTypeIndex = vk::find_memory_type(instance.physical_device,mem_req.memoryTypeBits,
+    alloc.memoryTypeIndex = vk::find_memory_type(instance.get_physical_device(),mem_req.memoryTypeBits,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     VK_CHECK(
-        vkAllocateMemory(instance.device, &alloc, nullptr, &swapchain.depth_memory)
+        vkAllocateMemory(instance.get_device(), &alloc, nullptr, &swapchain.depth_memory)
     );
 
-    vkBindImageMemory(instance.device, swapchain.depth_image, swapchain.depth_memory,0);
+    vkBindImageMemory(instance.get_device(), swapchain.depth_image, swapchain.depth_memory,0);
 
     VkImageViewCreateInfo view_ci{
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
@@ -173,7 +173,7 @@ void VkRenderBackend::create_depth_resources()
     view_ci.subresourceRange.layerCount = 1;
 
     VK_CHECK(vkCreateImageView(
-        instance.device, &view_ci, nullptr,
+        instance.get_device(), &view_ci, nullptr,
         &swapchain.depth_image_view));
 }
 
@@ -245,8 +245,8 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     data.index_count = static_cast<uint32_t>(mesh.indices.size());
 
     vk::create_buffer(
-        instance.device,
-        instance.physical_device,
+        instance.get_device(),
+        instance.get_physical_device(),
         mesh.vertices.size() * sizeof(Vertex),
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -256,7 +256,7 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
 
     void* mapped_data = nullptr;
     vkMapMemory(
-        instance.device,
+        instance.get_device(),
         data.vertex_memory,
         0,
         mesh.vertices.size() * sizeof(Vertex),
@@ -265,11 +265,11 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     );
     memcpy(mapped_data, mesh.vertices.data(),
         mesh.vertices.size() * sizeof(Vertex));
-    vkUnmapMemory(instance.device, data.vertex_memory);
+    vkUnmapMemory(instance.get_device(), data.vertex_memory);
 
     vk::create_buffer(
-        instance.device,
-        instance.physical_device,
+        instance.get_device(),
+        instance.get_physical_device(),
         mesh.indices.size() * sizeof(uint32_t),
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -278,7 +278,7 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     );
 
     vkMapMemory(
-        instance.device,
+        instance.get_device(),
         data.index_memory,
         0,
         mesh.indices.size() * sizeof(uint32_t),
@@ -287,7 +287,7 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     );
     memcpy(mapped_data, mesh.indices.data(),
         mesh.indices.size() * sizeof(uint32_t));
-    vkUnmapMemory(instance.device, data.index_memory);
+    vkUnmapMemory(instance.get_device(), data.index_memory);
 
     mesh_map[handle] = data;
 }
@@ -434,7 +434,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     rpci.pSubpasses = &subpass;
 
     VkRenderPass rp;
-    VK_CHECK(vkCreateRenderPass(instance.device, &rpci, nullptr, &rp));
+    VK_CHECK(vkCreateRenderPass(instance.get_device(), &rpci, nullptr, &rp));
 
     render_pass_cache[desc] = rp;
     return rp;
@@ -458,6 +458,13 @@ void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, 
 {
     swapchain.update_depth_descriptior(rb_handle, value);
 }
+
+RBImageHandle VkRenderBackend::create_texture_2d(const Texture& data)
+{
+    assert(false);
+    return {};
+}
+
 
 VkSampler VkRenderBackend::get_default_sampler() const
 {
@@ -486,7 +493,7 @@ VkSampler VkRenderBackend::get_default_sampler() const
         info.maxLod = 1.0f;
         info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
-        vkCreateSampler(instance.device, &info, nullptr, &default_sampler);
+        vkCreateSampler(instance.get_device(), &info, nullptr, &default_sampler);
     }
     
     return default_sampler;
@@ -524,13 +531,13 @@ void VkRenderBackend::create_command_pool()
 {
     if (command_context.command_pool != VK_NULL_HANDLE)
     {
-        vkDestroyCommandPool(instance.device, command_context.command_pool, nullptr);
+        vkDestroyCommandPool(instance.get_device(), command_context.command_pool, nullptr);
     }
     
-    vkGetDeviceQueue(instance.device, instance.queues.graphics, 0, 
+    vkGetDeviceQueue(instance.get_device(), instance.queues.graphics, 0, 
         &instance.graphics_queue);
 
-    vkGetDeviceQueue(instance.device, instance.queues.present, 0, 
+    vkGetDeviceQueue(instance.get_device(), instance.queues.present, 0, 
         &instance.present_queue);
 
     VkCommandPoolCreateInfo cpci{
@@ -540,7 +547,7 @@ void VkRenderBackend::create_command_pool()
     cpci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     VK_CHECK(vkCreateCommandPool(
-        instance.device,
+        instance.get_device(),
         &cpci,
         nullptr,
         &command_context.command_pool));
@@ -556,7 +563,7 @@ void VkRenderBackend::create_command_pool()
     std::vector<VkCommandBuffer> cmds(vk::MAX_FRAMES_IN_FLIGHT);
 
     VK_CHECK(
-        vkAllocateCommandBuffers(instance.device, &cbai, cmds.data())
+        vkAllocateCommandBuffers(instance.get_device(), &cbai, cmds.data())
     );
 
     for (uint32_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; ++i)
@@ -571,6 +578,12 @@ void VkRenderBackend::cleanup_swapchain()
 }
 
 
+VkRenderBackend::VkRenderBackend()
+    : instance()
+    , resource_manager(instance.get_device(), instance.get_physical_device())
+{
+    
+}
 
 void VkRenderBackend::init(RBWindowHandle in_window)
 {
@@ -673,7 +686,7 @@ RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc
     info.layers = 1;
 
     VkFramebuffer fb;
-    VK_CHECK(vkCreateFramebuffer(instance.device, &info, nullptr, &fb));
+    VK_CHECK(vkCreateFramebuffer(instance.get_device(), &info, nullptr, &fb));
 
     uint32_t id = framebuffer_resources.size();
     framebuffer_resources.push_back({
@@ -791,7 +804,7 @@ RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
     info.maxLod = 1.0f;
 
     VkSampler sampler;
-    VK_CHECK(vkCreateSampler(instance.device, &info, nullptr, &sampler));
+    VK_CHECK(vkCreateSampler(instance.get_device(), &info, nullptr, &sampler));
 
     return RBSampler{ sampler };
 }
@@ -813,5 +826,5 @@ void VkRenderBackend::bind_image_to_descriptor(RBDescriptorSetLayout layout, uin
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &img_info;
 
-    vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
+    vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
 }
