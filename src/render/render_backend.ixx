@@ -41,7 +41,7 @@ public:
     }
 
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
-    virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, RGTextureFormat format) = 0;
+    virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) = 0;
     virtual RBImageHandle create_texture_2d(const Texture& data) = 0;
 
 
@@ -83,7 +83,7 @@ public:
     virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
     virtual void get_or_create_mesh_buffers(MeshHandle handle) = 0;
-    virtual RGTextureFormat get_swapchain_format() const = 0;
+    virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual RBImageView get_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
@@ -101,7 +101,7 @@ public:
     virtual void CRUTCH_transition_image(
         RBCommandList cmd,
         RBImageHandle image,
-        RGTextureFormat format,
+        TextureFormat format,
         VkImageLayout old_layout,
         VkImageLayout new_layout) = 0;
     

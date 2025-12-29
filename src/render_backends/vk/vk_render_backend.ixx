@@ -16,6 +16,7 @@ import :pipeline;
 import :mesh_mgr;
 import framework;
 import render;
+import :immediate_commands;
 
 struct FramebufferResource
 {
@@ -51,7 +52,7 @@ public:   /// API Section
     virtual void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) override;
     virtual RBSwapchainExtent get_swapchain_extent() const override;
     virtual void CRUTCH_transition_image(RBCommandList cmd, RBImageHandle image, 
-        RGTextureFormat format,
+        TextureFormat format,
         VkImageLayout old_layout, VkImageLayout new_layout) override;
     virtual void update_sampled_image(
         RBDescriptorSetLayout layout,
@@ -71,7 +72,7 @@ public:   /// API Section
     virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
     virtual void get_or_create_mesh_buffers(MeshHandle handle) override;
-    virtual RGTextureFormat get_swapchain_format() const override;
+    virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual RBImageView get_image_view(RBImageHandle handle) override;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
@@ -86,7 +87,7 @@ public:   /// API Section
         RBSampler sampler) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
-    virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, RGTextureFormat format) override;
+    virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) override;
     virtual RBImageHandle create_texture_2d(const Texture& data) override;
     
 // Initialization section
@@ -118,6 +119,7 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::SwapchainControl swapchain {instance, texture_manager};  // holds refs
     vk::BufferManager resource_manager {instance.device, instance.physical_device}; // holds refs
     vk::MeshManager mesh_manager{instance};
+    vk::ImmediateCommandPool immediate_command_pool{instance};
     
     
 public:   /// cache and state section:

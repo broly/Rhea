@@ -131,7 +131,7 @@ void RenderGraph::execute(RenderBackend& backend, RBCommandList cmd, RBFrameHand
     backend.CRUTCH_transition_image(
         cmd,
         backend.get_swapchain_image(),
-        RGTextureFormat::RGBA8_UNORM,
+        TextureFormat::RGBA8_UNORM,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
     );

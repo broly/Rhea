@@ -36,7 +36,7 @@ export
         uint32_t width  = 0;
         uint32_t height = 0;    
 
-        RGTextureFormat format = RGTextureFormat::Undefined;
+        TextureFormat format = TextureFormat::Undefined;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
 
         bool external  = false;  // swapchain / imported resource

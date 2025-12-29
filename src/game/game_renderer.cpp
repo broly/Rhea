@@ -113,7 +113,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     RGTextureDesc depth_desc{
         .width  = 0,
         .height = 0,
-        .format = RGTextureFormat::Depth24Stencil8,
+        .format = TextureFormat::Depth24Stencil8,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
         .external = false
     };
@@ -123,7 +123,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     RGTextureDesc color_desc{
         .width  = 0,
         .height = 0,
-        .format = RGTextureFormat::RGBA8_UNORM,
+        .format = TextureFormat::RGBA8_UNORM,
         .usage  = RenderTextureUsage::Type(RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled),
         .external = false
     };

@@ -5,6 +5,7 @@ import <optional>;
 import <vulkan/vulkan_core.h>;
 import <GLFW/glfw3.h>;
 import <vector>;
+import assets;
 
 #include "common/type_macros.h"
 
@@ -105,19 +106,19 @@ export
     };
 
 
-    enum class RGTextureFormat
-    {
-        Undefined,
-
-        RGBA8_UNORM,
-        RGBA8_SRGB,
-
-        RGBA16F,
-        RGBA32F,
-
-        Depth24Stencil8,
-        Depth32F
-    };
+    // enum class TextureFormat
+    // {
+    //     Undefined,
+    //
+    //     RGBA8_UNORM,
+    //     RGBA8_SRGB,
+    //
+    //     RGBA16F,
+    //     RGBA32F,
+    //
+    //     Depth24Stencil8,
+    //     Depth32F
+    // };
 
 
     enum class ResourceUsageType
@@ -191,7 +192,7 @@ export
     {
         uint32_t width;
         uint32_t height;
-        RGTextureFormat format;
+        TextureFormat format;
         Mask<RenderTextureUsage::Type> usage;
     };
 

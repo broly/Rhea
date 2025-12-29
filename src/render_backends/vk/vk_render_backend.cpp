@@ -39,7 +39,7 @@ RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
 
 
 void VkRenderBackend::CRUTCH_transition_image(RBCommandList cmd, RBImageHandle image, 
-    RGTextureFormat format, VkImageLayout old_layout,
+    TextureFormat format, VkImageLayout old_layout,
     VkImageLayout new_layout)
 {
     swapchain.CRUTCH_transition_image(cmd, image,  format,  old_layout, new_layout);
@@ -180,6 +180,7 @@ void VkRenderBackend::create_depth_resources()
 }
 
 
+
 RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout)
 {
     return resource_manager.create_descriptor_set_layout(descriptor_set_layout);
@@ -241,21 +242,21 @@ void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
     mesh_manager.get_or_create_mesh_buffers(handle);
 }
 
-RGTextureFormat VkRenderBackend::get_swapchain_format() const
+TextureFormat VkRenderBackend::get_swapchain_format() const
 {
     switch (swapchain.surface_format.format)
     {
     case VK_FORMAT_B8G8R8A8_UNORM:
-        return RGTextureFormat::RGBA8_UNORM;
+        return TextureFormat::RGBA8_UNORM;
 
     case VK_FORMAT_B8G8R8A8_SRGB:
-        return RGTextureFormat::RGBA8_SRGB;
+        return TextureFormat::RGBA8_SRGB;
 
     case VK_FORMAT_R8G8B8A8_UNORM:
-        return RGTextureFormat::RGBA8_UNORM;
+        return TextureFormat::RGBA8_UNORM;
 
     case VK_FORMAT_R8G8B8A8_SRGB:
-        return RGTextureFormat::RGBA8_SRGB;
+        return TextureFormat::RGBA8_SRGB;
 
     default:
         throw std::runtime_error("Unsupported swapchain format");
@@ -403,15 +404,88 @@ RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle
 }
 
 void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value,
-    RGTextureFormat format)
+    TextureFormat format)
 {
     swapchain.update_depth_descriptior(rb_handle, value);
 }
 
-RBImageHandle VkRenderBackend::create_texture_2d(const Texture& data)
+RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex)
 {
-    assert(false);
-    return {};
+    RBImageDesc desc;
+    desc.width  = tex.width;
+    desc.height = tex.height;
+    desc.format = tex.format;
+    desc.usage  =
+        RenderTextureUsage::Sampled |
+        RenderTextureUsage::TransferDst;
+    
+    // 1. GPU image
+    RBImageHandle image = create_image(desc);
+    auto& res = swapchain.image_resources[image.id];
+    
+    // 2. staging buffer
+    size_t pixel_size =
+        tex.format == TextureFormat::RGB8 ? 3 : 4;
+    
+    size_t upload_size =
+        tex.width * tex.height * pixel_size;
+    
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+    
+    vk::create_buffer(
+        instance.device,
+        instance.physical_device,
+        upload_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buffer,
+        staging_memory);
+    
+    vk::update_buffer(instance.device, staging_memory, tex.pixels.data(), upload_size);
+    
+    // 3. copy
+    immediate_command_pool.submit([&](VkCommandBuffer cmd)
+    {
+        CRUTCH_transition_image(
+            cmd,
+            image,
+            tex.format,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        );
+    
+        VkBufferImageCopy copy{};
+        copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copy.imageSubresource.layerCount = 1;
+        copy.imageExtent = {
+            tex.width,
+            tex.height,
+            1
+        };
+    
+        vkCmdCopyBufferToImage(
+            cmd,
+            staging_buffer,
+            res.image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &copy
+        );
+    
+        CRUTCH_transition_image(
+            cmd,
+            image,
+            tex.format,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+    });
+    
+    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
+    
+    return image;
 }
 
 
@@ -519,6 +593,7 @@ void VkRenderBackend::init(RBWindowHandle in_window)
     create_descriptor_pool();
 
     swapchain.init();
+    immediate_command_pool.init();
     
     create_depth_resources();
     create_command_pool();

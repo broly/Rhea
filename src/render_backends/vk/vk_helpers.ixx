@@ -10,10 +10,11 @@ import :context;
 #include "vk_macro.h"
 import platform;
 import render;
+import assets;
 import <GLFW/glfw3.h>;
 import <cassert>;
 
-namespace vk
+export namespace vk
 {
     
     struct SwapchainSupport {
@@ -92,6 +93,40 @@ namespace vk
             bufferMemory, 0));
     }
 
+    void update_buffer(
+        VkDevice device,
+        VkDeviceMemory memory,
+        const void* data,
+        VkDeviceSize size,
+        VkDeviceSize offset = 0)
+    {
+        void* mapped = nullptr;
+
+        VK_CHECK(vkMapMemory(
+            device,
+            memory,
+            offset,
+            size,
+            0,
+            &mapped
+        ));
+
+        std::memcpy(mapped, data, static_cast<size_t>(size));
+
+        vkUnmapMemory(device, memory);
+    }
+    
+    void destroy_buffer(
+        VkDevice device,
+        VkBuffer buffer,
+        VkDeviceMemory memory)
+    {
+        if (buffer != VK_NULL_HANDLE)
+            vkDestroyBuffer(device, buffer, nullptr);
+
+        if (memory != VK_NULL_HANDLE)
+            vkFreeMemory(device, memory, nullptr);
+    }
 
     inline SwapchainSupport query_swapchain_support(
         VkPhysicalDevice device,
@@ -253,36 +288,6 @@ namespace vk
 
         return vk;
     }
-    
-    
-    inline VkFormat get_vk_format(RGTextureFormat format)
-    {
-        switch (format)
-        {
-        case RGTextureFormat::RGBA8_UNORM:
-            return VK_FORMAT_B8G8R8A8_UNORM;
-
-        case RGTextureFormat::RGBA8_SRGB:
-            return VK_FORMAT_B8G8R8A8_SRGB;
-
-        case RGTextureFormat::RGBA16F:
-            return VK_FORMAT_R16G16B16A16_SFLOAT;
-
-        case RGTextureFormat::RGBA32F:
-            return VK_FORMAT_R32G32B32A32_SFLOAT;
-
-        case RGTextureFormat::Depth24Stencil8:
-            return VK_FORMAT_D24_UNORM_S8_UINT;
-
-        case RGTextureFormat::Depth32F:
-            return VK_FORMAT_D32_SFLOAT;
-
-        case RGTextureFormat::Undefined:
-        default:
-            throw std::runtime_error("Unsupported texture format");
-        }
-    }
-
 
     inline bool is_depth_format(VkFormat format)
     {
@@ -298,4 +303,29 @@ namespace vk
         }
     }
 
+    VkFormat to_vk_format(TextureFormat format)
+    {
+        switch (format)
+        {
+        case TextureFormat::RGB8:
+            return VK_FORMAT_R8G8B8_UNORM;
+
+        case TextureFormat::RGBA8:
+            return VK_FORMAT_R8G8B8A8_UNORM;
+
+        case TextureFormat::RGBA8_SRGB:
+            return VK_FORMAT_R8G8B8A8_SRGB;
+        case TextureFormat::RGBA8_UNORM:
+            return VK_FORMAT_R8G8B8A8_UNORM;
+        case TextureFormat::RGBA16F:
+            return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case TextureFormat::RGBA32F:
+            return VK_FORMAT_R32G32B32A32_SFLOAT;
+        case TextureFormat::Depth24Stencil8:
+            return VK_FORMAT_D24_UNORM_S8_UINT;
+        case TextureFormat::Depth32F:
+            return VK_FORMAT_D32_SFLOAT;
+        }
+        return VK_FORMAT_UNDEFINED;
+    }
 }

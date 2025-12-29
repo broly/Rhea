@@ -38,9 +38,17 @@ private:
 
 export enum class TextureFormat
 {
-    RGB8,
-    RGBA8,
-    RGBA8_SRGB
+    Undefined, 
+    RGB8, 
+    RGBA8, 
+    RGBA8_UNORM,
+    RGBA8_SRGB,
+
+    RGBA16F,
+    RGBA32F,
+
+    Depth24Stencil8,
+    Depth32F
 };
 
 export struct Texture

@@ -118,7 +118,7 @@ RBSwapchainExtent vk::SwapchainControl::get_extent() const
 }
 
 void vk::SwapchainControl::CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image,
-    RGTextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout)
+    TextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout)
 {
     auto& img = image_resources[image.id];
 
@@ -166,7 +166,7 @@ void vk::SwapchainControl::CRUTCH_transition_image(const RBCommandList& cmd, RBI
     
     
     
-    if (vk::is_depth_format(vk::get_vk_format(format)))
+    if (vk::is_depth_format(vk::to_vk_format(format)))
     {
         barrier.subresourceRange.aspectMask =
             VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -202,7 +202,7 @@ RBImageHandle vk::SwapchainControl::create_image(RBImageDesc desc)
     vk::ImageResource res{};
     res.width  = width;
     res.height = height;
-    res.format = vk::get_vk_format(desc.format);
+    res.format = vk::to_vk_format(desc.format);
 
     VkImageUsageFlags vk_usage = 0;
 
@@ -214,13 +214,16 @@ RBImageHandle vk::SwapchainControl::create_image(RBImageDesc desc)
 
     if (desc.usage & RenderTextureUsage::Sampled)
         vk_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    
+    if (desc.usage & RenderTextureUsage::TransferDst)
+        vk_usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_info.imageType = VK_IMAGE_TYPE_2D;
     image_info.extent = { width, height, 1 };
     image_info.mipLevels = 1;
     image_info.arrayLayers = 1;
-    image_info.format = vk::get_vk_format(desc.format);
+    image_info.format = vk::to_vk_format(desc.format);
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_info.usage = vk_usage;
@@ -252,7 +255,7 @@ RBImageHandle vk::SwapchainControl::create_image(RBImageDesc desc)
     VkImageViewCreateInfo view_info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
     view_info.image = res.image;
     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = vk::get_vk_format(desc.format);
+    view_info.format = vk::to_vk_format(desc.format);
     view_info.subresourceRange = {
         aspect, 0, 1, 0, 1
     };

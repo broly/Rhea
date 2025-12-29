@@ -3,6 +3,7 @@ import render;
 import :context;
 import :instance;
 import :texture_mgr;
+import assets;
 import <vulkan/vulkan_core.h>;
 
 class VkRenderBackend;
@@ -31,7 +32,7 @@ namespace vk
         void init();
         RBSwapchainExtent get_extent() const;
         
-        void CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image, RGTextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout);
+        void CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image, TextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout);
         RBImageHandle create_image(RBImageDesc desc);
         RBImageView get_image_view(RBImageHandle handle) const;
         RBImageView get_image_view() const;

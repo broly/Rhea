@@ -10,6 +10,10 @@ struct Mask
 {
     using underlying = std::underlying_type_t<Enum>;
     
+    constexpr Mask()
+        : value(static_cast<Enum>(0))
+    {}
+    
     template<enum_compatible<Enum> T>
     constexpr Mask(T value)
         : value(static_cast<Enum>(value))
