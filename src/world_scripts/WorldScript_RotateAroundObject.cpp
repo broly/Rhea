@@ -1,7 +1,5 @@
-#include "WorldScript_RotateAroundObject.h"
+module WorldScript_RotateAroundObject;
 
-#include "framework/actor.h"
-#include "framework/world.h"
 
 void WorldScript_RotateAroundObject::tick(double dt)
 {

@@ -1,7 +1,7 @@
-#include "render_graph.h"
+module render:render_graph;
 
-#include "backends/vk/vk_render_backend.h"
-#include "common/enum_helpers.h"
+import enum_helpers;
+import <vulkan/vulkan_core.h>;
 
 
 void RenderGraphContext::bind_sampled_texture(RBDescriptorSetLayout layout, uint32_t binding, RGTextureHandle tex)

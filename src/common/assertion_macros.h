@@ -1,23 +1,7 @@
 ﻿#pragma once
-#include <source_location>
-#include <iostream>
 
-inline bool ensure_impl(bool value, std::source_location sl = std::source_location::current())
-{
-    if (!value)
-    {
-        std::cerr << "ensure condition failed: " << sl.file_name() << ":" << sl.line() << " at " << sl.function_name() << std::endl;
-        __debugbreak();
-    }
-    return value;
-}
-
-
-inline void print_error_no_text(std::source_location sl)
-{
-    std::cerr << "ensure condition failed: " << sl.file_name() << ":" << sl.line() << " at " << sl.function_name() << std::endl;
-}
-
+import assertions;
+import <source_location>;
 
 #define ENSURE_IMPL(v) \
     [](decltype(v) value, std::source_location sl = std::source_location::current()) -> decltype(v) \

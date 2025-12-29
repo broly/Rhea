@@ -1,8 +1,11 @@
-﻿#include "engine.h"
-#include "globals.h"
-#include "common/json_utils.h"
-#include "common/paths.h"
-
+﻿
+import engine;
+import <json/value.h>;
+import globals;
+import <iostream>;
+import paths;
+import json_utils;
+import game;
 
 int main() {
     paths::init();

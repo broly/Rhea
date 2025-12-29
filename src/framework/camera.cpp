@@ -1,4 +1,4 @@
-#include "camera.h"
+module framework:camera;
 
 void Camera::set_position(glm::vec3 in_position) {
     transform.set_position(in_position);

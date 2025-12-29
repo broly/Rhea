@@ -1,14 +1,17 @@
-﻿#include "game_renderer.h"
+﻿module game:renderer;
 
-#include <set>
+import render;
+import vk;
+import glm;
 
-#include "framework/world.h"
-#include "render/ubos.h"
-#include "render/backends/vk/vk_render_backend.h"
-
-void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_world)
+void GameRenderer::set_engine(const std::shared_ptr<Engine>& in_engine)
 {
-    Renderer::init(in_window, in_world);
+    engine = in_engine;
+}
+
+void GameRenderer::init(RBWindowHandle in_window)
+{
+    Renderer::init(in_window);
     
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     render_graph = std::make_shared<RenderGraph>();
@@ -132,10 +135,12 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
         .writes = { scene_color, depth_texture },
         .execute = [=](RenderGraphContext& ctx)
         {
+            auto& extractor = engine->scene_extractor;
             auto cmd = ctx.cmd;
             
             CameraUBO camera_ubo;
-            camera_ubo.mvp = world->camera->projection(1.0) * world->camera->view();
+            
+            camera_ubo.mvp = extractor->camera->projection(1.0) * extractor->camera->view();
             ctx.backend.update_uniform_buffer(camera_buffer, camera_ubo);
 
             ctx.backend.bind_pipeline(cmd, geometry_pipeline);
@@ -154,7 +159,7 @@ void GameRenderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_worl
             //     geometry_pipeline->get_pipeline_handle()
             // );
 
-            for (const auto& ro : world->get_render_extractor()->meshes)
+            for (const auto& ro : extractor->meshes)
             {
                 ctx.backend.get_or_create_mesh_buffers(ro.mesh);
 

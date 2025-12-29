@@ -1,0 +1,45 @@
+export module reflect;
+#include "common/foreach_macro.h"
+
+import fixed_string;
+
+export namespace reflect
+{
+    namespace detail
+    {
+        template<auto PtrToMember, FixedString Name>
+        struct NamedField
+        {            
+            static constexpr void iter(auto func)
+            {
+                func.template operator()<PtrToMember, Name>();
+            }
+        };
+
+
+        template<typename... Types>
+        struct NamedFieldList
+        {
+            static constexpr void iter(auto&& func)
+            {
+                (Types::iter(func), ...);
+            }
+        };
+    }
+    
+    template<typename>
+    struct ReflectionInfo;
+    
+    template<typename T>
+    constexpr void visit(auto func)
+    {
+        static_assert(requires { ReflectionInfo<T>::reflected; }, "specified type not reflected");
+        ReflectionInfo<T>::iter(func);
+    }
+    
+    template<typename T>
+    constexpr bool is_reflected_v = requires { ReflectionInfo<T>::reflected; };
+}
+
+
+

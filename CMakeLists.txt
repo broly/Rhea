@@ -3,6 +3,11 @@ project(rhea LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API "cxx_modules")
+set(CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP 1)
+
+option(FASTGLTF_COMPILE_AS_CPP20 "Compile fastgltf as C++20" ON)
+option(FASTGLTF_ENABLE_CPP_MODULES "Enable C++ modules target" ON)
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
@@ -11,18 +16,65 @@ find_package(fastgltf CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 
 
-file(GLOB_RECURSE RHEA_SOURCES
-    CONFIGURE_DEPENDS
-    src/*.cpp
-    src/*.h
-    shaders/*.vert
-    shaders/*.frag
-    shaders/*.comp
-    shaders/*.vs
-    shaders/*.fs
+# add_executable(rhea ${RHEA_SOURCES})
+add_executable(rhea ${RHEA_SOURCES})
+
+# file(GLOB_RECURSE RHEA_SOURCES
+#     CONFIGURE_DEPENDS
+#     src/*.cpp
+#     src/*.ixx
+#     src/*.h
+#     shaders/*.vert
+#     shaders/*.frag
+#     shaders/*.comp
+#     shaders/*.vs
+#     shaders/*.fs
+# )
+set(RHEA_MODULE_DIRS
+    src/glm_wrap
+    src/stb_image_wrap
+    src/fastgltf_wrapper
+    src/common
+    src/math
+    src/logging
+    src/object
+    src/assets
+    src/platform
+    src/framework
+    src/render
+    src/world_scripts
+    src/engine
+    src/render_backends/vk
+    src/game
 )
 
-add_executable(rhea ${RHEA_SOURCES})
+function(add_module_dir TARGET DIR)
+    file(GLOB MODULE_IXX CONFIGURE_DEPENDS ${DIR}/*.ixx)
+    file(GLOB MODULE_CPP CONFIGURE_DEPENDS ${DIR}/*.cpp)
+    file(GLOB MODULE_H   CONFIGURE_DEPENDS ${DIR}/*.h)
+
+    # гарантируем, что module.ixx идёт первым
+    list(FILTER MODULE_IXX INCLUDE REGEX ".*/module\\.ixx$")
+    file(GLOB OTHER_IXX CONFIGURE_DEPENDS ${DIR}/*.ixx)
+    list(FILTER OTHER_IXX EXCLUDE REGEX ".*/module\\.ixx$")
+
+    target_sources(${TARGET}
+        PRIVATE
+            ${MODULE_IXX}
+            ${OTHER_IXX}
+            ${MODULE_CPP}
+            ${MODULE_H}
+    )
+endfunction()
+
+
+foreach(dir ${RHEA_MODULE_DIRS})
+    add_module_dir(rhea ${dir})
+endforeach()
+target_sources(rhea 
+    PRIVATE
+        src/main.cpp)
+
 
 target_link_libraries(rhea
 	PRIVATE
@@ -31,6 +83,8 @@ target_link_libraries(rhea
 		JsonCpp::JsonCpp
 		fastgltf::fastgltf
 )
+
+
 
 target_compile_definitions(rhea
     PRIVATE 

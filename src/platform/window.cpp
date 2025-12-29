@@ -1,5 +1,6 @@
-﻿#include "window.h"
-#include <cassert>
+﻿module platform:window;
+import <cassert>;
+import <glfw/glfw3.h>;
 
 
 static void framebuffer_resize_callback(GLFWwindow* hwnd, int w, int h) {

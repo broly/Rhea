@@ -1,7 +1,14 @@
-﻿#include "actor.h"
+﻿module framework:actor;
+
+import :rhcomponent;
+import :rhcomponents;
+import :core;
+
+import <string>;
+
+import <cassert>;
 
 #include "common/assertion_macros.h"
-#include "components/rhcomp_transform.h"
 
 
 void RhActor::internal_start(const std::shared_ptr<World>& in_world)
@@ -135,4 +142,12 @@ Transform RhActor::get_transform()
     assert(transform_comp != nullptr);
     
     return transform_comp->get_transform();
+}
+
+std::shared_ptr<RhComponent> RhActor::find_component_by_name(const std::string& name)
+{
+    for (auto component : instanced_components)
+        if (component->name == name)
+            return component;
+    return nullptr;
 }

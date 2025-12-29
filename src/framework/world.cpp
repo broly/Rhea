@@ -1,17 +1,16 @@
-#include "world.h"
+module framework:world;
 
-#include <fstream>
-#include <json/json.h>
+import json_utils;
+import rhmath;
+import :engine_clock;
+import :world_script;
+import :camera;
+import :actor;
 
-#include "actor.h"
-#include "object.h"
-#include "object_reflection.h"
+import rhobject;
+import <json/value.h>;
+
 #include "common/assertion_macros.h"
-#include "common/json_utils.h"
-#include "common/paths.h"
-#include "render/scene_extractor.h"
-
-class RhActor;
 
 void World::tick()
 {
@@ -22,13 +21,10 @@ void World::tick()
     
     for (auto& actor : actors)
         actor->internal_tick(dt);
-    
-    render_extractor->perform_extraction();
 }
 
-void World::init(const std::shared_ptr<Renderer>& in_renderer)
-{    
-    render_extractor = std::make_shared<SceneExtractor>(shared_from_this(), in_renderer);
+void World::init()
+{
     
     load_bootstrap_level();
     
@@ -144,4 +140,9 @@ bool World::load_level(std::string level_path)
 void World::add_actor(std::shared_ptr<RhActor> actor)
 {
     actors.push_back(actor);
+}
+
+double World::get_time_seconds() const
+{
+    return clock->get_total_seconds();
 }

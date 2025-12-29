@@ -1,10 +1,11 @@
-﻿#include "renderer.h"
+﻿module render:renderer;
 
-#include "render_backend.h"
+import :render_backend;
+import <cassert>;
 
-void Renderer::init(RBWindowHandle in_window, std::shared_ptr<World> in_world)
+void Renderer::init(RBWindowHandle in_window)
 {
-    world = in_world;
+    // world = in_world;
 }
 
 void Renderer::update_material_descriptor(const RenderMaterial& rm, const MaterialKey& key)
