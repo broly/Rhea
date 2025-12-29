@@ -4,7 +4,7 @@ import <set>;
 import <vulkan/vulkan_core.h>;
 
 import :helpers;
-#include "vk_macro.h"
+#include "render_backends/vk/vk_macro.h"
 import <cassert>;
 
 constexpr const char* VALIDATION_LAYERS[] = {

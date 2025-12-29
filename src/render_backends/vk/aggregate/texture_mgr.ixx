@@ -3,9 +3,11 @@
 import <vulkan/vulkan_core.h>;
 import :instance;
 
+
+
 namespace vk
 {
-    class TextureManager
+    export class TextureManager
     {
     public:
         TextureManager(vk::Instance& in_instance)
