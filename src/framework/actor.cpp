@@ -1,7 +1,7 @@
 ﻿module framework:actor;
 
 import :rhcomponent;
-import :rhcomponents;
+import :rhcomp_transform;
 import :core;
 
 import <string>;

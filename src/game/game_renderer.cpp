@@ -22,7 +22,8 @@ void GameRenderer::init(RBWindowHandle in_window)
             .binding = 0,
             .type = DescriptorType::UniformBuffer,
             .stages = ShaderStage::ss_Vertex
-        }}
+        }},
+        .debug_name = "camera"
     };
 
     camera_layout = render_backend->create_descriptor_set_layout(camera_set);
@@ -32,22 +33,34 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     DescriptorSetLayoutDesc material_set{
         .set_index = 1,
-        .bindings = {{
-            .binding = 0,
-            .type = DescriptorType::CombinedImageSampler,
-            .stages = ShaderStage::ss_Fragment
-        }}
+        .bindings = {
+            {
+                .binding = 0,
+                .type = DescriptorType::UniformBuffer,
+                .stages = ShaderStage::ss_Fragment
+            },
+            {
+                .binding = 1,
+                .type = DescriptorType::CombinedImageSampler,
+                .stages = ShaderStage::ss_Fragment
+            }
+        },
+        .debug_name = "material"
     };
-
-    // auto material_layout = render_backend->create_descriptor_set_layout(material_set);
-    // render_backend->allocate_descriptor_sets_for_layout(material_layout, ResourceUsageType::Persistent);  // todo: replace Persistent -> Static
-
+    
+    material_layout = render_backend->create_descriptor_set_layout(material_set);   
+    
+    
     GraphicsPipelineDesc geom_pipeline_desc{
         .vertex_shader = "shaders/geometry.vert.spv",
         .fragment_shader = "shaders/geometry.frag.spv",
         .vertex_layout = VertexLayout::PositionNormalTangentUV,
         .layout = {
-            .sets = { camera_layout },//, material_layout }, 
+            .sets = { 
+                camera_layout,  // 0
+                material_layout, // 1
+                light_layout,
+            }, 
             .push_constants = {{
                 .stages = ShaderStage::ss_Vertex,
                 .offset = 0,
@@ -63,39 +76,9 @@ void GameRenderer::init(RBWindowHandle in_window)
     auto geometry_pipeline = render_backend->create_pipeline(geom_pipeline_desc);
     
     
-    
-    DescriptorSetLayoutDesc lighting_set{
-        .set_index = 0,
-        .bindings = {{
-            .binding = 0,
-            .type = DescriptorType::CombinedImageSampler,
-            .stages = ShaderStage::ss_Fragment
-        }}
-    };
-    
     auto depth_sampler = render_backend->create_sampler({});
     
-    auto lighting_layout = render_backend->create_descriptor_set_layout(lighting_set);
-    render_backend->allocate_descriptor_sets_for_layout(lighting_layout, ResourceUsageType::Frame);
     
-    
-    GraphicsPipelineDesc lighting_pipeline_desc{
-        .vertex_shader   = "shaders/fullscreen.vert.spv",
-        .fragment_shader = "shaders/lighting.frag.spv",
-        .vertex_layout = VertexLayout::None,
-
-        .layout = {
-            .sets = { lighting_layout },
-            .push_constants = {}
-        },
-
-        .rt_compat = {
-            .color_attachment_count = 1,
-            .has_depth = false
-        }
-    };
-
-    auto lighting_pipeline = render_backend->create_pipeline(lighting_pipeline_desc);
     
     
     RGTextureDesc swapchain_desc{
@@ -106,19 +89,16 @@ void GameRenderer::init(RBWindowHandle in_window)
         .external = true
     };
 
-    auto swapchain_color = render_graph->create_texture(swapchain_desc);
+    auto swapchain_color = render_graph->create_texture({
+        .format   = render_backend->get_swapchain_format(),
+        .usage    = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
+        .external = true
+    });
     
-    
-    
-    RGTextureDesc depth_desc{
-        .width  = 0,
-        .height = 0,
+    auto depth_texture = render_graph->create_texture({
         .format = TextureFormat::Depth24Stencil8,
-        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
-        .external = false
-    };
-
-    RGTextureHandle depth_texture = render_graph->create_texture(depth_desc);
+        .usage  = RenderTextureUsage::DepthStencil
+    });
     
     RGTextureDesc color_desc{
         .width  = 0,
@@ -130,80 +110,104 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     auto scene_color = render_graph->create_texture(color_desc);
     
+    DescriptorSetLayoutDesc light_set{
+        .set_index = 2,
+        .bindings = {{
+            .binding = 0,
+            .type = DescriptorType::UniformBuffer,
+            .stages = ShaderStage::ss_Fragment
+        }},
+        .debug_name = "light"
+    };
+
+    light_layout = render_backend->create_descriptor_set_layout(light_set);
+    render_backend->allocate_descriptor_sets_for_layout(
+        light_layout,
+        ResourceUsageType::Frame
+    );
+    
+    light_buffer = render_backend->create_uniform_buffer(
+        sizeof(LightUBO),
+        ResourceUsageType::Frame
+    );
+    
+    render_backend->bind_buffer_to_descriptor(
+        light_layout,
+        0,
+        light_buffer
+    );
+    
     render_graph->add_pass({
-        .name = "Geometry",
-        .writes = { scene_color, depth_texture },
+        .name = "GeometryForward",
+        .writes = { swapchain_color, depth_texture },
+
         .execute = [=](RenderGraphContext& ctx)
         {
-            auto& extractor = engine->scene_extractor;
+            auto& extractor = engine->scene_view;
             auto cmd = ctx.cmd;
-            
+
+            // ---------- Camera ----------
             CameraUBO camera_ubo;
-            
-            camera_ubo.mvp = extractor->camera->projection(1.0) * extractor->camera->view();
+            camera_ubo.mvp =
+                extractor->camera->projection(1.0f) *
+                extractor->camera->view();
+
             ctx.backend.update_uniform_buffer(camera_buffer, camera_ubo);
 
+            // ---------- Lights ----------
+            LightUBO light_ubo{};
+            light_ubo.light_count = 1;
+            light_ubo.lights[0].position = { 0.0f, 3.0f, 10.0f };
+            light_ubo.lights[0].color    = { 15.0f, 15.0f, 15.0f };
+
+            ctx.backend.update_uniform_buffer(light_buffer, light_ubo);
+
+            // ---------- Pipeline ----------
             ctx.backend.bind_pipeline(cmd, geometry_pipeline);
 
             ctx.backend.bind_descriptor_set(
-                cmd,
-                0,
+                cmd, 0,
                 ctx.backend.get_descriptor_set(camera_layout, ResourceUsageType::Frame),
                 geometry_pipeline->get_pipeline_handle()
             );
-            
-            // ctx.backend.bind_descriptor_set(
-            //     cmd,
-            //     1,
-            //     ctx.backend.get_descriptor_set(material_layout, ResourceUsageType::Persistent),  // todo: replace Persistent -> Static
-            //     geometry_pipeline->get_pipeline_handle()
-            // );
-
-            for (const auto& ro : extractor->meshes)
-            {
-                ctx.backend.get_or_create_mesh_buffers(ro.mesh);
-
-                ctx.backend.bind_mesh(cmd, ro.mesh);
-
-                ctx.backend.push_constants(cmd, ro.world, geometry_pipeline->get_pipeline_handle());
-
-                ctx.backend.draw_indexed(cmd, ro.mesh.get().get_index_count());
-            }
-
-        }
-    });
-    
-    render_graph->add_pass({
-        .name = "Lighting",
-        .reads = { depth_texture },
-        .writes = { swapchain_color },
-        .descriptor_layout = lighting_layout,
-        .descriptor_set = render_backend->get_descriptor_set(
-            lighting_layout,
-            ResourceUsageType::Frame
-        ),
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            auto cmd = ctx.cmd;
-            
-            ctx.bind_sampled_texture(
-                lighting_layout,
-                0,              // binding = 0
-                depth_texture
-            );
-
-            ctx.backend.bind_pipeline(cmd, lighting_pipeline);
 
             ctx.backend.bind_descriptor_set(
-                cmd,
-                0,
-                ctx.backend.get_descriptor_set(lighting_layout, ResourceUsageType::Frame),
-                lighting_pipeline->get_pipeline_handle()
+                cmd, 2,
+                ctx.backend.get_descriptor_set(light_layout, ResourceUsageType::Frame),
+                geometry_pipeline->get_pipeline_handle()
             );
 
-            ctx.backend.draw_fullscreen(cmd);
+            // ---------- Draw ----------
+            
+            auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
+            for (const auto& ro : meshes_processor.meshes)
+            {
+                const RenderMaterial& mat =
+                    extractor->get_or_create_material(ro.material.key);
+
+                ctx.backend.get_or_create_mesh_buffers(ro.mesh);
+
+                ctx.backend.bind_descriptor_set(
+                    cmd, 1,
+                    mat.descriptor,
+                    geometry_pipeline->get_pipeline_handle()
+                );
+
+                ctx.backend.bind_mesh(cmd, ro.mesh);
+                ctx.backend.push_constants(
+                    cmd, ro.world,
+                    geometry_pipeline->get_pipeline_handle()
+                );
+
+                ctx.backend.draw_indexed(
+                    cmd,
+                    ro.mesh.get().get_index_count()
+                );
+            }
         }
     });
+
+    
 
     render_graph->compile(*render_backend);
 }

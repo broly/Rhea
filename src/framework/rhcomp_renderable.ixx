@@ -1,31 +1,14 @@
-﻿export module framework:rhcomponents;
+export module framework:rhcomp_renderable;
+
 import :rhcomponent;
+import :rhcomp_transform;
 
 import rhmath;
 import assets;
 
+import :render_id;
+
 #include "object/object_reflection_macro.h"
-
-export class RhComp_Transform : public RhComponent
-{
-public:
-    
-    Transform transform;
-    
-    virtual void set_transform(const Transform& in_transform);
-    Transform get_transform();
-};
-
-REFLECT_OBJECT_FIELDS(RhComp_Transform, RhComponent, 
-    transform);
-
-
-
-export struct RenderId
-{
-    std::uint64_t identifier;
-    uint32_t generation;
-};
 
 
 
@@ -62,15 +45,3 @@ public:
 
 REFLECT_OBJECT(RhComp_Renderable, RhComp_Transform);
 
-
-
-export class RhComp_StaticMesh : public RhComp_Renderable
-{
-public:    
-    MeshHandle mesh;
-    TextureHandle texture;
-    PBRMaterial material;
-};
-
-REFLECT_OBJECT_FIELDS(RhComp_StaticMesh, RhComp_Renderable, 
-    transform, mesh, texture, material);

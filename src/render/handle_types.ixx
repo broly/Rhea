@@ -129,7 +129,7 @@ export
 
     struct RBBufferHandle
     {
-        RBBufferHandle(uint64_t in_handle) 
+        RBBufferHandle(uint64_t in_handle = 0) 
             : handle(in_handle) {}
         
         RBBufferHandle(uint32_t identifier, ResourceUsageType usage_type)

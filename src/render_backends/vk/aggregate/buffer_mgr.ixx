@@ -6,6 +6,7 @@ import <vulkan/vulkan_core.h>;
 import :context;
 import :internal_types;
 import render;
+import <optional>;
 
 class VkRenderBackend;
 
@@ -48,7 +49,7 @@ namespace vk
         
         void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer);
         vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index);
-        void allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type);
+        std::optional<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type);
         void create_descriptor_pool();
         RBDescriptorSetLayout allocate_descriptor_layout_handle();
         RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout);

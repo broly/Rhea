@@ -60,7 +60,7 @@ public:   /// API Section
         RBImageHandle image,
         ResourceUsageType usage) override;
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) override;
-    virtual void allocate_descriptor_sets_for_layout(
+    virtual std::optional<RBDescriptorSet> allocate_descriptor_sets_for_layout(
         RBDescriptorSetLayout layout_handle,
         ResourceUsageType usage_type) override;
     virtual void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;
@@ -88,7 +88,7 @@ public:   /// API Section
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) override;
-    virtual RBImageHandle create_texture_2d(const Texture& data) override;
+    virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) override;
     
 // Initialization section
     void create_frame_sync_objects();

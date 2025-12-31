@@ -106,4 +106,5 @@ export
 
             return h;
         }
-    };}
+    };
+}

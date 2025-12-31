@@ -1,7 +1,7 @@
 ﻿module vk:buffer_mgr;
 import <vulkan/vulkan_core.h>;
 import :helpers;
-
+import :log;
 #include "render_backends/vk/vk_macro.h"
 
 void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer)
@@ -65,7 +65,7 @@ vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size
     return persistent_ubos[buffer_handle.get_identifier()];
 }
 
-void vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type)
+std::optional<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type)
 {
     auto& layout_data = descriptor_set_layouts.at(layout_handle);
     
@@ -88,6 +88,7 @@ void vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayou
             ));
             frames_descriptors[frame_index].insert({layout_handle, set});
         }
+        return std::nullopt;
     } else
     {
         VkDescriptorSetAllocateInfo alloc{
@@ -105,6 +106,7 @@ void vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayou
         ));
         
         persistent_descriptors.insert({layout_handle, set});
+        return set;
     }
 
 }
@@ -187,6 +189,15 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
         layout, 
         descriptor_set_layout.set_index
     };
+    
+    LogRB.Log("created descritpor set layout (debug_name=%s, set_index=%i), identifier: %p, num bindings: %i",
+        descriptor_set_layout.debug_name.c_str(), descriptor_set_layout.set_index, layout, vk_bindings.size());
+    for (const DescriptorBinding& b : descriptor_set_layout.bindings)
+    {
+        LogRB.Log("  * binding %i, type %s, stages mask: %i ",
+            b.binding, to_string(b.type), b.stages);
+    }
+    
     RBDescriptorSetLayout handle = allocate_descriptor_layout_handle();
     descriptor_set_layouts[handle] = layout_data;
 

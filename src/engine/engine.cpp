@@ -29,7 +29,7 @@ void Engine::run()
     init();
     
     world = std::make_shared<World>();
-    scene_extractor = std::make_shared<SceneExtractor>(world, renderer);
+    scene_view = std::make_shared<SceneView>(world, renderer);
     
     renderer->init(window_handle);
     
@@ -43,7 +43,7 @@ void Engine::run()
     world->add_script<WorldScript_RotateAroundObject>(); // TODO hardcoded
     
     world->init();
-    scene_extractor->camera = world->camera;
+    scene_view->camera = world->camera;
     
 
     while (!window_should_close(window)) {
@@ -51,7 +51,7 @@ void Engine::run()
         clock->tick();
         
         world->tick();
-        scene_extractor->perform_extraction();
+        scene_view->perform_extraction();
         
         platform::window::window_poll_events();
         renderer->execute();

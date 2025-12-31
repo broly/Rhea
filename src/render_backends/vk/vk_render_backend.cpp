@@ -193,7 +193,7 @@ void VkRenderBackend::create_descriptor_pool()
 
 
 
-void VkRenderBackend::allocate_descriptor_sets_for_layout(
+std::optional<RBDescriptorSet> VkRenderBackend::allocate_descriptor_sets_for_layout(
     RBDescriptorSetLayout layout_handle,
     ResourceUsageType usage_type)
 {
@@ -210,7 +210,7 @@ void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescr
         cmd,
         VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline->get_pipeline_layout(),
-        0, 
+        i, 
         1, 
         &vk_set,
         0, nullptr
@@ -409,12 +409,12 @@ void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, 
     swapchain.update_depth_descriptior(rb_handle, value);
 }
 
-RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex)
+RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
 {
     RBImageDesc desc;
     desc.width  = tex.width;
     desc.height = tex.height;
-    desc.format = tex.format;
+    desc.format = format_override.value_or(tex.format);
     desc.usage  =
         RenderTextureUsage::Sampled |
         RenderTextureUsage::TransferDst;
@@ -430,6 +430,11 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex)
     size_t upload_size =
         tex.width * tex.height * pixel_size;
     
+    if (upload_size == 0)
+    {
+        throw std::runtime_error("create_texture_2d: upload_size == 0");
+    }
+    
     VkBuffer staging_buffer;
     VkDeviceMemory staging_memory;
     
@@ -442,6 +447,8 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex)
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         staging_buffer,
         staging_memory);
+    
+    
     
     vk::update_buffer(instance.device, staging_memory, tex.pixels.data(), upload_size);
     

@@ -33,4 +33,9 @@ export namespace glm
     using glm::operator==;
     using glm::operator!=;
     using glm::perspective;
+    
+    using glm::normalize;
+    using glm::length;
+    using glm::mat3;
+    using glm::quat_cast;
 }

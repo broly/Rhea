@@ -42,7 +42,7 @@ public:
 
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
     virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) = 0;
-    virtual RBImageHandle create_texture_2d(const Texture& data) = 0;
+    virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) = 0;
 
 
     template<RenderBackendType T>
@@ -67,7 +67,7 @@ public:
     
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) = 0;
     
-    virtual void allocate_descriptor_sets_for_layout(
+    virtual std::optional<RBDescriptorSet> allocate_descriptor_sets_for_layout(
         RBDescriptorSetLayout layout_handle,
         ResourceUsageType pool_type) = 0;
 

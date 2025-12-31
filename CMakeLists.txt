@@ -72,6 +72,7 @@ endfunction()
 foreach(dir ${RHEA_MODULE_DIRS})
     add_module_dir(rhea ${dir})
 endforeach()
+
 target_sources(rhea 
     PRIVATE
         src/main.cpp)
@@ -115,6 +116,7 @@ file(GLOB_RECURSE SHADERS
 
 set(SPIRV_SHADERS "")
 
+
 foreach(shader ${SHADERS})
     get_filename_component(shader_name ${shader} NAME)
     set(output ${SHADER_BINARY_DIR}/${shader_name}.spv)
@@ -153,3 +155,20 @@ set(ENABLE_ASAN 1)
 # endif()
 
 add_dependencies(rhea shaders)
+
+# Создать пользовательскую цель
+add_custom_target(compile_shaders ALL
+    DEPENDS ${SPIRV_SHADERS}
+    COMMENT "Compiling all shaders"
+)
+
+# Сделать так, чтобы цель rhea зависела от файлов шейдеров
+add_custom_command(
+    TARGET rhea
+    PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target compile_shaders
+    COMMENT "Recompiling shaders if needed"
+)
+
+# Убедиться, что shaders пересобираются при изменении исходных файлов
+set_target_properties(compile_shaders PROPERTIES EXCLUDE_FROM_ALL FALSE)

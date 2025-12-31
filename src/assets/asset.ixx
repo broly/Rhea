@@ -1,14 +1,19 @@
 ﻿export module assets:asset;
 import <cstdint>;
+import <limits>;
 
 #include "common/type_macros.h"
+
+using AssetId = uint32_t;
+
+static constexpr auto INVALID_ASSET_ID = std::numeric_limits<AssetId>::max();
 
 export template<typename T>
 struct AssetHandle
 {
     AUTO_SPACESHIP(AssetHandle, id)
     
-    uint32_t id;
+    AssetId id = INVALID_ASSET_ID;
     
     bool is_valid() const
     {
@@ -17,6 +22,6 @@ struct AssetHandle
     
     static T invalid()
     {
-        return {};
+        return {INVALID_ASSET_ID};
     }
 };

@@ -19,6 +19,7 @@ public:
     
     RBBufferHandle camera_buffer;
     RBDescriptorSetLayout camera_layout;
+    RBBufferHandle light_buffer;
     
     std::shared_ptr<Engine> engine;
     

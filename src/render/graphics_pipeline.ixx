@@ -33,6 +33,19 @@ export
         CombinedImageSampler,
     };
 
+    const char* to_string(DescriptorType e)
+    {
+        switch (e)
+        {
+        case DescriptorType::UniformBuffer: return "UniformBuffer";
+        case DescriptorType::StorageBuffer: return "StorageBuffer";
+        case DescriptorType::Sampler: return "Sampler";
+        case DescriptorType::SampledImage: return "SampledImage";
+        case DescriptorType::CombinedImageSampler: return "CombinedImageSampler";
+        default: return "unknown";
+        }
+    }
+
     struct DescriptorBinding
     {
         uint32_t binding;              // number of binding in shader
@@ -52,6 +65,7 @@ export
     {
         uint32_t set_index;
         std::vector<DescriptorBinding> bindings;
+        std::string debug_name;
     };
 
     struct PipelineLayoutDesc

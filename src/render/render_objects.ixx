@@ -6,6 +6,11 @@ import assets;
 import glm;
 import <string>;
 
+struct RenderProxy
+{
+    
+};
+
 
 export struct MaterialKey
 {
@@ -72,26 +77,23 @@ private:
 };
 
 
-
-export struct RenderObject_Mesh
-{
-    MeshHandle mesh;
-    glm::mat4 world;
-    AABB bounds;
-    MaterialKey material;
-    std::string debug_name;
-};
-
 export struct RenderMaterial
 {
     RBDescriptorSet descriptor;      // Persistent
     RBDescriptorSetLayout layout;
 
     RBBufferHandle material_ubo;     // optional
-    RBImageHandle albedo;
-    RBImageHandle normal;
-    RBImageHandle occlusion;
     
     MaterialKey key;
 };
 
+
+
+export struct RenderObject_Mesh
+{
+    MeshHandle mesh;
+    glm::mat4 world;
+    AABB bounds;
+    RenderMaterial material;
+    std::string debug_name;
+};

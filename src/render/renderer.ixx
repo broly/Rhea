@@ -18,6 +18,20 @@ export struct MaterialUBO
     int has_occlusion;
 };
 
+export struct Light
+{
+    glm::vec3 position;
+    float pad0;
+    glm::vec3 color;
+    float pad1;
+};
+
+export struct LightUBO
+{
+    Light lights[8];
+    int light_count;
+};
+
 
 export class Renderer
 {
@@ -26,6 +40,11 @@ public:
     virtual void init(RBWindowHandle in_window);
     void update_material_descriptor(const RenderMaterial& rm, const MaterialKey& key);
     
+    RBDescriptorSet allocate_material_descriptor();
+    RBBufferHandle create_material_ubo();
+
+    void bind_material_ubo(const RenderMaterial& rm);
+
     virtual void execute() {}
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
@@ -34,5 +53,7 @@ public:
     std::shared_ptr<RenderBackend> render_backend;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
+    RBDescriptorSetLayout material_layout;
+    RBDescriptorSetLayout light_layout;
     
 };

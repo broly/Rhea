@@ -16,5 +16,5 @@ export struct PBRMaterial
     TextureHandle occlusion;
 };
 REFLECT_STRUCT(PBRMaterial,
-    base_color, metallic, roughness, normal, occlusion);
+    base_color, metallic, roughness, normal, occlusion, albedo);
 

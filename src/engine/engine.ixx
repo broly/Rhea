@@ -6,7 +6,7 @@ import framework;
 import platform;
 import assets;
 import render;
-import :scene_extractor;
+import :scene_view;
 
 #include "object/object_reflection_macro.h"
 
@@ -25,7 +25,7 @@ public:
     platform::window::Window window = nullptr;
     RBWindowHandle window_handle;
     std::shared_ptr<World> world = nullptr;
-    std::shared_ptr<SceneExtractor> scene_extractor = nullptr;
+    std::shared_ptr<SceneView> scene_view = nullptr;
     std::shared_ptr<Renderer> renderer = nullptr;
 };
 REFLECT_OBJECT(Engine, RhObject);
