@@ -2,6 +2,29 @@
 	"name": "startup",
 	"actors": [
 		{
+			"name": "viewer",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "camera",
+					"class": "RhComp_Camera",
+					"fields": {
+						"transform": {
+							"position": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
+						},
+						"fov": 1.04,
+						"active": true,
+						"near_plane": 0.1,
+						"far_plane": 100
+						
+					}
+				}
+			]
+		},
+		{
 			"name": "lymphocyte",
 			"ref": "actors/lymphocyte.json",
 			

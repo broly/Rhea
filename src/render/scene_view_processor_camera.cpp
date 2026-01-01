@@ -1,0 +1,45 @@
+﻿module render:scene_view_proxy.camera;
+import render_scene;
+import rhcomponents;
+
+
+
+RenderId SceneViewProcessor_Camera::register_proxy()
+{
+    if (!vacated_camera_ids.empty())
+    {
+        RenderId reuse_id = vacated_camera_ids.back();
+        reuse_id.generation++;
+        vacated_camera_ids.pop_back();
+        return reuse_id;
+    }
+    uint32_t identifier = cameras.size();
+    cameras.push_back({});
+    const RenderId render_id(identifier, 0);
+    
+    return render_id;
+}
+
+void SceneViewProcessor_Camera::unregister_proxy(RenderId render_id)
+{
+    cameras[render_id.identifier] = {}; 
+    vacated_camera_ids.push_back(render_id);
+}
+
+void SceneViewProcessor_Camera::process()
+{
+    for (const auto& submitted : read_submission_buffer<SceneViewProxy_Camera>())
+    {
+        auto& camera_ro = cameras[submitted.render_id.identifier];
+        
+        camera_ro.debug_name = submitted.debug_name;
+        camera_ro.active = submitted.active;
+        camera_ro.far = submitted.far_plane;
+        camera_ro.near = submitted.near_plane;
+        camera_ro.fov = submitted.fov;
+        camera_ro.view = submitted.transform.get_view();
+        
+        if (camera_ro.active)
+            active_camera_id = submitted.render_id;
+    }
+}

@@ -1,11 +1,18 @@
-﻿module framework:rhcomp_light;
+﻿module rhcomponents:rhcomp_light;
 
 
 
-import :actor;
 import globals;
+#include "common/offsetof.h"
 
 
+
+RhComp_Light::RhComp_Light()
+{
+    render_info.scene_proxy_offset = offsetof(RhComp_Light, scene_proxy);
+    render_info.is_explicitly_null = false;
+    render_info.processor_id = 2;  // SceneViewProcessor_Light
+}
 
 void RhComp_Light::start()
 {

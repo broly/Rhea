@@ -33,19 +33,14 @@ public:
     {
         clock = in_clock;
     }
-
-    std::shared_ptr<Camera> get_camera()
-    {
-        return camera;
-    }
     
     const std::vector<std::shared_ptr<RhActor>>& get_actors()
     {
         return actors;
     }
     
+    std::shared_ptr<RhActor> find_actor_by_name(const std::string& name);
 
-    std::shared_ptr<Camera> camera;
     std::vector<std::unique_ptr<WorldScript>> scripts;
     std::shared_ptr<EngineClock> clock;
     std::vector<std::shared_ptr<RhActor>> actors;

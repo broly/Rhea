@@ -1,25 +1,31 @@
-export module framework:rhcomp_light;
+export module rhcomponents:rhcomp_light;
 
-import :rhcomponent;
 
 import rhmath;
 import assets;
-import :rhcomp_transform;
-import :rhcomp_renderable;
+import framework;
+import render_scene;
 
 #include "object/object_reflection_macro.h"
 
+export struct SceneViewProxy_Light : public SceneViewProxy_Transform
+{
+    
+};
 
 
 export class RhComp_Light : public RhComp_Renderable
 {
 public:    
+    RhComp_Light();
     void start() override;
     void finish() override;
 
     vec4 color;
     float intensity;
     float falloff;
+    
+    SceneViewProxy_Light scene_proxy;
 };
 
 REFLECT_OBJECT_FIELDS(RhComp_Light, RhComp_Renderable, 

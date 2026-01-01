@@ -145,12 +145,14 @@ void GameRenderer::init(RBWindowHandle in_window)
         {
             auto& extractor = engine->scene_view;
             auto cmd = ctx.cmd;
+            
+            auto& camera_processor = extractor->get_processor<SceneViewProcessor_Camera>();
 
             // ---------- Camera ----------
             CameraUBO camera_ubo;
             camera_ubo.mvp =
-                extractor->camera->projection(1.0f) *
-                extractor->camera->view();
+                camera_processor.get_active_camera()->get_projection(1.0f) *
+                camera_processor.get_active_camera()->view;
 
             ctx.backend.update_uniform_buffer(camera_buffer, camera_ubo);
 
@@ -183,7 +185,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             for (const auto& ro : meshes_processor.meshes)
             {
                 const RenderMaterial& mat =
-                    extractor->get_or_create_material(ro.material.key);
+                    meshes_processor.get_or_create_material(ro.material.key);
 
                 ctx.backend.get_or_create_mesh_buffers(ro.mesh);
 

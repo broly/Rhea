@@ -72,49 +72,52 @@ void RhActor::import_from_json_object(const Json::Value& object, const Json::Val
         }
     }
     
-    if (auto components_json_array_ptr = overrides->find("components"))
+    if (overrides)
     {
-        std::set<std::string> processed_component_names;
-        for (const auto& component_info : *components_json_array_ptr)
+        if (auto components_json_array_ptr = overrides->find("components"))
         {
-            if (auto component_class_value = component_info.find("class");
-                ensure(component_class_value && component_class_value->isString()))
+            std::set<std::string> processed_component_names;
+            for (const auto& component_info : *components_json_array_ptr)
             {
-                auto component_name_val = component_info.find("name");
-                if (!component_name_val)
-                    continue;
-                
-                std::string component_name = component_name_val->as<std::string>();
-                const std::string component_class_name = component_class_value->asString();
-                
-                auto reflection_info = reflect::find_object_reflection_info(component_class_name);
-                if ensure(reflection_info != nullptr)
+                if (auto component_class_value = component_info.find("class");
+                    ensure(component_class_value && component_class_value->isString()))
                 {
-                    std::shared_ptr<RhObject> comp_obj = find_component_by_name(component_name);
+                    auto component_name_val = component_info.find("name");
+                    if (!component_name_val)
+                        continue;
+                
+                    std::string component_name = component_name_val->as<std::string>();
+                    const std::string component_class_name = component_class_value->asString();
+                
+                    auto reflection_info = reflect::find_object_reflection_info(component_class_name);
+                    if ensure(reflection_info != nullptr)
+                    {
+                        std::shared_ptr<RhObject> comp_obj = find_component_by_name(component_name);
                     
-                    bool just_created = false;
-                    if (comp_obj == nullptr)
-                    {
-                        ObjectInitData InitData {
-                            component_name,
-                        };
-                        comp_obj = std::invoke(reflection_info->factory, InitData);
-                        just_created = true;
-                    }
-
-                    if (auto fields_object = component_info.find("fields"))
-                    {
-                        if (reflection_info->serializer != std::nullopt)
+                        bool just_created = false;
+                        if (comp_obj == nullptr)
                         {
-                            std::invoke(reflection_info->serializer.value(), *fields_object, comp_obj.get(), true);
+                            ObjectInitData InitData {
+                                component_name,
+                            };
+                            comp_obj = std::invoke(reflection_info->factory, InitData);
+                            just_created = true;
                         }
-                    }
+
+                        if (auto fields_object = component_info.find("fields"))
+                        {
+                            if (reflection_info->serializer != std::nullopt)
+                            {
+                                std::invoke(reflection_info->serializer.value(), *fields_object, comp_obj.get(), true);
+                            }
+                        }
                     
-                    if (just_created)
-                    {
-                        auto component = std::static_pointer_cast<RhComponent>(comp_obj);
-                        instanced_components.push_back(component);
-                        processed_component_names.emplace(component_name);
+                        if (just_created)
+                        {
+                            auto component = std::static_pointer_cast<RhComponent>(comp_obj);
+                            instanced_components.push_back(component);
+                            processed_component_names.emplace(component_name);
+                        }
                     }
                 }
             }

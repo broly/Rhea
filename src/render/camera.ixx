@@ -7,6 +7,8 @@ import rhmath;
 export class Camera
 {
 public:
+    bool active;
+    
     Transform transform;
     
     float fov = glm::radians(60.0f);

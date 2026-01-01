@@ -42,9 +42,7 @@ void Engine::run()
     world->set_clock(clock);
     world->add_script<WorldScript_RotateAroundObject>(); // TODO hardcoded
     
-    world->init();
-    scene_view->camera = world->camera;
-    
+    world->init();    
 
     while (!window_should_close(window)) {
         

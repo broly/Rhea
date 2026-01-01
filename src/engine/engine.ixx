@@ -6,7 +6,7 @@ import framework;
 import platform;
 import assets;
 import render;
-import :scene_view;
+import render_scene;
 
 #include "object/object_reflection_macro.h"
 

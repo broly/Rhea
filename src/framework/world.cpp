@@ -28,9 +28,6 @@ void World::init()
     
     load_bootstrap_level();
     
-    Transform transform{ {0.f, 0.f, 0.f}};
-    camera = std::make_shared<Camera>(transform);
-    
     for (auto& script : scripts)
     {
         script->init(this->shared_from_this());
@@ -145,4 +142,12 @@ void World::add_actor(std::shared_ptr<RhActor> actor)
 double World::get_time_seconds() const
 {
     return clock->get_total_seconds();
+}
+
+std::shared_ptr<RhActor> World::find_actor_by_name(const std::string& name)
+{
+    for (auto& actor : actors)
+        if (actor->name == name)
+            return actor;
+    return nullptr;
 }

@@ -40,7 +40,9 @@ set(RHEA_MODULE_DIRS
     src/object
     src/assets
     src/platform
+    src/render_scene
     src/framework
+    src/rhcomponents
     src/render
     src/world_scripts
     src/engine

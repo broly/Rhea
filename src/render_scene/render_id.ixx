@@ -1,4 +1,4 @@
-﻿export module framework:render_id;
+﻿export module render_scene:render_id;
 
 import <cstdint>;
 

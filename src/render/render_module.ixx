@@ -9,3 +9,6 @@ export import :graphics_pipeline;
 export import :rg_types;
 export import :render_objects;
 export import :ubos;
+export import :scene_view_proxy.camera;
+export import :scene_view_proxy.mesh;
+export import :scene_view_proxy.light;

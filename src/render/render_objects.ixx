@@ -88,12 +88,10 @@ export struct RenderMaterial
 };
 
 
-
-export struct RenderObject_Mesh
+export struct RenderObject_PointLight
 {
-    MeshHandle mesh;
-    glm::mat4 world;
-    AABB bounds;
-    RenderMaterial material;
-    std::string debug_name;
+    glm::vec3 position;
+    glm::vec4 color;
+    float intensity;
+    float attenuation;
 };

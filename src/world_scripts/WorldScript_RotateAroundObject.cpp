@@ -7,14 +7,20 @@ import rhmath;
 
 void WorldScript_RotateAroundObject::tick(double dt)
 {
-    double seconds = world->get_time_seconds();
-    const double distance = 10.f;
+    auto camera_actor = world->find_actor_by_name("viewer");
+    if (camera_actor)
+    {
+        double seconds = world->get_time_seconds();
+        const double distance = 10.f;
     
-    const double x = cos(seconds) * distance;
-    const double z = sin(seconds) * distance;
+        const double x = cos(seconds) * distance;
+        const double z = sin(seconds) * distance;
     
-    glm::quat q = math::lookAtQuaternion({-x, 0, z}, {0, 0, 0});
+        glm::quat quat = math::lookAtQuaternion({-x, 0, z}, {0, 0, 0});
+        glm::vec3 location = {x, 0, z};
+        
+        Transform t{location, quat};
     
-    world->camera->transform.set_position({x, 0, z});
-    world->camera->transform.set_rotation(q);
+        camera_actor->set_transform(t);
+    }
 }
