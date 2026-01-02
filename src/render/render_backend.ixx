@@ -87,7 +87,6 @@ public:
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual RBImageView get_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
-    virtual RBImageView resolve_image_view(const RGTexture& tex, RBFrameHandle frame) = 0;
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) = 0;
     virtual RBImageHandle get_swapchain_image() const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;

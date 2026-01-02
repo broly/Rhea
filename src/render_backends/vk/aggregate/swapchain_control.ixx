@@ -2,7 +2,7 @@
 import render;
 import :context;
 import :instance;
-import :texture_mgr;
+import :image_mgr;
 import assets;
 import <vulkan/vulkan_core.h>;
 
@@ -20,9 +20,9 @@ namespace vk
     class SwapchainControl
     {
     public:
-        SwapchainControl(vk::Instance& in_instance, vk::TextureManager& in_texture_manager)
+        SwapchainControl(vk::Instance& in_instance, vk::ImageManager& in_texture_manager)
             : swapchain(VK_NULL_HANDLE)
-            , texture_manager(in_texture_manager)
+            , image_manager(in_texture_manager)
             , extent()
             , surface_format()
             , instance(in_instance)
@@ -33,13 +33,9 @@ namespace vk
         RBSwapchainExtent get_extent() const;
         
         void CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image, TextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout);
-        RBImageHandle create_image(RBImageDesc desc);
-        RBImageView get_image_view(RBImageHandle handle) const;
         RBImageView get_image_view() const;
-        RBImageView resolve_image_view(const RGTexture& tex, uint32_t frame);
         RBImageHandle get_image() const;
         void update_depth_descriptior(const RBDescriptorSet& rb_handle, RBImageHandle value);
-        VkFormat get_image_format(RBImageHandle handle) const;
         bool acquire_next_image(RBFrameHandle frame_handle);
         void submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list);
         void advance_frame();
@@ -62,9 +58,8 @@ namespace vk
         VkSurfaceFormatKHR surface_format;
         
         vk::Instance& instance;
-        vk::TextureManager& texture_manager;
+        vk::ImageManager& image_manager;
         std::vector<RBImageHandle> swapchain_image_handles;
-        std::vector<vk::ImageResource> image_resources;
         
         
         uint32_t swapchain_image_index = 0;

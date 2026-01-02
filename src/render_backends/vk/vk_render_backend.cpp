@@ -92,7 +92,7 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSetLayout layout, uint32_
     VkDescriptorImageInfo info{};
     info.imageView   = get_image_view(image);
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    info.sampler     = texture_manager.get_default_sampler();
+    info.sampler     = image_manager.get_default_sampler();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -265,12 +265,12 @@ TextureFormat VkRenderBackend::get_swapchain_format() const
 
 RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
 {
-    return swapchain.create_image(desc);
+    return image_manager.create_image(desc);
 }
 
 RBImageView VkRenderBackend::get_image_view(RBImageHandle handle)
 {
-    return swapchain.get_image_view(handle);
+    return image_manager.get_image_view(handle);
 }
 
 size_t hash_framebuffer(
@@ -292,11 +292,6 @@ size_t hash_framebuffer(
     return h;
 }
 
-
-RBImageView VkRenderBackend::resolve_image_view(const RGTexture& tex, RBFrameHandle frame)
-{
-    return swapchain.resolve_image_view(tex, frame);
-}
 
 RBImageView VkRenderBackend::get_swapchain_image_view(RBFrameHandle frame)
 {
@@ -392,7 +387,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
 
 VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
 {
-    return swapchain.get_image_format(handle);
+    return image_manager.get_image_format(handle);
 }
 
 RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle, VkRenderPass render_pass)
@@ -421,7 +416,7 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
     
     // 1. GPU image
     RBImageHandle image = create_image(desc);
-    auto& res = swapchain.image_resources[image.id];
+    auto& res = image_manager.get_image_resource(image);
     
     // 2. staging buffer
     size_t pixel_size =
@@ -573,8 +568,8 @@ void VkRenderBackend::cleanup_swapchain()
 
 VkRenderBackend::VkRenderBackend()
     : instance()
-    , texture_manager(instance)
-    , swapchain(instance, texture_manager)
+    , image_manager(instance)
+    , swapchain(instance, image_manager)
     , resource_manager(instance.get_device(), instance.get_physical_device())
 {
 }
@@ -667,10 +662,12 @@ RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc
     std::vector<VkImageView> attachments;
 
     for (RBImageHandle img : desc.color_attachments)
-        attachments.push_back(swapchain.image_resources[img.id].view);
+    {
+        attachments.push_back(image_manager.get_image_view(img));
+    }
 
     if (desc.depth_attachment)
-        attachments.push_back(swapchain.image_resources[desc.depth_attachment->id].view);
+        attachments.push_back(image_manager.get_image_view(*desc.depth_attachment));
 
     VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     info.renderPass = rp;
@@ -807,10 +804,10 @@ RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
 void VkRenderBackend::bind_image_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBImageHandle image,
     RBSampler sampler)
 {
-    auto& img = swapchain.image_resources[image.id];
+    auto image_view = image_manager.get_image_view(image);
 
     VkDescriptorImageInfo img_info{};
-    img_info.imageView = img.view;
+    img_info.imageView = image_view;
     img_info.sampler   = sampler.as<VkSampler>();
     img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 

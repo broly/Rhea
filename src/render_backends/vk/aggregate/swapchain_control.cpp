@@ -22,6 +22,8 @@ void vk::SwapchainControl::init()
     VkPresentModeKHR present_mode = vk::choose_present_mode(support.present_modes);
 
     extent = vk::choose_extent(support.caps, instance.window);
+    
+    image_manager.set_default_extent(extent.width, extent.height);
 
     // --- Image count ---
     uint32_t image_count = support.caps.minImageCount + 1;
@@ -80,35 +82,8 @@ void vk::SwapchainControl::init()
 
     for (uint32_t i = 0; i < sc_image_count; ++i)
     {
-        VkImageView view;
-
-        VkImageViewCreateInfo ivci{
-            VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
-        };
-        ivci.image = swapchain_images[i];
-        ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        ivci.format = surface_format.format;
-        ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        ivci.subresourceRange.levelCount = 1;
-        ivci.subresourceRange.layerCount = 1;
-
-        VK_CHECK(vkCreateImageView(
-            instance.device,
-            &ivci,
-            nullptr,
-            &view));
-
-        vk::ImageResource res{};
-        res.image  = swapchain_images[i];                 // VkImage
-        res.view   = view;                                // VkImageView
-        res.format = surface_format.format;
-        res.width  = extent.width;
-        res.height = extent.height;
-
-        uint32_t id = static_cast<uint32_t>(image_resources.size());
-        image_resources.push_back(res);
-
-        swapchain_image_handles[i] = RBImageHandle{ id };
+        auto handle = image_manager.create_image_view(extent, surface_format, swapchain_images[i]);
+        swapchain_image_handles[i] = handle;
     }
 }
 
@@ -120,7 +95,7 @@ RBSwapchainExtent vk::SwapchainControl::get_extent() const
 void vk::SwapchainControl::CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image,
     TextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout)
 {
-    auto& img = image_resources[image.id];
+    auto& img = image_manager.get_image_resource(image);
 
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     barrier.oldLayout = old_layout;
@@ -188,105 +163,9 @@ void vk::SwapchainControl::CRUTCH_transition_image(const RBCommandList& cmd, RBI
     );
 }
 
-RBImageHandle vk::SwapchainControl::create_image(RBImageDesc desc)
-{    
-    uint32_t width  = desc.width;
-    uint32_t height = desc.height;
-
-    if (width == 0 || height == 0)
-    {
-        width  = extent.width;
-        height = extent.height;
-    }
-
-    vk::ImageResource res{};
-    res.width  = width;
-    res.height = height;
-    res.format = vk::to_vk_format(desc.format);
-
-    VkImageUsageFlags vk_usage = 0;
-
-    if (desc.usage & RenderTextureUsage::ColorAttachment)
-        vk_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    if (desc.usage & RenderTextureUsage::DepthStencil)
-        vk_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-    if (desc.usage & RenderTextureUsage::Sampled)
-        vk_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-    
-    if (desc.usage & RenderTextureUsage::TransferDst)
-        vk_usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-    VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent = { width, height, 1 };
-    image_info.mipLevels = 1;
-    image_info.arrayLayers = 1;
-    image_info.format = vk::to_vk_format(desc.format);
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = vk_usage;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VK_CHECK(vkCreateImage(instance.device, &image_info, nullptr, &res.image));
-
-    VkMemoryRequirements mem_req;
-    vkGetImageMemoryRequirements(instance.device, res.image, &mem_req);
-
-    VkMemoryAllocateInfo alloc_info{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    alloc_info.allocationSize = mem_req.size;
-    alloc_info.memoryTypeIndex =
-        vk::find_memory_type(
-            instance.physical_device,
-            mem_req.memoryTypeBits,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    VK_CHECK(vkAllocateMemory(instance.device, &alloc_info, nullptr, &res.memory));
-    VK_CHECK(vkBindImageMemory(instance.device, res.image, res.memory, 0));
-
-    // ---- Image View ----
-    VkImageAspectFlags aspect =
-        (desc.usage & RenderTextureUsage::DepthStencil)
-            ? VK_IMAGE_ASPECT_DEPTH_BIT
-            : VK_IMAGE_ASPECT_COLOR_BIT;
-
-    VkImageViewCreateInfo view_info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-    view_info.image = res.image;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = vk::to_vk_format(desc.format);
-    view_info.subresourceRange = {
-        aspect, 0, 1, 0, 1
-    };
-
-    VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &res.view));
-
-    uint32_t id = static_cast<uint32_t>(image_resources.size());
-    image_resources.push_back(res);
-
-    return RBImageHandle{ id };
-}
-
-RBImageView vk::SwapchainControl::get_image_view(RBImageHandle handle) const
-{
-    return image_resources[handle.id].view;
-}
-
 RBImageView vk::SwapchainControl::get_image_view() const
 {
     return image_views[swapchain_image_index];
-}
-
-RBImageView vk::SwapchainControl::resolve_image_view(const RGTexture& tex, uint32_t frame)
-{
-    if (tex.desc.external)
-    {
-        // swapchain
-        return image_views[swapchain_image_index];
-    }
-
-    return image_resources[tex.image.value().id].view;
 }
 
 RBImageHandle vk::SwapchainControl::get_image() const
@@ -296,13 +175,13 @@ RBImageHandle vk::SwapchainControl::get_image() const
 
 void vk::SwapchainControl::update_depth_descriptior(const RBDescriptorSet& rb_handle, RBImageHandle value)
 {
-    const auto& res = image_resources[value.id];
+    const auto& res = image_manager.get_image_resource(value);
     
 
     VkDescriptorImageInfo image_info{};
     image_info.imageView = res.view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_info.sampler = texture_manager.get_default_sampler();
+    image_info.sampler = image_manager.get_default_sampler();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -315,10 +194,6 @@ void vk::SwapchainControl::update_depth_descriptior(const RBDescriptorSet& rb_ha
     vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
 }
 
-VkFormat vk::SwapchainControl::get_image_format(RBImageHandle handle) const
-{
-    return image_resources[handle.id].format;
-}
 
 bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 {

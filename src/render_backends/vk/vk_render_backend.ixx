@@ -76,7 +76,6 @@ public:   /// API Section
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual RBImageView get_image_view(RBImageHandle handle) override;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
-    virtual RBImageView resolve_image_view(const RGTexture& tex, RBFrameHandle frame) override;
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) override;
     virtual RBImageHandle get_swapchain_image() const override;
     virtual RBSampler create_sampler(const RBSamplerDesc& desc) override;
@@ -115,8 +114,8 @@ private: // internal section
 
 public:   /// Aggregate section. These objects have same lifetime with render backend. use refs
     vk::Instance instance;
-    vk::TextureManager texture_manager {instance}; // holds refs
-    vk::SwapchainControl swapchain {instance, texture_manager};  // holds refs
+    vk::ImageManager image_manager {instance}; // holds refs
+    vk::SwapchainControl swapchain {instance, image_manager};  // holds refs
     vk::BufferManager resource_manager {instance.device, instance.physical_device}; // holds refs
     vk::MeshManager mesh_manager{instance};
     vk::ImmediateCommandPool immediate_command_pool{instance};
