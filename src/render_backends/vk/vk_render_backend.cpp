@@ -106,35 +106,18 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSetLayout layout, uint32_
 }
 
 
-void VkRenderBackend::recreate_swapchain()
-{
-    assert(false);
-    // int w = 0, h = 0;
-    // glfwGetFramebufferSize(window, &w, &h);
-    // while (w == 0 || h == 0)
-    // {
-    //     glfwWaitEvents();
-    //     glfwGetFramebufferSize(window, &w, &h);
-    // }
-    //
-    // vkDeviceWaitIdle(instance.get_device());
-    // cleanup_swapchain();
-    // create_swapchain();
-    // create_depth_resources();
-}
-
 void VkRenderBackend::create_depth_resources()
 {
     VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
     swapchain.depth_format = depth_format;
 
-    VkImageCreateInfo image_ci{
-        VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO
-    };
+    VkImageCreateInfo image_ci{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.extent.width  = swapchain.extent.width;
-    image_ci.extent.height = swapchain.extent.height;
-    image_ci.extent.depth  = 1;
+    image_ci.extent = {
+        swapchain.extent.width,
+        swapchain.extent.height,
+        1
+    };
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.format = depth_format;
@@ -144,41 +127,97 @@ void VkRenderBackend::create_depth_resources()
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VK_CHECK(
-        vkCreateImage(instance.get_device(), &image_ci, nullptr, &swapchain.depth_image)
-    );
+    VK_CHECK(vkCreateImage(
+        instance.get_device(), &image_ci, nullptr, &swapchain.depth_image
+    ));
 
     VkMemoryRequirements mem_req;
-    vkGetImageMemoryRequirements(instance.get_device(), swapchain.depth_image, &mem_req);
-
-    VkMemoryAllocateInfo alloc{
-        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO
-    };
-    alloc.allocationSize = mem_req.size;
-    alloc.memoryTypeIndex = vk::find_memory_type(instance.get_physical_device(),mem_req.memoryTypeBits,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    VK_CHECK(
-        vkAllocateMemory(instance.get_device(), &alloc, nullptr, &swapchain.depth_memory)
+    vkGetImageMemoryRequirements(
+        instance.get_device(), swapchain.depth_image, &mem_req
     );
 
-    vkBindImageMemory(instance.get_device(), swapchain.depth_image, swapchain.depth_memory,0);
+    VkMemoryAllocateInfo alloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    alloc.allocationSize = mem_req.size;
+    alloc.memoryTypeIndex =
+        vk::find_memory_type(
+            instance.get_physical_device(),
+            mem_req.memoryTypeBits,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
 
-    VkImageViewCreateInfo view_ci{
-        VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
-    };
+    VK_CHECK(vkAllocateMemory(
+        instance.get_device(), &alloc, nullptr, &swapchain.depth_memory
+    ));
+
+    VK_CHECK(vkBindImageMemory(
+        instance.get_device(),
+        swapchain.depth_image,
+        swapchain.depth_memory,
+        0
+    ));
+
+    VkImageViewCreateInfo view_ci{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
     view_ci.image = swapchain.depth_image;
     view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     view_ci.format = depth_format;
     view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    view_ci.subresourceRange.baseMipLevel = 0;
     view_ci.subresourceRange.levelCount = 1;
+    view_ci.subresourceRange.baseArrayLayer = 0;
     view_ci.subresourceRange.layerCount = 1;
 
     VK_CHECK(vkCreateImageView(
-        instance.get_device(), &view_ci, nullptr,
-        &swapchain.depth_image_view));
+        instance.get_device(),
+        &view_ci,
+        nullptr,
+        &swapchain.depth_image_view
+    ));
 }
 
+
+void VkRenderBackend::destroy_depth_resources()
+{
+    VkDevice device = instance.get_device();
+
+    if (swapchain.depth_image_view != VK_NULL_HANDLE)
+    {
+        vkDestroyImageView(device, swapchain.depth_image_view, nullptr);
+        swapchain.depth_image_view = VK_NULL_HANDLE;
+    }
+
+    if (swapchain.depth_image != VK_NULL_HANDLE)
+    {
+        vkDestroyImage(device, swapchain.depth_image, nullptr);
+        swapchain.depth_image = VK_NULL_HANDLE;
+    }
+
+    if (swapchain.depth_memory != VK_NULL_HANDLE)
+    {
+        vkFreeMemory(device, swapchain.depth_memory, nullptr);
+        swapchain.depth_memory = VK_NULL_HANDLE;
+    }
+}
+
+
+void VkRenderBackend::update_viewport_extent(const RBCommandList& cmd)
+{
+    RBSwapchainExtent extent = swapchain.get_extent();
+
+    VkViewport viewport;
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width  = (float)extent.width;
+    viewport.height = (float)extent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor;
+    scissor.offset = {0, 0};
+    scissor.extent = {extent.width, extent.height};
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor (cmd, 0, 1, &scissor);
+}
 
 
 RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout)
@@ -452,7 +491,7 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
     {
         CRUTCH_transition_image(
             cmd,
-            image,
+            image, 
             tex.format,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
@@ -490,6 +529,10 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
     return image;
 }
 
+std::pair<uint32_t, uint32_t> VkRenderBackend::get_viewport_extent() const
+{
+    return {swapchain.extent.width, swapchain.extent.height};
+}
 
 
 void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshHandle mesh)
@@ -511,6 +554,8 @@ void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix,
 
 void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)
 {
+    update_viewport_extent(cmd);
+    
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 }
 
@@ -630,7 +675,7 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
 {
     LogRB.Log<DisplayFn>("begin_render_pass");
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    const auto& fb = framebuffer_resources[framebuffer_index.as<uint64_t>()];
+    const auto& fb = framebuffer_manager.get_framebuffer_resource(framebuffer_index);
 
     VkClearValue clears[2]{};
     clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
@@ -651,44 +696,8 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
 RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc& desc)
 {
     VkRenderPass rp = get_or_create_render_pass(desc);
-    
-    uint32_t height = (desc.height > 0) ? desc.height : get_swapchain_extent().height;
-    uint32_t width = (desc.width > 0) ? desc.width : get_swapchain_extent().width;
-    
-    
-    assert(height > 0);
-    assert(width > 0);
-
-    std::vector<VkImageView> attachments;
-
-    for (RBImageHandle img : desc.color_attachments)
-    {
-        attachments.push_back(image_manager.get_image_view(img));
-    }
-
-    if (desc.depth_attachment)
-        attachments.push_back(image_manager.get_image_view(*desc.depth_attachment));
-
-    VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-    info.renderPass = rp;
-    info.attachmentCount = uint32_t(attachments.size());
-    info.pAttachments = attachments.data();
-    info.width  = width;
-    info.height = height;
-    info.layers = 1;
-
-    VkFramebuffer fb;
-    VK_CHECK(vkCreateFramebuffer(instance.get_device(), &info, nullptr, &fb));
-
-    uint32_t id = framebuffer_resources.size();
-    framebuffer_resources.push_back({
-        .framebuffer = fb,
-        .render_pass = rp,
-        .width = width,
-        .height = height
-    });
-
-    return RBFramebufferId{ (uint64_t)id };
+    RBSwapchainExtent extent = swapchain.get_extent();
+    return framebuffer_manager.get_or_create_framebuffer(desc, rp, extent);
 }
 
 
@@ -738,7 +747,14 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
 
 bool VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 {
-    return swapchain.acquire_next_image(frame_handle);
+    const bool result = swapchain.acquire_next_image(frame_handle);
+    if (!result)
+    {
+        framebuffer_manager.destroy_framebuffers();
+        destroy_depth_resources();
+        create_depth_resources();
+    }
+    return result;
 }
 
 

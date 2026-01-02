@@ -17,14 +17,8 @@ import :mesh_mgr;
 import framework;
 import render;
 import :immediate_commands;
+import :framebuffer_mgr;
 
-struct FramebufferResource
-{
-    VkFramebuffer framebuffer;
-    VkRenderPass  render_pass;
-    uint32_t      width;
-    uint32_t      height;
-};
 
 
 
@@ -88,17 +82,22 @@ public:   /// API Section
     virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) override;
+    std::pair<uint32_t, uint32_t> get_viewport_extent() const override;
+    
     
 // Initialization section
     void create_frame_sync_objects();
     void create_descriptor_pool();
     void create_command_pool();
     void cleanup_swapchain();
-    void recreate_swapchain();
     void create_depth_resources();
     
 
 private: // internal section
+    
+    void destroy_depth_resources();
+    
+    void update_viewport_extent(const RBCommandList& cmd);
     
     vk::DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
 
@@ -116,6 +115,7 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::Instance instance;
     vk::ImageManager image_manager {instance}; // holds refs
     vk::SwapchainControl swapchain {instance, image_manager};  // holds refs
+    vk::FramebufferManager framebuffer_manager{instance, image_manager};
     vk::BufferManager resource_manager {instance.device, instance.physical_device}; // holds refs
     vk::MeshManager mesh_manager{instance};
     vk::ImmediateCommandPool immediate_command_pool{instance};
@@ -134,9 +134,6 @@ public:   /// cache and state section:
     
     
     GLFWwindow* window = nullptr;
-    
-    std::unordered_map<size_t, VkFramebuffer> framebuffer_cache;
-    std::vector<FramebufferResource> framebuffer_resources;
     
     std::unordered_map<RenderPassDesc, VkRenderPass, RenderPassDescHash> render_pass_cache;
     VkRenderPass current_render_pass = VK_NULL_HANDLE;

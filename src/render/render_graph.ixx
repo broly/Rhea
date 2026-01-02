@@ -50,14 +50,15 @@ public:
 export class RenderGraph
 {
 public:
+    RenderGraph(const std::shared_ptr<RenderBackend>& in_backend);
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGResourceHandle create_buffer(const RGBufferDesc& desc);
 
     RGPassId add_pass(RenderGraphPass&& pass);
 
-    void compile(RenderBackend& backend);
-    void execute(RenderBackend& backend, RBCommandList cmd, RBFrameHandle frame);
+    void compile();
+    void execute(RBCommandList cmd, RBFrameHandle frame);
     
     
     RBImageHandle get_image(RGTextureHandle tex) const
@@ -69,6 +70,7 @@ public:
         return rg_tex.image.value();
     }
     
+    void rebuild_resources();
 
 private:
     struct Resource
@@ -82,4 +84,5 @@ private:
     std::vector<uint32_t> execution_order;
     
     std::vector<RGTexture> textures;
+    std::shared_ptr<RenderBackend> backend;
 };

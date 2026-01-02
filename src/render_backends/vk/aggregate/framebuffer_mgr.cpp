@@ -1,0 +1,72 @@
+module vk:framebuffer_mgr;
+
+import <cassert>;
+
+#include "render_backends/vk/vk_macro.h"
+
+void vk::FramebufferManager::destroy_framebuffers()
+{
+    for (auto& fb : framebuffer_resources)
+    {
+        vkDestroyFramebuffer(instance.device, fb.framebuffer, nullptr);
+    }
+    framebuffer_resources.clear();
+}
+
+RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const FramebufferDesc& desc, VkRenderPass render_pass,
+                                                                  RBSwapchainExtent extent)
+{
+    
+    uint32_t height = (desc.height > 0) ? desc.height : extent.height;
+    uint32_t width = (desc.width > 0) ? desc.width : extent.width;
+    
+    
+    for (uint32_t i = 0; i < framebuffer_resources.size(); ++i)
+    {
+        if (framebuffer_resources[i].matches(desc, render_pass, width, height))
+            return RBFramebufferId{(uint64_t)i};
+    }
+    
+    
+    assert(height > 0);
+    assert(width > 0);
+
+    std::vector<VkImageView> attachments;
+
+    for (RBImageHandle img : desc.color_attachments)
+    {
+        attachments.push_back(image_manager.get_image_view(img));
+    }
+
+    if (desc.depth_attachment)
+        attachments.push_back(image_manager.get_image_view(*desc.depth_attachment));
+
+    VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+    info.renderPass = render_pass;
+    info.attachmentCount = uint32_t(attachments.size());
+    info.pAttachments = attachments.data();
+    info.width  = width;
+    info.height = height;
+    info.layers = 1;
+
+    VkFramebuffer fb;
+    VK_CHECK(vkCreateFramebuffer(instance.get_device(), &info, nullptr, &fb));
+
+    uint32_t id = framebuffer_resources.size();
+    framebuffer_resources.push_back({
+        .desc = desc,
+        .framebuffer = fb,
+        .render_pass = render_pass,
+        .width = width,
+        .height = height,
+        .attachments = attachments
+    });
+
+    return RBFramebufferId{ (uint64_t)id };
+}
+
+const vk::FramebufferResource& vk::FramebufferManager::get_framebuffer_resource(RBFramebufferId framebuffer_id)
+{
+    return framebuffer_resources[framebuffer_id.as<uint64_t>()];
+}
+

@@ -30,6 +30,7 @@ namespace vk
         }
 
         void init();
+        void recreate_swapchain();
         RBSwapchainExtent get_extent() const;
         
         void CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image, TextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout);

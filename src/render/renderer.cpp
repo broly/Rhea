@@ -84,6 +84,5 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
     if (it != texture_cache.end())
         return it->second;
 
-
     return create_texture_from_asset(handle);
 }

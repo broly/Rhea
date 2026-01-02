@@ -35,7 +35,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     Renderer::init(in_window);
     
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
-    render_graph = std::make_shared<RenderGraph>();
+    render_graph = std::make_shared<RenderGraph>(render_backend);
     
     DescriptorSetLayoutDesc camera_set{
         .set_index = 0,
@@ -128,8 +128,12 @@ void GameRenderer::init(RBWindowHandle in_window)
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
         .external = true
     };
+    
+    auto swapchain_extent = render_backend->get_swapchain_extent();
 
     auto swapchain_color = render_graph->create_texture({
+        .width = swapchain_extent.width,
+        .height = swapchain_extent.height,
         .format   = render_backend->get_swapchain_format(),
         .usage    = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
         .external = true
@@ -169,7 +173,6 @@ void GameRenderer::init(RBWindowHandle in_window)
     render_graph->add_pass({
         .name = "GeometryForward",
         .writes = { swapchain_color, depth_texture },
-
         .execute = [=](RenderGraphContext& ctx)
         {
             auto& extractor = engine->scene_view;
@@ -179,10 +182,12 @@ void GameRenderer::init(RBWindowHandle in_window)
             auto& camera_processor = extractor->get_processor<SceneViewProcessor_Camera>();
 
             const RenderObject_Camera* active_camera = camera_processor.get_active_camera();
+            
+            auto [width, height] = ctx.backend.get_viewport_extent();
 
             CameraUBO camera_ubo;
             camera_ubo.view_proj =
-                active_camera->get_projection(1.0f) *
+                active_camera->get_projection(float(width) / float(height)) *
                 active_camera->view;
             camera_ubo.camera_pos = active_camera->position;
 
@@ -249,7 +254,7 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     
 
-    render_graph->compile(*render_backend);
+    render_graph->compile();
 }
 
 void GameRenderer::execute()
@@ -263,10 +268,13 @@ void GameRenderer::execute()
     backend.reset_frame_fence(frame);
 
     if (!backend.acquire_next_image(frame))
+    {
+        render_graph->rebuild_resources();
         return;
+    }
 
     RBCommandList cmd = backend.begin_commands(frame);
-    render_graph->execute(backend, cmd, frame);
+    render_graph->execute(cmd, frame);
     backend.end_commands(cmd);
 
     backend.submit_frame(frame, cmd);

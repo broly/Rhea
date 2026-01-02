@@ -15,15 +15,12 @@ export namespace math
     glm::quat lookAtQuaternion(const glm::vec3& from, const glm::vec3& to, 
                               const glm::vec3& up = math::up)
     {
-
         glm::vec3 direction = glm::normalize(to - from);
     
-
         if (glm::length(direction) < 0.0001f) {
             return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
         }
     
-
         glm::mat4 lookAtMatrix = glm::lookAt(from, to, up);
         glm::mat3 rotationMatrix = glm::mat3(lookAtMatrix);
     

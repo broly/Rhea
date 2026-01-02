@@ -87,6 +87,38 @@ void vk::SwapchainControl::init()
     }
 }
 
+void vk::SwapchainControl::recreate_swapchain()
+{
+    LogRB.Log("recreate_swapchain");
+
+    int width = 0;
+    int height = 0;
+
+    while (width == 0 || height == 0)
+    {
+        glfwGetFramebufferSize(instance.window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(instance.device);
+
+    cleanup();
+
+    init();
+
+    for (auto sem : render_finished_per_image)
+    {
+        vkDestroySemaphore(instance.device, sem, nullptr);
+    }
+    render_finished_per_image.clear();
+
+    create_sync_objects();
+
+    swapchain_image_index = 0;
+}
+
+
+
 RBSwapchainExtent vk::SwapchainControl::get_extent() const
 {
     return RBSwapchainExtent{extent.width, extent.height};
@@ -210,9 +242,9 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
         &swapchain_image_index
     );
 
-    if (res == VK_ERROR_OUT_OF_DATE_KHR)
+    if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
     {
-        // recreate_swapchain();
+        recreate_swapchain();
         return false;
     }
 

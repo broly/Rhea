@@ -111,4 +111,6 @@ public:
         uint32_t binding,
         RBImageHandle image,
         ResourceUsageType usage) = 0;
+    
+    virtual std::pair<uint32_t, uint32_t> get_viewport_extent() const = 0;
 };
