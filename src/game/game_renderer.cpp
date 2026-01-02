@@ -64,6 +64,11 @@ void GameRenderer::init(RBWindowHandle in_window)
                 .binding = 1,
                 .type = DescriptorType::CombinedImageSampler,
                 .stages = ShaderStage::ss_Fragment
+            },
+            {
+                .binding = 2,
+                .type = DescriptorType::CombinedImageSampler,
+                .stages = ShaderStage::ss_Fragment
             }
         },
         .debug_name = "material"

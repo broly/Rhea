@@ -11,12 +11,13 @@ layout(location = LOCATION_TANGENT) in vec3 in_tangent;
 layout(location = 0) out vec3 v_world_pos;
 layout(location = 1) out vec3 v_world_normal;
 layout(location = 2) out vec2 v_uv;
+layout(location = 3) out vec3 v_world_tangent;
 
-// ---------- Camera (set = 0) ----------
+// ---------- Camera ----------
 layout(set = 0, binding = 0) uniform CameraUBO
 {
     mat4 view_proj;
-    vec4 camera_pos; // xyz
+    vec4 camera_pos;
 } camera;
 
 // ---------- Push constants ----------
@@ -33,7 +34,9 @@ void main()
     v_world_pos = world_pos.xyz;
 
     mat3 normal_matrix = transpose(inverse(mat3(pc.model)));
-    v_world_normal = normalize(normal_matrix * in_normal);
+
+    v_world_normal  = normal_matrix * in_normal;
+    v_world_tangent = normal_matrix * in_tangent;
 
     gl_Position = camera.view_proj * world_pos;
 }

@@ -28,12 +28,12 @@ void Renderer::update_material_descriptor(const RenderMaterial& rm, const Materi
         ResourceUsageType::Persistent
     );
 
-    // render_backend->update_sampled_image(
-    //     rm.layout,
-    //     2, // normal
-    //     get_texture(key.normal),
-    //     ResourceUsageType::Persistent
-    // );
+    render_backend->update_sampled_image(
+        rm.layout,
+        2, // normal
+        get_texture(key.normal),
+        ResourceUsageType::Persistent
+    );
 }
 
 RBDescriptorSet Renderer::allocate_material_descriptor()

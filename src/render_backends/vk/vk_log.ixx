@@ -3,4 +3,4 @@
 import log;
 #include <logging/log_macro.h>
 
-DEFINE_LOGGER(LogRB, Log);
+DEFINE_LOGGER(LogRB, Warning);
