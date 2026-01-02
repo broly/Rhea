@@ -63,7 +63,7 @@ public:   /// API Section
     virtual std::optional<RBDescriptorSet> allocate_descriptor_sets_for_layout(
         RBDescriptorSetLayout layout_handle,
         ResourceUsageType usage_type) override;
-    virtual void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;
+    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;
     virtual RBFrameHandle get_current_frame() const override;
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;

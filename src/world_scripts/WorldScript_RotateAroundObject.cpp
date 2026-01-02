@@ -15,8 +15,12 @@ void WorldScript_RotateAroundObject::tick(double dt)
     
         const double x = cos(seconds) * distance;
         const double z = sin(seconds) * distance;
+        
+        glm::vec3 position = {x, 0, z};
+        glm::vec3 target   = {0, 0, 0};
+        glm::vec3 dir = glm::normalize(target - position);
     
-        glm::quat quat = math::lookAtQuaternion({-x, 0, z}, {0, 0, 0});
+        glm::quat quat = math::lookRotation(-dir);
         glm::vec3 location = {x, 0, z};
         
         Transform t{location, quat};

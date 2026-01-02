@@ -9,14 +9,14 @@ import :rg_types;
 export
 {
 
-    enum class VertexLayout
-    {
-        None,
-        Position,
-        PositionNormal,
-        PositionNormalUV,
-        PositionNormalTangentUV,
-    };
+    // enum class VertexLayout
+    // {
+    //     None,
+    //     Position,
+    //     PositionNormal,
+    //     PositionNormalUV,
+    //     PositionNormalTangentUV,
+    // };
 
     enum ShaderStage
     {
@@ -79,12 +79,27 @@ export
         uint32_t color_attachment_count = 0;
         bool has_depth = false;
     };
+    
+    struct VertexComponentLayoutData
+    {
+        uint8_t location;
+        uint16_t offset;
+        uint8_t binding;
+        uint8_t num_components;
+        uint8_t component_size;
+    };
+    
+    struct VertexLayoutData
+    {
+        size_t stride;
+        std::vector<VertexComponentLayoutData> data;
+    };
 
     struct GraphicsPipelineDesc
     {
         std::string vertex_shader;
         std::string fragment_shader;
-        VertexLayout vertex_layout;
+        VertexLayoutData vertex_layout;
         PipelineLayoutDesc layout;
         bool depth_test;
         

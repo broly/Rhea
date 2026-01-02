@@ -200,7 +200,7 @@ std::optional<RBDescriptorSet> VkRenderBackend::allocate_descriptor_sets_for_lay
     return resource_manager.allocate_descriptor_sets_for_layout(layout_handle, usage_type);
 }
 
-void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle)
+void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle)
 {
     auto& pipeline = pipelines[pipeline_handle];
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
@@ -210,7 +210,7 @@ void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int i, RBDescr
         cmd,
         VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline->get_pipeline_layout(),
-        i, 
+        set_index, 
         1, 
         &vk_set,
         0, nullptr

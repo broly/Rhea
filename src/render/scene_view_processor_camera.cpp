@@ -38,6 +38,7 @@ void SceneViewProcessor_Camera::process()
         camera_ro.near = submitted.near_plane;
         camera_ro.fov = submitted.fov;
         camera_ro.view = submitted.transform.get_view();
+        camera_ro.position = submitted.transform.position;
         
         if (camera_ro.active)
             active_camera_id = submitted.render_id;

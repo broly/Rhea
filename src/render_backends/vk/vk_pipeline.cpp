@@ -4,7 +4,7 @@ import :helpers;
 import rhmath;
 import <vector>;
 import <vulkan/vulkan_core.h>;
-
+import <cassert>;
 #include "vk_macro.h"
 
 class VkRenderBackend;
@@ -54,6 +54,40 @@ VkPipelineObject::~VkPipelineObject()
         vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
 }
 
+using VkFormatPair = std::pair<
+    int, // num_components
+    int  // component_size
+>;
+
+std::vector<VkVertexInputAttributeDescription> generate_vk_attributes(const std::vector<VertexComponentLayoutData>& layout)
+{
+    std::vector<VkVertexInputAttributeDescription> result;
+    
+    static std::map<VkFormatPair, VkFormat> vk_formats = {
+        {{1, 2}, VK_FORMAT_R16_SFLOAT},
+        {{2, 2}, VK_FORMAT_R16G16_SFLOAT},
+        {{3, 2}, VK_FORMAT_R16G16B16_SFLOAT},
+        {{4, 2}, VK_FORMAT_R16G16B16A16_SFLOAT},
+        {{1, 4}, VK_FORMAT_R32_SFLOAT},
+        {{2, 4}, VK_FORMAT_R32G32_SFLOAT},
+        {{3, 4}, VK_FORMAT_R32G32B32_SFLOAT},
+        {{4, 4}, VK_FORMAT_R32G32B32A32_SFLOAT},
+        {{1, 8}, VK_FORMAT_R64_SFLOAT},
+        {{2, 8}, VK_FORMAT_R64G64_SFLOAT},
+        {{3, 8}, VK_FORMAT_R64G64B64_SFLOAT},
+        {{4, 8}, VK_FORMAT_R64G64B64A64_SFLOAT},
+    };
+    
+    for (const VertexComponentLayoutData& layout_data : layout)
+    {
+        auto pair = vk_formats.find({layout_data.num_components, layout_data.component_size});
+        assert(pair != vk_formats.end());
+        
+        result.push_back({layout_data.location, layout_data.binding, pair->second, layout_data.offset});
+    }
+    return result;
+}
+
 VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 {
     if (pipeline_ != nullptr)
@@ -86,25 +120,15 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     
     VkVertexInputBindingDescription binding{};
     binding.binding = 0;
-    binding.stride = sizeof(Vertex);
+    binding.stride = pipeline_desc.vertex_layout.stride;
     binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    
+    std::vector<VkVertexInputAttributeDescription> attrs = generate_vk_attributes(pipeline_desc.vertex_layout.data);
 
-    std::array<VkVertexInputAttributeDescription, 3> attrs{};
-    attrs[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position) };
-    attrs[1] = { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) };
-    attrs[2] = { 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, tex_coord) };
-
-    if (pipeline_desc.vertex_layout == VertexLayout::None)
-    {
-        vertex_input.vertexBindingDescriptionCount = 0;
-        vertex_input.vertexAttributeDescriptionCount = 0;
-    } else
-    {
-        vertex_input.vertexBindingDescriptionCount = 1;
-        vertex_input.pVertexBindingDescriptions = &binding;
-        vertex_input.vertexAttributeDescriptionCount = attrs.size();
-        vertex_input.pVertexAttributeDescriptions = attrs.data();
-    }
+    vertex_input.vertexBindingDescriptionCount = 1;
+    vertex_input.pVertexBindingDescriptions = &binding;
+    vertex_input.vertexAttributeDescriptionCount = attrs.size();
+    vertex_input.pVertexAttributeDescriptions = attrs.data();
 
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{

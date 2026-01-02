@@ -20,10 +20,8 @@ export struct MaterialUBO
 
 export struct Light
 {
-    glm::vec3 position;
-    float pad0;
-    glm::vec3 color;
-    float pad1;
+    glm::vec4 position;
+    glm::vec4 color;
 };
 
 export struct LightUBO

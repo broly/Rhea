@@ -1,5 +1,7 @@
 ﻿export module glm;
 
+#define GLM_ENABLE_EXPERIMENTAL
+
 #include <glm/fwd.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
@@ -10,6 +12,7 @@
 #include <glm/detail/type_vec3.hpp>
 #include <glm/detail/type_vec2.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/norm.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
 export namespace glm
@@ -36,6 +39,10 @@ export namespace glm
     
     using glm::normalize;
     using glm::length;
+    using glm::length2;
     using glm::mat3;
     using glm::quat_cast;
+    using glm::cross;
+    using glm::distance;
+    using glm::distance2;
 }

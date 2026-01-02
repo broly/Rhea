@@ -10,7 +10,9 @@ import render_scene;
 
 export struct SceneViewProxy_Light : public SceneViewProxy_Transform
 {
-    
+    vec4 color;
+    float intensity;
+    float falloff;
 };
 
 
@@ -21,6 +23,8 @@ public:
     void start() override;
     void finish() override;
 
+    void update_scene_proxy();
+    
     vec4 color;
     float intensity;
     float falloff;

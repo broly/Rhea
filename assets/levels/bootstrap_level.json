@@ -61,6 +61,48 @@
 					}
 				}
 			]
+		},
+		{
+			"name": "light0",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "light0",
+					"class": "RhComp_Light",
+					"fields": {
+						"transform": {
+							"position": { "x": -5, "y": -5, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"color": { "x": 400, "y": 0, "z": 0 },
+						"intensity": 100,
+						"falloff": 100
+					}
+				}
+			]
+		},
+		{
+			"name": "light1",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "light1",
+					"class": "RhComp_Light",
+					"fields": {
+						"transform": {
+							"position": { "x": 0, "y": 0, "z": 5 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"color": { "x": 100, "y": 100, "z": 100 },
+						"intensity": 100,
+						"falloff": 100
+					}
+				}
+			]
 		}
 	]
 }

@@ -4,6 +4,8 @@ import glm;
 
 export namespace math
 {
+    constexpr auto up = glm::vec3(0.f, 1.f, 0.f);
+    
     inline glm::quat from_euler_rotation(glm::vec3 in_euler_rotation)
     {
         return glm::quat(glm::vec3(in_euler_rotation.x, in_euler_rotation.y, in_euler_rotation.z));
@@ -11,7 +13,7 @@ export namespace math
     
     
     glm::quat lookAtQuaternion(const glm::vec3& from, const glm::vec3& to, 
-                              const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f))
+                              const glm::vec3& up = math::up)
     {
 
         glm::vec3 direction = glm::normalize(to - from);
@@ -26,6 +28,16 @@ export namespace math
         glm::mat3 rotationMatrix = glm::mat3(lookAtMatrix);
     
         return glm::quat_cast(rotationMatrix);
+    }
+    
+    glm::quat lookRotation(glm::vec3 forward, glm::vec3 up = math::up)
+    {
+        forward = glm::normalize(forward);
+        glm::vec3 right = glm::normalize(glm::cross(up, forward));
+        up = glm::cross(forward, right);
+
+        glm::mat3 m(right, up, forward);
+        return glm::quat_cast(m);
     }
 
 }

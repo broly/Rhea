@@ -18,6 +18,7 @@ void RhComp_Transform::set_transform(const Transform& in_transform)
     
     if (renderable)
     {
+        // non-virtual submit if transform changed
         SceneViewProxy_Transform& proxy = get_typed_scene_proxy_address<SceneViewProxy_Transform>();
         proxy.transform = in_transform;
         render_submit();

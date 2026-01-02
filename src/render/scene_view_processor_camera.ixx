@@ -10,7 +10,7 @@ import rhcomponents;
 
 export struct RenderObject_Camera
 {
-    // glm::mat4 world;
+    glm::vec3 position;
     glm::mat4 view;
     
     

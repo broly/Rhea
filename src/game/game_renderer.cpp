@@ -3,10 +3,31 @@
 import render;
 import vk;
 import glm;
+import rhmath;
+import <vector>;
+
+
+#define LOCATION_POSTION 0
+#define LOCATION_NORMAL 1
+#define LOCATION_UV 2
+#define LOCATION_TANGENT 3
 
 void GameRenderer::set_engine(const std::shared_ptr<Engine>& in_engine)
 {
     engine = in_engine;
+}
+
+VertexLayoutData make_PositionNormalTangentUV()
+{
+    return  {
+        sizeof(Vertex),
+        {
+                {LOCATION_POSTION,  offsetof(Vertex, position), 0, 3, 4},
+                {LOCATION_NORMAL,   offsetof(Vertex, normal),   0, 3, 4},
+                {LOCATION_UV,       offsetof(Vertex, tex_coord),0, 2, 4},
+                {LOCATION_TANGENT,  offsetof(Vertex, tangent),  0, 3, 4},
+            },
+    };
 }
 
 void GameRenderer::init(RBWindowHandle in_window)
@@ -51,10 +72,24 @@ void GameRenderer::init(RBWindowHandle in_window)
     material_layout = render_backend->create_descriptor_set_layout(material_set);   
     
     
+    DescriptorSetLayoutDesc light_set{
+        .set_index = 2,
+        .bindings = {{
+            .binding = 0,
+            .type = DescriptorType::UniformBuffer,
+            .stages = ShaderStage::ss_Fragment
+        }},
+        .debug_name = "light"
+    };
+
+    
+    light_layout = render_backend->create_descriptor_set_layout(light_set);
+    
+    
     GraphicsPipelineDesc geom_pipeline_desc{
         .vertex_shader = "shaders/geometry.vert.spv",
         .fragment_shader = "shaders/geometry.frag.spv",
-        .vertex_layout = VertexLayout::PositionNormalTangentUV,
+        .vertex_layout = make_PositionNormalTangentUV(),
         .layout = {
             .sets = { 
                 camera_layout,  // 0
@@ -110,17 +145,6 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     auto scene_color = render_graph->create_texture(color_desc);
     
-    DescriptorSetLayoutDesc light_set{
-        .set_index = 2,
-        .bindings = {{
-            .binding = 0,
-            .type = DescriptorType::UniformBuffer,
-            .stages = ShaderStage::ss_Fragment
-        }},
-        .debug_name = "light"
-    };
-
-    light_layout = render_backend->create_descriptor_set_layout(light_set);
     render_backend->allocate_descriptor_sets_for_layout(
         light_layout,
         ResourceUsageType::Frame
@@ -146,21 +170,30 @@ void GameRenderer::init(RBWindowHandle in_window)
             auto& extractor = engine->scene_view;
             auto cmd = ctx.cmd;
             
+            // ---------- Camera ----------
             auto& camera_processor = extractor->get_processor<SceneViewProcessor_Camera>();
 
-            // ---------- Camera ----------
+            const RenderObject_Camera* active_camera = camera_processor.get_active_camera();
+
             CameraUBO camera_ubo;
-            camera_ubo.mvp =
-                camera_processor.get_active_camera()->get_projection(1.0f) *
-                camera_processor.get_active_camera()->view;
+            camera_ubo.view_proj =
+                active_camera->get_projection(1.0f) *
+                active_camera->view;
+            camera_ubo.camera_pos = active_camera->position;
 
             ctx.backend.update_uniform_buffer(camera_buffer, camera_ubo);
 
             // ---------- Lights ----------
+            auto& point_light_processor = extractor->get_processor<SceneViewProcessor_Light>();
+            const auto [lights, light_num] = point_light_processor.query_nearest_lights_limited<8>(active_camera->position);
+            
             LightUBO light_ubo{};
-            light_ubo.light_count = 1;
-            light_ubo.lights[0].position = { 0.0f, 3.0f, 10.0f };
-            light_ubo.lights[0].color    = { 15.0f, 15.0f, 15.0f };
+            light_ubo.light_count = light_num;
+            for (int i = 0; i < light_num; ++i)
+            {
+                light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
+                light_ubo.lights[i].color    = glm::vec4(lights[i].color);
+            }
 
             ctx.backend.update_uniform_buffer(light_buffer, light_ubo);
 

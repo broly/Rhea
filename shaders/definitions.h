@@ -1,0 +1,6 @@
+
+#define LOCATION_POSTION 0
+#define LOCATION_NORMAL 1
+#define LOCATION_UV 2
+#define LOCATION_TANGENT 3
+

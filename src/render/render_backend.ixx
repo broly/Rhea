@@ -77,7 +77,7 @@ public:
     virtual PipelineObject* create_pipeline(GraphicsPipelineDesc desc) = 0;
 
 
-    virtual void bind_descriptor_set(RBCommandList cmd, int i, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) = 0;
+    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) = 0;
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshHandle mesh) = 0;
     virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) = 0;

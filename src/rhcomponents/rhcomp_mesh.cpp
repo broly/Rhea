@@ -30,5 +30,6 @@ void RhComp_StaticMesh::update_scene_proxy()
 {
     scene_proxy.material = material;
     scene_proxy.mesh = mesh;
+    scene_proxy.transform = transform;
 }
 

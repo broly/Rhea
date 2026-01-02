@@ -17,15 +17,22 @@ RhComp_Light::RhComp_Light()
 void RhComp_Light::start()
 {
     RhComp_Renderable::start();
-    
-    
-    // render_id = RhGlobals::engine->scene_view->register_ro_light();
+    update_scene_proxy();
+    RhGlobals::engine->scene_view->register_scene_view_proxy(scene_proxy, render_info.processor_id, name);
 }
 
 void RhComp_Light::finish()
 {
     RhComp_Renderable::finish();
-    // RhGlobals::engine->scene_view->unregister_ro_light(render_id);
+    RhGlobals::engine->scene_view->unregister_scene_view_proxy(scene_proxy, render_info.processor_id);
     
     
+}
+
+void RhComp_Light::update_scene_proxy()
+{
+    scene_proxy.transform = transform;
+    scene_proxy.color = color;
+    scene_proxy.intensity = intensity;
+    scene_proxy.falloff = falloff;
 }
