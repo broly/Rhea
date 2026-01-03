@@ -538,10 +538,10 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
     immediate_command_pool.submit([&](VkCommandBuffer cmd)
     {
         transition_image(
-        cmd,
-        image,
-        RBImageUsage::Undefined,
-        RBImageUsage::TransferDst
+            cmd,
+            image,
+            RBImageUsage::Undefined,
+            RBImageUsage::TransferDst
     );
     
         VkBufferImageCopy copy{};
@@ -563,11 +563,11 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
         );
     
         transition_image(
-        cmd,
-        image,
-        RBImageUsage::TransferDst,
-        RBImageUsage::SampledFragment
-    );
+            cmd,
+            image,
+            RBImageUsage::TransferDst,
+            RBImageUsage::SampledFragment
+        );
     });
     
     vk::destroy_buffer(instance.device, staging_buffer, staging_memory);

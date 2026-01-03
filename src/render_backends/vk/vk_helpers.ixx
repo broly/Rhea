@@ -365,6 +365,13 @@ export namespace vk
                 VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
             };
+            
+        case RBImageUsage::DepthStencilReadOnly:
+            return {
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT
+            };
 
         case RBImageUsage::SampledFragment:
             return {

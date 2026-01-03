@@ -136,6 +136,12 @@ void RenderGraph::compile()
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 {
     RenderGraphContext ctx(*backend, cmd, {}, *this);
+    
+    for (auto& tex : textures)
+    {
+        if (tex.desc.external)
+            tex.current_usage = RBImageUsage::Undefined;
+    }
 
     for (size_t i = 0; i < execution_order.size(); ++i)
     {
@@ -180,6 +186,22 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
         backend->begin_render_pass(cmd, ctx.framebuffer);
         pass.execute(ctx);
         backend->end_render_pass(cmd);
+    }
+    
+    for (auto& tex : textures)
+    {
+        if (tex.desc.external &&
+            tex.current_usage != RBImageUsage::Present)
+        {
+            backend->transition_image(
+                cmd,
+                resolve_image(tex),
+                tex.current_usage,
+                RBImageUsage::Present
+            );
+
+            tex.current_usage = RBImageUsage::Present;
+        }
     }
 }
 

@@ -239,6 +239,7 @@ export
 
         ColorAttachment,
         DepthStencilAttachment,
+        DepthStencilReadOnly,
 
         SampledFragment,
         SampledVertex,
