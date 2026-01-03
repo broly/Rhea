@@ -9,13 +9,11 @@ import :render_backend;
 
 export struct MaterialUBO
 {
-    glm::vec4 base_color;
-
-    float metallic;
-    float roughness;
-
-    int has_normal;
-    int has_occlusion;
+    float base_color_mult;
+    float emissive_mult;
+    float occlusion_mult;
+    float roughness_mult;
+    float metallic_mult;
 };
 
 export struct Light

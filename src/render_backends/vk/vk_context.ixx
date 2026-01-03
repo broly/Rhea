@@ -62,5 +62,8 @@ namespace vk
         uint32_t width = 0;
         uint32_t height = 0;
         VkFormat format = VK_FORMAT_UNDEFINED;
+        
+        uint32_t mip_levels   = 1; 
+        uint32_t array_layers = 1;
     };
 }

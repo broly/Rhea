@@ -1,0 +1,11 @@
+#ifndef DEFINITIONS
+#define DEFINITIONS
+
+#define VERT_LOCATION_POSTION 0
+#define VERT_LOCATION_NORMAL 1
+#define VERT_LOCATION_UV 2
+#define VERT_LOCATION_TANGENT 3
+
+const float PI = 3.14159265359;
+
+#endif

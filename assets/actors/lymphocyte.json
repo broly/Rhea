@@ -13,11 +13,15 @@
 				},
 				"mesh": "meshes/lymphocyte/lymphocyte.glb",
 				"material": {
-					"base_color": {"x": 0.5, "y": 0.4, "z": 0.3, "w": 0.2 },
-					"metallic": 0.44,
-					"roughness": 0.41,
+					"base_color": "textures/lymphocyte/Lymphocyte_B.png",
+					"emissive": "textures/lymphocyte/Lymphocyte_E.png",
 					"normal": "textures/lymphocyte/Lymphocyte_N.png",
-					"albedo": "textures/lymphocyte/Lymphocyte_B.png"
+					"occlusion_roughness_metallic": "textures/lymphocyte/Lymphocyte_ORM.png",
+					"base_color_mult": 1.0,
+					"emissive_mult": 1.0,
+					"occlusion_mult": 1.0,
+					"roughness_mult": 1.0,
+					"metallic_mult": 1.0,
 					
 				}
 			}

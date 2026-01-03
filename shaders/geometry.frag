@@ -1,25 +1,41 @@
 #version 450
 
-// ---------- Inputs ----------
+#include "definitions.glsl"
+#include "pbr_helpers.glsl"
+
+// ================== INPUTS ==================
 layout(location = 0) in vec3 v_world_pos;
 layout(location = 1) in vec3 v_world_normal;
 layout(location = 2) in vec2 v_uv;
 layout(location = 3) in vec3 v_world_tangent;
 
-// ---------- Output ----------
+// ================== OUTPUT ==================
 layout(location = 0) out vec4 out_color;
 
-// ---------- Material ----------
+// ================== MATERIAL ==================
 layout(set = 1, binding = 0) uniform MaterialUBO
 {
-    vec4 base_color;
-    vec4 params; // x = metallic, y = roughness
+    float base_color_mult;
+    float emissive_mult;
+    float occlusion_mult;
+    float roughness_mult;
+    float metallic_mult;
 } material;
 
-layout(set = 1, binding = 1) uniform sampler2D u_albedo;
-layout(set = 1, binding = 2) uniform sampler2D u_normal_map;
 
-// ---------- Light ----------
+layout(set = 1, binding = 1) uniform sampler2D u_base_color; // _B
+layout(set = 1, binding = 2) uniform sampler2D u_emissive;   // _E
+layout(set = 1, binding = 3) uniform sampler2D u_normal_map; // _N
+layout(set = 1, binding = 4) uniform sampler2D u_orm;        // _ORM
+
+// ================== CAMERA ==================
+layout(set = 0, binding = 0) uniform CameraUBO
+{
+    mat4 view_proj;
+    vec4 camera_pos;
+} camera;
+
+// ================== LIGHT ==================
 struct Light
 {
     vec4 position;
@@ -32,43 +48,71 @@ layout(set = 2, binding = 0) uniform LightUBO
     int light_count;
 } light_ubo;
 
-// ---------- Main ----------
+
+// ================== MAIN ==================
 void main()
 {
-    vec3 albedo = texture(u_albedo, v_uv).rgb * material.base_color.rgb;
+    // ----- Textures -----
+    vec3 albedo = pow(texture(u_base_color, v_uv).rgb, vec3(2.2)) * material.base_color_mult;
+    vec3 emissive = texture(u_emissive, v_uv).rgb * material.emissive_mult;
+
+    vec3 orm = texture(u_orm, v_uv).rgb;
+    float ao        = orm.r * material.occlusion_mult;
+    float roughness = orm.g * material.roughness_mult;
+    float metallic  = orm.b * material.metallic_mult;
 
     // ----- TBN -----
     vec3 N = normalize(v_world_normal);
     vec3 T = normalize(v_world_tangent);
     vec3 B = normalize(cross(N, T));
-
     mat3 TBN = mat3(T, B, N);
 
-    // ----- Normal map -----
-    vec3 normal_ts = texture(u_normal_map, v_uv).rgb;
-    normal_ts = normal_ts * 2.0 - 1.0; // [0,1] → [-1,1]
+    vec3 normal_ts = texture(u_normal_map, v_uv).rgb * 2.0 - 1.0;
+    normal_ts.z = 1.0 - (normal_ts.z);
+    vec3 normal = normalize(TBN * normal_ts);
 
-    vec3 normal_ws = normalize(TBN * normal_ts);
+    // ----- View -----
+    vec3 V = normalize(camera.camera_pos.xyz - v_world_pos);
 
-    // ----- Lighting -----
-    vec3 lighting = albedo * 0.05; // ambient
+    // ----- F0 -----
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
 
-    int light_count = int(light_ubo.light_count);
+    vec3 Lo = vec3(0.0);
 
-    for (int i = 0; i < light_count; ++i)
+    int count = int(light_ubo.light_count);
+    for (int i = 0; i < count; ++i)
     {
-        vec3 light_pos = light_ubo.lights[i].position.xyz;
-        vec3 light_col = light_ubo.lights[i].color.rgb;
+        vec3 Lpos = light_ubo.lights[i].position.xyz;
+        vec3 Lcol = light_ubo.lights[i].color.rgb;
 
-        vec3 L = light_pos - v_world_pos;
-        float dist = length(L);
-        L /= max(dist, 0.0001);
+        vec3 L = normalize(Lpos - v_world_pos);
+        vec3 H = normalize(V + L);
 
-        float NdotL = max(dot(normal_ws, L), 0.0);
+        float dist = length(Lpos - v_world_pos);
         float attenuation = 1.0 / (dist * dist + 1.0);
+        vec3 radiance = Lcol * attenuation;
 
-        lighting += albedo * light_col * NdotL * attenuation;
+        float NDF = DistributionGGX(normal, H, roughness);
+        float G   = GeometrySmith(normal, V, L, roughness);
+        vec3  F   = FresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 specular =
+        (NDF * G * F) /
+        max(4.0 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0), 0.001);
+
+        vec3 kS = F;
+        vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+
+        float NdotL = max(dot(normal, L), 0.0);
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
 
-    out_color = vec4(lighting, 1.0);
+    vec3 ambient = vec3(0.03) * albedo * ao;
+    vec3 color = ambient + Lo + emissive;
+
+    // ----- Tonemap + gamma -----
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0 / 2.2));
+
+    out_color = vec4(color, 1.0);
 }

@@ -5,6 +5,7 @@ import <vector>;
 
 import :handle_types;
 import :rg_types;
+#include "common/type_macros.h"
 
 export
 {
@@ -23,6 +24,7 @@ export
         ss_Vertex = 0x1,
         ss_Fragment = 0x2,
     };
+    ENUM_MASK_OPS(ShaderStage);
 
     enum class DescriptorType
     {

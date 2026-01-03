@@ -55,7 +55,9 @@ RBImageHandle vk::ImageManager::create_image_view(
     ivci.format = surface_format.format;
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     ivci.subresourceRange.levelCount = 1;
+    ivci.subresourceRange.baseMipLevel = 0;
     ivci.subresourceRange.layerCount = 1;
+    ivci.subresourceRange.baseArrayLayer = 0;
 
     VK_CHECK(vkCreateImageView(
         instance.device,

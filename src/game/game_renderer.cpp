@@ -7,10 +7,10 @@ import rhmath;
 import <vector>;
 
 
-#define LOCATION_POSTION 0
-#define LOCATION_NORMAL 1
-#define LOCATION_UV 2
-#define LOCATION_TANGENT 3
+#define VERT_LOCATION_POSTION 0
+#define VERT_LOCATION_NORMAL 1
+#define VERT_LOCATION_UV 2
+#define VERT_LOCATION_TANGENT 3
 
 void GameRenderer::set_engine(const std::shared_ptr<Engine>& in_engine)
 {
@@ -22,10 +22,10 @@ VertexLayoutData make_PositionNormalTangentUV()
     return  {
         sizeof(Vertex),
         {
-                {LOCATION_POSTION,  offsetof(Vertex, position), 0, 3, 4},
-                {LOCATION_NORMAL,   offsetof(Vertex, normal),   0, 3, 4},
-                {LOCATION_UV,       offsetof(Vertex, tex_coord),0, 2, 4},
-                {LOCATION_TANGENT,  offsetof(Vertex, tangent),  0, 3, 4},
+                {VERT_LOCATION_POSTION,  offsetof(Vertex, position), 0, 3, 4},
+                {VERT_LOCATION_NORMAL,   offsetof(Vertex, normal),   0, 3, 4},
+                {VERT_LOCATION_UV,       offsetof(Vertex, tex_coord),0, 2, 4},
+                {VERT_LOCATION_TANGENT,  offsetof(Vertex, tangent),  0, 3, 4},
             },
     };
 }
@@ -42,7 +42,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .bindings = {{
             .binding = 0,
             .type = DescriptorType::UniformBuffer,
-            .stages = ShaderStage::ss_Vertex
+            .stages = ShaderStage::ss_Vertex | ShaderStage::ss_Fragment
         }},
         .debug_name = "camera"
     };
@@ -67,6 +67,16 @@ void GameRenderer::init(RBWindowHandle in_window)
             },
             {
                 .binding = 2,
+                .type = DescriptorType::CombinedImageSampler,
+                .stages = ShaderStage::ss_Fragment
+            },
+            {
+                .binding = 3,
+                .type = DescriptorType::CombinedImageSampler,
+                .stages = ShaderStage::ss_Fragment
+            },
+            {
+                .binding = 4,
                 .type = DescriptorType::CombinedImageSampler,
                 .stages = ShaderStage::ss_Fragment
             }

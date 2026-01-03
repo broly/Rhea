@@ -53,6 +53,8 @@ void VkRenderBackend::transition_image(
     barrier.newLayout = dst.layout;
     barrier.srcAccessMask = src.access;
     barrier.dstAccessMask = dst.access;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image_manager.get_image_resource(image).image;
 
     barrier.subresourceRange = full_subresource_range(image);
@@ -202,9 +204,9 @@ VkImageSubresourceRange VkRenderBackend::full_subresource_range(RBImageHandle im
 
     VkImageSubresourceRange range{};
     range.baseMipLevel   = 0;
-    // range.levelCount     = img.mip_levels;
+    range.levelCount     = img.mip_levels;  // default = 1
     range.baseArrayLayer = 0;
-    // range.layerCount     = img.array_layers;
+    range.layerCount     = img.array_layers;  // default = 1
 
     if (vk::is_depth_format(img.format))
     {
@@ -542,7 +544,7 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
             image,
             RBImageUsage::Undefined,
             RBImageUsage::TransferDst
-    );
+        );
     
         VkBufferImageCopy copy{};
         copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;

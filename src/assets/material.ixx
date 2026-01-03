@@ -6,15 +6,19 @@ import rhmath;
 
 export struct PBRMaterial
 {
-    vec4 base_color;
     
-    float metallic;
-    float roughness;
-    
-    TextureHandle albedo;
+    TextureHandle base_color;
+    TextureHandle emissive;
     TextureHandle normal;
-    TextureHandle occlusion;
+    TextureHandle occlusion_roughness_metallic;
+    
+    float base_color_mult;
+    float emissive_mult;
+    float occlusion_mult;
+    float roughness_mult;
+    float metallic_mult;
 };
 REFLECT_STRUCT(PBRMaterial,
-    base_color, metallic, roughness, normal, occlusion, albedo);
+    base_color, emissive, occlusion_roughness_metallic, normal, 
+    base_color_mult, emissive_mult, occlusion_mult, roughness_mult, metallic_mult);
 

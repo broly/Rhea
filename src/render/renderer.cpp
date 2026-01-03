@@ -15,23 +15,39 @@ void Renderer::update_material_descriptor(const RenderMaterial& rm, const Materi
     render_backend->update_uniform_buffer(
         rm.material_ubo,
         MaterialUBO{
-            .base_color = key.base_color,
-            .metallic   = key.metallic,
-            .roughness  = key.roughness
+            .base_color_mult = key.base_color_mult,
+            .emissive_mult = key.emissive_mult,
+            .occlusion_mult = key.occlusion_mult,
+            .roughness_mult = key.roughness_mult,
+            .metallic_mult = key.metallic_mult,
         }
     );
 
     render_backend->update_sampled_image(
         rm.layout,
-        1, // albedo
-        get_texture(key.albedo),
+        1, // base_color
+        get_texture(key.base_color),
         ResourceUsageType::Persistent
     );
 
     render_backend->update_sampled_image(
         rm.layout,
-        2, // normal
+        2, // emissive
+        get_texture(key.emissive),
+        ResourceUsageType::Persistent
+    );
+
+    render_backend->update_sampled_image(
+        rm.layout,
+        3, // normal
         get_texture(key.normal),
+        ResourceUsageType::Persistent
+        );
+
+    render_backend->update_sampled_image(
+        rm.layout,
+        4, // occlusion_roughness_metallic
+        get_texture(key.occlusion_roughness_metallic),
         ResourceUsageType::Persistent
     );
 }

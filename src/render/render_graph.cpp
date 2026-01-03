@@ -69,6 +69,9 @@ void RenderGraph::compile()
         for (auto tex_handle : pass.reads)
         {
             const RGTexture& tex = textures[tex_handle.texture.id];
+            
+            if (tex.desc.external)
+                continue;
 
             if (!(tex.desc.usage & RenderTextureUsage::DepthStencil))
                 continue; 
@@ -96,6 +99,9 @@ void RenderGraph::compile()
         for (const auto& read : pass.reads)
         {
             RGTexture& tex = textures[read.texture.id];
+            
+            if (tex.desc.external)
+                continue;
 
             if (tex.current_usage != read.usage)
             {
@@ -113,7 +119,10 @@ void RenderGraph::compile()
         for (const auto& write : pass.writes)
         {
             RGTexture& tex = textures[write.texture.id];
-
+            
+            if (tex.desc.external)
+                continue; 
+            
             if (tex.current_usage != write.usage)
             {
                 barriers.push_back({
