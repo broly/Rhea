@@ -9,6 +9,8 @@ import enum_helpers;
 
 export 
 {
+
+    
     enum class RGResourceType {
         SwapchainColor,
 
@@ -54,7 +56,7 @@ export
         RGTextureDesc texture_desc{};
         RGBufferDesc  buffer_desc{};
     };
-
+    
     struct RGResourceHandle
     {
         std::uint32_t id = UINT32_MAX;
@@ -71,11 +73,27 @@ export
     {
         RGTextureDesc desc;
         std::optional<RBImageHandle> image;      // backend image
+        
+        RBImageUsage current_usage = RBImageUsage::Undefined;
     };
 
     struct RGTextureHandle
     {
         uint32_t id;
+    };
+
+    struct RGImageBarrier
+    {
+        RGTextureHandle texture;
+        RBImageUsage    before;
+        RBImageUsage    after;
+    };
+
+
+    struct RGImageUse
+    {
+        RGTextureHandle texture;
+        RBImageUsage    usage;
     };
 
     using RBFormat = RBHandle<VkFormat>;

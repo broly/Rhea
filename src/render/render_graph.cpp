@@ -68,23 +68,68 @@ void RenderGraph::compile()
 
         for (auto tex_handle : pass.reads)
         {
-            const RGTexture& tex = textures[tex_handle.id];
+            const RGTexture& tex = textures[tex_handle.texture.id];
 
             if (!(tex.desc.usage & RenderTextureUsage::DepthStencil))
-                continue;
+                continue; 
+            
+            auto image = resolve_image(tex);
 
             backend->update_depth_descriptor(
                 pass.descriptor_set,
-                tex.image.value(),
+                image,
                 tex.desc.format
             );
+        }
+    }
+    
+    
+    pass_barriers.clear();
+    pass_barriers.resize(passes.size());
+    
+    for (size_t pass_index = 0; pass_index < passes.size(); ++pass_index)
+    {
+        auto& pass = passes[pass_index];
+        auto& barriers = pass_barriers[pass_index];
+
+        // READS
+        for (const auto& read : pass.reads)
+        {
+            RGTexture& tex = textures[read.texture.id];
+
+            if (tex.current_usage != read.usage)
+            {
+                barriers.push_back({
+                    read.texture,
+                    tex.current_usage,
+                    read.usage
+                });
+
+                tex.current_usage = read.usage;
+            }
+        }
+
+        // WRITES
+        for (const auto& write : pass.writes)
+        {
+            RGTexture& tex = textures[write.texture.id];
+
+            if (tex.current_usage != write.usage)
+            {
+                barriers.push_back({
+                    write.texture,
+                    tex.current_usage,
+                    write.usage
+                });
+
+                tex.current_usage = write.usage;
+            }
         }
     }
 
     execution_order.clear();
     for (uint32_t i = 0; i < passes.size(); ++i)
         execution_order.push_back(i);
-    
 }
 
 
@@ -92,29 +137,32 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 {
     RenderGraphContext ctx(*backend, cmd, {}, *this);
 
-    for (uint32_t pass_index : execution_order)
+    for (size_t i = 0; i < execution_order.size(); ++i)
     {
+        uint32_t pass_index = execution_order[i];
         auto& pass = passes[pass_index];
-        FramebufferDesc fb_desc{};
 
-        for (auto tex_handle : pass.reads)
+        // 1. Apply barriers
+        for (const auto& barrier : pass_barriers[pass_index])
         {
-            const RGTexture& tex = textures[tex_handle.id];
-            if (!tex.image.has_value()) continue;
-
-            backend->CRUTCH_transition_image(
+            auto tex = textures[barrier.texture.id];
+            
+            
+            RBImageHandle image = resolve_image(tex, frame);
+            
+            backend->transition_image(
                 cmd,
-                tex.image.value(),
-                tex.desc.format,
-                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                image,
+                barrier.before,
+                barrier.after
             );
         }
 
         // framebuffer build
+        FramebufferDesc fb_desc{};
         for (auto handle : pass.writes)
         {
-            const RGTexture& tex = textures[handle.id];
+            const RGTexture& tex = textures[handle.texture.id];
 
             RBImageHandle image =
                 tex.desc.external
@@ -133,14 +181,14 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
         pass.execute(ctx);
         backend->end_render_pass(cmd);
     }
+}
 
-    backend->CRUTCH_transition_image(
-        cmd,
-        backend->get_swapchain_image(),
-        TextureFormat::RGBA8_UNORM,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-    );
+RBImageHandle RenderGraph::resolve_image(const RGTexture& tex, std::optional<RBFrameHandle> frame)
+{
+    if (tex.desc.external)
+        return backend->get_swapchain_image(frame);
+    else 
+        return tex.image.value();
 }
 
 void RenderGraph::rebuild_resources()
@@ -174,7 +222,7 @@ void RenderGraph::rebuild_resources()
 
         for (auto tex_handle : pass.reads)
         {
-            const RGTexture& tex = textures[tex_handle.id];
+            const RGTexture& tex = textures[tex_handle.texture.id];
 
             if (!(tex.desc.usage & RenderTextureUsage::DepthStencil))
                 continue;

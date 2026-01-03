@@ -230,4 +230,22 @@ export
         bool linear = true;
         bool clamp_to_edge = true;
     };
+    
+    
+    
+    enum class RBImageUsage
+    {
+        Undefined,
+
+        ColorAttachment,
+        DepthStencilAttachment,
+
+        SampledFragment,
+        SampledVertex,
+
+        TransferSrc,
+        TransferDst,
+
+        Present
+    };
 }

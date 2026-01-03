@@ -33,7 +33,6 @@ namespace vk
         void recreate_swapchain();
         RBSwapchainExtent get_extent() const;
         
-        void CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image, TextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout);
         RBImageView get_image_view() const;
         RBImageHandle get_image() const;
         void update_depth_descriptior(const RBDescriptorSet& rb_handle, RBImageHandle value);
@@ -63,7 +62,7 @@ namespace vk
         std::vector<RBImageHandle> swapchain_image_handles;
         
         
-        uint32_t swapchain_image_index = 0;
+        uint32_t current_swapchain_index = 0;
         
         
         

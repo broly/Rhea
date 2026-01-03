@@ -38,12 +38,34 @@ RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
 }
 
 
-void VkRenderBackend::CRUTCH_transition_image(RBCommandList cmd, RBImageHandle image, 
-    TextureFormat format, VkImageLayout old_layout,
-    VkImageLayout new_layout)
+
+void VkRenderBackend::transition_image(
+        RBCommandList cmd,
+        RBImageHandle image,
+        RBImageUsage before,
+        RBImageUsage after)
 {
-    swapchain.CRUTCH_transition_image(cmd, image,  format,  old_layout, new_layout);
-    
+    auto src = vk::to_vk_state(before);
+    auto dst = vk::to_vk_state(after);
+
+    VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    barrier.oldLayout = src.layout;
+    barrier.newLayout = dst.layout;
+    barrier.srcAccessMask = src.access;
+    barrier.dstAccessMask = dst.access;
+    barrier.image = image_manager.get_image_resource(image).image;
+
+    barrier.subresourceRange = full_subresource_range(image);
+
+    vkCmdPipelineBarrier(
+        cmd.as<VkCommandBuffer>(),
+        src.stage,
+        dst.stage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
 }
 
 
@@ -172,6 +194,31 @@ void VkRenderBackend::create_depth_resources()
         nullptr,
         &swapchain.depth_image_view
     ));
+}
+
+VkImageSubresourceRange VkRenderBackend::full_subresource_range(RBImageHandle image)
+{
+    const auto& img = image_manager.get_image_resource(image);
+
+    VkImageSubresourceRange range{};
+    range.baseMipLevel   = 0;
+    // range.levelCount     = img.mip_levels;
+    range.baseArrayLayer = 0;
+    // range.layerCount     = img.array_layers;
+
+    if (vk::is_depth_format(img.format))
+    {
+        range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        if (vk::has_stencil(img.format))
+            range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    else
+    {
+        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+
+    return range;
 }
 
 
@@ -337,8 +384,9 @@ RBImageView VkRenderBackend::get_swapchain_image_view(RBFrameHandle frame)
     return swapchain.get_image_view();
 }
 
-RBImageHandle VkRenderBackend::get_swapchain_image() const
+RBImageHandle VkRenderBackend::get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const
 {
+    // frame_handle is unused yet
     return swapchain.get_image();
 }
 
@@ -489,13 +537,12 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
     // 3. copy
     immediate_command_pool.submit([&](VkCommandBuffer cmd)
     {
-        CRUTCH_transition_image(
-            cmd,
-            image, 
-            tex.format,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-        );
+        transition_image(
+        cmd,
+        image,
+        RBImageUsage::Undefined,
+        RBImageUsage::TransferDst
+    );
     
         VkBufferImageCopy copy{};
         copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -515,13 +562,12 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::option
             &copy
         );
     
-        CRUTCH_transition_image(
-            cmd,
-            image,
-            tex.format,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
+        transition_image(
+        cmd,
+        image,
+        RBImageUsage::TransferDst,
+        RBImageUsage::SampledFragment
+    );
     });
     
     vk::destroy_buffer(instance.device, staging_buffer, staging_memory);

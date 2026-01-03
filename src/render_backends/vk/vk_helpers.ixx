@@ -302,8 +302,20 @@ export namespace vk
             return false;
         }
     }
+    
+    inline bool has_stencil(VkFormat format)
+    {
+        switch (format)
+        {
+        case VK_FORMAT_D24_UNORM_S8_UINT:
+        case VK_FORMAT_D32_SFLOAT_S8_UINT:
+            return true;
+        default:
+            return false;
+        }
+    }
 
-    VkFormat to_vk_format(TextureFormat format)
+    inline VkFormat to_vk_format(TextureFormat format)
     {
         switch (format)
         {
@@ -328,4 +340,61 @@ export namespace vk
         }
         return VK_FORMAT_UNDEFINED;
     }
+    
+    struct ImageState
+    {
+        VkImageLayout layout;
+        VkPipelineStageFlags stage;
+        VkAccessFlags access;
+    };
+    
+    ImageState to_vk_state(RBImageUsage usage)
+    {
+        switch (usage)
+        {
+        case RBImageUsage::ColorAttachment:
+            return {
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+            };
+
+        case RBImageUsage::DepthStencilAttachment:
+            return {
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+            };
+
+        case RBImageUsage::SampledFragment:
+            return {
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT
+            };
+
+        case RBImageUsage::Present:
+            return {
+                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                0
+            };
+        case RBImageUsage::TransferDst:
+            return {
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_ACCESS_TRANSFER_WRITE_BIT
+            };
+
+        default:
+            return {
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                0
+            };
+        }
+    }
+    
+    
+
 }

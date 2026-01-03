@@ -114,7 +114,7 @@ void vk::SwapchainControl::recreate_swapchain()
 
     create_sync_objects();
 
-    swapchain_image_index = 0;
+    current_swapchain_index = 0;
 }
 
 
@@ -124,85 +124,14 @@ RBSwapchainExtent vk::SwapchainControl::get_extent() const
     return RBSwapchainExtent{extent.width, extent.height};
 }
 
-void vk::SwapchainControl::CRUTCH_transition_image(const RBCommandList& cmd, RBImageHandle image,
-    TextureFormat format, VkImageLayout old_layout, VkImageLayout new_layout)
-{
-    auto& img = image_manager.get_image_resource(image);
-
-    VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    barrier.oldLayout = old_layout;
-    barrier.newLayout = new_layout;
-    barrier.image = img.image;
-
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-
-    if (new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-    {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    }
-    else
-    {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    }
-
-    VkPipelineStageFlags src_stage;
-    VkPipelineStageFlags dst_stage;
-
-    if (old_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL &&
-        new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-    {
-        barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    }
-    else
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = 0;
-        src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-        dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    }
-    
-    
-    
-    if (vk::is_depth_format(vk::to_vk_format(format)))
-    {
-        barrier.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    else
-    {
-        barrier.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_COLOR_BIT;
-    }
-
-    vkCmdPipelineBarrier(
-        cmd.as<VkCommandBuffer>(),
-        src_stage,
-        dst_stage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
-}
-
 RBImageView vk::SwapchainControl::get_image_view() const
 {
-    return image_views[swapchain_image_index];
+    return image_views[current_swapchain_index];
 }
 
 RBImageHandle vk::SwapchainControl::get_image() const
 {
-    return swapchain_image_handles[swapchain_image_index];
+    return swapchain_image_handles[current_swapchain_index];
 }
 
 void vk::SwapchainControl::update_depth_descriptior(const RBDescriptorSet& rb_handle, RBImageHandle value)
@@ -239,7 +168,7 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
         UINT64_MAX,
         frame.image_available, // semaphore
         VK_NULL_HANDLE,
-        &swapchain_image_index
+        &current_swapchain_index
     );
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
@@ -263,7 +192,7 @@ void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBComm
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     VkSemaphore render_finished =
-    render_finished_per_image[swapchain_image_index];
+    render_finished_per_image[current_swapchain_index];
 
     VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit.waitSemaphoreCount = 1;
@@ -287,7 +216,7 @@ void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBComm
     present.pWaitSemaphores = &render_finished;
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain;
-    present.pImageIndices = &swapchain_image_index;
+    present.pImageIndices = &current_swapchain_index;
 
     auto res = vkQueuePresentKHR(
         instance.present_queue, &present);

@@ -172,7 +172,10 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_graph->add_pass({
         .name = "GeometryForward",
-        .writes = { swapchain_color, depth_texture },
+        .writes = { 
+            { swapchain_color, RBImageUsage::ColorAttachment }, 
+            { depth_texture, RBImageUsage::DepthStencilAttachment } 
+        },
         .execute = [=](RenderGraphContext& ctx)
         {
             auto& extractor = engine->scene_view;

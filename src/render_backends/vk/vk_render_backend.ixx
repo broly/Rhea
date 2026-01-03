@@ -45,9 +45,11 @@ public:   /// API Section
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data) override;
     virtual void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) override;
     virtual RBSwapchainExtent get_swapchain_extent() const override;
-    virtual void CRUTCH_transition_image(RBCommandList cmd, RBImageHandle image, 
-        TextureFormat format,
-        VkImageLayout old_layout, VkImageLayout new_layout) override;
+    virtual void transition_image(
+        RBCommandList cmd,
+        RBImageHandle image,
+        RBImageUsage before,
+        RBImageUsage after) override;
     virtual void update_sampled_image(
         RBDescriptorSetLayout layout,
         uint32_t binding,
@@ -71,7 +73,7 @@ public:   /// API Section
     virtual RBImageView get_image_view(RBImageHandle handle) override;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) override;
-    virtual RBImageHandle get_swapchain_image() const override;
+    virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
     virtual RBSampler create_sampler(const RBSamplerDesc& desc) override;
     virtual void bind_image_to_descriptor(
         RBDescriptorSetLayout layout,
@@ -92,6 +94,7 @@ public:   /// API Section
     void cleanup_swapchain();
     void create_depth_resources();
     
+    VkImageSubresourceRange full_subresource_range(RBImageHandle image);
 
 private: // internal section
     

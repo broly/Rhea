@@ -5,13 +5,12 @@ import :rg_types;
 import <cassert>;
 import <functional>;
 
-
 export struct RenderGraphPass
 {
     std::string name;
 
-    std::vector<RGTextureHandle> reads;
-    std::vector<RGTextureHandle> writes;
+    std::vector<RGImageUse> reads;
+    std::vector<RGImageUse> writes;
     RBDescriptorSetLayout descriptor_layout{};
     RBDescriptorSet descriptor_set{};
 
@@ -60,6 +59,8 @@ public:
     void compile();
     void execute(RBCommandList cmd, RBFrameHandle frame);
     
+    RBImageHandle resolve_image(const RGTexture& tex, std::optional<RBFrameHandle> frame = std::nullopt);
+    
     
     RBImageHandle get_image(RGTextureHandle tex) const
     {
@@ -85,4 +86,5 @@ private:
     
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
+    std::vector<std::vector<RGImageBarrier>> pass_barriers;
 };

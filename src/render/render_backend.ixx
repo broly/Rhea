@@ -88,7 +88,7 @@ public:
     virtual RBImageView get_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) = 0;
-    virtual RBImageHandle get_swapchain_image() const = 0;
+    virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
     virtual RBSampler create_sampler(const RBSamplerDesc& desc) = 0;
     virtual void bind_image_to_descriptor(
@@ -97,12 +97,11 @@ public:
         RBImageHandle image,
         RBSampler sampler) = 0;
     
-    virtual void CRUTCH_transition_image(
+    virtual void transition_image(
         RBCommandList cmd,
         RBImageHandle image,
-        TextureFormat format,
-        VkImageLayout old_layout,
-        VkImageLayout new_layout) = 0;
+        RBImageUsage before,
+        RBImageUsage after) = 0;
     
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
     
