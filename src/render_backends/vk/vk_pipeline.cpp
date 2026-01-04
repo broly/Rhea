@@ -6,6 +6,7 @@ import <vector>;
 import <vulkan/vulkan_core.h>;
 import <cassert>;
 import spirv_reflect;
+import :reflection;
 #include "vk_macro.h"
 
 class VkRenderBackend;
@@ -54,8 +55,8 @@ VkPipelineObject::VkPipelineObject(
 
 VkPipelineObject::~VkPipelineObject()
 {
-    if (pipeline_ != nullptr)
-        vkDestroyPipeline(instance.device, pipeline_, nullptr);
+    if (vk_pipeline != nullptr)
+        vkDestroyPipeline(instance.device, vk_pipeline, nullptr);
 
     if (pipeline_layout != nullptr)
         vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
@@ -98,8 +99,8 @@ std::vector<VkVertexInputAttributeDescription> generate_vk_attributes(
 
 VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 {
-    if (pipeline_ != nullptr)
-        return pipeline_;
+    if (vk_pipeline != nullptr)
+        return vk_pipeline;
 
     VkPipelineShaderStageCreateInfo stages[2]{};
 
@@ -143,25 +144,6 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO
     };
     input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-    RBSwapchainExtent extent = swapchain.get_extent();
-
-    // VkViewport viewport{
-    //     0, 0,
-    //     (float)extent.width,
-    //     (float)extent.height,
-    //     0.0f, 1.0f
-    // };
-    //
-    // VkRect2D scissor{{0,0}, swapchain.extent};
-    //
-    // VkPipelineViewportStateCreateInfo viewport_state{
-    //     VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
-    // };
-    // viewport_state.viewportCount = 1;
-    // viewport_state.pViewports = &viewport;
-    // viewport_state.scissorCount = 1;
-    // viewport_state.pScissors = &scissor;
 
     VkDynamicState dynamic_states[] = {
         VK_DYNAMIC_STATE_VIEWPORT,
@@ -241,8 +223,8 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         1,
         &pci,
         nullptr,
-        &pipeline_));
-    return pipeline_;
+        &vk_pipeline));
+    return vk_pipeline;
 }
 
 DescriptorType to_descriptor_type(SpvReflectDescriptorType type)
@@ -280,50 +262,7 @@ DescriptorType to_descriptor_type(SpvReflectDescriptorType type)
 
 void VkPipelineObject::reflect_shader(const VkShader& shader, ShaderStage stage)
 {
-    auto code = shader.get_spirv(); // vector<uint32_t>
+    SpirvReflection reflection(shader.get_spirv());
     
-    SpvReflectShaderModule module;
-    SpvReflectResult result;
-    
-    result = spvReflectCreateShaderModule(code.size() * sizeof(uint32_t),
-                                 code.data(),
-                                 &module);
-    
-    // --- Descriptor bindings ---
-    uint32_t count = 0;
-    
-    result = spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
-    
-    std::vector<SpvReflectDescriptorBinding*> bindings(count);
-    result = spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
-    
-    for (auto* b : bindings)
-    {
-        auto& r = reflection.resources[b->name];
-    
-        r.name    = b->name;
-        r.set     = b->set;
-        r.binding = b->binding;
-        r.type    = to_descriptor_type(b->descriptor_type);
-        r.stages |= stage;
-    
-        if (b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-            r.size = b->block.size;
-    }
-    
-    // --- Push constants ---
-    uint32_t pc_count = 0;
-    result = spvReflectEnumeratePushConstantBlocks(&module, &pc_count, nullptr);
-    if (pc_count > 0)
-    {
-        SpvReflectBlockVariable* pc;
-        result = spvReflectEnumeratePushConstantBlocks(&module, &pc_count, &pc);
-    
-        reflection.push_constants = {
-            .size   = pc->size,
-            .stages = stage
-        };
-    }
-    
-    spvReflectDestroyShaderModule(&module);
+    pipeline_reflection.input_variables = reflection.get_input_variables();
 }

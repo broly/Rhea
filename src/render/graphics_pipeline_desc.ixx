@@ -1,4 +1,4 @@
-﻿export module render:graphics_pipeline;
+﻿export module render:graphics_pipeline_desc;
 import <string>;
 import <unordered_map>;
 import <vector>;
@@ -9,15 +9,6 @@ import :rg_types;
 
 export
 {
-
-    // enum class VertexLayout
-    // {
-    //     None,
-    //     Position,
-    //     PositionNormal,
-    //     PositionNormalUV,
-    //     PositionNormalTangentUV,
-    // };
 
     enum ShaderStage
     {

@@ -3,7 +3,7 @@ import <memory>;
 import <span>;
 
 import glm;
-import :graphics_pipeline;
+import :graphics_pipeline_desc;
 import framework;
 import :handle_types;
 import :pipeline_object;

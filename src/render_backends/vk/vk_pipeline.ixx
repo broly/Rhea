@@ -11,29 +11,7 @@ import render;
 import <unordered_map>;
 import <optional>;
 import <cassert>;
-
-struct ReflectedResource
-{
-    std::string name;
-    uint32_t set;
-    uint32_t binding;
-    DescriptorType type;
-    ShaderStage stages;
-    uint32_t size;
-};
-
-struct ReflectedPushConstants
-{
-    uint32_t size;
-    ShaderStage stages;
-};
-
-struct PipelineReflection
-{
-    std::unordered_map<std::string, ReflectedResource> resources;
-    std::optional<ReflectedPushConstants> push_constants;
-};
-
+import :reflection;
 
 class VkPipelineObject : public PipelineObject
 {
@@ -47,13 +25,13 @@ public:
 
     RBPipelineHandle get_pipeline_handle() const override
     {
-        assert(pipeline_ != VK_NULL_HANDLE); 
-        return pipeline_;
+        assert(vk_pipeline != VK_NULL_HANDLE); 
+        return vk_pipeline;
     }
     
     VkPipelineLayout get_pipeline_layout() const
     {
-        assert(pipeline_ != VK_NULL_HANDLE); 
+        assert(vk_pipeline != VK_NULL_HANDLE); 
         return pipeline_layout;
     }
     VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
@@ -67,13 +45,13 @@ private:
     vk::SwapchainControl& swapchain;
     vk::BufferManager& buffer_manager;
 
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
+    VkPipeline vk_pipeline = VK_NULL_HANDLE;
     
     VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     
     std::optional<VkShader> vert;
     std::optional<VkShader> frag;
     
-    PipelineReflection reflection;
+    PipelineReflection pipeline_reflection;
     
 };
