@@ -28,6 +28,11 @@ import <compare>;
             static_cast<std::underlying_type_t<Enum>>(a) | static_cast<std::underlying_type_t<Enum>>(b) \
         ); \
     } \
+    inline Enum operator|=(Enum& a, Enum b) \
+    { \
+        a = a | b; \
+        return a; \
+    } \
     inline Enum operator&(Enum a, Enum b) \
     { \
         return static_cast<Enum>( \

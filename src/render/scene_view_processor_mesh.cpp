@@ -58,7 +58,7 @@ RenderMaterial SceneViewProcessor_Mesh::get_or_create_material(const MaterialKey
     rm.key = key;
     
     auto renderer = RhGlobals::engine->renderer;  // crutch
-    rm.layout = renderer->material_layout;
+    rm.layout = renderer->get_material_layout();
     rm.descriptor = renderer->allocate_material_descriptor();
     rm.material_ubo = renderer->create_material_ubo();
     renderer->bind_material_ubo(rm);

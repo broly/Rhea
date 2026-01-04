@@ -8,8 +8,31 @@ import :instance;
 import :swapchain_control;
 import :buffer_mgr;
 import render;
+import <unordered_map>;
 import <optional>;
 import <cassert>;
+
+struct ReflectedResource
+{
+    std::string name;
+    uint32_t set;
+    uint32_t binding;
+    DescriptorType type;
+    ShaderStage stages;
+    uint32_t size;
+};
+
+struct ReflectedPushConstants
+{
+    uint32_t size;
+    ShaderStage stages;
+};
+
+struct PipelineReflection
+{
+    std::unordered_map<std::string, ReflectedResource> resources;
+    std::optional<ReflectedPushConstants> push_constants;
+};
 
 
 class VkPipelineObject : public PipelineObject
@@ -36,6 +59,8 @@ public:
     VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
     
     GraphicsPipelineDesc pipeline_desc;
+    
+    void reflect_shader(const VkShader& shader, ShaderStage stage);
 
 private:
     vk::Instance& instance;
@@ -48,5 +73,7 @@ private:
     
     std::optional<VkShader> vert;
     std::optional<VkShader> frag;
+    
+    PipelineReflection reflection;
     
 };

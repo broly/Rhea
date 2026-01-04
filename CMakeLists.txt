@@ -14,6 +14,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(jsoncpp CONFIG REQUIRED)
 find_package(fastgltf CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(unofficial-spirv-reflect CONFIG REQUIRED)
 
 
 # add_executable(rhea ${RHEA_SOURCES})
@@ -32,6 +33,7 @@ add_executable(rhea ${RHEA_SOURCES})
 # )
 set(RHEA_MODULE_DIRS
     src/glm_wrap
+    src/spirv_reflect_wrap
     src/stb_image_wrap
     src/fastgltf_wrapper
     src/common
@@ -86,6 +88,7 @@ target_link_libraries(rhea
 		glfw
 		JsonCpp::JsonCpp
 		fastgltf::fastgltf
+		unofficial::spirv-reflect
 )
 
 

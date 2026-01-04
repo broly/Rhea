@@ -14,7 +14,7 @@ layout(location = 2) out vec2 v_uv;
 layout(location = 3) out vec3 v_world_tangent;
 
 // ---------- Camera ----------
-layout(set = 0, binding = 0) uniform CameraUBO
+layout(set = SET_CAMERA, binding = BINDING_CAMERA_UBO) uniform CameraUBO
 {
     mat4 view_proj;
     vec4 camera_pos;
