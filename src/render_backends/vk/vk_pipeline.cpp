@@ -43,14 +43,12 @@ VkPipelineObject::VkPipelineObject(
 
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
     
-    VkShader v(instance.device, desc.vertex_shader);
-    VkShader f(instance.device, desc.fragment_shader);
-
-    vert.emplace(std::move(v));
-    frag.emplace(std::move(f));
-    
-    reflect_shader(*vert, ss_Vertex);
-    reflect_shader(*frag, ss_Fragment);
+    for (auto& stage : desc.stages)
+    {
+        VkShader stage_shader(instance.device, stage.shader);
+        reflect_shader(stage_shader, stage.stage);
+        shaders.push_back(std::move(stage_shader));
+    }
 }
 
 VkPipelineObject::~VkPipelineObject()
@@ -62,82 +60,78 @@ VkPipelineObject::~VkPipelineObject()
         vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
 }
 
-using VkFormatPair = std::pair<
-    int, // num_components
-    int // component_size
->;
-
-std::vector<VkVertexInputAttributeDescription> generate_vk_attributes(
-    const std::vector<VertexComponentLayoutData>& layout)
-{
-    std::vector<VkVertexInputAttributeDescription> result;
-
-    static std::map<VkFormatPair, VkFormat> vk_formats = {
-        {{1, 2}, VK_FORMAT_R16_SFLOAT},
-        {{2, 2}, VK_FORMAT_R16G16_SFLOAT},
-        {{3, 2}, VK_FORMAT_R16G16B16_SFLOAT},
-        {{4, 2}, VK_FORMAT_R16G16B16A16_SFLOAT},
-        {{1, 4}, VK_FORMAT_R32_SFLOAT},
-        {{2, 4}, VK_FORMAT_R32G32_SFLOAT},
-        {{3, 4}, VK_FORMAT_R32G32B32_SFLOAT},
-        {{4, 4}, VK_FORMAT_R32G32B32A32_SFLOAT},
-        {{1, 8}, VK_FORMAT_R64_SFLOAT},
-        {{2, 8}, VK_FORMAT_R64G64_SFLOAT},
-        {{3, 8}, VK_FORMAT_R64G64B64_SFLOAT},
-        {{4, 8}, VK_FORMAT_R64G64B64A64_SFLOAT},
-    };
-
-    for (const VertexComponentLayoutData& layout_data : layout)
-    {
-        auto pair = vk_formats.find({layout_data.num_components, layout_data.component_size});
-        assert(pair != vk_formats.end());
-
-        result.push_back({layout_data.location, layout_data.binding, pair->second, layout_data.offset});
-    }
-    return result;
-}
 
 VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 {
     if (vk_pipeline != nullptr)
         return vk_pipeline;
 
-    VkPipelineShaderStageCreateInfo stages[2]{};
-
-    stages[0] = {
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        nullptr,
-        0,
-        VK_SHADER_STAGE_VERTEX_BIT,
-        vert->get_module(),
-        "main"
+    std::vector<VkPipelineShaderStageCreateInfo> vk_stages;
+    
+    static std::array<VkShaderStageFlagBits, static_cast<uint32_t>(ShaderStage::MAX)> stages_vk_bits;
+    stages_vk_bits[static_cast<uint32_t>(ShaderStage::Vertex)] = VK_SHADER_STAGE_VERTEX_BIT;
+    stages_vk_bits[static_cast<uint32_t>(ShaderStage::Fragment)] = VK_SHADER_STAGE_FRAGMENT_BIT;
+    
+    VkGraphicsPipelineCreateInfo pci{
+        VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO
     };
+    
+    
+    std::optional<VkPipelineVertexInputStateCreateInfo> o_vertex_input = std::nullopt;
+    std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
+    std::vector<VkVertexInputAttributeDescription> vk_attrs;
 
-    stages[1] = {
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        nullptr,
-        0,
-        VK_SHADER_STAGE_FRAGMENT_BIT,
-        frag->get_module(),
-        "main"
-    };
+    
+    for (uint32_t stage_index = 0; auto& stage : pipeline_desc.stages)
+    {
+        VkPipelineShaderStageCreateInfo vk_stage {
+            VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            nullptr,
+            0,
+            stages_vk_bits[static_cast<uint32_t>(stage.stage)],
+            shaders[stage_index].get_module(),
+            "main"
+        };
+        vk_stages.push_back(vk_stage);
+        
+        if (stage.stage == ShaderStage::Vertex)
+        {            
+            o_vertex_input = VkPipelineVertexInputStateCreateInfo {
+                VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+            };
+            
+            for (const auto& layout : stage.vertex_layouts)
+            {
+                VkVertexInputBindingDescription vertex_input_binding;
+                vertex_input_binding.stride = layout.stride;
+                vertex_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+                vertex_input_binding.binding = layout.binding_index;
+                
+                for (const auto& attribute_info : layout.attributes)
+                {
+                    auto stage_reflection = pipeline_reflection[stage.stage];
+                    assert(stage_reflection.input_variables.contains(attribute_info.variable_name));
 
-    // fixed-function (minimal)
-    VkPipelineVertexInputStateCreateInfo vertex_input{
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
-    };
+                    ReflectedInterfaceVariable& reflection_info = stage_reflection.input_variables[attribute_info.variable_name];
+                
+                    VkVertexInputAttributeDescription attr;
+                    attr.location = reflection_info.location;
+                    attr.offset = attribute_info.offset;
+                    attr.format = reflection_info.format;
+                    attr.binding = layout.binding_index;
+                    vk_attrs.push_back(attr);
+                }
+                vertex_input_bindings.push_back(vertex_input_binding);
+            }
 
-    VkVertexInputBindingDescription binding{};
-    binding.binding = 0;
-    binding.stride = pipeline_desc.vertex_layout.stride;
-    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    std::vector<VkVertexInputAttributeDescription> attrs = generate_vk_attributes(pipeline_desc.vertex_layout.data);
-
-    vertex_input.vertexBindingDescriptionCount = 1;
-    vertex_input.pVertexBindingDescriptions = &binding;
-    vertex_input.vertexAttributeDescriptionCount = attrs.size();
-    vertex_input.pVertexAttributeDescriptions = attrs.data();
+            o_vertex_input->vertexBindingDescriptionCount = vertex_input_bindings.size();
+            o_vertex_input->pVertexBindingDescriptions = vertex_input_bindings.data();
+            o_vertex_input->vertexAttributeDescriptionCount = vk_attrs.size();
+            o_vertex_input->pVertexAttributeDescriptions = vk_attrs.data();
+        }
+        
+        stage_index++;
+    }
 
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{
@@ -200,12 +194,9 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     depth_ci.depthBoundsTestEnable = VK_FALSE;
     depth_ci.stencilTestEnable = VK_FALSE;
 
-    VkGraphicsPipelineCreateInfo pci{
-        VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO
-    };
-    pci.stageCount = 2;
-    pci.pStages = stages;
-    pci.pVertexInputState = &vertex_input;
+    pci.stageCount = vk_stages.size();
+    pci.pStages = vk_stages.data();
+    pci.pVertexInputState = o_vertex_input.has_value() ? &o_vertex_input.value() : nullptr;
     pci.pInputAssemblyState = &input_assembly;
     pci.pViewportState = &viewport_state;
     pci.pRasterizationState = &raster;
@@ -264,5 +255,8 @@ void VkPipelineObject::reflect_shader(const VkShader& shader, ShaderStage stage)
 {
     SpirvReflection reflection(shader.get_spirv());
     
-    pipeline_reflection.input_variables = reflection.get_input_variables();
+    auto input_variables = reflection.get_input_variables();
+    
+    pipeline_reflection.insert({stage, 
+        PipelineReflection(input_variables)});
 }

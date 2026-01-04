@@ -49,9 +49,8 @@ private:
     
     VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     
-    std::optional<VkShader> vert;
-    std::optional<VkShader> frag;
+    std::vector<VkShader> shaders;
     
-    PipelineReflection pipeline_reflection;
+    std::map<ShaderStage, PipelineReflection> pipeline_reflection;
     
 };

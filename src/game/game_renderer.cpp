@@ -40,19 +40,6 @@ void GameRenderer::set_engine(const std::shared_ptr<Engine>& in_engine)
     engine = in_engine;
 }
 
-VertexLayoutData make_PositionNormalTangentUV()
-{
-    return  {
-        sizeof(Vertex),
-        {
-                {VERT_LOCATION_POSTION,  offsetof(Vertex, position), 0, 3, 4},
-                {VERT_LOCATION_NORMAL,   offsetof(Vertex, normal),   0, 3, 4},
-                {VERT_LOCATION_UV,       offsetof(Vertex, tex_coord),0, 2, 4},
-                {VERT_LOCATION_TANGENT,  offsetof(Vertex, tangent),  0, 3, 4},
-            },
-    };
-}
-
 void GameRenderer::init(RBWindowHandle in_window)
 {
     Renderer::init(in_window);
@@ -65,7 +52,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .bindings = {{
             .binding = BINDING_CAMERA_UBO,
             .type = DescriptorType::UniformBuffer,
-            .stages = ShaderStage::ss_Vertex | ShaderStage::ss_Fragment
+            .stages = ShaderStage::Vertex | ShaderStage::Fragment
         }},
         .debug_name = "camera"
     };
@@ -91,27 +78,27 @@ void GameRenderer::init(RBWindowHandle in_window)
             {
                 .binding = BINDING_MATERIAL_UBO,
                 .type = DescriptorType::UniformBuffer,
-                .stages = ShaderStage::ss_Fragment
+                .stages = ShaderStage::Fragment
             },
             {
                 .binding = BINDING_BASE_COLOR,
                 .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::ss_Fragment
+                .stages = ShaderStage::Fragment
             },
             {
                 .binding = BINDING_EMISSIVE,
                 .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::ss_Fragment
+                .stages = ShaderStage::Fragment
             },
             {
                 .binding = BINDING_NORMAL_MAP,
                 .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::ss_Fragment
+                .stages = ShaderStage::Fragment
             },
             {
                 .binding = BINDING_ORM,
                 .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::ss_Fragment
+                .stages = ShaderStage::Fragment
             }
         },
         .debug_name = "material"
@@ -125,7 +112,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .bindings = {{
             .binding = BINDING_LIGHT_UBO,
             .type = DescriptorType::UniformBuffer,
-            .stages = ShaderStage::ss_Fragment
+            .stages = ShaderStage::Fragment
         }},
         .debug_name = "light"
     };
@@ -135,9 +122,28 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     
     GraphicsPipelineDesc geom_pipeline_desc{
-        .vertex_shader = "shaders/geometry.vert.spv",
-        .fragment_shader = "shaders/geometry.frag.spv",
-        .vertex_layout = make_PositionNormalTangentUV(),
+        .stages = {
+            {
+                .stage = ShaderStage::Vertex,
+                .shader = "shaders/geometry.vert.spv",
+                .vertex_layouts = {
+                    VertexLayoutData {
+                            .binding_index = 0,
+                            .stride = sizeof(Vertex),
+                            .attributes = {
+                                { "in_position", offsetof(Vertex, position) },
+                                { "in_normal", offsetof(Vertex, normal) },
+                                { "in_uv", offsetof(Vertex, tex_coord) },
+                                { "in_tangent", offsetof(Vertex, tangent) }
+                            }
+                        }
+                    }
+            },
+            {
+                .stage = ShaderStage::Fragment,
+                .shader = "shaders/geometry.frag.spv"
+            }
+        },
         .layout = {
             .sets = { 
                 camera_layout,  // 0
@@ -145,7 +151,7 @@ void GameRenderer::init(RBWindowHandle in_window)
                 light_layout, // 2
             }, 
             .push_constants = {{
-                .stages = ShaderStage::ss_Vertex,
+                .stages = ShaderStage::Vertex,
                 .offset = 0,
                 .size = sizeof(glm::mat4),
             }}
@@ -162,7 +168,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .bindings = {{
             .binding = BINDING_HDR_COLOR,
             .type    = DescriptorType::CombinedImageSampler,
-            .stages  = ShaderStage::ss_Fragment
+            .stages  = ShaderStage::Fragment
         }},
         .debug_name = "tonemap"
     };
@@ -170,9 +176,16 @@ void GameRenderer::init(RBWindowHandle in_window)
     tonemap_layout = render_backend->create_descriptor_set_layout(tonemap_set);   
     
     GraphicsPipelineDesc tonemap_pipeline_desc{
-        .vertex_shader   = "shaders/fullscreen.vert.spv",
-        .fragment_shader = "shaders/tonemap.frag.spv",
-        .vertex_layout   = {}, 
+        .stages = {
+            {
+                .stage = ShaderStage::Vertex,
+                .shader = "shaders/fullscreen.vert.spv",
+            },
+            {
+                .stage = ShaderStage::Fragment,
+                .shader = "shaders/tonemap.frag.spv",
+            }
+        },
         .layout = {
             .sets = { tonemap_layout },
         },

@@ -262,10 +262,10 @@ export namespace vk
     {
         VkShaderStageFlags flags = 0;
 
-        if (stages & ShaderStage::ss_Vertex)
+        if (bool(stages & ShaderStage::Vertex))
             flags |= VK_SHADER_STAGE_VERTEX_BIT;
 
-        if (stages & ShaderStage::ss_Fragment)
+        if (bool(stages & ShaderStage::Fragment))
             flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 
         return flags;

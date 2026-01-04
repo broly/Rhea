@@ -2,7 +2,7 @@
 import <string>;
 import <unordered_map>;
 import <vector>;
-
+import <memory>;
 import :handle_types;
 import :rg_types;
 #include "common/type_macros.h"
@@ -10,10 +10,12 @@ import :rg_types;
 export
 {
 
-    enum ShaderStage
+    enum class ShaderStage
     {
-        ss_Vertex = 0x1,
-        ss_Fragment = 0x2,
+        Vertex = 0x1,
+        Fragment = 0x2,
+        
+        MAX,
     };
     ENUM_MASK_OPS(ShaderStage);
 
@@ -73,7 +75,7 @@ export
         bool has_depth = false;
     };
     
-    struct VertexComponentLayoutData
+    struct VertexComponentLayoutData_DEPRECATED
     {
         uint8_t location;
         uint16_t offset;
@@ -82,17 +84,33 @@ export
         uint8_t component_size;
     };
     
+    struct VertexAttributeInfo
+    {
+        const char* variable_name;
+        uint32_t offset;
+    };
+    
     struct VertexLayoutData
     {
+        uint32_t binding_index;
         size_t stride;
-        std::vector<VertexComponentLayoutData> data;
+        std::vector<VertexAttributeInfo> attributes;
     };
-
+    
+    
+    struct GraphicsPipelineStage
+    {
+        ShaderStage stage;
+        std::string shader;
+        std::vector<VertexLayoutData> vertex_layouts;
+    };
+    
     struct GraphicsPipelineDesc
     {
-        std::string vertex_shader;
-        std::string fragment_shader;
-        VertexLayoutData vertex_layout;
+        std::vector<GraphicsPipelineStage> stages;
+        // std::string vertex_shader;
+        // std::string fragment_shader;
+        // VertexLayoutData vertex_layout;
         PipelineLayoutDesc layout;
         bool depth_test;
         
