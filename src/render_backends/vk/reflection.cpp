@@ -35,6 +35,24 @@ const char* get_readable_spv_result(SpvReflectResult result)
     return result_map.at(result);
 }
 
+static VkDescriptorType convert_spv_to_vk_descriptor_type(SpvReflectDescriptorType type)
+{
+    static std::map<SpvReflectDescriptorType, VkDescriptorType> types_map = {
+        {SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_SAMPLER},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC},
+        {SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT},
+    };
+    return types_map[type];
+}
+
 static VkFormat convert_spv_to_vk_format(SpvReflectFormat format)
 {
     static std::map<SpvReflectFormat, VkFormat> format_map = {
@@ -127,6 +145,35 @@ std::unordered_map<std::string, ReflectedInterfaceVariable> SpirvReflection::get
                    .name = v->name, 
                    .location = v->location,
                    .format = convert_spv_to_vk_format(v->format),
+               }});
+        }
+    }
+    return result;
+}
+
+std::unordered_map<std::string, ReflectedBinding> SpirvReflection::get_bindings() const
+{
+    std::unordered_map<std::string, ReflectedBinding> result;
+    
+    uint32_t count;
+    
+    SPV_CHECK(
+        spvReflectEnumerateDescriptorBindings(&spirv_module, &count, nullptr)
+    );
+    std::vector<SpvReflectDescriptorBinding*> descriptors(count);
+    SPV_CHECK(
+        spvReflectEnumerateDescriptorBindings(&spirv_module, &count, descriptors.data())
+    );
+    for (auto* v : descriptors)
+    {
+        {
+            result.insert({v->name, 
+               ReflectedBinding{
+                   .name = v->name, 
+                   .set = v->set,
+                   .binding = v->binding,
+                   .count = v->count,
+                   .descriptor_type = convert_spv_to_vk_descriptor_type(v->descriptor_type)
                }});
         }
     }

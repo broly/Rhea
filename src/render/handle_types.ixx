@@ -123,8 +123,8 @@ export
 
     enum class ResourceUsageType
     {
-        Frame,      // per-frame (camera, per-frame UBOs)
-        Persistent  // materials, textures etc.
+        frame,      // per-frame (camera, per-frame UBOs)
+        persistent  // materials, textures etc.
     };
 
     struct RBBufferHandle
@@ -165,6 +165,8 @@ export
     using RBPipelineHandle = RBHandle<VkPipeline>;
     using RBDescriptorSet = RBHandle<VkDescriptorSet>;
     using RBDescriptorSetLayout = RBHandle<uint64_t>; // temporary
+    
+    using RBObject = RBHandle<uint64_t>;
 
     using RBWindowHandle = RBHandle<GLFWwindow*>;
 

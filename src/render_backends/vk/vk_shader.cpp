@@ -25,6 +25,7 @@ static std::vector<uint32_t> read_file(const std::string& path)
 VkShader::VkShader(VkDevice device, const std::string& path)
     : device_(device)
 {
+    shader_name = path;
     code = read_file(path);
 
     VkShaderModuleCreateInfo ci{

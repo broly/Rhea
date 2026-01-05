@@ -17,17 +17,19 @@ class VkPipelineObject : public PipelineObject
 {
 public:
     VkPipelineObject(
-        const GraphicsPipelineDesc& desc,
         vk::Instance& in_instance,
         vk::SwapchainControl& in_swapchain,
         vk::BufferManager& in_buffer_manager);
     ~VkPipelineObject();
+    
+    void prepare(const GraphicsPipelineDesc& in_desc);
 
     RBPipelineHandle get_pipeline_handle() const override
     {
         assert(vk_pipeline != VK_NULL_HANDLE); 
         return vk_pipeline;
     }
+    
     
     VkPipelineLayout get_pipeline_layout() const
     {
@@ -36,9 +38,14 @@ public:
     }
     VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
     
-    GraphicsPipelineDesc pipeline_desc;
+    std::optional<GraphicsPipelineDesc> pipeline_desc;
     
     void reflect_shader(const VkShader& shader, ShaderStage stage);
+
+    const std::map<ShaderStage, PipelineReflection>& get_reflection() const
+    {
+        return pipeline_reflection;
+    }
 
 private:
     vk::Instance& instance;

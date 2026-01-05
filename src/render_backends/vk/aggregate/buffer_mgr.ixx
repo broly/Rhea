@@ -5,6 +5,7 @@ import <vulkan/vulkan_core.h>;
 
 import :context;
 import :internal_types;
+import :swapchain_control;
 import render;
 import <optional>;
 
@@ -23,9 +24,10 @@ namespace vk
     class BufferManager
     {
     public:
-        BufferManager(const VkDevice& in_device, const VkPhysicalDevice& in_physical_device)
+        BufferManager(const VkDevice& in_device, const VkPhysicalDevice& in_physical_device, const vk::SwapchainControl& in_swapchain)
             : device(in_device)
             , physical_device(in_physical_device)
+            , swapchain(in_swapchain)
         {}
     
         uint32_t persistent_ubo_counter = 0;
@@ -60,10 +62,13 @@ namespace vk
             uint32_t frame);
         RBBufferHandle create_uniform_buffer(size_t size, ResourceUsageType resource_usage);
         
-        
+        void update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data);
+
     private:
         const VkDevice& device;
         const VkPhysicalDevice& physical_device;
+        
+        const vk::SwapchainControl& swapchain;
     };
     
 }

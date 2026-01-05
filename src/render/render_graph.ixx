@@ -9,8 +9,10 @@ export struct RenderGraphPass
 {
     std::string name;
 
+    PipelineObject* pipeline;
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
+    std::vector<RenderResource*> resources;
     RBDescriptorSetLayout descriptor_layout{};
     RBDescriptorSet descriptor_set{};
 
@@ -23,12 +25,13 @@ public:
     RenderGraphContext(
         RenderBackend& in_backend,
         RBCommandList in_cmd,
-        RBFramebufferId in_fb,
+        RBFramebufferId in_fb, 
         class RenderGraph& render_graph)
         : backend(in_backend)
         , cmd(in_cmd)
         , framebuffer(in_fb)
         , render_graph(render_graph)
+        , pipeline(nullptr)
     {}
     
     
@@ -41,6 +44,7 @@ public:
     RBCommandList  cmd;
     RBFramebufferId framebuffer;
     RenderGraph& render_graph;
+    PipelineObject* pipeline;
     
 };
 
@@ -50,6 +54,8 @@ export class RenderGraph
 {
 public:
     RenderGraph(const std::shared_ptr<RenderBackend>& in_backend);
+    
+    
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGResourceHandle create_buffer(const RGBufferDesc& desc);
@@ -72,6 +78,10 @@ public:
     }
     
     void rebuild_resources();
+    
+    PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
+
+    RenderResource* create_resource(const RenderResourceDesc& desc);
 
 private:
     struct Resource
@@ -79,7 +89,7 @@ private:
         RGResourceType type;
     };
 
-    std::vector<RGResource> resources;
+    std::vector<RGResource> rg_resources;
     std::vector<RenderGraphPass> passes;
 
     std::vector<uint32_t> execution_order;
@@ -87,4 +97,11 @@ private:
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
     std::vector<std::vector<RGImageBarrier>> pass_barriers;
+    
+    
+    
+    std::vector<PipelineObject*> pipelines; 
+    std::vector<RenderResource*> resources;
+    
+    bool graph_compiled = false;
 };

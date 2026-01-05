@@ -18,10 +18,7 @@ import :pipeline;
 
 void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data)
 {
-    auto& buf = get_buffer(buffer_handle, swapchain.current_frame);
-    
-    memcpy(buf.mapped_ptr, data, size);
-    
+    resource_manager.update_uniform_buffer(buffer_handle, size, data);
 }
 
 void VkRenderBackend::bind_buffer_to_descriptor(
@@ -582,6 +579,14 @@ std::pair<uint32_t, uint32_t> VkRenderBackend::get_viewport_extent() const
     return {swapchain.extent.width, swapchain.extent.height};
 }
 
+RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
+{
+    std::unique_ptr<VkRenderResource> res = std::make_unique<VkRenderResource>(desc, resource_manager, *this);
+    
+    resources.push_back(std::move(res));
+    return resources.back().get();
+}
+
 
 void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshHandle mesh)
 {
@@ -660,10 +665,6 @@ void VkRenderBackend::cleanup_swapchain()
 
 
 VkRenderBackend::VkRenderBackend()
-    : instance()
-    , image_manager(instance)
-    , swapchain(instance, image_manager)
-    , resource_manager(instance.get_device(), instance.get_physical_device())
 {
 }
 
@@ -813,9 +814,9 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
 }
 
 
-PipelineObject* VkRenderBackend::create_pipeline(GraphicsPipelineDesc desc)
+PipelineObject* VkRenderBackend::create_pipeline()
 {
-    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(desc, instance, swapchain, resource_manager);
+    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(instance, swapchain, resource_manager);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;
@@ -876,7 +877,7 @@ void VkRenderBackend::bind_image_to_descriptor(RBDescriptorSetLayout layout, uin
     img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet = get_descriptor_set(layout, ResourceUsageType::Frame).as<VkDescriptorSet>();
+    write.dstSet = get_descriptor_set(layout, ResourceUsageType::frame).as<VkDescriptorSet>();
     write.dstBinding = binding;
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

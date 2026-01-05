@@ -18,6 +18,7 @@ import framework;
 import render;
 import :immediate_commands;
 import :framebuffer_mgr;
+import :render_resource;
 
 
 
@@ -39,7 +40,7 @@ public:   /// API Section
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
     virtual bool acquire_next_image(RBFrameHandle frame_handle) override;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
-    virtual PipelineObject* create_pipeline(GraphicsPipelineDesc desc) override;
+    virtual PipelineObject* create_pipeline() override;
     virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) override;
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data) override;
@@ -85,6 +86,7 @@ public:   /// API Section
     virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) override;
     std::pair<uint32_t, uint32_t> get_viewport_extent() const override;
+    virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     
     
 // Initialization section
@@ -115,13 +117,15 @@ private: // internal section
         VkRenderPass render_pass);
 
 public:   /// Aggregate section. These objects have same lifetime with render backend. use refs
-    vk::Instance instance;
+    vk::Instance instance {};
     vk::ImageManager image_manager {instance}; // holds refs
     vk::SwapchainControl swapchain {instance, image_manager};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
-    vk::BufferManager resource_manager {instance.device, instance.physical_device}; // holds refs
+    vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
     vk::MeshManager mesh_manager{instance};
     vk::ImmediateCommandPool immediate_command_pool{instance};
+    
+    std::vector<std::unique_ptr<VkRenderResource>> resources;
     
     
 public:   /// cache and state section:

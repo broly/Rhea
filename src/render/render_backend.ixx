@@ -8,6 +8,7 @@ import framework;
 import :handle_types;
 import :pipeline_object;
 import :rg_types;
+import :render_resource;
 
 import assets;
 
@@ -74,7 +75,7 @@ public:
     virtual bool acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
     
-    virtual PipelineObject* create_pipeline(GraphicsPipelineDesc desc) = 0;
+    virtual PipelineObject* create_pipeline() = 0;
 
 
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) = 0;
@@ -112,4 +113,6 @@ public:
         ResourceUsageType usage) = 0;
     
     virtual std::pair<uint32_t, uint32_t> get_viewport_extent() const = 0;
+    
+    virtual RenderResource* create_resource(const RenderResourceDesc& desc) = 0;
 };

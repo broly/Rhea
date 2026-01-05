@@ -8,7 +8,7 @@ void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout, 
 {
     auto usage = buffer.get_usage_type();
 
-    if (usage == ResourceUsageType::Frame)
+    if (usage == ResourceUsageType::frame)
     {
         for (uint32_t frame = 0; frame < vk::MAX_FRAMES_IN_FLIGHT; ++frame)
         {
@@ -57,7 +57,7 @@ void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout, 
 
 vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
 {
-    if (buffer_handle.get_usage_type() == ResourceUsageType::Frame)
+    if (buffer_handle.get_usage_type() == ResourceUsageType::frame)
     {
         size_t index = buffer_handle.get_identifier();
         return frames_ubos.at(index).at(frame_index);
@@ -69,7 +69,7 @@ std::optional<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_l
 {
     auto& layout_data = descriptor_set_layouts.at(layout_handle);
     
-    if (usage_type == ResourceUsageType::Frame)
+    if (usage_type == ResourceUsageType::frame)
     {
         for (size_t frame_index = 0; frame_index < vk::MAX_FRAMES_IN_FLIGHT; frame_index++)
         {
@@ -163,7 +163,7 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
     for (const DescriptorBinding& b : descriptor_set_layout.bindings)
     {
         VkDescriptorSetLayoutBinding vk{};
-        vk.binding = b.binding;
+        vk.binding = b.binding_index;
         vk.descriptorType = vk::to_vk_descriptor_type(b.type);
         vk.descriptorCount = b.count;
         vk.stageFlags = vk::to_vk_shader_stage_flags(b.stages);
@@ -195,7 +195,7 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
     for (const DescriptorBinding& b : descriptor_set_layout.bindings)
     {
         LogRB.Log("  * binding %i, type %s, stages mask: %i ",
-            b.binding, to_string(b.type), b.stages);
+            b.binding_index, to_string(b.type), b.stages);
     }
     
     RBDescriptorSetLayout handle = allocate_descriptor_layout_handle();
@@ -212,18 +212,18 @@ vk::DescriptorSetLayoutData vk::BufferManager::get_vk_descriptor_set_layout(RBDe
 RBDescriptorSet vk::BufferManager::get_descriptor_set(RBDescriptorSetLayout descriptor_set_layout,
     ResourceUsageType pool_type, uint32_t frame)
 {
-    if (pool_type == ResourceUsageType::Frame)
+    if (pool_type == ResourceUsageType::frame)
         return frames_descriptors[frame][descriptor_set_layout];
     return persistent_descriptors[descriptor_set_layout];
 }
 
 RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
 {
-    if (usage_type == ResourceUsageType::Frame)
+    if (usage_type == ResourceUsageType::frame)
     {
         frames_ubo_counter++;
         
-        const RBBufferHandle handle {frames_ubo_counter, ResourceUsageType::Frame};
+        const RBBufferHandle handle {frames_ubo_counter, ResourceUsageType::frame};
         std::array<vk::BufferInfo, vk::MAX_FRAMES_IN_FLIGHT> buffers;
         for (int32_t index = 0; auto& _ : buffers)
         {
@@ -245,7 +245,7 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
     } else
     {
         persistent_ubo_counter++;
-        const RBBufferHandle handle {persistent_ubo_counter, ResourceUsageType::Persistent};
+        const RBBufferHandle handle {persistent_ubo_counter, ResourceUsageType::persistent};
         
         vk::BufferInfo buffer_info;
         
@@ -264,4 +264,11 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
         persistent_ubos[handle.get_identifier()] = buffer_info;
         return handle;
     }
+}
+
+void vk::BufferManager::update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data)
+{
+    auto& buf = get_buffer(buffer_handle, swapchain.current_frame);
+    
+    memcpy(buf.mapped_ptr, data, size);
 }

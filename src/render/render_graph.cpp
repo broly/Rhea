@@ -3,6 +3,7 @@ module render:render_graph;
 import enum_helpers;
 import :render_backend;
 import <vulkan/vulkan_core.h>;
+import <cassert>;
 
 
 void RenderGraphContext::bind_sampled_texture(RBDescriptorSetLayout layout, uint32_t binding, RGTextureHandle tex)
@@ -11,7 +12,7 @@ void RenderGraphContext::bind_sampled_texture(RBDescriptorSetLayout layout, uint
         layout,
         binding,
         render_graph.get_image(tex),
-        ResourceUsageType::Frame
+        ResourceUsageType::frame
     );
 }
 
@@ -32,14 +33,16 @@ RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
 RGResourceHandle RenderGraph::create_buffer(const RGBufferDesc&)
 {
     RGResourceHandle handle;
-    handle.id = static_cast<uint32_t>(resources.size());
+    handle.id = static_cast<uint32_t>(rg_resources.size());
 
-    resources.push_back({ RGResourceKind::Buffer });
+    rg_resources.push_back({ RGResourceKind::Buffer });
     return handle;
 }
 
 RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
 {
+    assert(!graph_compiled);
+    
     RGPassId id{ static_cast<uint32_t>(passes.size()) };
     passes.push_back(std::move(pass));
     return id;
@@ -47,6 +50,18 @@ RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
 
 void RenderGraph::compile()
 {
+    assert(!graph_compiled);
+    
+    
+    for (auto& pass : passes)
+    {
+        for (RenderResource* resource : pass.resources)
+        {
+            resource->provide(pass.pipeline);
+        }
+    }
+    
+    
     for (auto& tex : textures)
     {
         if (tex.desc.external)
@@ -139,11 +154,15 @@ void RenderGraph::compile()
     execution_order.clear();
     for (uint32_t i = 0; i < passes.size(); ++i)
         execution_order.push_back(i);
+    
+    graph_compiled = true;
 }
 
 
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 {
+    assert(graph_compiled);
+    
     RenderGraphContext ctx(*backend, cmd, {}, *this);
     
     for (auto& tex : textures)
@@ -191,7 +210,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
         }
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
-
+        ctx.pipeline = pass.pipeline;
         backend->begin_render_pass(cmd, ctx.framebuffer);
         pass.execute(ctx);
         backend->end_render_pass(cmd);
@@ -265,4 +284,21 @@ void RenderGraph::rebuild_resources()
             );
         }
     }
+}
+
+PipelineObject* RenderGraph::create_pipeline(const GraphicsPipelineDesc& desc)
+{
+    assert(!graph_compiled);
+    PipelineObject* pipeline = backend->create_pipeline();
+    pipeline->prepare(desc);  // todo temp
+    pipelines.push_back(pipeline);
+    return pipeline;
+}
+
+RenderResource* RenderGraph::create_resource(const RenderResourceDesc& desc)
+{
+    assert(!graph_compiled);
+    RenderResource* resource = backend->create_resource(desc);
+    resources.push_back(resource);
+    return resource;
 }

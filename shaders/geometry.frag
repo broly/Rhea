@@ -4,10 +4,10 @@
 #include "pbr_helpers.glsl"
 
 // ================== INPUTS ==================
-layout(location = VERT_LOCATION_POSTION) in vec3 v_world_pos;
-layout(location = VERT_LOCATION_NORMAL) in vec3 v_world_normal;
-layout(location = VERT_LOCATION_UV) in vec2 v_uv;
-layout(location = VERT_LOCATION_TANGENT) in vec3 v_world_tangent;
+layout(location = 0) in vec3 v_world_pos;
+layout(location = 1) in vec3 v_world_normal;
+layout(location = 2) in vec2 v_uv;
+layout(location = 3) in vec3 v_world_tangent;
 
 // ================== OUTPUT ==================
 layout(location = 0) out vec4 out_color;

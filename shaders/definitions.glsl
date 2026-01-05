@@ -2,12 +2,6 @@
 #define DEFINITIONS
 
 
-// locations
-#define VERT_LOCATION_POSTION 0
-#define VERT_LOCATION_NORMAL 1
-#define VERT_LOCATION_UV 2
-#define VERT_LOCATION_TANGENT 3
-
 // geometry.vert / geometry.frag
 
 #define SET_CAMERA 0

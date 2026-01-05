@@ -7,26 +7,44 @@ import <vulkan/vulkan_core.h>;
 import <cassert>;
 import spirv_reflect;
 import :reflection;
+import :render_resource;
 #include "vk_macro.h"
+import <bit>;
 
 class VkRenderBackend;
 
 VkPipelineObject::VkPipelineObject(
-    const GraphicsPipelineDesc& desc,
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
     vk::BufferManager& in_buffer_manager)
-        : pipeline_desc(desc)
+        : pipeline_desc({})
         , instance(in_instance)
         , swapchain(in_swapchain)
         , buffer_manager(in_buffer_manager)
 {
+}
+
+VkPipelineObject::~VkPipelineObject()
+{
+    if (vk_pipeline != nullptr)
+        vkDestroyPipeline(instance.device, vk_pipeline, nullptr);
+
+    if (pipeline_layout != nullptr)
+        vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
+}
+
+void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
+{
+    pipeline_desc = in_desc;
+
+    GraphicsPipelineDesc& desc = *pipeline_desc;
+    
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
     for (RBDescriptorSetLayout h : desc.layout.sets)
     {
         vk_layouts.push_back(
-            in_buffer_manager.get_vk_descriptor_set_layout(h).vk_layout
+            buffer_manager.get_vk_descriptor_set_layout(h).vk_layout
         );
     }
 
@@ -51,14 +69,16 @@ VkPipelineObject::VkPipelineObject(
     }
 }
 
-VkPipelineObject::~VkPipelineObject()
-{
-    if (vk_pipeline != nullptr)
-        vkDestroyPipeline(instance.device, vk_pipeline, nullptr);
 
-    if (pipeline_layout != nullptr)
-        vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
+static constexpr std::array<VkShaderStageFlagBits, MAX_STAGES> get_vk_stages()
+{
+    std::array<VkShaderStageFlagBits, MAX_STAGES> stages_vk_bits;
+    stages_vk_bits[ShaderStage_index(ShaderStage::vertex)] = VK_SHADER_STAGE_VERTEX_BIT;
+    stages_vk_bits[ShaderStage_index(ShaderStage::fragment)] = VK_SHADER_STAGE_FRAGMENT_BIT;
+    return stages_vk_bits;
 }
+
+constexpr std::array<VkShaderStageFlagBits, MAX_STAGES> STAGES_VK_BITS = get_vk_stages();
 
 
 VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
@@ -68,9 +88,6 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 
     std::vector<VkPipelineShaderStageCreateInfo> vk_stages;
     
-    static std::array<VkShaderStageFlagBits, static_cast<uint32_t>(ShaderStage::MAX)> stages_vk_bits;
-    stages_vk_bits[static_cast<uint32_t>(ShaderStage::Vertex)] = VK_SHADER_STAGE_VERTEX_BIT;
-    stages_vk_bits[static_cast<uint32_t>(ShaderStage::Fragment)] = VK_SHADER_STAGE_FRAGMENT_BIT;
     
     VkGraphicsPipelineCreateInfo pci{
         VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO
@@ -82,19 +99,19 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     std::vector<VkVertexInputAttributeDescription> vk_attrs;
 
     
-    for (uint32_t stage_index = 0; auto& stage : pipeline_desc.stages)
+    for (uint32_t stage_index = 0; auto& stage : pipeline_desc->stages)
     {
         VkPipelineShaderStageCreateInfo vk_stage {
             VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             nullptr,
             0,
-            stages_vk_bits[static_cast<uint32_t>(stage.stage)],
+            STAGES_VK_BITS[ShaderStage_index(stage.stage)],
             shaders[stage_index].get_module(),
             "main"
         };
         vk_stages.push_back(vk_stage);
         
-        if (stage.stage == ShaderStage::Vertex)
+        if (stage.stage == ShaderStage::vertex)
         {            
             o_vertex_input = VkPipelineVertexInputStateCreateInfo {
                 VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
@@ -255,8 +272,9 @@ void VkPipelineObject::reflect_shader(const VkShader& shader, ShaderStage stage)
 {
     SpirvReflection reflection(shader.get_spirv());
     
-    auto input_variables = reflection.get_input_variables();
-    
     pipeline_reflection.insert({stage, 
-        PipelineReflection(input_variables)});
+        PipelineReflection(
+            shader.get_shader_name(),
+            reflection.get_input_variables(), 
+            reflection.get_bindings())});
 }

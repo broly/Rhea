@@ -119,6 +119,18 @@ file(GLOB_RECURSE SHADERS
     ${SHADER_SOURCE_DIR}/*.comp
 )
 
+# Сразу после file(GLOB_RECURSE SHADERS ...)
+source_group("Shaders" FILES ${SHADERS})
+
+# Добавляем шейдеры в цель
+target_sources(rhea PRIVATE ${SHADERS})
+
+# Указываем, что это не файлы для компиляции C++
+set_source_files_properties(${SHADERS}
+    PROPERTIES
+    HEADER_FILE_ONLY TRUE
+)
+
 set(SPIRV_SHADERS "")
 
 
