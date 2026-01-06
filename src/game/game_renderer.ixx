@@ -8,7 +8,6 @@ export class GameRenderer : public Renderer
 {
 public:
     GameRenderer()
-        : camera_buffer(0)
     {
     }
     
@@ -17,24 +16,14 @@ public:
     void init(RBWindowHandle in_window) override;
     void execute() override;
     
+    RenderResource* get_material_resource() override;
     
-    virtual void update_material_descriptor(const RenderMaterial& rm, const MaterialKey& key);
-    
-    virtual RBDescriptorSet allocate_material_descriptor();
-    virtual RBBufferHandle create_material_ubo();
-    RBDescriptorSetLayout get_material_layout() const override;
-
-    virtual void bind_material_ubo(const RenderMaterial& rm);
-    
-    RBBufferHandle camera_buffer;
-    RBBufferHandle light_buffer;
-    
-    RBDescriptorSetLayout camera_layout;
-    RBDescriptorSetLayout tonemap_layout;
-    RBDescriptorSetLayout material_layout;
-    RBDescriptorSetLayout light_layout;
+    void update_material_resource(RenderResourceInstance* material_resource_inst, MaterialKey material_key) override;
     
     std::shared_ptr<Engine> engine;
     
     std::shared_ptr<RenderGraph> render_graph;
+    
+    RenderResource* _mat_res;
+    PipelineObject* geom_pipeline;
 };

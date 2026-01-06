@@ -12,6 +12,8 @@ public:
         update_uniform_buffer_impl(pipeline_object, buffer_name_SUBOPTIMAL, sizeof(T), (void*)&data);
     }
     
+    virtual void update_image(class PipelineObject* pipeline_object, const char* buffer_name_SUBOPTIMAL, RBImageHandle image_handle) = 0;
+    
     virtual void bind(class PipelineObject* pipeline_object, RBCommandList command_list) = 0;
     
     virtual void update_uniform_buffer_impl(class PipelineObject* pipeline_object,

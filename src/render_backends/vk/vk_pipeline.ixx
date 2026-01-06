@@ -22,7 +22,8 @@ public:
         vk::BufferManager& in_buffer_manager);
     ~VkPipelineObject();
     
-    void prepare(const GraphicsPipelineDesc& in_desc);
+    void fetch_shaders(const GraphicsPipelineDesc& in_desc) override;
+    void prepare(const GraphicsPipelineDesc& in_desc) override;
 
     RBPipelineHandle get_pipeline_handle() const override
     {

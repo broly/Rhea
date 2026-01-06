@@ -4,6 +4,7 @@ import :render_backend;
 import :rg_types;
 import <cassert>;
 import <functional>;
+#include <map>
 
 export struct RenderGraphPass
 {
@@ -89,6 +90,7 @@ private:
         RGResourceType type;
     };
 
+    std::map<PipelineObject*, GraphicsPipelineDesc> pipelines_descs;
     std::vector<RGResource> rg_resources;
     std::vector<RenderGraphPass> passes;
 

@@ -34,10 +34,12 @@ void SceneViewProcessor_Mesh::process()
     {
         auto& mesh_ro = meshes[submitted.render_id.identifier];
         
+        auto renderer = RhGlobals::engine->renderer;  // crutch
+        
         const MeshHandle mesh_handle = submitted.mesh;
         auto& mesh_resource = mesh_handle.get();
-        mesh_ro.material = get_or_create_material(MaterialKey::make_key(submitted.material));
-        
+        mesh_ro.material_key = MaterialKey::make_key(submitted.material);
+        mesh_ro.render_resource = get_or_create_material_resource(renderer->get_material_resource(), mesh_ro.material_key);
         mesh_ro.mesh = mesh_handle;
         mesh_ro.bounds = mesh_resource.bounds;
         mesh_ro.mesh = mesh_handle;
@@ -47,24 +49,19 @@ void SceneViewProcessor_Mesh::process()
 }
 
 
-RenderMaterial SceneViewProcessor_Mesh::get_or_create_material(const MaterialKey& key)
+RenderResourceInstance* SceneViewProcessor_Mesh::get_or_create_material_resource(RenderResource* resource, const MaterialKey& key)
 {
     
     auto it = material_cache.find(key);
     if (it != material_cache.end())
         return it->second;
     
-    RenderMaterial rm{};
-    rm.key = key;
+    auto resource_instance = resource->create_instance();
+    
     
     auto renderer = RhGlobals::engine->renderer;  // crutch
-    rm.layout = renderer->get_material_layout();
-    rm.descriptor = renderer->allocate_material_descriptor();
-    rm.material_ubo = renderer->create_material_ubo();
-    renderer->bind_material_ubo(rm);
+    renderer->update_material_resource(resource_instance, key);
     
-    renderer->update_material_descriptor(rm, key);
-    
-    auto [new_it, _] = material_cache.emplace(key, rm);
+    auto [new_it, _] = material_cache.emplace(key, resource_instance);
     return new_it->second;
 }

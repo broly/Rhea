@@ -44,9 +44,13 @@ public:
     virtual void bind_material_ubo(const RenderMaterial& rm);
 
     virtual void execute() {}
+    
+    virtual void update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
+    
+    virtual RenderResource* get_material_resource();
     
     std::shared_ptr<RenderBackend> render_backend;
     

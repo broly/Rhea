@@ -7,6 +7,7 @@ export class PipelineObject
 {
 public:
     virtual RBPipelineHandle get_pipeline_handle() const = 0;
+    virtual void fetch_shaders(const GraphicsPipelineDesc& in_desc) = 0;
     virtual void prepare(const GraphicsPipelineDesc& in_desc) = 0;
 };
 

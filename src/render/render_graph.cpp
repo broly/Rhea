@@ -55,10 +55,29 @@ void RenderGraph::compile()
     
     for (auto& pass : passes)
     {
+        auto desc_it = pipelines_descs.find(pass.pipeline);
+        auto& desc = desc_it->second;
+        pass.pipeline->fetch_shaders(desc);
+    }
+    
+    
+    for (auto& pass : passes)
+    {
         for (RenderResource* resource : pass.resources)
         {
             resource->provide(pass.pipeline);
         }
+    }
+    
+    for (auto& pass : passes)
+    {
+        auto desc_it = pipelines_descs.find(pass.pipeline);
+        auto& desc = desc_it->second;
+        for (auto resource : pass.resources)
+        {
+            desc.layout.sets.push_back(resource->get_descriptor_set_layout(pass.pipeline));
+        }
+        pass.pipeline->prepare(desc);
     }
     
     
@@ -212,6 +231,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
         ctx.pipeline = pass.pipeline;
         backend->begin_render_pass(cmd, ctx.framebuffer);
+        backend->bind_pipeline(cmd, ctx.pipeline);
         pass.execute(ctx);
         backend->end_render_pass(cmd);
     }
@@ -290,7 +310,7 @@ PipelineObject* RenderGraph::create_pipeline(const GraphicsPipelineDesc& desc)
 {
     assert(!graph_compiled);
     PipelineObject* pipeline = backend->create_pipeline();
-    pipeline->prepare(desc);  // todo temp
+    pipelines_descs.insert({pipeline, desc});
     pipelines.push_back(pipeline);
     return pipeline;
 }

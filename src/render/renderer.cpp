@@ -38,6 +38,11 @@ void Renderer::bind_material_ubo(const RenderMaterial& rm)
     assert(false);
 }
 
+void Renderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key)
+{
+    assert(false);
+}
+
 RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
 {
     const Texture& data = handle.get();
@@ -58,4 +63,9 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
         return it->second;
 
     return create_texture_from_asset(handle);
+}
+
+RenderResource* Renderer::get_material_resource()
+{
+    unreachable("qweqwf");
 }

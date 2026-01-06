@@ -29,6 +29,8 @@ public:
     
     virtual void provide(class PipelineObject* pipeline_object) override;
     
+    virtual RBDescriptorSetLayout get_descriptor_set_layout(class PipelineObject* pipeline_object) override;
+    
     std::map<VkPipelineObject*, VkRenderResourcePipelineInfo> info_by_pipeline;
     
     RenderResourceInstance* single_resource = nullptr;

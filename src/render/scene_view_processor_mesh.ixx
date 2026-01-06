@@ -6,6 +6,7 @@ import glm;
 import <string>;
 import assets;
 import :render_objects;
+import :render_resource;
 import rhcomponents;
 #include "scene_proxy_boilerplate.h"
 import <unordered_map>;
@@ -15,7 +16,9 @@ export struct RenderObject_Mesh
     MeshHandle mesh;
     glm::mat4 world;
     AABB bounds;
-    RenderMaterial material;
+    MaterialKey material_key;
+    RenderResourceInstance* render_resource;
+    // RenderMaterial material;
     std::string debug_name;
 };
 
@@ -34,8 +37,8 @@ public:
     std::vector<RenderId> vacated_mesh_ids; 
     
     
-    RenderMaterial get_or_create_material(const MaterialKey& material_key);
+    RenderResourceInstance* get_or_create_material_resource(RenderResource* resource, const MaterialKey& material_key);
     
-    std::unordered_map<MaterialKey, RenderMaterial, MaterialKeyHash> material_cache;
+    std::unordered_map<MaterialKey, RenderResourceInstance*, MaterialKeyHash> material_cache;
 };
 REGISTER_SCENE_PROXY_PROCESSOR(SceneViewProcessor_Mesh)

@@ -1,6 +1,7 @@
 ﻿export module render:render_objects;
 
 import :handle_types;
+import :render_resource_instance;
 import rhmath;
 import assets;
 import glm;
@@ -81,10 +82,7 @@ private:
 
 export struct RenderMaterial
 {
-    RBDescriptorSet descriptor;      // Persistent
-    RBDescriptorSetLayout layout;
-
-    RBBufferHandle material_ubo;     // optional
+    RenderResourceInstance* resource = nullptr;
     
     MaterialKey key;
 };

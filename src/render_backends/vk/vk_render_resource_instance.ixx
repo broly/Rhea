@@ -12,6 +12,8 @@ public:
     virtual void update_uniform_buffer_impl(PipelineObject* pipeline_object, 
         const char* buffer_name_SUBOPTIMAL, size_t size, void* data);
     
+    void update_image(class PipelineObject* pipeline_object, const char* buffer_name_SUBOPTIMAL, RBImageHandle image_handle) override;
+    
     void bind(class PipelineObject* pipeline_object, RBCommandList command_list) override;
 
     vk::BufferManager& buffer_manager;

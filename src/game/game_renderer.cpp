@@ -47,14 +47,14 @@ void GameRenderer::init(RBWindowHandle in_window)
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     render_graph = std::make_shared<RenderGraph>(render_backend);
     
-    //auto camera_resource = render_graph->create_resource({
-    //    .name = "camera",
-    //    .stages = ShaderStage::all,
-    //    .usage_type = ResourceUsageType::frame,
-    //    .variables = {
-    //        { "camera", sizeof(CameraUBO) }
-    //    }
-    //});
+    auto camera_resource = render_graph->create_resource({
+        .name = "camera",
+        .stages = ShaderStage::all,
+        .usage_type = ResourceUsageType::frame,
+        .variables = {
+            { "camera", sizeof(CameraUBO) }
+        }
+    });
     
     auto light_resource = render_graph->create_resource({
         .name = "light",
@@ -68,7 +68,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     auto material_resource = render_graph->create_resource({
         .name = "material",
         .stages = ShaderStage::fragment,
-        .usage_type = ResourceUsageType::frame,
+        .usage_type = ResourceUsageType::persistent,
         .variables = {
             { "material", sizeof(MaterialUBO) },
             { "u_base_color" },
@@ -77,6 +77,8 @@ void GameRenderer::init(RBWindowHandle in_window)
             { "u_orm" },
         }
     });
+    
+    _mat_res = material_resource;
     
     auto tonemap_resource = render_graph->create_resource({
         .name = "tonemap",
@@ -87,22 +89,6 @@ void GameRenderer::init(RBWindowHandle in_window)
         },
     });
     
-    DescriptorSetLayoutDesc camera_set{
-        .set_index = SET_CAMERA,
-        .bindings = {{
-            .binding_index = BINDING_CAMERA_UBO,
-            .type = DescriptorType::UniformBuffer,
-            .stages = ShaderStage::vertex | ShaderStage::fragment
-        }},
-        .debug_name = "camera"
-    };
-    
-
-    camera_layout = render_backend->create_descriptor_set_layout(camera_set);
-    render_backend->allocate_descriptor_sets_for_layout(camera_layout, ResourceUsageType::frame);
-    camera_buffer = render_backend->create_uniform_buffer(sizeof(CameraUBO), ResourceUsageType::frame);
-    render_backend->bind_buffer_to_descriptor(camera_layout, BINDING_CAMERA_UBO, camera_buffer);
-    
     RGTextureDesc hdr_color_desc{
         .width  = 0,
         .height = 0,
@@ -112,54 +98,6 @@ void GameRenderer::init(RBWindowHandle in_window)
     };
 
     auto hdr_color = render_graph->create_texture(hdr_color_desc);
-    
-    DescriptorSetLayoutDesc material_set{
-        .set_index = SET_MATERIAL,
-        .bindings = {
-            {
-                .binding_index = BINDING_MATERIAL_UBO,
-                .type = DescriptorType::UniformBuffer,
-                .stages = ShaderStage::fragment
-            },
-            {
-                .binding_index = BINDING_BASE_COLOR,
-                .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::fragment
-            },
-            {
-                .binding_index = BINDING_EMISSIVE,
-                .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::fragment
-            },
-            {
-                .binding_index = BINDING_NORMAL_MAP,
-                .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::fragment
-            },
-            {
-                .binding_index = BINDING_ORM,
-                .type = DescriptorType::CombinedImageSampler,
-                .stages = ShaderStage::fragment
-            }
-        },
-        .debug_name = "material"
-    };
-    
-    material_layout = render_backend->create_descriptor_set_layout(material_set);   
-    
-    
-    DescriptorSetLayoutDesc light_set{
-        .set_index = SET_LIGHT,
-        .bindings = {{
-            .binding_index = BINDING_LIGHT_UBO,
-            .type = DescriptorType::UniformBuffer,
-            .stages = ShaderStage::fragment
-        }},
-        .debug_name = "light"
-    };
-
-    
-    light_layout = render_backend->create_descriptor_set_layout(light_set);
     
     
     GraphicsPipelineDesc geom_pipeline_desc{
@@ -186,11 +124,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             }
         },
         .layout = {
-            .sets = { 
-                camera_layout,  // 0
-                material_layout, // 1
-                light_layout, // 2
-            }, 
+            .sets = {}, 
             .push_constants = {{
                 .stages = ShaderStage::vertex,
                 .offset = 0,
@@ -204,18 +138,6 @@ void GameRenderer::init(RBWindowHandle in_window)
     };
     
     
-    DescriptorSetLayoutDesc tonemap_set{
-        .set_index = SET_TONEMAPPING,
-        .bindings = {{
-            .binding_index = BINDING_HDR_COLOR,
-            .type    = DescriptorType::CombinedImageSampler,
-            .stages  = ShaderStage::fragment
-        }},
-        .debug_name = "tonemap"
-    };
-    
-    tonemap_layout = render_backend->create_descriptor_set_layout(tonemap_set);   
-    
     GraphicsPipelineDesc tonemap_pipeline_desc{
         .stages = {
             {
@@ -228,7 +150,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             }
         },
         .layout = {
-            .sets = { tonemap_layout },
+            .sets = {  },
         },
         .rt_compat = {
             .color_attachment_count = 1,
@@ -236,8 +158,9 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     };
     auto tonemap_pipeline = render_graph->create_pipeline(tonemap_pipeline_desc);
-
     auto geometry_pipeline = render_graph->create_pipeline(geom_pipeline_desc);
+    
+    geom_pipeline = geometry_pipeline;
     
     auto swapchain_extent = render_backend->get_swapchain_extent();
 
@@ -264,27 +187,6 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     auto scene_color = render_graph->create_texture(color_desc);
     
-    render_backend->allocate_descriptor_sets_for_layout(
-        light_layout,
-        ResourceUsageType::frame
-    );
-    
-    
-    render_backend->allocate_descriptor_sets_for_layout(
-        tonemap_layout,
-        ResourceUsageType::frame
-    );
-    
-    light_buffer = render_backend->create_uniform_buffer(
-        sizeof(LightUBO),
-        ResourceUsageType::frame
-    );
-    
-    render_backend->bind_buffer_to_descriptor(
-        light_layout,
-        BINDING_LIGHT_UBO,
-        light_buffer
-    );
     auto sampler = render_backend->create_sampler(RBSamplerDesc{
         .linear=true,
         .clamp_to_edge=true
@@ -295,15 +197,14 @@ void GameRenderer::init(RBWindowHandle in_window)
         .name = "GeometryForward",
         .pipeline = geometry_pipeline,  // added this
         .writes = { 
-            { hdr_color, RBImageUsage::ColorAttachment }, 
-            { depth_texture, RBImageUsage::DepthStencilAttachment } 
+        { hdr_color, RBImageUsage::ColorAttachment }, 
+        { depth_texture, RBImageUsage::DepthStencilAttachment } 
         },
-        .resources = { /* camera_resource, light_resource, material_resource */ },    
+        .resources = { camera_resource, material_resource, light_resource },    
         .execute = [=](RenderGraphContext& ctx)
         {
             auto& extractor = engine->scene_view;
             auto cmd = ctx.cmd;
-            ctx.backend.bind_pipeline(cmd, geometry_pipeline);
             
             // ---------- Camera ----------
             auto& camera_processor = extractor->get_processor<SceneViewProcessor_Camera>();
@@ -318,10 +219,9 @@ void GameRenderer::init(RBWindowHandle in_window)
                 active_camera->view;
             camera_ubo.camera_pos = active_camera->position;
             
-            // auto cam = camera_resource->query_single();
-            // cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo);
-
-            ctx.backend.update_uniform_buffer(camera_buffer, camera_ubo);
+            auto cam = camera_resource->query_single();
+            cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo);
+            cam->bind(ctx.pipeline, cmd);
 
             // ---------- Lights ----------
             auto& point_light_processor = extractor->get_processor<SceneViewProcessor_Light>();
@@ -335,39 +235,22 @@ void GameRenderer::init(RBWindowHandle in_window)
                 light_ubo.lights[i].color    = glm::vec4(lights[i].color);
             }
 
-            ctx.backend.update_uniform_buffer(light_buffer, light_ubo);
+            auto light = light_resource->query_single();
+            light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo);
+            light->bind(ctx.pipeline, cmd);
 
-            // ---------- Pipeline ----------
-            
-            // cam->bind(ctx.pipeline, cmd);
-
-            ctx.backend.bind_descriptor_set(
-                cmd, SET_CAMERA,
-                ctx.backend.get_descriptor_set(camera_layout, ResourceUsageType::frame),
-                geometry_pipeline->get_pipeline_handle()
-            );
-
-            ctx.backend.bind_descriptor_set(
-                cmd, SET_LIGHT,
-                ctx.backend.get_descriptor_set(light_layout, ResourceUsageType::frame),
-                geometry_pipeline->get_pipeline_handle()
-            );
 
             // ---------- Draw ----------
             
             auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
             for (const auto& ro : meshes_processor.meshes)
             {
-                const RenderMaterial& mat =
-                    meshes_processor.get_or_create_material(ro.material.key);
-
+                auto material_resource_instance = meshes_processor.get_or_create_material_resource(
+                    material_resource, ro.material_key);
+                
+                material_resource_instance->bind(ctx.pipeline, cmd);
+                
                 ctx.backend.get_or_create_mesh_buffers(ro.mesh);
-
-                ctx.backend.bind_descriptor_set(
-                    cmd, SET_MATERIAL,
-                    mat.descriptor,
-                    geometry_pipeline->get_pipeline_handle()
-                );
 
                 ctx.backend.bind_mesh(cmd, ro.mesh);
                 ctx.backend.push_constants(
@@ -375,6 +258,7 @@ void GameRenderer::init(RBWindowHandle in_window)
                     geometry_pipeline->get_pipeline_handle()
                 );
 
+                
                 ctx.backend.draw_indexed(
                     cmd,
                     ro.mesh.get().get_index_count()
@@ -395,18 +279,10 @@ void GameRenderer::init(RBWindowHandle in_window)
         .resources = { tonemap_resource },
         .execute = [=](RenderGraphContext& ctx)
         {
-            ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
-            render_backend->bind_image_to_descriptor(
-                tonemap_layout,
-                BINDING_HDR_COLOR,
-                render_graph->get_image(hdr_color),
-                sampler
-            );
-            ctx.backend.bind_descriptor_set(
-                ctx.cmd, SET_TONEMAPPING,
-                ctx.backend.get_descriptor_set(tonemap_layout, ResourceUsageType::frame),
-                tonemap_pipeline->get_pipeline_handle()
-            );
+            auto tonemap = tonemap_resource->query_single();
+            tonemap->update_image(ctx.pipeline, "u_hdr_color", render_graph->get_image(hdr_color));
+            tonemap->bind(ctx.pipeline, ctx.cmd);
+            
             ctx.backend.draw_fullscreen(ctx.cmd);
         }
     });
@@ -441,79 +317,32 @@ void GameRenderer::execute()
 
 }
 
-void GameRenderer::update_material_descriptor(const RenderMaterial& rm, const MaterialKey& key)
+RenderResource* GameRenderer::get_material_resource()
 {
-    render_backend->update_uniform_buffer(
-        rm.material_ubo,
+    return _mat_res;
+}
+
+void GameRenderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key)
+{
+    
+    material_resource_instance->update_uniform_buffer(geom_pipeline, "material", 
         MaterialUBO{
-            .base_color_mult = key.base_color_mult,
-            .emissive_mult = key.emissive_mult,
-            .occlusion_mult = key.occlusion_mult,
-            .roughness_mult = key.roughness_mult,
-            .metallic_mult = key.metallic_mult,
-        }
-    );
-
-    render_backend->update_sampled_image(
-        rm.layout,
-        BINDING_BASE_COLOR, // base_color
-        get_texture(key.base_color),
-        ResourceUsageType::persistent
-    );
-
-    render_backend->update_sampled_image(
-        rm.layout,
-        BINDING_EMISSIVE, // emissive
-        get_texture(key.emissive),
-        ResourceUsageType::persistent
-    );
-
-    render_backend->update_sampled_image(
-        rm.layout,
-        BINDING_NORMAL_MAP, // normal
-        get_texture(key.normal),
-        ResourceUsageType::persistent
-        );
-
-    render_backend->update_sampled_image(
-        rm.layout,
-        BINDING_ORM, // occlusion_roughness_metallic
-        get_texture(key.occlusion_roughness_metallic),
-        ResourceUsageType::persistent
-    );
+            .base_color_mult = material_key.base_color_mult,
+            .emissive_mult = material_key.emissive_mult,
+            .occlusion_mult = material_key.occlusion_mult,
+            .roughness_mult = material_key.roughness_mult,
+            .metallic_mult = material_key.metallic_mult,
+        });
+                
+    material_resource_instance->update_image(geom_pipeline, "u_base_color", 
+        get_texture(material_key.base_color));
+    material_resource_instance->update_image(geom_pipeline, "u_emissive", 
+        get_texture(material_key.emissive));
+    material_resource_instance->update_image(geom_pipeline, "u_normal_map", 
+        get_texture(material_key.normal));
+    material_resource_instance->update_image(geom_pipeline, "u_orm", 
+        get_texture(material_key.occlusion_roughness_metallic));                
+                
 }
 
-RBDescriptorSet GameRenderer::allocate_material_descriptor()
-{
-    auto result = render_backend->allocate_descriptor_sets_for_layout(
-        material_layout,
-        ResourceUsageType::persistent
-    );
-    
-    ensure(result.has_value());
-    
-    return *result;
-}
-
-RBBufferHandle GameRenderer::create_material_ubo()
-{
-    return render_backend->create_uniform_buffer(
-        sizeof(MaterialUBO),
-        ResourceUsageType::persistent
-    );
-}
-
-RBDescriptorSetLayout GameRenderer::get_material_layout() const
-{
-    return material_layout;
-}
-
-void GameRenderer::bind_material_ubo(const RenderMaterial& rm)
-{
-    render_backend->bind_buffer_to_descriptor(
-        rm.layout,
-        BINDING_MATERIAL_UBO,      // binding = 0
-        rm.material_ubo
-    );
-}
 

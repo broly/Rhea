@@ -18,19 +18,19 @@ import <source_location>;
 
 
 #define checkf(assertion, text, ...) \
-    [&](std::source_location sl = std::source_location::current()) \
+    do \
     { \
         if (!(assertion)) \
         { \
-            print_error(sl, text, __VA_ARGS__); \
+            print_error(std::source_location::current(), text, ##__VA_ARGS__); \
             __debugbreak(); \
             std::terminate(); \
         }\
-    }()
+    } while (false)
 
 #define unreachable(text, ...) \
     {\
-        print_error(std::source_location::current(), text, __VA_ARGS__); \
+        print_error(std::source_location::current(), text, ##__VA_ARGS__); \
         __debugbreak(); \
         std::terminate(); \
     }

@@ -16,9 +16,20 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeli
     auto vk_pipeline_object = (VkPipelineObject*)pipeline_object;
     const auto& info = resource.info_by_pipeline.find(vk_pipeline_object);
     
-    auto  [index, binding] = info->second.descritor_set_layout_desc.get_binding(buffer_name_SUBOPTIMAL);
-        
+    auto [index, binding] = info->second.descritor_set_layout_desc.get_binding(buffer_name_SUBOPTIMAL);
+    checkf(binding.type == DescriptorType::UniformBuffer, "type mismatch");
     buffer_manager.update_uniform_buffer(info->second.buffers[index].value(), size, data);
+}
+
+void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_object, const char* buffer_name_SUBOPTIMAL,
+                                              RBImageHandle image_handle)
+{
+    auto vk_pipeline_object = (VkPipelineObject*)pipeline_object;
+    const auto& info_it = resource.info_by_pipeline.find(vk_pipeline_object);
+    auto& info = info_it->second;
+    auto [index, binding] = info.descritor_set_layout_desc.get_binding(buffer_name_SUBOPTIMAL);
+    checkf(binding.type == DescriptorType::CombinedImageSampler, "type mismatch");
+    resource.backend.update_sampled_image(info.layout, binding.binding_index, image_handle, usage);
 }
 
 void VkRenderResourceInstance::bind(class PipelineObject* pipeline_object, RBCommandList command_list)

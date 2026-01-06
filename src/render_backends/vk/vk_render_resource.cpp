@@ -61,7 +61,7 @@ RenderResourceInstance* VkRenderResource::create_instance()
         {
             if (binding.type == DescriptorType::UniformBuffer)
             {
-                RBBufferHandle buffer = buffer_manager.create_uniform_buffer(binding.size, ResourceUsageType::frame);
+                RBBufferHandle buffer = buffer_manager.create_uniform_buffer(binding.size, desc.usage_type);
                 buffer_manager.bind_buffer_to_descriptor(info.layout, binding.binding_index, buffer);
                 if (info.buffers.size() < index + 1)
                     info.buffers.resize(index + 1, std::nullopt);
@@ -187,4 +187,14 @@ void VkRenderResource::provide(class PipelineObject* pipeline_object)
     info.descritor_set_layout_desc = descriptor_set;
     info.layout = buffer_manager.create_descriptor_set_layout(descriptor_set);
     info_by_pipeline.insert({vk_pipeline_object, info});
+}
+
+RBDescriptorSetLayout VkRenderResource::get_descriptor_set_layout(class PipelineObject* pipeline_object)
+{
+    auto vk_pipeline_object = (VkPipelineObject*)pipeline_object;
+    auto info_it = info_by_pipeline.find(vk_pipeline_object);
+    auto& info = info_it->second;
+    
+    return info.layout;
+    
 }

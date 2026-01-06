@@ -33,8 +33,24 @@ VkPipelineObject::~VkPipelineObject()
         vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
 }
 
+void VkPipelineObject::fetch_shaders(const GraphicsPipelineDesc& in_desc)
+{
+    pipeline_desc = in_desc;
+
+    GraphicsPipelineDesc& desc = *pipeline_desc;
+    
+    
+    for (auto& stage : desc.stages)
+    {
+        VkShader stage_shader(instance.device, stage.shader);
+        reflect_shader(stage_shader, stage.stage);
+        shaders.push_back(std::move(stage_shader));
+    }
+}
+
 void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
 {
+    
     pipeline_desc = in_desc;
 
     GraphicsPipelineDesc& desc = *pipeline_desc;
@@ -60,13 +76,6 @@ void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
     plci.pPushConstantRanges = push_constants.data();
 
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
-    
-    for (auto& stage : desc.stages)
-    {
-        VkShader stage_shader(instance.device, stage.shader);
-        reflect_shader(stage_shader, stage.stage);
-        shaders.push_back(std::move(stage_shader));
-    }
 }
 
 
