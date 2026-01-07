@@ -16,18 +16,11 @@ import :pipeline;
 
 
 
-void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data)
+void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
 {
-    resource_manager.update_uniform_buffer(buffer_handle, size, data);
+    resource_manager.update_uniform_buffer(buffer_handle, size, data, frame);
 }
 
-void VkRenderBackend::bind_buffer_to_descriptor(
-    RBDescriptorSetLayout layout,
-    uint32_t binding,
-    RBBufferHandle buffer)
-{
-    resource_manager.bind_buffer_to_descriptor(layout, binding, buffer);
-}
 
 RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
 {
@@ -67,12 +60,6 @@ void VkRenderBackend::transition_image(
     );
 }
 
-
-vk::BufferInfo& VkRenderBackend::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
-{
-    return resource_manager.get_buffer(buffer_handle, frame_index);
-}
-
 RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb) const
 {
     RenderPassDesc rp{};
@@ -104,10 +91,10 @@ void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
     );
 }
 
-void VkRenderBackend::update_sampled_image(RBDescriptorSetLayout layout, uint32_t binding, RBImageHandle image,
+void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
     ResourceUsageType usage)
 {
-    VkDescriptorSet set = get_descriptor_set(layout, usage);
+    // VkDescriptorSet set = get_descriptor_set(layout, usage);
 
 
     VkDescriptorImageInfo info{};
@@ -276,15 +263,6 @@ void VkRenderBackend::create_descriptor_pool()
     resource_manager.create_descriptor_pool();
 }
 
-
-
-std::optional<RBDescriptorSet> VkRenderBackend::allocate_descriptor_sets_for_layout(
-    RBDescriptorSetLayout layout_handle,
-    ResourceUsageType usage_type)
-{
-    return resource_manager.allocate_descriptor_sets_for_layout(layout_handle, usage_type);
-}
-
 void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle)
 {
     auto& pipeline = pipelines[pipeline_handle];
@@ -322,7 +300,7 @@ void VkRenderBackend::advance_frame()
     swapchain.advance_frame();
 }
 
-void VkRenderBackend::get_or_create_mesh_buffers(MeshHandle handle)
+void VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle)
 {
     mesh_manager.get_or_create_mesh_buffers(handle);
 }
@@ -492,6 +470,94 @@ void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, 
 
 RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
 {
+    const TextureFormat format =
+        format_override.value_or(tex.format);
+
+    // =========================
+    // STATIC BLACK TEXTURE (FALLBACK)
+    // =========================
+    static std::unordered_map<TextureFormat, RBImageHandle> black_textures;
+
+    if (tex.width == 0 || tex.height == 0)
+    {
+        auto it = black_textures.find(format);
+        if (it != black_textures.end())
+            return it->second;
+
+        // --- create 1x1 black texture ---
+        RBImageDesc desc;
+        desc.width  = 1;
+        desc.height = 1;
+        desc.format = format;
+        desc.usage =
+            RenderTextureUsage::Sampled |
+            RenderTextureUsage::TransferDst;
+
+        RBImageHandle image = create_image(desc);
+        auto& res = image_manager.get_image_resource(image);
+
+        const size_t pixel_size =
+            format == TextureFormat::RGB8 ? 3 : 4;
+
+        uint8_t black_pixel[4] = { 0, 0, 0, 255 };
+
+        VkBuffer staging_buffer;
+        VkDeviceMemory staging_memory;
+
+        vk::create_buffer(
+            instance.device,
+            instance.physical_device,
+            pixel_size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            staging_buffer,
+            staging_memory);
+
+        vk::update_buffer(
+            instance.device,
+            staging_memory,
+            black_pixel,
+            pixel_size);
+
+        immediate_command_pool.submit([&](VkCommandBuffer cmd)
+        {
+            transition_image(
+                cmd,
+                image,
+                RBImageUsage::Undefined,
+                RBImageUsage::TransferDst);
+
+            VkBufferImageCopy copy{};
+            copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy.imageSubresource.layerCount = 1;
+            copy.imageExtent = { 1, 1, 1 };
+
+            vkCmdCopyBufferToImage(
+                cmd,
+                staging_buffer,
+                res.image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1,
+                &copy);
+
+            transition_image(
+                cmd,
+                image,
+                RBImageUsage::TransferDst,
+                RBImageUsage::SampledFragment);
+        });
+
+        vk::destroy_buffer(
+            instance.device,
+            staging_buffer,
+            staging_memory);
+
+        black_textures[format] = image;
+        return image;
+    }
+    
+    
     RBImageDesc desc;
     desc.width  = tex.width;
     desc.height = tex.height;
@@ -588,7 +654,7 @@ RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
 }
 
 
-void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshHandle mesh)
+void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame)
 {
     mesh_manager.bind(cmd, mesh);
 }
@@ -827,11 +893,6 @@ vk::DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(RBDesc
     return resource_manager.get_vk_descriptor_set_layout(descriptor_set_layout);
 }
 
-RBDescriptorSet VkRenderBackend::get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type)
-{
-    return resource_manager.get_descriptor_set(rb_descriptor_set_layout, pool_type, swapchain.current_frame);
-}
-
 RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
 {
     return resource_manager.create_uniform_buffer(buffer_size, usage_type);
@@ -864,24 +925,4 @@ RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
     VK_CHECK(vkCreateSampler(instance.get_device(), &info, nullptr, &sampler));
 
     return RBSampler{ sampler };
-}
-
-void VkRenderBackend::bind_image_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBImageHandle image,
-    RBSampler sampler)
-{
-    auto image_view = image_manager.get_image_view(image);
-
-    VkDescriptorImageInfo img_info{};
-    img_info.imageView = image_view;
-    img_info.sampler   = sampler.as<VkSampler>();
-    img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet = get_descriptor_set(layout, ResourceUsageType::frame).as<VkDescriptorSet>();
-    write.dstBinding = binding;
-    write.descriptorCount = 1;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write.pImageInfo = &img_info;
-
-    vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
 }

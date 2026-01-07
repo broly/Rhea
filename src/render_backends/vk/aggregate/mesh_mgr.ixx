@@ -25,11 +25,11 @@ namespace vk
         vk::Instance& instance;
         
         
-        void get_or_create_mesh_buffers(MeshHandle handle);
+        void get_or_create_mesh_buffers(MeshPrimHandle handle);
         
-        void bind(const RBCommandList& cmd, MeshHandle mesh);
+        void bind(const RBCommandList& cmd, MeshPrimHandle mesh);
 
 
-        std::map<MeshHandle, MeshGPUData> mesh_map;
+        std::map<MeshPrimHandle, MeshGPUData> mesh_map;
     };
 }

@@ -32,7 +32,6 @@ export namespace reflect_inner
     }
 }
 
-
     
 export inline void serialize_json_value(Json::Int& target, const Json::Value& value)
 {
@@ -63,6 +62,22 @@ export inline void serialize_json_value(std::string& target, const Json::Value& 
 
 
 
+// export template<typename T>
+// requires requires(T& t, const Json::Value& v) 
+// {
+//     serialize_json_value(t, v);
+// }
+// inline void serialize_json_value(std::vector<T>& target, const Json::Value& value)
+// {
+//     assert(value.isArray());
+//     target.clear();
+//     for (auto& json_item : value)
+//     {
+//         T array_item;
+//         serialize_json_value<T>(array_item, json_item);
+//         target.push_back(array_item);
+//     }
+// }
 
 
 export inline void serialize_json_value(float& target, const Json::Value& value)
@@ -80,6 +95,37 @@ export inline void serialize_json_value(bool& target, const Json::Value& value)
     assert(value.isBool());
     target = value.asBool();
 }
+
+template<typename T>
+struct is_vector
+{
+    static bool constexpr value = false;
+};
+
+template<typename T>
+struct is_vector<std::vector<T> > 
+{
+    static bool constexpr value = true;
+};
+
+template<typename T>
+constexpr bool is_vector_v = is_vector<T>::value;
+
+
+template<typename>
+struct is_map 
+{
+    static bool constexpr value = false;
+};
+
+template<typename K, typename V>
+struct is_map<std::map<K, V> > 
+{
+    static bool constexpr value = true;
+};
+
+template<typename T>
+constexpr bool is_map_v = is_map<T>::value;
     
 export namespace reflect::json
 {
@@ -90,17 +136,46 @@ export namespace reflect::json
     template<typename T>
     void do_serialize_json_value(T& target, const Json::Value& value, bool is_loading)
     {
+        
         if constexpr (reflect::is_reflected_v<T>)
         {
             assert(value.isObject());
             visit_serialize(value, target, is_loading);
-        } else
+        } else if constexpr (is_vector_v<std::decay_t<T>>)
         {
-            if constexpr (!requires { serialize_json_value(target, value); })
+            assert(value.isArray());
+            target.clear();
+            for (auto& json_item : value)
             {
-                ReflectionInfo<T>::reflected;
+                typename T::value_type array_item;
+                // serialize_json_value(array_item, json_item);
+                visit_serialize(json_item, array_item, is_loading);
+                target.push_back(array_item);
             }
-            static_assert(requires { serialize_json_value(target, value); });
+        } else if constexpr (is_map_v<std::decay_t<T>>)
+        {
+            assert(value.isObject());
+            auto member_names = value.getMemberNames();
+            
+            static_assert(std::is_same_v<typename T::key_type, std::string>);
+            
+            for (auto& member_name : member_names)
+            {
+                typename T::mapped_type map_value;
+                
+                auto& json_value = value[member_name];
+                
+                visit_serialize(json_value, map_value, is_loading);
+                target.try_emplace(member_name, map_value);
+            }
+        } else if constexpr (requires { serialize_json_value(target, value); })
+        {
+            // visit_serialize(value, target, is_loading);
+            // if constexpr (!requires { serialize_json_value(target, value); })
+            // {
+            //     ReflectionInfo<T>::reflected;
+            // }
+            // static_assert(requires { serialize_json_value(target, value); });
             serialize_json_value(target, value);
         }
     }

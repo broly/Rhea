@@ -5,22 +5,26 @@
 
 import globals;
 import paths;
+import log;
+#include "logging/log_macro.h"
 
 
+DEFINE_LOGGER(LogAssets, Log);
 
 MeshHandle AssetManager::load_mesh(const std::string& rel_path)
 {
     if (mesh_by_path.contains(rel_path))
         return mesh_by_path[rel_path];
+    LogAssets.Log("Loading mesh: %s", rel_path.c_str());
     
     const std::filesystem::path path = paths::get_assets_path() / rel_path;
     
-    std::optional<Mesh> mesh_opt = Mesh::create_from_file(path);
+    std::optional<StaticMesh> mesh_opt = StaticMesh::create_from_file(path);
     
     if (!mesh_opt.has_value())
         return MeshHandle::invalid();
     
-    Mesh mesh = std::move(*mesh_opt);
+    StaticMesh mesh = std::move(*mesh_opt);
     
     mesh.name = rel_path;
     const uint32_t mesh_id = ++meshes_counter;
@@ -38,12 +42,18 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
     if (texture_by_path.contains(rel_path))
         return texture_by_path[rel_path];
     
+    
+    LogAssets.Log("Loading texture: %s", rel_path.c_str());
+    
     const std::filesystem::path path = paths::get_assets_path() / rel_path;
     
     std::optional<Texture> texture_opt = Texture::create_from_file(path);
     
     if (!texture_opt.has_value())
+    {
+        LogAssets.Log("Loading texture failed: %s", rel_path.c_str());
         return TextureHandle::invalid();
+    }
     
     Texture texture = std::move(*texture_opt);
     
@@ -63,7 +73,7 @@ AssetManager& AssetManager::get()
     return *RhGlobals::engine->asset_manager;
 }
 
-const Mesh& AssetManager::get_mesh(MeshHandle id)
+const StaticMesh& AssetManager::get_mesh(MeshHandle id)
 {
     return loaded_meshes[id];
 }

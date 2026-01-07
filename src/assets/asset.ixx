@@ -11,7 +11,17 @@ static constexpr auto INVALID_ASSET_ID = std::numeric_limits<AssetId>::max();
 export template<typename T>
 struct AssetHandle
 {
-    AUTO_SPACESHIP(AssetHandle, id)
+    AUTO_SPACESHIP(AssetHandle, id);
+    
+    friend bool operator==(const AssetHandle<T>& lhs, const AssetHandle<T>& rhs)
+    {
+        return lhs.id == rhs.id;
+    }
+    
+    friend bool operator!=(const AssetHandle<T>& lhs, const AssetHandle<T>& rhs)
+    {
+        return lhs.id != rhs.id;
+    }
     
     AssetId id = INVALID_ASSET_ID;
     

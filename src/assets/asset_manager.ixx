@@ -17,14 +17,14 @@ public:
     static AssetManager& get();
     
     
-    const Mesh& get_mesh(MeshHandle id);
+    const StaticMesh& get_mesh(MeshHandle id);
     const Texture& get_texture(TextureHandle texture_handle);
     
     
     std::map<TextureHandle, Texture> loaded_textures;
     std::map<std::string, TextureHandle> texture_by_path;
     
-    std::map<MeshHandle, Mesh> loaded_meshes;
+    std::map<MeshHandle, StaticMesh> loaded_meshes;
     std::map<std::string, MeshHandle> mesh_by_path;
     
     uint32_t meshes_counter;

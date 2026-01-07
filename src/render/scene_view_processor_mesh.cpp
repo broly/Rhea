@@ -2,6 +2,7 @@
 import render_scene;
 import framework;
 import globals;
+#include "common/assertion_macros.h"
 
 
 RenderId SceneViewProcessor_Mesh::register_proxy()
@@ -37,11 +38,25 @@ void SceneViewProcessor_Mesh::process()
         auto renderer = RhGlobals::engine->renderer;  // crutch
         
         const MeshHandle mesh_handle = submitted.mesh;
-        auto& mesh_resource = mesh_handle.get();
-        mesh_ro.material_key = MaterialKey::make_key(submitted.material);
-        mesh_ro.render_resource = get_or_create_material_resource(renderer->get_material_resource(), mesh_ro.material_key);
+        auto& mesh = mesh_handle.get();
+        
+        if (mesh_ro.material_keys.size() > 0 && mesh_ro.material_keys.size() < submitted.materials.size())
+        {
+            checkf(false, "unsupported materials changing behaviour");
+        }
+        
+        mesh_ro.material_keys.resize(submitted.materials.size());
+        mesh_ro.material_instances.resize(submitted.materials.size());
+        
+        for (uint32_t index = 0; auto material : submitted.materials)
+        {
+            mesh_ro.material_keys[index] = MaterialKey::make_key(material);
+            mesh_ro.material_instances[index] = get_or_create_material_resource(renderer->get_material_resource(), mesh_ro.material_keys[index]);
+            index++;
+        }
+        
         mesh_ro.mesh = mesh_handle;
-        mesh_ro.bounds = mesh_resource.bounds;
+        mesh_ro.bounds = mesh.bounds;
         mesh_ro.mesh = mesh_handle;
         mesh_ro.world = submitted.transform.matrix();
         mesh_ro.debug_name = submitted.debug_name;
@@ -49,7 +64,7 @@ void SceneViewProcessor_Mesh::process()
 }
 
 
-RenderResourceInstance* SceneViewProcessor_Mesh::get_or_create_material_resource(RenderResource* resource, const MaterialKey& key)
+RenderResourceInstance* SceneViewProcessor_Mesh::get_or_create_material_resource(RenderResource* resource, const MaterialKey& key, RBFrameHandle frame_handle)
 {
     
     auto it = material_cache.find(key);
@@ -60,7 +75,7 @@ RenderResourceInstance* SceneViewProcessor_Mesh::get_or_create_material_resource
     
     
     auto renderer = RhGlobals::engine->renderer;  // crutch
-    renderer->update_material_resource(resource_instance, key);
+    renderer->update_material_resource(resource_instance, key, frame_handle);
     
     auto [new_it, _] = material_cache.emplace(key, resource_instance);
     return new_it->second;

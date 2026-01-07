@@ -9,8 +9,6 @@ import assets;
 
 #include "common/type_macros.h"
 
-#include <typeinfo>
-
 import type_utils;
 import enum_helpers;
 

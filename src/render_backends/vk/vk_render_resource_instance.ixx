@@ -9,12 +9,13 @@ class VkRenderResourceInstance : public RenderResourceInstance
 public:
     VkRenderResourceInstance(vk::BufferManager& buffer_manager, const class VkRenderResource& in_resource, ResourceUsageType in_usage);
 
-    virtual void update_uniform_buffer_impl(PipelineObject* pipeline_object, 
-        const char* buffer_name_SUBOPTIMAL, size_t size, void* data);
+    virtual void update_uniform_buffer_impl(PipelineObject* pipeline_object,
+                                            const char* buffer_name_SUBOPTIMAL, size_t size, void* data, RBFrameHandle frame);
     
-    void update_image(class PipelineObject* pipeline_object, const char* buffer_name_SUBOPTIMAL, RBImageHandle image_handle) override;
+    void update_image(class PipelineObject* pipeline_object, const char* buffer_name_SUBOPTIMAL, RBImageHandle image_handle, RBFrameHandle
+                      frame) override;
     
-    void bind(class PipelineObject* pipeline_object, RBCommandList command_list) override;
+    void bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame) override;
 
     vk::BufferManager& buffer_manager;
     const VkRenderResource& resource;

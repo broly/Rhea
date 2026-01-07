@@ -45,7 +45,7 @@
 		},
 		{
 			"name": "lymphocyte2",
-			"ref": "actors/lymphocyte.json",
+			"ref": "actors/lymphocyte2.json",
 			
 			"components": [
 				{
@@ -58,6 +58,26 @@
 							"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
 						},
 						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
+					}
+				}
+			]
+		},
+		{
+			"name": "sponza_model",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "mesh",
+					"class": "RhComp_StaticMesh",
+					"fields": {
+						"transform": {
+							"position": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
+						},
+						"mesh": "meshes/sponza/column_2ndfloor_01.glb",
+						"auto_retrieve_materials": true
 					}
 				}
 			]

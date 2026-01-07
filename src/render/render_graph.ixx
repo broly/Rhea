@@ -46,6 +46,7 @@ public:
     RBFramebufferId framebuffer;
     RenderGraph& render_graph;
     PipelineObject* pipeline;
+    RBFrameHandle frame;
     
 };
 

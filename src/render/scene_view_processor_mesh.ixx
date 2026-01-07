@@ -16,9 +16,8 @@ export struct RenderObject_Mesh
     MeshHandle mesh;
     glm::mat4 world;
     AABB bounds;
-    MaterialKey material_key;
-    RenderResourceInstance* render_resource;
-    // RenderMaterial material;
+    std::vector<MaterialKey> material_keys;
+    std::vector<RenderResourceInstance*> material_instances;
     std::string debug_name;
 };
 
@@ -37,7 +36,7 @@ public:
     std::vector<RenderId> vacated_mesh_ids; 
     
     
-    RenderResourceInstance* get_or_create_material_resource(RenderResource* resource, const MaterialKey& material_key);
+    RenderResourceInstance* get_or_create_material_resource(RenderResource* resource, const MaterialKey& material_key, RBFrameHandle frame_handle = 0);
     
     std::unordered_map<MaterialKey, RenderResourceInstance*, MaterialKeyHash> material_cache;
 };

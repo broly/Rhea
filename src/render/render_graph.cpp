@@ -5,15 +5,18 @@ import :render_backend;
 import <vulkan/vulkan_core.h>;
 import <cassert>;
 
+#include "common/assertion_macros.h"
+
 
 void RenderGraphContext::bind_sampled_texture(RBDescriptorSetLayout layout, uint32_t binding, RGTextureHandle tex)
 {
-    backend.update_sampled_image(
-        layout,
-        binding,
-        render_graph.get_image(tex),
-        ResourceUsageType::frame
-    );
+    checkf(false, "deprecated code path");
+    // backend.update_sampled_image(
+    //     layout,
+    //     binding,
+    //     render_graph.get_image(tex),
+    //     ResourceUsageType::frame
+    // );
 }
 
 RenderGraph::RenderGraph(const std::shared_ptr<RenderBackend>& in_backend)
@@ -230,6 +233,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
         ctx.pipeline = pass.pipeline;
+        ctx.frame = frame;
         backend->begin_render_pass(cmd, ctx.framebuffer);
         backend->bind_pipeline(cmd, ctx.pipeline);
         pass.execute(ctx);

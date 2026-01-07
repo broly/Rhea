@@ -50,22 +50,24 @@ RenderResourceInstance* VkRenderResource::create_instance()
     
     for (auto& [pipeline, info] : info_by_pipeline)
     {
-        auto descritpor = buffer_manager.allocate_descriptor_sets_for_layout(info.layout, desc.usage_type);
+        info.sets_per_frame = buffer_manager.allocate_descriptor_sets_for_layout(info.layout, desc.usage_type);
         
-        if (descritpor)
-        {
-            info.set = *descritpor;
-        }
-        
-        for (uint32_t index = 0; auto binding : info.descritor_set_layout_desc.bindings)
+        for (uint32_t index = 0; auto& binding : info.descritor_set_layout_desc.bindings)
         {
             if (binding.type == DescriptorType::UniformBuffer)
             {
-                RBBufferHandle buffer = buffer_manager.create_uniform_buffer(binding.size, desc.usage_type);
-                buffer_manager.bind_buffer_to_descriptor(info.layout, binding.binding_index, buffer);
+                frame_list<RBBufferHandle> buffers_per_frame;
+                for (uint32_t frame = 0; auto set : info.sets_per_frame)
+                {
+                    RBBufferHandle buffer = buffer_manager.create_uniform_buffer(binding.size, desc.usage_type);
+                    buffer_manager.bind_buffer_to_descriptor(set, binding.binding_index, buffer, frame);
+                    buffers_per_frame.push_back(buffer);
+                    frame++;
+                    
+                }
                 if (info.buffers.size() < index + 1)
-                    info.buffers.resize(index + 1, std::nullopt);
-                info.buffers[index] = buffer;
+                    info.buffers.resize(index + 1, {});
+                info.buffers[index] = buffers_per_frame;
             }
             index++;
         }

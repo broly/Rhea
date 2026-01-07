@@ -5,8 +5,7 @@ import rhmath;
 #include "common/reflect_macros.h"
 
 export struct PBRMaterial
-{
-    
+{    
     TextureHandle base_color;
     TextureHandle emissive;
     TextureHandle normal;

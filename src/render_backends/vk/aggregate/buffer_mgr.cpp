@@ -4,55 +4,38 @@ import :helpers;
 import :log;
 #include "render_backends/vk/vk_macro.h"
 
-void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer)
+void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame)
 {
-    auto usage = buffer.get_usage_type();
+    vk::BufferInfo* buf = nullptr;
 
-    if (usage == ResourceUsageType::frame)
+    if (buffer.get_usage_type() == ResourceUsageType::frame)
     {
-        for (uint32_t frame = 0; frame < vk::MAX_FRAMES_IN_FLIGHT; ++frame)
-        {
-            auto& buf = frames_ubos.at(buffer.get_identifier())[frame];
-
-            VkDescriptorBufferInfo info{
-                .buffer = buf.buffer,
-                .offset = 0,
-                .range  = VK_WHOLE_SIZE
-            };
-
-            VkWriteDescriptorSet write{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = frames_descriptors[frame].at(layout),
-                .dstBinding = binding,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &info
-            };
-
-            vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
-        }
+        buf = &frames_ubos
+            .at(buffer.get_identifier())
+            .at(frame);
     }
-    else // Persistent
+    else
     {
-        auto& buf = persistent_ubos.at(buffer.get_identifier());
-
-        VkDescriptorBufferInfo info{
-            .buffer = buf.buffer,
-            .offset = 0,
-            .range  = VK_WHOLE_SIZE
-        };
-
-        VkWriteDescriptorSet write{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = persistent_descriptors.at(layout),
-            .dstBinding = binding,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pBufferInfo = &info
-        };
-
-        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+        buf = &persistent_ubos
+            .at(buffer.get_identifier());
     }
+
+    VkDescriptorBufferInfo info{
+        .buffer = buf->buffer,
+        .offset = 0,
+        .range  = VK_WHOLE_SIZE
+    };
+
+    VkWriteDescriptorSet write{
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = set,
+        .dstBinding = binding,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .pBufferInfo = &info
+    };
+
+    vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 }
 
 vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
@@ -65,12 +48,13 @@ vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size
     return persistent_ubos[buffer_handle.get_identifier()];
 }
 
-std::optional<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type)
+std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type)
 {
     auto& layout_data = descriptor_set_layouts.at(layout_handle);
     
     if (usage_type == ResourceUsageType::frame)
     {
+        std::vector<RBDescriptorSet> result;
         for (size_t frame_index = 0; frame_index < vk::MAX_FRAMES_IN_FLIGHT; frame_index++)
         {
             VkDescriptorSetAllocateInfo alloc{
@@ -86,9 +70,10 @@ std::optional<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_l
                 &alloc,
                 &set
             ));
-            frames_descriptors[frame_index].insert({layout_handle, set});
+            
+            result.push_back(set);
         }
-        return std::nullopt;
+        return result;
     } else
     {
         VkDescriptorSetAllocateInfo alloc{
@@ -105,8 +90,7 @@ std::optional<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_l
             &set
         ));
         
-        persistent_descriptors.insert({layout_handle, set});
-        return set;
+        return {set};
     }
 
 }
@@ -209,14 +193,6 @@ vk::DescriptorSetLayoutData vk::BufferManager::get_vk_descriptor_set_layout(RBDe
     return descriptor_set_layouts[rb_handle];
 }
 
-RBDescriptorSet vk::BufferManager::get_descriptor_set(RBDescriptorSetLayout descriptor_set_layout,
-    ResourceUsageType pool_type, uint32_t frame)
-{
-    if (pool_type == ResourceUsageType::frame)
-        return frames_descriptors[frame][descriptor_set_layout];
-    return persistent_descriptors[descriptor_set_layout];
-}
-
 RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
 {
     if (usage_type == ResourceUsageType::frame)
@@ -266,9 +242,9 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
     }
 }
 
-void vk::BufferManager::update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data)
+void vk::BufferManager::update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
 {
-    auto& buf = get_buffer(buffer_handle, swapchain.current_frame);
+    auto& buf = get_buffer(buffer_handle, frame);
     
     memcpy(buf.mapped_ptr, data, size);
 }

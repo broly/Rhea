@@ -18,7 +18,7 @@ public:
     
     RenderResource* get_material_resource() override;
     
-    void update_material_resource(RenderResourceInstance* material_resource_inst, MaterialKey material_key) override;
+    void update_material_resource(RenderResourceInstance* material_resource_inst, MaterialKey material_key, RBFrameHandle frame) override;
     
     std::shared_ptr<Engine> engine;
     

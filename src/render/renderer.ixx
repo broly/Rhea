@@ -45,7 +45,7 @@ public:
 
     virtual void execute() {}
     
-    virtual void update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key);
+    virtual void update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);

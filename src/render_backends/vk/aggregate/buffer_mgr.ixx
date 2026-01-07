@@ -39,30 +39,22 @@ namespace vk
         VkDescriptorPool frame_pool = VK_NULL_HANDLE;
         VkDescriptorPool persistent_pool = VK_NULL_HANDLE;
         
-        std::array<
-            std::map<RBDescriptorSetLayout, RBDescriptorSet>,
-            MAX_FRAMES_IN_FLIGHT>
-        frames_descriptors;
         
         std::map<RBDescriptorSetLayout, DescriptorSetLayoutData> descriptor_set_layouts;
-        
-        std::map<RBDescriptorSetLayout, RBDescriptorSet> persistent_descriptors;
+
+        std::vector<RBDescriptorSet> descriptors;
         uint64_t descriptor_set_counter = 0;
         
-        void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer);
+        void bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame);
         vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index);
-        std::optional<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type);
+        std::vector<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type);
         void create_descriptor_pool();
         RBDescriptorSetLayout allocate_descriptor_layout_handle();
         RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout);
         DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
-        RBDescriptorSet get_descriptor_set(
-            RBDescriptorSetLayout descriptor_set_layout, 
-            ResourceUsageType resource_usage,
-            uint32_t frame);
         RBBufferHandle create_uniform_buffer(size_t size, ResourceUsageType resource_usage);
         
-        void update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data);
+        void update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame);
 
     private:
         const VkDevice& device;

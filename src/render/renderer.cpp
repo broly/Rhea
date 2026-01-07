@@ -38,7 +38,7 @@ void Renderer::bind_material_ubo(const RenderMaterial& rm)
     assert(false);
 }
 
-void Renderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key)
+void Renderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame)
 {
     assert(false);
 }

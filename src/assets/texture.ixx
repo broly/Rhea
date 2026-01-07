@@ -61,7 +61,7 @@ export struct Texture
 
     std::vector<uint8_t> pixels;
     
-    static Texture create_from_file(const std::filesystem::path& path);
+    static std::optional<Texture> create_from_file(const std::filesystem::path& path);
     
 };
 

@@ -13,7 +13,7 @@ layout(location = 3) in vec3 v_world_tangent;
 layout(location = 0) out vec4 out_color;
 
 // ================== MATERIAL ==================
-layout(set = SET_MATERIAL, binding = BINDING_MATERIAL_UBO) uniform MaterialUBO
+layout(set = 1, binding = 0) uniform MaterialUBO
 {
     float base_color_mult;
     float emissive_mult;
@@ -22,10 +22,10 @@ layout(set = SET_MATERIAL, binding = BINDING_MATERIAL_UBO) uniform MaterialUBO
     float metallic_mult;
 } material;
 
-layout(set = SET_MATERIAL, binding = BINDING_BASE_COLOR) uniform sampler2D u_base_color;
-layout(set = SET_MATERIAL, binding = BINDING_EMISSIVE) uniform sampler2D u_emissive;
-layout(set = SET_MATERIAL, binding = BINDING_NORMAL_MAP) uniform sampler2D u_normal_map;
-layout(set = SET_MATERIAL, binding = BINDING_ORM) uniform sampler2D u_orm;
+layout(set = 1, binding = 1) uniform sampler2D u_base_color;
+layout(set = 1, binding = 2) uniform sampler2D u_emissive;
+layout(set = 1, binding = 3) uniform sampler2D u_normal_map;
+layout(set = 1, binding = 4) uniform sampler2D u_orm;
 
 // ================== CAMERA ==================
 layout(set = SET_CAMERA, binding = BINDING_CAMERA_UBO) uniform CameraUBO

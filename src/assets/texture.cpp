@@ -11,7 +11,7 @@ const Texture& TextureHandle::get() const
     return RhGlobals::engine->asset_manager->get_texture(*this);
 }
 
-Texture Texture::create_from_file(const std::filesystem::path& path)
+std::optional<Texture> Texture::create_from_file(const std::filesystem::path& path)
 {
     Texture texture;
     
@@ -23,7 +23,8 @@ Texture Texture::create_from_file(const std::filesystem::path& path)
                                 stb::STBI_rgb_alpha);
     
     if (!pixels) {
-        throw std::runtime_error("Failed to load texture: " + path.string());
+        return std::nullopt;
+        // throw std::runtime_error("Failed to load texture: " + path.string());
     }
     
     texture.width = static_cast<uint32_t>(width);

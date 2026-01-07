@@ -6,12 +6,15 @@ import :render_resource_instance;
 import <memory>;
 
 
+template<typename T>
+using frame_list = std::vector<T>;
+
 struct VkRenderResourcePipelineInfo
 {
     DescriptorSetLayoutDesc descritor_set_layout_desc;
     RBDescriptorSetLayout layout;
-    std::optional<RBDescriptorSet> set;
-    std::vector<std::optional<RBBufferHandle>> buffers;
+    frame_list<RBDescriptorSet> sets_per_frame;
+    std::vector<frame_list<RBBufferHandle>> buffers;
 };
 
 class VkRenderResource : public RenderResource

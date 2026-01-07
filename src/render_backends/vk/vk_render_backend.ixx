@@ -41,10 +41,8 @@ public:   /// API Section
     virtual bool acquire_next_image(RBFrameHandle frame_handle) override;
     virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
     virtual PipelineObject* create_pipeline() override;
-    virtual RBDescriptorSet get_descriptor_set(RBDescriptorSetLayout rb_descriptor_set_layout, ResourceUsageType pool_type) override;
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
-    virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data) override;
-    virtual void bind_buffer_to_descriptor(RBDescriptorSetLayout layout, uint32_t binding, RBBufferHandle buffer) override;
+    virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) override;
     virtual RBSwapchainExtent get_swapchain_extent() const override;
     virtual void transition_image(
         RBCommandList cmd,
@@ -52,23 +50,20 @@ public:   /// API Section
         RBImageUsage before,
         RBImageUsage after) override;
     virtual void update_sampled_image(
-        RBDescriptorSetLayout layout,
+        RBDescriptorSet set,
         uint32_t binding,
         RBImageHandle image,
         ResourceUsageType usage) override;
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) override;
-    virtual std::optional<RBDescriptorSet> allocate_descriptor_sets_for_layout(
-        RBDescriptorSetLayout layout_handle,
-        ResourceUsageType usage_type) override;
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;
     virtual RBFrameHandle get_current_frame() const override;
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
-    virtual void bind_mesh(const RBCommandList& cmd, MeshHandle mesh) override;
+    virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
-    virtual void get_or_create_mesh_buffers(MeshHandle handle) override;
+    virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) override;
     virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual RBImageView get_image_view(RBImageHandle handle) override;
@@ -76,11 +71,6 @@ public:   /// API Section
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) override;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
     virtual RBSampler create_sampler(const RBSamplerDesc& desc) override;
-    virtual void bind_image_to_descriptor(
-        RBDescriptorSetLayout layout,
-        uint32_t binding,
-        RBImageHandle image,
-        RBSampler sampler) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) override;
@@ -105,8 +95,6 @@ private: // internal section
     void update_viewport_extent(const RBCommandList& cmd);
     
     vk::DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
-
-    vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index = 0);
     
     RenderPassDesc make_render_pass_desc(const FramebufferDesc& fb) const;
     

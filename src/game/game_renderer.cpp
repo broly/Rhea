@@ -184,14 +184,6 @@ void GameRenderer::init(RBWindowHandle in_window)
         .usage  = RenderTextureUsage::Type(RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled),
         .external = false
     };
-
-    auto scene_color = render_graph->create_texture(color_desc);
-    
-    auto sampler = render_backend->create_sampler(RBSamplerDesc{
-        .linear=true,
-        .clamp_to_edge=true
-    });
-        
     
     render_graph->add_pass({
         .name = "GeometryForward",
@@ -220,8 +212,8 @@ void GameRenderer::init(RBWindowHandle in_window)
             camera_ubo.camera_pos = active_camera->position;
             
             auto cam = camera_resource->query_single();
-            cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo);
-            cam->bind(ctx.pipeline, cmd);
+            cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo, ctx.frame);
+            cam->bind(ctx.pipeline, cmd, ctx.frame);
 
             // ---------- Lights ----------
             auto& point_light_processor = extractor->get_processor<SceneViewProcessor_Light>();
@@ -236,8 +228,8 @@ void GameRenderer::init(RBWindowHandle in_window)
             }
 
             auto light = light_resource->query_single();
-            light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo);
-            light->bind(ctx.pipeline, cmd);
+            light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo, ctx.frame);
+            light->bind(ctx.pipeline, cmd, ctx.frame);
 
 
             // ---------- Draw ----------
@@ -245,24 +237,39 @@ void GameRenderer::init(RBWindowHandle in_window)
             auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
             for (const auto& ro : meshes_processor.meshes)
             {
-                auto material_resource_instance = meshes_processor.get_or_create_material_resource(
-                    material_resource, ro.material_key);
+                checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");
                 
-                material_resource_instance->bind(ctx.pipeline, cmd);
-                
-                ctx.backend.get_or_create_mesh_buffers(ro.mesh);
+                for (uint32_t geom_index = 0; auto geom : ro.mesh.get().mesh_geometry)
+                {
+                    for (uint32_t prim_index = 0; auto prim : geom.primitives)
+                    {
+                        MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
 
-                ctx.backend.bind_mesh(cmd, ro.mesh);
-                ctx.backend.push_constants(
-                    cmd, ro.world,
-                    geometry_pipeline->get_pipeline_handle()
-                );
-
+                        uint32_t material_index = prim.material_index.value_or(0);
+                        auto material_key = ro.material_keys[material_index];
+                            
+                        auto material_resource_instance = meshes_processor.get_or_create_material_resource(
+                            material_resource, material_key);
+                            
+                        material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
                 
-                ctx.backend.draw_indexed(
-                    cmd,
-                    ro.mesh.get().get_index_count()
-                );
+                        ctx.backend.get_or_create_mesh_buffers(mesh_prim);
+                        
+                        ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
+                        ctx.backend.push_constants(
+                            cmd, ro.world,
+                            geometry_pipeline->get_pipeline_handle()
+                        );
+
+                        ctx.backend.draw_indexed(
+                            cmd,
+                            prim.indices.size()
+                        );
+                        prim_index++;
+                    }
+                    geom_index++;
+                }
+                
             }
         }
     });
@@ -280,8 +287,8 @@ void GameRenderer::init(RBWindowHandle in_window)
         .execute = [=](RenderGraphContext& ctx)
         {
             auto tonemap = tonemap_resource->query_single();
-            tonemap->update_image(ctx.pipeline, "u_hdr_color", render_graph->get_image(hdr_color));
-            tonemap->bind(ctx.pipeline, ctx.cmd);
+            tonemap->update_image(ctx.pipeline, "u_hdr_color", render_graph->get_image(hdr_color), ctx.frame);
+            tonemap->bind(ctx.pipeline, ctx.cmd, ctx.frame);
             
             ctx.backend.draw_fullscreen(ctx.cmd);
         }
@@ -322,26 +329,26 @@ RenderResource* GameRenderer::get_material_resource()
     return _mat_res;
 }
 
-void GameRenderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key)
+void GameRenderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame)
 {
     
     material_resource_instance->update_uniform_buffer(geom_pipeline, "material", 
-        MaterialUBO{
-            .base_color_mult = material_key.base_color_mult,
-            .emissive_mult = material_key.emissive_mult,
-            .occlusion_mult = material_key.occlusion_mult,
-            .roughness_mult = material_key.roughness_mult,
-            .metallic_mult = material_key.metallic_mult,
-        });
+                                                      MaterialUBO{
+                                                          .base_color_mult = material_key.base_color_mult,
+                                                          .emissive_mult = material_key.emissive_mult,
+                                                          .occlusion_mult = material_key.occlusion_mult,
+                                                          .roughness_mult = material_key.roughness_mult,
+                                                          .metallic_mult = material_key.metallic_mult,
+                                                      }, frame);
                 
     material_resource_instance->update_image(geom_pipeline, "u_base_color", 
-        get_texture(material_key.base_color));
+                                             get_texture(material_key.base_color), frame);
     material_resource_instance->update_image(geom_pipeline, "u_emissive", 
-        get_texture(material_key.emissive));
+                                             get_texture(material_key.emissive), frame);
     material_resource_instance->update_image(geom_pipeline, "u_normal_map", 
-        get_texture(material_key.normal));
+                                             get_texture(material_key.normal), frame);
     material_resource_instance->update_image(geom_pipeline, "u_orm", 
-        get_texture(material_key.occlusion_roughness_metallic));                
+                                             get_texture(material_key.occlusion_roughness_metallic), frame);                
                 
 }
 
