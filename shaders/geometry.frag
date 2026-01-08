@@ -8,6 +8,7 @@ layout(location = 0) in vec3 v_world_pos;
 layout(location = 1) in vec3 v_world_normal;
 layout(location = 2) in vec2 v_uv;
 layout(location = 3) in vec3 v_world_tangent;
+layout(location = 4) in vec3 v_world_bitangent;
 
 // ================== OUTPUT ==================
 layout(location = 0) out vec4 out_color;
@@ -65,7 +66,7 @@ void main()
     // ----- TBN -----
     vec3 N = normalize(v_world_normal);
     vec3 T = normalize(v_world_tangent);
-    vec3 B = normalize(cross(N, T));
+    vec3 B = normalize(v_world_bitangent);
     mat3 TBN = mat3(T, B, N);
 
     vec3 normal_ts = texture(u_normal_map, v_uv).rgb * 2.0 - 1.0;

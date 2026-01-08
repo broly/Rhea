@@ -5,6 +5,7 @@ import vk;
 import glm;
 import rhmath;
 import <vector>;
+import profile;
 
 // geometry
 
@@ -34,6 +35,7 @@ import <vector>;
 #define SET_TONEMAPPING 0
     #define BINDING_HDR_COLOR 0
 #include "common/assertion_macros.h"
+#include "profiling/profile.h"
 
 void GameRenderer::set_engine(const std::shared_ptr<Engine>& in_engine)
 {
@@ -195,6 +197,8 @@ void GameRenderer::init(RBWindowHandle in_window)
         .resources = { camera_resource, material_resource, light_resource },    
         .execute = [=](RenderGraphContext& ctx)
         {
+            PROFILE("GeometryForward");
+            
             auto& extractor = engine->scene_view;
             auto cmd = ctx.cmd;
             
@@ -226,23 +230,35 @@ void GameRenderer::init(RBWindowHandle in_window)
                 light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
                 light_ubo.lights[i].color    = glm::vec4(lights[i].color);
             }
-
-            auto light = light_resource->query_single();
-            light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo, ctx.frame);
-            light->bind(ctx.pipeline, cmd, ctx.frame);
+            {
+                PROFILE("GeometryForward:light");
+                
+                auto light = light_resource->query_single();
+                light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo, ctx.frame);
+                light->bind(ctx.pipeline, cmd, ctx.frame);
+            }
 
 
             // ---------- Draw ----------
             
             auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
+            RenderResourceInstance* bound_material = nullptr;
+            MeshPrimHandle bound_mesh{};
+            bool has_bound_mesh = false;
+
+            PROFILE("GeometryForward:draw");
+            
             for (const auto& ro : meshes_processor.meshes)
             {
+                PROFILE("GeometryForward:draw:mesh");
                 checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");
                 
                 for (uint32_t geom_index = 0; auto geom : ro.mesh.get().mesh_geometry)
                 {
+                    PROFILE("GeometryForward:draw:mesh:geom");
                     for (uint32_t prim_index = 0; auto prim : geom.primitives)
                     {
+                        PROFILE("GeometryForward:draw:mesh:geom:prim");
                         MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
 
                         uint32_t material_index = prim.material_index.value_or(0);
@@ -250,12 +266,23 @@ void GameRenderer::init(RBWindowHandle in_window)
                             
                         auto material_resource_instance = meshes_processor.get_or_create_material_resource(
                             material_resource, material_key);
+                        
+                        if (material_resource_instance != bound_material)
+                        {
+                            material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
+                            bound_material = material_resource_instance;
+                        }
                             
-                        material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
+                        // material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
                 
                         ctx.backend.get_or_create_mesh_buffers(mesh_prim);
                         
-                        ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
+                        if (!has_bound_mesh || mesh_prim != bound_mesh)
+                        {
+                            ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
+                            bound_mesh = mesh_prim;
+                            has_bound_mesh = true;
+                        }
                         ctx.backend.push_constants(
                             cmd, ro.world,
                             geometry_pipeline->get_pipeline_handle()

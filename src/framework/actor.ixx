@@ -5,6 +5,7 @@ import <memory>;
 import <json/value.h>;
 import :world;
 import :rhcomponent;
+import rhmath;
 import :core;
 
 #include "object/object_reflection_macro.h"

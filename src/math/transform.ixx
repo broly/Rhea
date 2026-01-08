@@ -36,14 +36,8 @@ export struct Transform {
     }
 
     [[nodiscard]] 
-    glm::mat4 matrix() const {
-        glm::mat4 T = glm::translate(glm::mat4(1.0f), position.glm());
-        glm::mat4 R = glm::mat4_cast(rotation.glm());
-        glm::mat4 S = glm::scale(glm::mat4(1.0f), scale.glm());
+    glm::mat4 matrix() const;
 
-        return T * R * S;
-    }
-    
     [[nodiscard]] 
     glm::vec3 forward() const {
         return rotation.glm() * glm::vec3(0, 0, -1);
@@ -69,11 +63,9 @@ export struct Transform {
 
     [[nodiscard]] 
     glm::mat4 get_view() const {
-        return glm::lookAt(
-            position.glm(),
-            position.glm() + forward(),
-            up()
-        );
+        glm::mat4 T = glm::translate(glm::mat4(1.0f), position.glm());
+        glm::mat4 R = glm::mat4_cast(rotation.glm());
+        return glm::inverse(T * R);
     }
 
     static Transform make_identity()

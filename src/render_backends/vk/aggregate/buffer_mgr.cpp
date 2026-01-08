@@ -100,11 +100,11 @@ void vk::BufferManager::create_descriptor_pool()
     VkDescriptorPoolSize pool_sizes[] = {
         {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = vk::MAX_FRAMES_IN_FLIGHT * 16
+            .descriptorCount = 1000 
         },
         {
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = vk::MAX_FRAMES_IN_FLIGHT * 16
+            .descriptorCount = 1000 
         }
     };
 
@@ -113,7 +113,7 @@ void vk::BufferManager::create_descriptor_pool()
     };
     pool_info.poolSizeCount = uint32_t(std::size(pool_sizes));
     pool_info.pPoolSizes = pool_sizes;
-    pool_info.maxSets = vk::MAX_FRAMES_IN_FLIGHT * 16;
+    pool_info.maxSets = 1000;
     pool_info.flags = 0;
 
     VK_CHECK(vkCreateDescriptorPool(

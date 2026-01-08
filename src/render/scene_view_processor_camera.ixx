@@ -20,12 +20,7 @@ export struct RenderObject_Camera
     bool active;
     std::string debug_name;
     
-    glm::mat4 get_projection(float aspect) const
-    {
-        auto p = glm::perspective(fov, aspect, near, far);
-        p[1][1] *= -1; // Vulkan NDC
-        return p;
-    }
+    glm::mat4 get_projection(float aspect) const;
 };
 
 

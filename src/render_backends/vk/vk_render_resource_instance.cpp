@@ -1,8 +1,9 @@
 ﻿module vk:render_resource_instance;
 import :render_resource;
-import :pipeline;
 import :render_backend;
+import profile;
 #include "common/assertion_macros.h"
+#include "profiling/profile.h"
 
 VkRenderResourceInstance::VkRenderResourceInstance(vk::BufferManager& buffer_manager, const VkRenderResource& in_resource, ResourceUsageType in_usage)
     : buffer_manager(buffer_manager)
@@ -13,46 +14,60 @@ VkRenderResourceInstance::VkRenderResourceInstance(vk::BufferManager& buffer_man
 void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeline_object,
                                                           const char* buffer_name_SUBOPTIMAL, size_t size, void* data, RBFrameHandle frame)
 {
-    auto vk_pipeline_object = (VkPipelineObject*)pipeline_object;
-    const auto& info = resource.info_by_pipeline.find(vk_pipeline_object);
-    
-    auto [index, binding] = info->second.descritor_set_layout_desc.get_binding(buffer_name_SUBOPTIMAL);
-    checkf(binding.type == DescriptorType::UniformBuffer, "type mismatch");
-    auto ds_idx = usage == ResourceUsageType::frame ? frame : 0;
-    
-    buffer_manager.update_uniform_buffer(info->second.buffers[index][ds_idx], size, data, frame);
+    auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
+    auto& pipe_info = resource.info_by_pipeline.at(vk_pipeline);
+    auto& inst_info = per_pipeline.at(vk_pipeline);
+
+    auto [binding_index, binding] =
+        pipe_info.descritor_set_layout_desc.get_binding(buffer_name_SUBOPTIMAL);
+
+    checkf(binding.type == DescriptorType::UniformBuffer, "Type mismatch");
+
+    uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
+
+    RBBufferHandle buffer =
+        inst_info.buffers[binding_index][frame_index];
+
+    buffer_manager.update_uniform_buffer(buffer, size, data, frame);
 }
 
 void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_object, const char* buffer_name_SUBOPTIMAL,
                                             RBImageHandle image_handle, RBFrameHandle frame)
 {
-    auto vk_pipeline_object = (VkPipelineObject*)pipeline_object;
-    const auto& info_it = resource.info_by_pipeline.find(vk_pipeline_object);
-    auto& info = info_it->second;
-    auto [index, binding] = info.descritor_set_layout_desc.get_binding(buffer_name_SUBOPTIMAL);
-    checkf(binding.type == DescriptorType::CombinedImageSampler, "type mismatch");
-    checkf(info.sets_per_frame.size() > 0, "Descriptor set not allocated for resource instance");
-    
-    auto ds_idx = usage == ResourceUsageType::frame ? frame : 0;
-    RBDescriptorSet descriptor_set = info.sets_per_frame[ds_idx];
-    
-    resource.backend.update_sampled_image(descriptor_set, binding.binding_index, image_handle, usage);
+    auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
+    auto& pipe_info = resource.info_by_pipeline.at(vk_pipeline);
+    auto& inst_info = per_pipeline.at(vk_pipeline);
+
+    auto [binding_index, binding] =
+        pipe_info.descritor_set_layout_desc.get_binding(buffer_name_SUBOPTIMAL);
+
+    checkf(binding.type == DescriptorType::CombinedImageSampler, "Type mismatch");
+
+    uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
+
+    RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
+
+    resource.backend.update_sampled_image(
+        set,
+        binding.binding_index,
+        image_handle,
+        usage);
 }
 
 void VkRenderResourceInstance::bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame)
 {
-    VkPipelineObject* vk_pipeline_object = (VkPipelineObject*)pipeline_object;
-    const auto& info_it = resource.info_by_pipeline.find(vk_pipeline_object);
-    auto& info = info_it->second;
+    PROFILE("VkRenderResourceInstance::bind");
+    auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
+    auto& pipe_info = resource.info_by_pipeline.at(vk_pipeline);
+    auto& inst_info = per_pipeline.at(vk_pipeline);
 
-    checkf(info.sets_per_frame.size() > 0, "Descriptor set not allocated for resource instance");
-    
-    auto ds_idx = usage == ResourceUsageType::frame ? frame : 0;
-    RBDescriptorSet descriptor_set = info.sets_per_frame[ds_idx];
+    uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
+
+    RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
+
     resource.backend.bind_descriptor_set(
         command_list,
-        info.descritor_set_layout_desc.set_index,
-        descriptor_set,
-        pipeline_object->get_pipeline_handle()
-    );
+        pipe_info.descritor_set_layout_desc.set_index,
+        set,
+        pipeline_object->get_pipeline_handle());
 }

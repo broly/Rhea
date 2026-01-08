@@ -4,7 +4,6 @@ import <iostream>;
 import <memory>;
 import <ostream>;
 
-import :camera;
 import :core;
 
 export class WorldScript

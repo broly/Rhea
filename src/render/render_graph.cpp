@@ -4,6 +4,8 @@ import enum_helpers;
 import :render_backend;
 import <vulkan/vulkan_core.h>;
 import <cassert>;
+import profile;
+#include "profiling/profile.h"
 
 #include "common/assertion_macros.h"
 
@@ -183,6 +185,7 @@ void RenderGraph::compile()
 
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 {
+    PROFILE();
     assert(graph_compiled);
     
     RenderGraphContext ctx(*backend, cmd, {}, *this);
@@ -236,10 +239,16 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
         ctx.frame = frame;
         backend->begin_render_pass(cmd, ctx.framebuffer);
         backend->bind_pipeline(cmd, ctx.pipeline);
-        pass.execute(ctx);
+        {
+            PROFILE("graph execution");
+            
+            pass.execute(ctx);
+        }
         backend->end_render_pass(cmd);
     }
     
+    
+    PROFILE("transition");
     for (auto& tex : textures)
     {
         if (tex.desc.external &&

@@ -4,7 +4,6 @@ import json_utils;
 import rhmath;
 import :engine_clock;
 import :world_script;
-import :camera;
 import :actor;
 
 import rhobject;

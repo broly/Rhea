@@ -33,10 +33,12 @@ add_executable(rhea ${RHEA_SOURCES})
 # )
 set(RHEA_MODULE_DIRS
     src/glm_wrap
+    src/input
     src/spirv_reflect_wrap
     src/stb_image_wrap
     src/fastgltf_wrapper
     src/common
+    src/profiling
     src/math
     src/logging
     src/object

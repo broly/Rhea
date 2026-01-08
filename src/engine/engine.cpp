@@ -9,6 +9,7 @@ import framework;
 import render;
 import vk;
 import WorldScript_RotateAroundObject;
+import profile;
 
 
 void Engine::init()
@@ -22,11 +23,17 @@ void Engine::run()
 {
     asset_manager = std::make_shared<AssetManager>();
     
+    
     window_create(window, 1280, 720, "Rhea");
     
     window_handle = {window.handle};
+    input = std::make_shared<Input>();
+    
+    platform::window::set_input(input.get());
     
     init();
+    
+    
     
     world = std::make_shared<World>();
     scene_view = std::make_shared<SceneView>(world, renderer);
@@ -45,6 +52,7 @@ void Engine::run()
     world->init();    
 
     while (!window_should_close(window)) {
+        prof::frame_start();
         
         clock->tick();
         
@@ -53,6 +61,7 @@ void Engine::run()
         
         platform::window::window_poll_events();
         renderer->execute();
+        prof::frame_end();
         // render_graph->draw(*world->get_camera());
     }
     window_destroy(window);

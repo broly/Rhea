@@ -7,6 +7,7 @@ import platform;
 import assets;
 import render;
 import render_scene;
+import input;
 
 #include "object/object_reflection_macro.h"
 
@@ -23,6 +24,7 @@ public:
     
     std::shared_ptr<AssetManager> asset_manager = nullptr;
     platform::window::Window window = nullptr;
+    std::shared_ptr<Input> input = nullptr;
     RBWindowHandle window_handle;
     std::shared_ptr<World> world = nullptr;
     std::shared_ptr<SceneView> scene_view = nullptr;

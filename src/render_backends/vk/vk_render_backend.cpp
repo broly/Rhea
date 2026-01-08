@@ -7,12 +7,14 @@ import <algorithm>;
 import <span>;
 
 #include "vk_macro.h"
+#include "profiling/profile.h"
 
 import render;
 
 import :helpers;
 import :log;
 import :pipeline;
+import profile;
 
 
 
@@ -302,6 +304,7 @@ void VkRenderBackend::advance_frame()
 
 void VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle)
 {
+    PROFILE(__FUNCTION__);
     mesh_manager.get_or_create_mesh_buffers(handle);
 }
 
@@ -656,11 +659,13 @@ RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
 
 void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame)
 {
+    PROFILE(__FUNCTION__);
     mesh_manager.bind(cmd, mesh);
 }
 
 void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle)
 {
+    PROFILE(__FUNCTION__);
     vkCmdPushConstants(
         cmd,
         pipelines[pipeline_handle]->get_pipeline_layout(),
@@ -673,6 +678,7 @@ void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix,
 
 void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)
 {
+    PROFILE("draw_indexed");
     update_viewport_extent(cmd);
     
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);

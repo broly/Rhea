@@ -3,7 +3,6 @@
 import <memory>;
 import <string>;
 import :engine_clock;
-import :camera;
 import :core;
 // import :scene_extractor;
 

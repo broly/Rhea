@@ -45,4 +45,9 @@ export namespace glm
     using glm::cross;
     using glm::distance;
     using glm::distance2;
+    using glm::angleAxis;
+    using glm::clamp;
+    using glm::conjugate;
+    using glm::quatLookAtRH;
+    using glm::inverse;
 }

@@ -2,11 +2,19 @@
 
 import render;
 import :buffer_mgr;
+import :pipeline;
+
 
 
 class VkRenderResourceInstance : public RenderResourceInstance
 {
 public:
+    struct PerPipelineData
+    {
+        std::vector<RBDescriptorSet> sets_per_frame;
+        std::vector<std::vector<RBBufferHandle>> buffers; // [binding][frame]
+    };
+    
     VkRenderResourceInstance(vk::BufferManager& buffer_manager, const class VkRenderResource& in_resource, ResourceUsageType in_usage);
 
     virtual void update_uniform_buffer_impl(PipelineObject* pipeline_object,
@@ -20,4 +28,6 @@ public:
     vk::BufferManager& buffer_manager;
     const VkRenderResource& resource;
     ResourceUsageType usage;
+
+    std::map<VkPipelineObject*, PerPipelineData> per_pipeline;
 };

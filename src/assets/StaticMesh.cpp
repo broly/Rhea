@@ -22,6 +22,9 @@ static auto fastgtlf_to_glm(const T& v)
     } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fvec2>)
     {
         return glm::vec2(v.x(), v.y());
+    } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fvec4>)
+    {
+        return glm::vec4(v.x(), v.y(), v.z(), v.w());
     } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fquat>)
     {
         return glm::quat(v.x(), v.y(), v.z(), v.w());
@@ -116,7 +119,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
             const fastgltf::Accessor* normAccessor =
                 normIt ? &asset.accessors.at(normIt->accessorIndex) : nullptr;
             const fastgltf::Accessor* tangentAccessor =
-                tangentIt ? &asset.accessors.at(normIt->accessorIndex) : nullptr;
+                tangentIt != primitive.attributes.end() ? &asset.accessors.at(tangentIt->accessorIndex) : nullptr;
             const fastgltf::Accessor* uvAccessor =
                 uvIt ? &asset.accessors.at(uvIt->accessorIndex) : nullptr;
 
@@ -130,6 +133,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
                 {
                     Vertex& v = mesh_primitive.vertices[index];
                     v.position = fastgtlf_to_glm(position);
+                    v.position.z *= -1;
 
                     mesh.bounds.min = glm::min(mesh.bounds.min, fastgtlf_to_glm(position));
                     mesh.bounds.max = glm::max(mesh.bounds.max, fastgtlf_to_glm(position));
@@ -146,10 +150,10 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
             }
         
             if (tangentAccessor) {
-                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, *tangentAccessor,
-                    [&](fastgltf::math::fvec3 normal, size_t index)
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, *tangentAccessor,
+                    [&](fastgltf::math::fvec4 tangent, size_t index)
                     {
-                        mesh_primitive.vertices[index].tangent = fastgtlf_to_glm(normal);
+                        mesh_primitive.vertices[index].tangent = fastgtlf_to_glm(tangent);
                     }
                 );
             }

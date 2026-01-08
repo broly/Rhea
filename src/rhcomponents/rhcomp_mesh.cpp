@@ -92,8 +92,9 @@ void RhComp_StaticMesh::start()
             if (auto texture = AssetManager::get().load_texture(orm_path); texture.is_valid())
                 mat.occlusion_roughness_metallic = texture;
             
-            if (auto texture = AssetManager::get().load_texture(emissive_path); texture.is_valid())
-                mat.emissive = texture;
+            mat.emissive = TextureHandle::invalid();
+            // if (auto texture = AssetManager::get().load_texture(emissive_path); texture.is_valid())
+            //     mat.emissive = texture;
             
             
             mat.emissive_mult = 1.f;

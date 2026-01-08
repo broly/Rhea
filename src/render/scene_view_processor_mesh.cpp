@@ -2,7 +2,9 @@
 import render_scene;
 import framework;
 import globals;
+import profile;
 #include "common/assertion_macros.h"
+#include "profiling/profile.h"
 
 
 RenderId SceneViewProcessor_Mesh::register_proxy()
@@ -66,7 +68,7 @@ void SceneViewProcessor_Mesh::process()
 
 RenderResourceInstance* SceneViewProcessor_Mesh::get_or_create_material_resource(RenderResource* resource, const MaterialKey& key, RBFrameHandle frame_handle)
 {
-    
+    PROFILE("SceneViewProcessor_Mesh::get_or_create_material_resource");
     auto it = material_cache.find(key);
     if (it != material_cache.end())
         return it->second;
