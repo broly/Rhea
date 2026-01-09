@@ -80,7 +80,7 @@ export namespace prof
 
     export FORCEINLINE void frame_end()
     {
-
+        
     }
 
     // ------------------------------------------------------------

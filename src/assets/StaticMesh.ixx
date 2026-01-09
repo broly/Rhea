@@ -97,4 +97,4 @@ struct std::hash<MeshPrimHandle>
     }
 };
 
-export void serialize_json_value(MeshHandle& target, const Json::Value& value);
+export void serialize_json_value(MeshHandle& target, const Json::Value& value, DependencyCollector* dc);

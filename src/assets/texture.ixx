@@ -4,6 +4,7 @@ import <cstdint>;
 import <filesystem>;
 import <vector>;
 import <json/value.h>;
+import dependency_collector;
 
 
 import :asset;
@@ -66,4 +67,4 @@ export struct Texture
 };
 
 
-export void serialize_json_value(TextureHandle& target, const Json::Value& value);
+export void serialize_json_value(TextureHandle& target, const Json::Value& value, DependencyCollector* dc);

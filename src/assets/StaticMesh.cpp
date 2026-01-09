@@ -11,6 +11,7 @@ import <json/value.h>;
 
 import engine;
 import globals;
+import dependency_collector;
 
 
 template<typename T>
@@ -206,7 +207,7 @@ const Primitive& MeshPrimHandle::get() const
     return mesh.get().mesh_geometry[geom_index].primitives[prim_index];
 }
 
-void serialize_json_value(MeshHandle& target, const Json::Value& value)
+void serialize_json_value(MeshHandle& target, const Json::Value& value, DependencyCollector* dc)
 {
     if (value.isString())
     {

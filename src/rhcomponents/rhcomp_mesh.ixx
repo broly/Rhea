@@ -26,6 +26,7 @@ public:
     
     void start() override;
     void finish() override;
+    void on_serialize(DependencyCollector* dc) override;
     
     void update_scene_proxy();
     

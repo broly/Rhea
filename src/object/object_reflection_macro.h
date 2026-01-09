@@ -4,6 +4,7 @@ import <set>;
 import <optional>;
 import <string_view>;
 import <json/value.h>;
+import dependency_collector;
 
 #include "common/reflect_macros.h"
 
@@ -38,10 +39,11 @@ import <json/value.h>;
         const bool Name##_registered = \
             reflect::register_actor_class<Name>(\
                 #Name, \
-                    [] (const Json::Value& json_object, RhObject* ObjPtr, bool is_loading) -> bool { \
+                    [] (const Json::Value& json_object, RhObject* ObjPtr, bool is_loading, DependencyCollector* collector) -> bool { \
                         using Class = Name;\
                         auto CastedObjPtr = reinterpret_cast<Name*>(ObjPtr); \
-                        reflect::json::visit_serialize(json_object, *CastedObjPtr, is_loading); \
+                        reflect::json::visit_serialize(json_object, *CastedObjPtr, is_loading, collector); \
+                        CastedObjPtr->on_serialize(collector); \
                         return true; \
                     }\
                 ); \

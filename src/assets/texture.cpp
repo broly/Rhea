@@ -5,6 +5,7 @@ import <json/value.h>;
 
 import globals;
 import engine;
+import <future>;
 
 const Texture& TextureHandle::get() const
 {
@@ -40,11 +41,26 @@ std::optional<Texture> Texture::create_from_file(const std::filesystem::path& pa
     return texture;
 }
 
-void serialize_json_value(TextureHandle& target, const Json::Value& value)
+void serialize_json_value(TextureHandle& target, const Json::Value& value, DependencyCollector* dc)
 {
     if (value.isString())
     {
         std::string path = value.asString();
-        target = RhGlobals::engine->asset_manager->load_texture(path);
+        
+        auto result = std::async(std::launch::async, [&, path]() {
+            if (!value.isString())
+                return;
+
+            auto future = RhGlobals::engine
+                ->asset_manager
+                ->load_texture_async(path);
+
+            dc->push(std::async(std::launch::async, [&target, future]() mutable 
+                {
+                    target = future.get();
+                }));
+        });
+        
+        dc->push(std::move(result));
     }
 }

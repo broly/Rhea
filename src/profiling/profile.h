@@ -12,7 +12,7 @@ import profile;
 #ifdef DO_PROFILE
 
 #define PROFILE(...) \
-    auto PROFILE_VAR_NAME(__PROF_,__LINE__) = Profile(##__VA_ARGS__)
+    auto PROFILE_VAR_NAME(__PROF_,__LINE__) = Profile(__VA_ARGS__)
 
 #else 
 #define PROFILE(...)\

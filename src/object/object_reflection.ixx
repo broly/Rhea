@@ -11,6 +11,7 @@ import reflect;
 import fixed_string;
 
 import :object;
+import dependency_collector;
 
 #include "common/reflect_macros.h"
 
@@ -33,64 +34,44 @@ export namespace reflect_inner
 }
 
     
-export inline void serialize_json_value(Json::Int& target, const Json::Value& value)
+export inline void serialize_json_value(Json::Int& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isNumeric() || value.isIntegral());
     target = value.asInt();
 }
-export inline void serialize_json_value(Json::UInt& target, const Json::Value& value)
+export inline void serialize_json_value(Json::UInt& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isNumeric() || value.isIntegral());
     target = value.asUInt();
 }
-export inline void serialize_json_value(Json::Int64& target, const Json::Value& value)
+export inline void serialize_json_value(Json::Int64& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isNumeric() || value.isIntegral());
     target = value.asInt64();
 }
-export inline void serialize_json_value(Json::UInt64& target, const Json::Value& value)
+export inline void serialize_json_value(Json::UInt64& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isNumeric() || value.isIntegral());
     target = value.asUInt64();
 }
-export inline void serialize_json_value(std::string& target, const Json::Value& value)
+export inline void serialize_json_value(std::string& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isString());
     target = value.asString();
 }
 
 
-
-
-// export template<typename T>
-// requires requires(T& t, const Json::Value& v) 
-// {
-//     serialize_json_value(t, v);
-// }
-// inline void serialize_json_value(std::vector<T>& target, const Json::Value& value)
-// {
-//     assert(value.isArray());
-//     target.clear();
-//     for (auto& json_item : value)
-//     {
-//         T array_item;
-//         serialize_json_value<T>(array_item, json_item);
-//         target.push_back(array_item);
-//     }
-// }
-
-
-export inline void serialize_json_value(float& target, const Json::Value& value)
+export inline void serialize_json_value(float& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isNumeric() || value.isIntegral() || value.isDouble());
     target = value.asFloat();
 }
-export inline void serialize_json_value(double& target, const Json::Value& value)
+export inline void serialize_json_value(double& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isNumeric() || value.isIntegral() || value.isDouble());
     target = value.asDouble();
 }
-export inline void serialize_json_value(bool& target, const Json::Value& value)
+export inline void serialize_json_value(bool& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isBool());
     target = value.asBool();
@@ -131,16 +112,16 @@ export namespace reflect::json
 {
     
     template<typename T>
-    void visit_serialize(const Json::Value& json_object, T& struct_ref, bool is_loading);
+    void visit_serialize(const Json::Value& json_object, T& struct_ref, bool is_loading, DependencyCollector* dc);
 
     template<typename T>
-    void do_serialize_json_value(T& target, const Json::Value& value, bool is_loading)
+    void do_serialize_json_value(T& target, const Json::Value& value, bool is_loading, DependencyCollector* dc)
     {
         
         if constexpr (reflect::is_reflected_v<T>)
         {
             assert(value.isObject());
-            visit_serialize(value, target, is_loading);
+            visit_serialize(value, target, is_loading, dc);
         } else if constexpr (is_vector_v<std::decay_t<T>>)
         {
             assert(value.isArray());
@@ -149,7 +130,7 @@ export namespace reflect::json
             {
                 typename T::value_type array_item;
                 // serialize_json_value(array_item, json_item);
-                visit_serialize(json_item, array_item, is_loading);
+                visit_serialize(json_item, array_item, is_loading, dc);
                 target.push_back(array_item);
             }
         } else if constexpr (is_map_v<std::decay_t<T>>)
@@ -165,10 +146,10 @@ export namespace reflect::json
                 
                 auto& json_value = value[member_name];
                 
-                visit_serialize(json_value, map_value, is_loading);
+                visit_serialize(json_value, map_value, is_loading, dc);
                 target.try_emplace(member_name, map_value);
             }
-        } else if constexpr (requires { serialize_json_value(target, value); })
+        } else if constexpr (requires { serialize_json_value(target, value, dc); })
         {
             // visit_serialize(value, target, is_loading);
             // if constexpr (!requires { serialize_json_value(target, value); })
@@ -176,12 +157,12 @@ export namespace reflect::json
             //     ReflectionInfo<T>::reflected;
             // }
             // static_assert(requires { serialize_json_value(target, value); });
-            serialize_json_value(target, value);
+            serialize_json_value(target, value, dc);
         }
     }
 
     template<typename T>
-    void visit_serialize(const Json::Value& json_object, T& struct_ref, bool is_loading)
+    void visit_serialize(const Json::Value& json_object, T& struct_ref, bool is_loading, DependencyCollector* dc)
     {
         reflect::visit<T>([&] <auto PtrToField, FixedString Name> ()
         {
@@ -189,7 +170,7 @@ export namespace reflect::json
             if (Json::Value const* json_value = json_object.find(std::string(name)))
             {
                 auto& field_ref = struct_ref.*PtrToField;
-                do_serialize_json_value(field_ref, *json_value, is_loading);
+                do_serialize_json_value(field_ref, *json_value, is_loading, dc);
             }
         });
     }
@@ -230,7 +211,7 @@ export struct ObjectInitData
 export namespace reflect
 {
     using ObjectFactoryType = std::function<std::shared_ptr<RhObject>(const ObjectInitData& init_data)>;
-    using JsonSerializer = std::function<bool(const Json::Value&, RhObject* Ptr, bool is_loading)>;
+    using JsonSerializer = std::function<bool(const Json::Value&, RhObject* Ptr, bool is_loading, DependencyCollector* collector)>;
     
     struct ObjectReflectionInfo
     {

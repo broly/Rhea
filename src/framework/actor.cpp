@@ -33,7 +33,7 @@ void RhActor::internal_tick(double dt)
     tick(dt);
 }
 
-void RhActor::import_from_json_object(const Json::Value& object, const Json::Value* overrides)
+void RhActor::import_from_json_object(const Json::Value& object, const Json::Value* overrides, DependencyCollector* collector)
 {
     auto pthis = std::static_pointer_cast<RhActor>(shared_from_this());
     
@@ -62,10 +62,10 @@ void RhActor::import_from_json_object(const Json::Value& object, const Json::Val
                     {
                         if (reflection_info->serializer != std::nullopt)
                         {
-                            std::invoke(reflection_info->serializer.value(), *fields_object, component.get(), true);
+                            std::invoke(reflection_info->serializer.value(), *fields_object, component.get(), true, collector);
                         }
                     }
-                    instanced_components.push_back(component);
+                    pending_components.push_back(component);
                     processed_component_names.emplace(component_name);
                 }
             }
@@ -108,14 +108,14 @@ void RhActor::import_from_json_object(const Json::Value& object, const Json::Val
                         {
                             if (reflection_info->serializer != std::nullopt)
                             {
-                                std::invoke(reflection_info->serializer.value(), *fields_object, comp_obj.get(), true);
+                                std::invoke(reflection_info->serializer.value(), *fields_object, comp_obj.get(), true, collector);
                             }
                         }
                     
                         if (just_created)
                         {
                             auto component = std::static_pointer_cast<RhComponent>(comp_obj);
-                            instanced_components.push_back(component);
+                            pending_components.push_back(component);
                             processed_component_names.emplace(component_name);
                         }
                     }
@@ -124,6 +124,13 @@ void RhActor::import_from_json_object(const Json::Value& object, const Json::Val
         }
     }
     
+}
+
+void RhActor::finish_importing()
+{
+    auto pthis = std::static_pointer_cast<RhActor>(shared_from_this());
+    instanced_components = pending_components;
+    pending_components.clear();
     for (auto& component: instanced_components)
         component->on_add(pthis);
 }

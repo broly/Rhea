@@ -40,7 +40,10 @@ MeshHandle AssetManager::load_mesh(const std::string& rel_path)
 TextureHandle AssetManager::load_texture(const std::string& rel_path)
 {
     if (texture_by_path.contains(rel_path))
+    {
+        LogAssets.Log("Texture %s already loaded", rel_path.c_str());
         return texture_by_path[rel_path];
+    }
     
     
     LogAssets.Log("Loading texture: %s", rel_path.c_str());
@@ -67,6 +70,31 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
 
     return texture_handle;
 }
+
+std::shared_future<TextureHandle> AssetManager::load_texture_async(const std::string& path)
+{
+    std::lock_guard lock(mutex);
+
+    if (auto it = in_flight.find(path); it != in_flight.end())
+    {
+        return it->second;
+    }
+
+    std::packaged_task<TextureHandle()> task([path]() {
+        return RhGlobals::engine->asset_manager->load_texture(path);
+    });
+
+    auto future = task.get_future().share();
+
+    in_flight[path] = future;
+
+    std::thread([task = std::move(task)]() mutable {
+        task();
+    }).detach();
+
+    return future;
+}
+
 
 AssetManager& AssetManager::get()
 {

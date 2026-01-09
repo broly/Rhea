@@ -7,6 +7,7 @@ import :world;
 import :rhcomponent;
 import rhmath;
 import :core;
+import dependency_collector;
 
 #include "object/object_reflection_macro.h"
 
@@ -27,7 +28,8 @@ public:
     void internal_finish();
     void internal_tick(double dt);
     
-    void import_from_json_object(const Json::Value& object, const Json::Value* overrides = nullptr);
+    void import_from_json_object(const Json::Value& object, const Json::Value* overrides = nullptr, DependencyCollector* collector = nullptr);
+    void finish_importing();
     
     virtual void start() {}
     virtual void tick(const double DeltaTime) {}
@@ -57,6 +59,7 @@ public:
         return world;
     }
     
+    std::vector<std::shared_ptr<RhComponent>> pending_components;
     std::vector<std::shared_ptr<RhComponent>> instanced_components;
     std::shared_ptr<World> world;
 };

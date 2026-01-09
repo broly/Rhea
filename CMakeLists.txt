@@ -60,7 +60,6 @@ function(add_module_dir TARGET DIR)
     file(GLOB MODULE_CPP CONFIGURE_DEPENDS ${DIR}/*.cpp)
     file(GLOB MODULE_H   CONFIGURE_DEPENDS ${DIR}/*.h)
 
-    # гарантируем, что module.ixx идёт первым
     list(FILTER MODULE_IXX INCLUDE REGEX ".*/module\\.ixx$")
     file(GLOB OTHER_IXX CONFIGURE_DEPENDS ${DIR}/*.ixx)
     list(FILTER OTHER_IXX EXCLUDE REGEX ".*/module\\.ixx$")
@@ -121,13 +120,10 @@ file(GLOB_RECURSE SHADERS
     ${SHADER_SOURCE_DIR}/*.comp
 )
 
-# Сразу после file(GLOB_RECURSE SHADERS ...)
 source_group("Shaders" FILES ${SHADERS})
 
-# Добавляем шейдеры в цель
 target_sources(rhea PRIVATE ${SHADERS})
 
-# Указываем, что это не файлы для компиляции C++
 set_source_files_properties(${SHADERS}
     PROPERTIES
     HEADER_FILE_ONLY TRUE
@@ -175,13 +171,11 @@ set(ENABLE_ASAN 1)
 
 add_dependencies(rhea shaders)
 
-# Создать пользовательскую цель
 add_custom_target(compile_shaders ALL
     DEPENDS ${SPIRV_SHADERS}
     COMMENT "Compiling all shaders"
 )
 
-# Сделать так, чтобы цель rhea зависела от файлов шейдеров
 add_custom_command(
     TARGET rhea
     PRE_BUILD
@@ -189,5 +183,4 @@ add_custom_command(
     COMMENT "Recompiling shaders if needed"
 )
 
-# Убедиться, что shaders пересобираются при изменении исходных файлов
 set_target_properties(compile_shaders PROPERTIES EXCLUDE_FROM_ALL FALSE)

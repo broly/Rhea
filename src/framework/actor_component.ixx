@@ -16,6 +16,8 @@ public:
     virtual void finish();
     virtual void tick(double dt);
     
+    virtual void on_serialize(DependencyCollector* dc);
+    
     std::shared_ptr<RhActor> owner;
 };
 

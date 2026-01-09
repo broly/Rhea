@@ -5,6 +5,7 @@ import rhmath;
 import :engine_clock;
 import :world_script;
 import :actor;
+import dependency_collector;
 
 import rhobject;
 import <json/value.h>;
@@ -41,6 +42,10 @@ bool World::load_bootstrap_level()
 bool World::load_level(std::string level_path)
 {
     std::optional<Json::Value> root_opt = json_utils::load_json_asset(level_path);
+    
+    DependencyCollector collector;
+    
+    std::vector<std::shared_ptr<RhActor>> pending_actors;
     
     if (!root_opt.has_value())
     {
@@ -101,7 +106,7 @@ bool World::load_level(std::string level_path)
                 {
                     if (reflection_info->serializer != std::nullopt)
                     {
-                        std::invoke(reflection_info->serializer.value(), *ref_fields_object, obj.get(), true);
+                        std::invoke(reflection_info->serializer.value(), *ref_fields_object, obj.get(), true, &collector);
                     }
                 }
             }
@@ -111,7 +116,7 @@ bool World::load_level(std::string level_path)
             {
                 if (reflection_info->serializer != std::nullopt)
                 {
-                    std::invoke(reflection_info->serializer.value(), *level_actor_fields_object, obj.get(), true);
+                    std::invoke(reflection_info->serializer.value(), *level_actor_fields_object, obj.get(), true, &collector);
                 }
             }
             
@@ -120,14 +125,20 @@ bool World::load_level(std::string level_path)
                 auto actor = std::static_pointer_cast<RhActor>(obj);
                 
                 ref_json_value_opt.has_value() ?
-                    actor->import_from_json_object(*ref_json_value_opt, &level_actor_json_value) :
-                    actor->import_from_json_object(level_actor_json_value);
-                actors.push_back(actor);
-                actor->internal_start(shared_from_this());
+                    actor->import_from_json_object(*ref_json_value_opt, &level_actor_json_value, &collector) :
+                    actor->import_from_json_object(level_actor_json_value, nullptr, &collector);
+                pending_actors.push_back(actor);
             }
         }
         
         
+    }
+    
+    for (auto& actor : pending_actors)
+    {
+        actor->finish_importing();
+        actors.push_back(actor);
+        actor->internal_start(shared_from_this());
     }
     
     return true;

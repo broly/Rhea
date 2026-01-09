@@ -19,3 +19,7 @@ void RhComponent::finish()
 void RhComponent::tick(double dt)
 {
 }
+
+void RhComponent::on_serialize(DependencyCollector* dc)
+{
+}

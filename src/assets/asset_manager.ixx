@@ -6,12 +6,18 @@ import <string>;
 
 import :mesh;
 import :texture;
+import <future>;
 
 export class AssetManager
 {
 public:
     MeshHandle load_mesh(const std::string& rel_path);
     TextureHandle load_texture(const std::string& rel_path);
+    
+    std::mutex mutex;
+    std::unordered_map<std::string, std::shared_future<TextureHandle>> in_flight;
+    
+    std::shared_future<TextureHandle> load_texture_async(const std::string& path);
 
 
     static AssetManager& get();
