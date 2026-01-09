@@ -29,7 +29,7 @@ layout(set = 1, binding = 3) uniform sampler2D u_normal_map;
 layout(set = 1, binding = 4) uniform sampler2D u_orm;
 
 // ================== CAMERA ==================
-layout(set = SET_CAMERA, binding = BINDING_CAMERA_UBO) uniform CameraUBO
+layout(set = 0, binding = 0) uniform CameraUBO
 {
     mat4 view_proj;
     vec4 camera_pos;
@@ -42,7 +42,7 @@ struct Light
     vec4 color;
 };
 
-layout(set = SET_LIGHT, binding = BINDING_LIGHT_UBO) uniform LightUBO
+layout(set = 2, binding = 0) uniform LightUBO
 {
     Light lights[8];
     int light_count;

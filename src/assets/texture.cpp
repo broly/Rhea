@@ -43,24 +43,24 @@ std::optional<Texture> Texture::create_from_file(const std::filesystem::path& pa
 
 void serialize_json_value(TextureHandle& target, const Json::Value& value, DependencyCollector* dc)
 {
-    if (value.isString())
-    {
-        std::string path = value.asString();
-        
-        auto result = std::async(std::launch::async, [&, path]() {
-            if (!value.isString())
-                return;
+    if (!value.isString())
+        return;
 
-            auto future = RhGlobals::engine
-                ->asset_manager
-                ->load_texture_async(path);
+    target = RhGlobals::engine->asset_manager->load_texture(value.asString());
+    // std::string path = value.asString();
+    // target.pending_path = path;
+    //
 
-            dc->push(std::async(std::launch::async, [&target, future]() mutable 
-                {
-                    target = future.get();
-                }));
-        });
-        
-        dc->push(std::move(result));
-    }
+    // auto texture_future =
+    //     RhGlobals::engine
+    //         ->asset_manager
+    //         ->load_texture_async(path);
+    //
+
+    // dc->push(std::async(
+    //     std::launch::async,
+    //     [&target, texture_future]() mutable
+    //     {
+    //         target = texture_future.get();
+    //     }));
 }

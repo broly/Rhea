@@ -15,11 +15,17 @@ layout(location = 3) out vec3 v_world_tangent;
 layout(location = 4) out vec3 v_world_bitangent;
 
 // ---------- Camera ----------
-layout(set = SET_CAMERA, binding = BINDING_CAMERA_UBO) uniform CameraUBO
+layout(set = 0, binding = 0) uniform CameraUBO
 {
     mat4 view_proj;
     vec4 camera_pos;
 } camera;
+
+layout(set = 3, binding = 0) uniform ModelUBO
+{
+    mat4 model;
+} model_ubo;
+
 
 // ---------- Push constants ----------
 layout(push_constant) uniform PushConstants

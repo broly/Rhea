@@ -10,17 +10,6 @@ import profile;
 #include "common/assertion_macros.h"
 
 
-void RenderGraphContext::bind_sampled_texture(RBDescriptorSetLayout layout, uint32_t binding, RGTextureHandle tex)
-{
-    checkf(false, "deprecated code path");
-    // backend.update_sampled_image(
-    //     layout,
-    //     binding,
-    //     render_graph.get_image(tex),
-    //     ResourceUsageType::frame
-    // );
-}
-
 RenderGraph::RenderGraph(const std::shared_ptr<RenderBackend>& in_backend)
     : backend(in_backend)
 {

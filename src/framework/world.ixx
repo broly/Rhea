@@ -4,6 +4,7 @@ import <memory>;
 import <string>;
 import :engine_clock;
 import :core;
+import dependency_collector;
 // import :scene_extractor;
 
 
@@ -43,4 +44,5 @@ public:
     std::vector<std::unique_ptr<WorldScript>> scripts;
     std::shared_ptr<EngineClock> clock;
     std::vector<std::shared_ptr<RhActor>> actors;
+    DependencyCollector collector;
 };

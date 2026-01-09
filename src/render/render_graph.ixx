@@ -34,12 +34,6 @@ public:
         , render_graph(render_graph)
         , pipeline(nullptr)
     {}
-    
-    
-    void bind_sampled_texture(
-        RBDescriptorSetLayout layout,
-        uint32_t binding,
-        RGTextureHandle tex);
 
     RenderBackend& backend;
     RBCommandList  cmd;

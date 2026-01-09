@@ -43,7 +43,6 @@ bool World::load_level(std::string level_path)
 {
     std::optional<Json::Value> root_opt = json_utils::load_json_asset(level_path);
     
-    DependencyCollector collector;
     
     std::vector<std::shared_ptr<RhActor>> pending_actors;
     
@@ -134,8 +133,12 @@ bool World::load_level(std::string level_path)
         
     }
     
-    for (auto& actor : pending_actors)
+    collector.wait();
+    
+    
+    for (uint32_t index = 0; index < pending_actors.size(); index++)
     {
+        auto& actor = pending_actors[index];
         actor->finish_importing();
         actors.push_back(actor);
         actor->internal_start(shared_from_this());

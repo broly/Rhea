@@ -247,4 +247,12 @@ void vk::BufferManager::update_uniform_buffer(RBBufferHandle buffer_handle, size
     auto& buf = get_buffer(buffer_handle, frame);
     
     memcpy(buf.mapped_ptr, data, size);
+    
+    VkMappedMemoryRange range{};
+    range.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    range.memory = buf.memory;
+    range.offset = 0;
+    range.size   = VK_WHOLE_SIZE;
+
+    vkFlushMappedMemoryRanges(device, 1, &range);
 }

@@ -46,6 +46,7 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
     }
     
     
+    
     LogAssets.Log("Loading texture: %s", rel_path.c_str());
     
     const std::filesystem::path path = paths::get_assets_path() / rel_path;

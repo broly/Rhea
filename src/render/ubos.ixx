@@ -8,3 +8,9 @@ export struct CameraUBO
     glm::vec3 camera_pos;
     float pad;
 };
+
+export struct ModelUBO_Temp
+{
+    glm::mat4 position;
+    float pad;
+};

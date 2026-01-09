@@ -393,6 +393,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     std::vector<VkAttachmentReference> color_refs;
 
     uint32_t index = 0;
+    
+    
     for (VkFormat fmt : desc.color_formats)
     {
         attachments.push_back({
@@ -452,6 +454,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     return rp;
 }
 
+
 VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
 {
     return image_manager.get_image_format(handle);
@@ -470,6 +473,7 @@ void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, 
 {
     swapchain.update_depth_descriptior(rb_handle, value);
 }
+
 
 RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
 {

@@ -58,6 +58,18 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
+    
+    auto model_resource = render_graph->create_resource({
+        .name = "model_ubo",
+        .stages = ShaderStage::all,
+        .usage_type = ResourceUsageType::frame,
+        .variables = {
+            { "model_ubo", sizeof(ModelUBO_Temp) }
+        }
+    });
+    
+    
+    
     auto light_resource = render_graph->create_resource({
         .name = "light",
         .stages = ShaderStage::fragment,
@@ -125,6 +137,7 @@ void GameRenderer::init(RBWindowHandle in_window)
                 .shader = "shaders/geometry.frag.spv"
             }
         },
+        
         .layout = {
             .sets = {}, 
             .push_constants = {{
@@ -187,6 +200,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .external = false
     };
     
+    
     render_graph->add_pass({
         .name = "GeometryForward",
         .pipeline = geometry_pipeline,  // added this
@@ -194,7 +208,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         { hdr_color, RBImageUsage::ColorAttachment }, 
         { depth_texture, RBImageUsage::DepthStencilAttachment } 
         },
-        .resources = { camera_resource, material_resource, light_resource },    
+        .resources = { camera_resource, material_resource, light_resource, model_resource },    
         .execute = [=](RenderGraphContext& ctx)
         {
             PROFILE("GeometryForward");
@@ -219,6 +233,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo, ctx.frame);
             cam->bind(ctx.pipeline, cmd, ctx.frame);
 
+            
             // ---------- Lights ----------
             auto& point_light_processor = extractor->get_processor<SceneViewProcessor_Light>();
             const auto [lights, light_num] = point_light_processor.query_nearest_lights_limited<8>(active_camera->position);
@@ -240,10 +255,6 @@ void GameRenderer::init(RBWindowHandle in_window)
             // ---------- Draw ----------
             
             auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
-            RenderResourceInstance* bound_material = nullptr;
-            MeshPrimHandle bound_mesh{};
-            bool has_bound_mesh = false;
-            
             for (const auto& ro : meshes_processor.meshes)
             {
                 checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");
@@ -255,27 +266,21 @@ void GameRenderer::init(RBWindowHandle in_window)
                         MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
 
                         uint32_t material_index = prim.material_index.value_or(0);
-                        auto material_key = ro.material_keys[material_index];
+                        auto material_key = ro.material_keys[0]; // 0 is temp crutch
                             
                         auto material_resource_instance = meshes_processor.get_or_create_material_resource(
                             material_resource, material_key);
-                        
-                        if (material_resource_instance != bound_material)
-                        {
-                            material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
-                            bound_material = material_resource_instance;
-                        }
                             
-                        // material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
+                        material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
                 
                         ctx.backend.get_or_create_mesh_buffers(mesh_prim);
                         
-                        if (!has_bound_mesh || mesh_prim != bound_mesh)
-                        {
-                            ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
-                            bound_mesh = mesh_prim;
-                            has_bound_mesh = true;
-                        }
+                        ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
+                        
+                        auto model = model_resource->query_single();
+                        ModelUBO_Temp model_ubo{ro.world};
+                        model->update_uniform_buffer(ctx.pipeline, "model_ubo", model_ubo, ctx.frame);
+                        model->bind(ctx.pipeline, cmd, ctx.frame);
                         ctx.backend.push_constants(
                             cmd, ro.world,
                             geometry_pipeline->get_pipeline_handle()
