@@ -135,7 +135,6 @@ bool World::load_level(std::string level_path)
     
     collector.wait();
     
-    
     for (uint32_t index = 0; index < pending_actors.size(); index++)
     {
         auto& actor = pending_actors[index];

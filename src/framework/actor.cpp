@@ -37,7 +37,7 @@ void RhActor::internal_tick(double dt)
 
 void RhActor::import_from_json_object(const Json::Value& object, const Json::Value* overrides, DependencyCollector* collector)
 {
-      auto pthis = std::static_pointer_cast<RhActor>(shared_from_this());
+    auto pthis = std::static_pointer_cast<RhActor>(shared_from_this());
 
     std::unordered_map<std::string, std::shared_ptr<RhComponent>> components_by_name;
 

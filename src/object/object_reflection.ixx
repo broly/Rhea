@@ -130,8 +130,8 @@ export namespace reflect::json
             {
                 typename T::value_type array_item;
                 // serialize_json_value(array_item, json_item);
-                visit_serialize(json_item, array_item, is_loading, dc);
                 target.push_back(array_item);
+                visit_serialize(json_item, target.back(), is_loading, dc);
             }
         } else if constexpr (is_map_v<std::decay_t<T>>)
         {
@@ -143,11 +143,11 @@ export namespace reflect::json
             for (auto& member_name : member_names)
             {
                 typename T::mapped_type map_value;
+                auto [it, inserted] = target.try_emplace(member_name, map_value);
                 
                 auto& json_value = value[member_name];
                 
-                visit_serialize(json_value, map_value, is_loading, dc);
-                target.try_emplace(member_name, map_value);
+                visit_serialize(json_value, it->second, is_loading, dc);
             }
         } else if constexpr (requires { serialize_json_value(target, value, dc); })
         {

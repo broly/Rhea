@@ -46,21 +46,18 @@ void serialize_json_value(TextureHandle& target, const Json::Value& value, Depen
     if (!value.isString())
         return;
 
-    target = RhGlobals::engine->asset_manager->load_texture(value.asString());
-    // std::string path = value.asString();
-    // target.pending_path = path;
-    //
-
-    // auto texture_future =
-    //     RhGlobals::engine
-    //         ->asset_manager
-    //         ->load_texture_async(path);
-    //
-
-    // dc->push(std::async(
-    //     std::launch::async,
-    //     [&target, texture_future]() mutable
-    //     {
-    //         target = texture_future.get();
-    //     }));
+    std::string path = value.asString();
+    target.pending_path = path;
+    
+    auto texture_future =
+        RhGlobals::engine
+            ->asset_manager
+            ->load_texture_async(path);
+    
+    dc->push(std::async(
+        std::launch::async,
+        [&target, texture_future]() mutable
+        {
+            target = texture_future.get();
+        }));
 }
