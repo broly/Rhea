@@ -6,11 +6,7 @@ import <vector>;
 
 export class GameRenderer : public Renderer
 {
-public:
-    GameRenderer()
-    {
-    }
-    
+public:    
     void set_engine(const std::shared_ptr<Engine>& in_engine);
 
     void init(RBWindowHandle in_window) override;

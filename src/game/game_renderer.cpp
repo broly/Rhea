@@ -230,9 +230,7 @@ void GameRenderer::init(RBWindowHandle in_window)
                 light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
                 light_ubo.lights[i].color    = glm::vec4(lights[i].color);
             }
-            {
-                PROFILE("GeometryForward:light");
-                
+            {                
                 auto light = light_resource->query_single();
                 light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo, ctx.frame);
                 light->bind(ctx.pipeline, cmd, ctx.frame);
@@ -245,20 +243,15 @@ void GameRenderer::init(RBWindowHandle in_window)
             RenderResourceInstance* bound_material = nullptr;
             MeshPrimHandle bound_mesh{};
             bool has_bound_mesh = false;
-
-            PROFILE("GeometryForward:draw");
             
             for (const auto& ro : meshes_processor.meshes)
             {
-                PROFILE("GeometryForward:draw:mesh");
                 checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");
                 
-                for (uint32_t geom_index = 0; auto geom : ro.mesh.get().mesh_geometry)
+                for (uint32_t geom_index = 0; auto& geom : ro.mesh.get().mesh_geometry)
                 {
-                    PROFILE("GeometryForward:draw:mesh:geom");
-                    for (uint32_t prim_index = 0; auto prim : geom.primitives)
+                    for (uint32_t prim_index = 0; auto& prim : geom.primitives)
                     {
-                        PROFILE("GeometryForward:draw:mesh:geom:prim");
                         MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
 
                         uint32_t material_index = prim.material_index.value_or(0);
@@ -358,7 +351,7 @@ RenderResource* GameRenderer::get_material_resource()
 
 void GameRenderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame)
 {
-    
+    PROFILE("GeometryForward:update_material_resource");
     material_resource_instance->update_uniform_buffer(geom_pipeline, "material", 
                                                       MaterialUBO{
                                                           .base_color_mult = material_key.base_color_mult,

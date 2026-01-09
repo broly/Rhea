@@ -20,8 +20,6 @@ public:
     
     void run();
 
-    void init_render_graph(RenderBackend& render_backend, RenderGraph& render_graph);
-    
     std::shared_ptr<AssetManager> asset_manager = nullptr;
     platform::window::Window window = nullptr;
     std::shared_ptr<Input> input = nullptr;

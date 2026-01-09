@@ -4,6 +4,7 @@ import <cassert>;
 import <set>;
 
 #include "common/assertion_macros.h"
+#include "profiling/profile.h"
 
 #define check_conditional(cond, assertion, msg, ...) \
         if (cond) \
@@ -46,6 +47,7 @@ VkRenderResource::VkRenderResource(const RenderResourceDesc& desc, vk::BufferMan
 
 RenderResourceInstance* VkRenderResource::create_instance()
 {
+    PROFILE("VkRenderResource::create_instance");
     auto instance = std::make_unique<VkRenderResourceInstance>(
         buffer_manager, *this, desc.usage_type);
 

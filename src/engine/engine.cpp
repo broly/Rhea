@@ -51,6 +51,7 @@ void Engine::run()
     
     world->init();    
 
+    
     while (!window_should_close(window)) {
         prof::frame_start();
         
@@ -62,13 +63,6 @@ void Engine::run()
         platform::window::window_poll_events();
         renderer->execute();
         prof::frame_end();
-        // render_graph->draw(*world->get_camera());
     }
     window_destroy(window);
-}
-
-void Engine::init_render_graph(RenderBackend& render_backend, RenderGraph& render_graph)
-{
-    
-
 }
