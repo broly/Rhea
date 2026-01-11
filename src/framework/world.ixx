@@ -20,6 +20,8 @@ public:
     
     void add_actor(std::shared_ptr<RhActor> actor);
     
+    std::shared_ptr<RhActor> spawn(const std::string& name);
+
     template<typename T>
     void add_script()
     {

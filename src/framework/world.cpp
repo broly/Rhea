@@ -151,6 +151,15 @@ void World::add_actor(std::shared_ptr<RhActor> actor)
     actors.push_back(actor);
 }
 
+std::shared_ptr<RhActor> World::spawn(const std::string& name)
+{
+    std::shared_ptr<RhActor> actor = std::make_shared<RhActor>();
+    actor->name = name;
+    actors.push_back(actor);
+    actor->internal_start(shared_from_this());
+    return actor;
+}
+
 double World::get_time_seconds() const
 {
     return clock->get_total_seconds();

@@ -10,7 +10,7 @@ import rhmath;
 
 #include "common/type_macros.h"
 
-struct Primitive
+export struct Primitive
 {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -18,12 +18,12 @@ struct Primitive
     
 };
 
-struct Geometry
+export struct Geometry
 {
     std::vector<Primitive> primitives;
 };
 
-struct MeshNode
+export struct MeshNode
 {
     uint32_t index;
     Transform transform;

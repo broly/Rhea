@@ -7,6 +7,8 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/detail/type_vec4.hpp>
 #include <glm/detail/type_vec3.hpp>
@@ -50,4 +52,5 @@ export namespace glm
     using glm::conjugate;
     using glm::quatLookAtRH;
     using glm::inverse;
+    using glm::make_mat4;
 }

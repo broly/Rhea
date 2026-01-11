@@ -1,9 +1,4 @@
-﻿module;
-
-#include <fastgltf/core.hpp>
-#include <fastgltf/tools.hpp>
-
-module assets:mesh;
+﻿module assets:asset_scene;
 
 import <iostream>;
 import glm;
@@ -12,27 +7,10 @@ import <json/value.h>;
 import engine;
 import globals;
 import dependency_collector;
+import fastgltf;
+import fastgltf_helper;
 
-
-template<typename T>
-static auto fastgtlf_to_glm(const T& v)
-{
-    if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fvec3>)
-    {
-        return glm::vec3(v.x(), v.y(), v.z());
-    } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fvec2>)
-    {
-        return glm::vec2(v.x(), v.y());
-    } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fvec4>)
-    {
-        return glm::vec4(v.x(), v.y(), v.z(), v.w());
-    } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fquat>)
-    {
-        return glm::quat(v.x(), v.y(), v.z(), v.w());
-    }
-}
-
-std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::path path)
+std::vector<AssetSceneObject> AssetSceneHandle::load(const std::filesystem::path& path)
 {
     static constexpr auto supported_extensions =
         fastgltf::Extensions::KHR_mesh_quantization |
@@ -51,7 +29,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
     auto gltfFile = fastgltf::MappedGltfFile::FromPath(path);
     if (!gltfFile) {
         std::cerr << "Failed to open glTF file\n";
-        return std::nullopt;
+        return {};
     }
 
     auto assetResult = parser.loadGltf(
@@ -62,22 +40,26 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
 
     if (assetResult.error() != fastgltf::Error::None) {
         std::cerr << "Failed to load glTF\n";
-        return std::nullopt;
+        return {};
     }
 
     fastgltf::Asset& asset = assetResult.get();
 
     if (asset.meshes.empty()) {
         std::cerr << "No meshes in glTF\n";
-        return std::nullopt;
+        return {};
     }
 
-    StaticMesh mesh;
+    // StaticMesh mesh;
+    
+    std::vector<AssetSceneObject> result;
     
     for (auto& gltf_node : asset.nodes)
     {
         if (!gltf_node.meshIndex.has_value())
             continue;
+        
+        auto mesh_index = *gltf_node.meshIndex;
         
         auto trs = std::get<fastgltf::TRS>(gltf_node.transform);
         Transform t {
@@ -85,20 +67,18 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
                 fastgtlf_to_glm(trs.rotation),
                 fastgtlf_to_glm(trs.scale),
         };
-        MeshNode node;
-        node.index = *gltf_node.meshIndex;
-        node.transform = t;
-        mesh.nodes.push_back(node);
-    }
-    
-    for (auto& gltf_material : asset.materials)
-    {
-        mesh.material_names.push_back(gltf_material.name.c_str());
-    }
-    
-    for (auto& gltf_mesh : asset.meshes)
-    {
-        Geometry mesh_section;
+        
+        result.push_back({});
+        
+        auto& scene_object = result.back();
+        scene_object.transform = t;
+        
+        
+        auto& mesh = scene_object.mesh;
+        auto& gltf_mesh = asset.meshes[mesh_index];
+
+        scene_object.mesh.mesh_geometry.push_back({});
+        Geometry& mesh_section = mesh.mesh_geometry.back();
         
         for (auto& primitive : gltf_mesh.primitives)
         {
@@ -192,26 +172,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
             mesh_section.primitives.push_back(mesh_primitive);
         }
         
-        mesh.mesh_geometry.push_back(mesh_section);
     }
-    return mesh;
-}
-
-const StaticMesh& MeshHandle::get() const
-{
-    return RhGlobals::engine->asset_manager->get_mesh(*this);
-}
-
-const Primitive& MeshPrimHandle::get() const
-{
-    return mesh.get().mesh_geometry[geom_index].primitives[prim_index];
-}
-
-void serialize_json_value(MeshHandle& target, const Json::Value& value, DependencyCollector* dc)
-{
-    if (value.isString())
-    {
-        std::string path = value.asString();
-        target = RhGlobals::engine->asset_manager->load_mesh(path);
-    }
+    
+    return result;
 }

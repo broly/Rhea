@@ -53,6 +53,20 @@ public:
     }
     
     std::shared_ptr<RhComponent> find_component_by_name(const std::string& name);
+    
+    template<typename T = RhComponent>
+    std::shared_ptr<T> add_component() const
+    {
+        auto requested_object_type_id = reflect::get_object_type_id<T>();
+        
+        const auto& component_reflection_info = 
+            reflect::find_object_reflection_info(requested_object_type_id);
+        
+        auto instance = component_reflection_info->template instantiate<T>();
+        instanced_components.push_back(instance);
+        instance->on_add(shared_from_this());
+        return instance;
+    }
 
     std::shared_ptr<World> get_world() const
     {

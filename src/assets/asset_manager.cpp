@@ -72,6 +72,30 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
     return texture_handle;
 }
 
+AssetSceneHandle AssetManager::load_scene(const std::string& rel_path)
+{
+    
+    const std::filesystem::path path = paths::get_assets_path() / rel_path;
+    
+    std::vector<AssetSceneObject> objects = AssetSceneHandle::load(path);
+    
+    if (objects.empty())
+        throw std::runtime_error("Failed to load scene");
+    
+    return {};
+}
+
+MeshHandle AssetManager::store_mesh(StaticMesh&& mesh)
+{
+    const uint32_t mesh_id = ++meshes_counter;
+    
+    const MeshHandle mesh_handle {mesh_id};
+    
+    loaded_meshes.insert({mesh_handle, std::move(mesh)});
+
+    return mesh_handle;
+}
+
 std::shared_future<TextureHandle> AssetManager::load_texture_async(const std::string& path)
 {
     std::lock_guard lock(mutex);

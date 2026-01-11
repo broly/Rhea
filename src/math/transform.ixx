@@ -22,6 +22,22 @@ export struct Transform {
             : position(position), rotation(rotation), scale(scale)
     {}
     
+    Transform(glm::mat4 mat)
+    {
+        position = glm::vec3(mat[3]);
+        
+        scale.x = glm::length(glm::vec3(mat[0]));
+        scale.y = glm::length(glm::vec3(mat[1]));
+        scale.z = glm::length(glm::vec3(mat[2]));
+        
+        glm::mat3 rotationMatrix;
+        rotationMatrix[0] = glm::vec3(mat[0]) / scale.x;
+        rotationMatrix[1] = glm::vec3(mat[1]) / scale.y;
+        rotationMatrix[2] = glm::vec3(mat[2]) / scale.z;
+        
+        rotation = glm::quat_cast(rotationMatrix);
+    }
+    
     [[nodiscard]]
     static Transform make_from_euler(
         glm::vec3 in_position, 
