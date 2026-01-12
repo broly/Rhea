@@ -58,10 +58,11 @@ void WorldScript_RotateAroundObject::tick(double dt)
         rotation_started = false;
     }
 
-    auto qrot = math::from_euler_rotation(glm::vec3(0, yaw, pitch));
+    auto qrot = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
     
     t.rotation = qrot;
 
+    
     float speed = move_speed * (float)dt;
     
     if (input->is_key_down(Key::P))

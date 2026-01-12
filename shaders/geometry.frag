@@ -112,6 +112,5 @@ void main()
     vec3 ambient = vec3(0.01) * albedo * ao;
     vec3 hdr_color = ambient + Lo + emissive;
 
-    // out_color = vec4(hdr_color, 1.0);
-    out_color = vec4(albedo, 1.0);
+    out_color = vec4(hdr_color, 1.0);
 }

@@ -86,6 +86,7 @@ void RhActor::import_from_json_object(const Json::Value& object, const Json::Val
             {
                 if (reflection_info->serializer)
                 {
+                    component->set_owner(pthis);
                     std::invoke(
                         reflection_info->serializer.value(),
                         *fields_object,

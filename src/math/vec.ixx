@@ -126,12 +126,12 @@ export struct quat
     
     operator glm_type() const
     {
-        return glm_type(x, y, z, w);
+        return glm_type(w, x, y, z);
     }
     
     auto glm() const
     {
-        return glm_type(x, y, z, w);
+        return glm_type(w, x, y, z);
     }
 };
 REFLECT_STRUCT(quat,

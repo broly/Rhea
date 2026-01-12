@@ -2,6 +2,7 @@
 import <cstdint>;
 import <limits>;
 import <string>;
+import <optional>;
 
 #include "common/type_macros.h"
 
@@ -17,12 +18,17 @@ struct AssetHandle
     AUTO_SPACESHIP(AssetHandle, id);
     
     AssetId id = INVALID_ASSET_ID;
-    std::string pending_path;
+    std::optional<std::string> pending_path;
     
     void start_async_loading(const std::string& path)
     {
         pending_path = path;
         id = PENDING_ASSET_ID;
+    }
+    
+    bool is_pending() const
+    {
+        return id == PENDING_ASSET_ID;
     }
     
     bool is_valid() const
@@ -42,5 +48,13 @@ struct AssetHandle
     static T invalid()
     {
         return {INVALID_ASSET_ID};
+    }
+    
+    static T make_pending(const std::string& path)
+    {
+        T result;
+        result.pending_path = path;
+        result.id = PENDING_ASSET_ID;
+        return result;
     }
 };

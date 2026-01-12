@@ -4,8 +4,8 @@ import <compare>;
 #define DEFAULT_NON_COPYABLE(Class) \
     Class(const Class&) = delete; \
     Class& operator=(const Class&) = delete; \
-    Class(Class&&) = default; \
-    Class& operator=(Class&&) = default; \
+    Class(Class&&) noexcept = default; \
+    Class& operator=(Class&&) noexcept = default; \
     Class() = default; \
     ~Class() = default;
 

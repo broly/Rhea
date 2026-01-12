@@ -13,9 +13,10 @@ class RhComp_GltfScene : public RhComponent
 public:
     void on_serialize(DependencyCollector* dc) override;
     std::string asset_path;
+    std::string textures_dir;
     
     
     
 };
 REFLECT_OBJECT_FIELDS(RhComp_GltfScene, RhComponent,
-    asset_path);
+    asset_path, textures_dir);

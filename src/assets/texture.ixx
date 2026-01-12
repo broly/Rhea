@@ -3,6 +3,7 @@
 import <cstdint>;
 import <filesystem>;
 import <vector>;
+import <future>;
 import <json/value.h>;
 import dependency_collector;
 
@@ -19,6 +20,8 @@ export struct TextureHandle : public AssetHandle<TextureHandle>
     {
         return id == other.id;
     }
+    
+    std::shared_future<void> resolve_async();
 };
 
 export struct TextureHandleHash

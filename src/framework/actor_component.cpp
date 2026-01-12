@@ -23,3 +23,8 @@ void RhComponent::tick(double dt)
 void RhComponent::on_serialize(DependencyCollector* dc)
 {
 }
+
+void RhComponent::set_owner(std::shared_ptr<RhActor> actor)
+{
+    owner = actor;
+}

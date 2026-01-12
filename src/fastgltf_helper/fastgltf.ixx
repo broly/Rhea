@@ -7,7 +7,7 @@ import fastgltf;
 import glm;
 
 export template<typename T>
-auto fastgtlf_to_glm(const T& v)
+auto fastgltf_to_glm(const T& v)
 {
     if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fvec3>)
     {
@@ -20,7 +20,7 @@ auto fastgtlf_to_glm(const T& v)
         return glm::vec4(v.x(), v.y(), v.z(), v.w());
     } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fquat>)
     {
-        return glm::quat(v.x(), v.y(), v.z(), v.w());
+        return glm::quat(v.w(), v.x(), v.y(), v.z());
     } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, fastgltf::math::fmat4x4>)
     {
         return glm::make_mat4(v.data());

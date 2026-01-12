@@ -83,78 +83,78 @@ void RhComp_StaticMesh::finish()
 }
 void RhComp_StaticMesh::on_serialize(DependencyCollector* dc)
 {
-    if (!auto_retrieve_materials || !mesh.is_valid())
-        return;
-
-    auto& mesh_object = mesh.get();
-    std::string texture_base_name = get_texture_base_name(mesh_object.name);
-
-    for (auto material_name : mesh_object.material_names)
-    {
-        std::string cleaned_material_name = clean_material_name(material_name);
-
-        std::string base_color_path = texture_base_name + "/" + cleaned_material_name + "_BaseColor.png";
-        std::string normal_path     = texture_base_name + "/" + cleaned_material_name + "_Normal.png";
-        std::string orm_path        = texture_base_name + "/" + cleaned_material_name + "_ORM.png";
-
-        auto base_color_fut = AssetManager::get().load_texture_async(base_color_path);
-        auto normal_fut     = AssetManager::get().load_texture_async(normal_path);
-        auto orm_fut        = AssetManager::get().load_texture_async(orm_path);
-
-        auto material_task = std::async(
-            std::launch::async,
-            [this,
-             material_name,
-             base_color_fut,
-             normal_fut,
-             orm_fut]()
-            {
-                PBRMaterial mat;
-
-                if (auto tex = base_color_fut.get(); tex.is_valid())
-                    mat.base_color = tex;
-
-                if (auto tex = normal_fut.get(); tex.is_valid())
-                    mat.normal = tex;
-
-                if (auto tex = orm_fut.get(); tex.is_valid())
-                    mat.occlusion_roughness_metallic = tex;
-
-                mat.emissive = TextureHandle::invalid();
-
-                mat.emissive_mult  = 1.f;
-                mat.base_color_mult = 1.f;
-                mat.occlusion_mult  = 1.f;
-                mat.metallic_mult   = 1.f;
-                mat.roughness_mult  = 1.f;
-
-                materials.emplace(material_name, std::move(mat));
-            });
-
-        dc->push(std::async(std::launch::async, [base_color_fut]() { base_color_fut.wait(); }));
-        dc->push(std::async(std::launch::async, [normal_fut]()     { normal_fut.wait(); }));
-        dc->push(std::async(std::launch::async, [orm_fut]()        { orm_fut.wait(); }));
-
-        dc->push(std::move(material_task));
-    }
+    // if (!auto_retrieve_materials || !mesh.is_valid())
+    //     return;
+    //
+    // auto& mesh_object = mesh.get();
+    // std::string texture_base_name = get_texture_base_name(mesh_object.name);
+    //
+    // for (auto material_name : mesh_object.material_names)
+    // {
+    //     std::string cleaned_material_name = clean_material_name(material_name);
+    //
+    //     std::string base_color_path = texture_base_name + "/" + cleaned_material_name + "_BaseColor.png";
+    //     std::string normal_path     = texture_base_name + "/" + cleaned_material_name + "_Normal.png";
+    //     std::string orm_path        = texture_base_name + "/" + cleaned_material_name + "_ORM.png";
+    //
+    //     auto base_color_fut = AssetManager::get().load_texture_async(base_color_path);
+    //     auto normal_fut     = AssetManager::get().load_texture_async(normal_path);
+    //     auto orm_fut        = AssetManager::get().load_texture_async(orm_path);
+    //
+    //     auto material_task = std::async(
+    //         std::launch::async,
+    //         [this,
+    //          material_name,
+    //          base_color_fut,
+    //          normal_fut,
+    //          orm_fut]()
+    //         {
+    //             PBRMaterial mat;
+    //
+    //             if (auto tex = base_color_fut.get(); tex.is_valid())
+    //                 mat.base_color = tex;
+    //
+    //             if (auto tex = normal_fut.get(); tex.is_valid())
+    //                 mat.normal = tex;
+    //
+    //             if (auto tex = orm_fut.get(); tex.is_valid())
+    //                 mat.occlusion_roughness_metallic = tex;
+    //
+    //             mat.emissive = TextureHandle::invalid();
+    //
+    //             mat.emissive_mult  = 1.f;
+    //             mat.base_color_mult = 1.f;
+    //             mat.occlusion_mult  = 1.f;
+    //             mat.metallic_mult   = 1.f;
+    //             mat.roughness_mult  = 1.f;
+    //
+    //             materials.emplace(material_name, std::move(mat));
+    //         });
+    //
+    //     dc->push(std::async(std::launch::async, [base_color_fut]() { base_color_fut.wait(); }));
+    //     dc->push(std::async(std::launch::async, [normal_fut]()     { normal_fut.wait(); }));
+    //     dc->push(std::async(std::launch::async, [orm_fut]()        { orm_fut.wait(); }));
+    //
+    //     dc->push(std::move(material_task));
+    // }
 }
 
 void RhComp_StaticMesh::update_scene_proxy()
 {
-    std::vector<PBRMaterial> mats;
-    if (auto_retrieve_materials)
-    {
-        for (auto mat_name : mesh.get().material_names)
-        {
-            mats.push_back(materials[mat_name]);
-        }
-    }
-    else
-    {
-        if (materials.contains("default"))
-            mats.push_back(materials["default"]);
-    }
-    scene_proxy.materials = mats;
+    // std::vector<PBRMaterial> mats;
+    // if (auto_retrieve_materials)
+    // {
+    //     for (auto mat_name : mesh.get().material_names)
+    //     {
+    //         mats.push_back(materials[mat_name]);
+    //     }
+    // }
+    // else
+    // {
+    //     if (materials.contains("default"))
+    //         mats.push_back(materials["default"]);
+    // }
+    scene_proxy.materials = materials;
     scene_proxy.mesh = mesh;
     scene_proxy.transform = transform;
     scene_proxy.auto_retrieve_materials = auto_retrieve_materials;

@@ -16,6 +16,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/norm.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 
 export namespace glm
 {
@@ -53,4 +54,7 @@ export namespace glm
     using glm::quatLookAtRH;
     using glm::inverse;
     using glm::make_mat4;
+    using glm::decompose;
+    using glm::rotate;
+    using glm::transpose;
 }

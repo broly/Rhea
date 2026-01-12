@@ -15,7 +15,7 @@ export class AssetManager
 public:
     MeshHandle load_mesh(const std::string& rel_path);
     TextureHandle load_texture(const std::string& rel_path);
-    AssetSceneHandle load_scene(const std::string& rel_path);
+    AssetSceneInfo load_scene(const std::string& rel_path, const std::string& textures_rel_path);
     
     
     MeshHandle store_mesh(StaticMesh&& mesh);

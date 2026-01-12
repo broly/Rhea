@@ -61,9 +61,9 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
         
         auto trs = std::get<fastgltf::TRS>(gltf_node.transform);
         Transform t {
-                fastgtlf_to_glm(trs.translation),
-                fastgtlf_to_glm(trs.rotation),
-                fastgtlf_to_glm(trs.scale),
+                fastgltf_to_glm(trs.translation),
+                fastgltf_to_glm(trs.rotation),
+                fastgltf_to_glm(trs.scale),
         };
         MeshNode node;
         node.index = *gltf_node.meshIndex;
@@ -113,11 +113,11 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
                 [&](fastgltf::math::fvec3 position, size_t index)
                 {
                     Vertex& v = mesh_primitive.vertices[index];
-                    v.position = fastgtlf_to_glm(position);
+                    v.position = fastgltf_to_glm(position);
                     v.position.z *= -1;
 
-                    mesh.bounds.min = glm::min(mesh.bounds.min, fastgtlf_to_glm(position));
-                    mesh.bounds.max = glm::max(mesh.bounds.max, fastgtlf_to_glm(position));
+                    mesh.bounds.min = glm::min(mesh.bounds.min, fastgltf_to_glm(position));
+                    mesh.bounds.max = glm::max(mesh.bounds.max, fastgltf_to_glm(position));
                 }
             );
 
@@ -125,7 +125,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
                 fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, *normAccessor,
                     [&](fastgltf::math::fvec3 normal, size_t index)
                     {
-                        mesh_primitive.vertices[index].normal = fastgtlf_to_glm(normal);
+                        mesh_primitive.vertices[index].normal = fastgltf_to_glm(normal);
                     }
                 );
             }
@@ -134,7 +134,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
                 fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, *tangentAccessor,
                     [&](fastgltf::math::fvec4 tangent, size_t index)
                     {
-                        mesh_primitive.vertices[index].tangent = fastgtlf_to_glm(tangent);
+                        mesh_primitive.vertices[index].tangent = fastgltf_to_glm(tangent);
                     }
                 );
             }
@@ -144,7 +144,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
                 fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, *uvAccessor,
                     [&](fastgltf::math::fvec2 uv, size_t index)
                     {
-                        mesh_primitive.vertices[index].tex_coord = fastgtlf_to_glm(uv);
+                        mesh_primitive.vertices[index].tex_coord = fastgltf_to_glm(uv);
                     }
                 );
             }

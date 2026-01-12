@@ -32,7 +32,7 @@ public:
     
     SceneViewProxy_Mesh scene_proxy;
     
-    std::map<std::string, PBRMaterial> materials;
+    std::vector<PBRMaterial> materials;
     
     MeshHandle mesh;
     

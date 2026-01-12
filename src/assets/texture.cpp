@@ -7,9 +7,25 @@ import globals;
 import engine;
 import <future>;
 
+#include "common/assertion_macros.h"
+
 const Texture& TextureHandle::get() const
 {
     return RhGlobals::engine->asset_manager->get_texture(*this);
+}
+
+std::shared_future<void> TextureHandle::resolve_async()
+{
+    checkf(pending_path.has_value(), "pending path is required");
+    auto fut = AssetManager::get().load_texture_async(*pending_path);
+    
+    std::shared_future<void> result = std::async(std::launch::async,[this, fut]
+    {
+        auto resolved = fut.get();
+        id = resolved.id;
+    });
+    
+    return result;
 }
 
 std::optional<Texture> Texture::create_from_file(const std::filesystem::path& path)

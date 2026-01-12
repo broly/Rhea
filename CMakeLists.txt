@@ -37,7 +37,7 @@ set(RHEA_MODULE_DIRS
     src/input
     src/spirv_reflect_wrap
     src/stb_image_wrap
-    # src/fastgltf_wrapper
+    src/fastgltf_helper
     src/common
     src/profiling
     src/math
