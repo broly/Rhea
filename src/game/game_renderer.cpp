@@ -48,6 +48,9 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     render_graph = std::make_shared<RenderGraph>(render_backend);
+
+    auto surface_sampler = render_backend->create_sampler(samplers::default_surface());
+    auto default_sampler = render_backend->create_sampler(samplers::default_surface());
     
     auto camera_resource = render_graph->create_resource({
         .name = "camera",
@@ -83,13 +86,14 @@ void GameRenderer::init(RBWindowHandle in_window)
         .name = "material",
         .stages = ShaderStage::fragment,
         .usage_type = ResourceUsageType::persistent,
+        .sampler = surface_sampler,
         .variables = {
             { "material", sizeof(MaterialUBO) },
             { "u_base_color" },
             { "u_emissive" },
             { "u_normal_map" },
             { "u_orm" },
-        }
+        },
     });
     
     _mat_res = material_resource;
@@ -201,12 +205,14 @@ void GameRenderer::init(RBWindowHandle in_window)
     };
     
     
+    
+    
     render_graph->add_pass({
         .name = "GeometryForward",
         .pipeline = geometry_pipeline,  // added this
         .writes = { 
-        { hdr_color, RBImageUsage::ColorAttachment }, 
-        { depth_texture, RBImageUsage::DepthStencilAttachment } 
+            { hdr_color, RBImageUsage::ColorAttachment }, 
+            { depth_texture, RBImageUsage::DepthStencilAttachment } 
         },
         .resources = { camera_resource, material_resource, light_resource, model_resource },    
         .execute = [=](RenderGraphContext& ctx)
@@ -266,7 +272,7 @@ void GameRenderer::init(RBWindowHandle in_window)
                         MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
 
                         uint32_t material_index = prim.material_index.value_or(0);
-                        auto material_key = ro.material_keys[0]; // 0 is temp crutch
+                        auto material_key = ro.material_keys[material_index]; // 0 is temp crutch
                             
                         auto material_resource_instance = meshes_processor.get_or_create_material_resource(
                             material_resource, material_key);

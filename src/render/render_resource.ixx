@@ -16,6 +16,7 @@ export struct RenderResourceDesc
     
     ShaderStage stages = ShaderStage::all;
     ResourceUsageType usage_type = ResourceUsageType::persistent;
+    std::optional<RBSampler> sampler;
     
     std::vector<RenderResourceVariable> variables;
 };

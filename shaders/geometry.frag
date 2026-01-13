@@ -70,7 +70,7 @@ void main()
     mat3 TBN = mat3(T, B, N);
 
     vec3 normal_ts = texture(u_normal_map, v_uv).rgb * 2.0 - 1.0;
-    normal_ts.z = 1.0 - normal_ts.z;
+    // normal_ts.z = 1.0 - normal_ts.z;
     vec3 normal = normalize(TBN * normal_ts);
 
     // ----- View -----

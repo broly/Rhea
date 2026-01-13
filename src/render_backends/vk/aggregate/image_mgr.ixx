@@ -2,6 +2,10 @@
 
 import <vulkan/vulkan_core.h>;
 import :instance;
+import :immediate_commands;
+import render;
+import assets;
+import <optional>;
 
 
 
@@ -10,8 +14,9 @@ namespace vk
     export class ImageManager
     {
     public:
-        ImageManager(vk::Instance& in_instance)
+        ImageManager(vk::Instance& in_instance, vk::ImmediateCommandPool& in_immediate_command_pool)
             : instance{in_instance}
+            , immediate_command_pool(in_immediate_command_pool)
         {}
         
         RBImageHandle create_image_view(
@@ -25,10 +30,24 @@ namespace vk
         RBImageHandle create_image(const RBImageDesc& desc);
         
         vk::Instance& instance;
+        vk::ImmediateCommandPool& immediate_command_pool;
         
         std::vector<vk::ImageResource> image_resources;
         
         void set_default_extent(uint32_t width, uint32_t height);
+        
+        RBImageHandle create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override);
+        
+        void transition_image(
+            RBCommandList cmd,
+            RBImageHandle image,
+            RBImageUsage before,
+            RBImageUsage after);
+        
+        void generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image, uint32_t width, uint32_t height, uint32_t mip_levels);
+        
+        
+        VkImageSubresourceRange full_subresource_range(RBImageHandle image);
         
         
         VkFormat get_image_format(RBImageHandle handle) const;

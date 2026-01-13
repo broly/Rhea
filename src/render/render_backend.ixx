@@ -9,6 +9,7 @@ import :handle_types;
 import :pipeline_object;
 import :rg_types;
 import :render_resource;
+import :sampler_desc;
 
 import assets;
 
@@ -85,7 +86,7 @@ public:
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) = 0;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
-    virtual RBSampler create_sampler(const RBSamplerDesc& desc) = 0;
+    virtual RBSampler create_sampler(const ::SamplerDesc& desc) = 0;
     
     virtual void transition_image(
         RBCommandList cmd,
@@ -99,9 +100,12 @@ public:
         RBDescriptorSet set,
         uint32_t binding,
         RBImageHandle image,
-        ResourceUsageType usage) = 0;
+        ResourceUsageType usage,
+        std::optional<RBSampler> sampler) = 0;
     
     virtual std::pair<uint32_t, uint32_t> get_viewport_extent() const = 0;
     
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) = 0;
+    
+    
 };

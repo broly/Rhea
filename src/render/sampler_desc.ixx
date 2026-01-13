@@ -51,6 +51,8 @@ export enum class SamplerBorderColor : uint32_t
 
 export struct SamplerDesc
 {
+    constexpr SamplerDesc() {}
+    
     SamplerFilter min_filter = SamplerFilter::Linear;
     SamplerFilter mag_filter = SamplerFilter::Linear;
     SamplerMipMapMode mipmap_mode = SamplerMipMapMode::Linear;
@@ -104,3 +106,31 @@ export struct SamplerDescHash
         return h;
     }
 };
+
+export namespace samplers
+{
+    constexpr SamplerDesc default_surface()
+    {
+        SamplerDesc surface_sampler{};
+        surface_sampler.min_filter   = SamplerFilter::Linear;
+        surface_sampler.mag_filter   = SamplerFilter::Linear;
+        surface_sampler.mipmap_mode  = SamplerMipMapMode::Linear;
+
+        surface_sampler.address_u = SamplerAddressMode::Repeat;
+        surface_sampler.address_v = SamplerAddressMode::Repeat;
+        surface_sampler.address_w = SamplerAddressMode::Repeat;
+
+        surface_sampler.min_lod_bias = 0.0f;
+        surface_sampler.min_lod      = 0.0f;
+        surface_sampler.max_lod      = 1000.0f;
+
+        surface_sampler.anisotropy     = true;
+        surface_sampler.max_anisotropy = 8.0f; 
+
+        surface_sampler.comparison = false;
+
+        surface_sampler.border_color = SamplerBorderColor::float_opaque_white;
+        
+        return surface_sampler;
+    }
+}

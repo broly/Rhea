@@ -37,29 +37,7 @@ void VkRenderBackend::transition_image(
         RBImageUsage before,
         RBImageUsage after)
 {
-    auto src = vk::to_vk_state(before);
-    auto dst = vk::to_vk_state(after);
-
-    VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    barrier.oldLayout = src.layout;
-    barrier.newLayout = dst.layout;
-    barrier.srcAccessMask = src.access;
-    barrier.dstAccessMask = dst.access;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image_manager.get_image_resource(image).image;
-
-    barrier.subresourceRange = full_subresource_range(image);
-
-    vkCmdPipelineBarrier(
-        cmd.as<VkCommandBuffer>(),
-        src.stage,
-        dst.stage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+    image_manager.transition_image(cmd, image, before, after);
 }
 
 RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb) const
@@ -94,7 +72,7 @@ void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
 }
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
-    ResourceUsageType usage)
+    ResourceUsageType usage, std::optional<RBSampler> sampler)
 {
     // VkDescriptorSet set = get_descriptor_set(layout, usage);
 
@@ -102,7 +80,7 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding
     VkDescriptorImageInfo info{};
     info.imageView   = get_image_view(image);
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    info.sampler     = sampler_manager.get_default_sampler();
+    info.sampler     = sampler.has_value() ? VkSampler(*sampler) : sampler_manager.get_default_sampler();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -186,27 +164,7 @@ void VkRenderBackend::create_depth_resources()
 
 VkImageSubresourceRange VkRenderBackend::full_subresource_range(RBImageHandle image)
 {
-    const auto& img = image_manager.get_image_resource(image);
-
-    VkImageSubresourceRange range{};
-    range.baseMipLevel   = 0;
-    range.levelCount     = img.mip_levels;  // default = 1
-    range.baseArrayLayer = 0;
-    range.layerCount     = img.array_layers;  // default = 1
-
-    if (vk::is_depth_format(img.format))
-    {
-        range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-        if (vk::has_stencil(img.format))
-            range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    else
-    {
-        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    }
-
-    return range;
+    return image_manager.full_subresource_range(image);
 }
 
 
@@ -477,174 +435,7 @@ void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, 
 
 RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
 {
-    const TextureFormat format =
-        format_override.value_or(tex.format);
-
-    // =========================
-    // STATIC BLACK TEXTURE (FALLBACK)
-    // =========================
-    static std::unordered_map<TextureFormat, RBImageHandle> black_textures;
-
-    if (tex.width == 0 || tex.height == 0)
-    {
-        auto it = black_textures.find(format);
-        if (it != black_textures.end())
-            return it->second;
-
-        // --- create 1x1 black texture ---
-        RBImageDesc desc;
-        desc.width  = 1;
-        desc.height = 1;
-        desc.format = format;
-        desc.usage =
-            RenderTextureUsage::Sampled |
-            RenderTextureUsage::TransferDst;
-
-        RBImageHandle image = create_image(desc);
-        auto& res = image_manager.get_image_resource(image);
-
-        const size_t pixel_size =
-            format == TextureFormat::RGB8 ? 3 : 4;
-
-        uint8_t black_pixel[4] = { 0, 0, 0, 255 };
-
-        VkBuffer staging_buffer;
-        VkDeviceMemory staging_memory;
-
-        vk::create_buffer(
-            instance.device,
-            instance.physical_device,
-            pixel_size,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            staging_buffer,
-            staging_memory);
-
-        vk::update_buffer(
-            instance.device,
-            staging_memory,
-            black_pixel,
-            pixel_size);
-
-        immediate_command_pool.submit([&](VkCommandBuffer cmd)
-        {
-            transition_image(
-                cmd,
-                image,
-                RBImageUsage::Undefined,
-                RBImageUsage::TransferDst);
-
-            VkBufferImageCopy copy{};
-            copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            copy.imageSubresource.layerCount = 1;
-            copy.imageExtent = { 1, 1, 1 };
-
-            vkCmdCopyBufferToImage(
-                cmd,
-                staging_buffer,
-                res.image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1,
-                &copy);
-
-            transition_image(
-                cmd,
-                image,
-                RBImageUsage::TransferDst,
-                RBImageUsage::SampledFragment);
-        });
-
-        vk::destroy_buffer(
-            instance.device,
-            staging_buffer,
-            staging_memory);
-
-        black_textures[format] = image;
-        return image;
-    }
-    
-    
-    RBImageDesc desc;
-    desc.width  = tex.width;
-    desc.height = tex.height;
-    desc.format = format_override.value_or(tex.format);
-    desc.usage  =
-        RenderTextureUsage::Sampled |
-        RenderTextureUsage::TransferDst;
-    
-    // 1. GPU image
-    RBImageHandle image = create_image(desc);
-    auto& res = image_manager.get_image_resource(image);
-    
-    // 2. staging buffer
-    size_t pixel_size =
-        tex.format == TextureFormat::RGB8 ? 3 : 4;
-    
-    size_t upload_size =
-        tex.width * tex.height * pixel_size;
-    
-    if (upload_size == 0)
-    {
-        throw std::runtime_error("create_texture_2d: upload_size == 0");
-    }
-    
-    VkBuffer staging_buffer;
-    VkDeviceMemory staging_memory;
-    
-    vk::create_buffer(
-        instance.device,
-        instance.physical_device,
-        upload_size,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        staging_buffer,
-        staging_memory);
-    
-    
-    
-    vk::update_buffer(instance.device, staging_memory, tex.pixels.data(), upload_size);
-    
-    // 3. copy
-    immediate_command_pool.submit([&](VkCommandBuffer cmd)
-    {
-        transition_image(
-            cmd,
-            image,
-            RBImageUsage::Undefined,
-            RBImageUsage::TransferDst
-        );
-    
-        VkBufferImageCopy copy{};
-        copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copy.imageSubresource.layerCount = 1;
-        copy.imageExtent = {
-            tex.width,
-            tex.height,
-            1
-        };
-    
-        vkCmdCopyBufferToImage(
-            cmd,
-            staging_buffer,
-            res.image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1,
-            &copy
-        );
-    
-        transition_image(
-            cmd,
-            image,
-            RBImageUsage::TransferDst,
-            RBImageUsage::SampledFragment
-        );
-    });
-    
-    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
-    
-    return image;
+    return image_manager.create_texture_2d(tex, format_override);
 }
 
 std::pair<uint32_t, uint32_t> VkRenderBackend::get_viewport_extent() const
@@ -915,25 +706,7 @@ void VkRenderBackend::create_frame_sync_objects()
     swapchain.create_sync_objects();
 }
 
-RBSampler VkRenderBackend::create_sampler(const RBSamplerDesc& desc)
+RBSampler VkRenderBackend::create_sampler(const ::SamplerDesc& desc)
 {
-    VkSamplerCreateInfo info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-
-    info.magFilter = desc.linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-    info.minFilter = desc.linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-
-    info.addressModeU =
-    info.addressModeV =
-    info.addressModeW = desc.clamp_to_edge
-        ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-        : VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-    info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    info.minLod = 0.0f;
-    info.maxLod = 1.0f;
-
-    VkSampler sampler;
-    VK_CHECK(vkCreateSampler(instance.get_device(), &info, nullptr, &sampler));
-
-    return RBSampler{ sampler };
+    return sampler_manager.get_or_create(desc);
 }

@@ -53,7 +53,8 @@ public:   /// API Section
         RBDescriptorSet set,
         uint32_t binding,
         RBImageHandle image,
-        ResourceUsageType usage) override;
+        ResourceUsageType usage,
+        std::optional<RBSampler> sampler) override;
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) override;
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;
     virtual RBFrameHandle get_current_frame() const override;
@@ -70,7 +71,7 @@ public:   /// API Section
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
     virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) override;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
-    virtual RBSampler create_sampler(const RBSamplerDesc& desc) override;
+    virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) override;
@@ -106,13 +107,13 @@ private: // internal section
 
 public:   /// Aggregate section. These objects have same lifetime with render backend. use refs
     vk::Instance instance {};
-    vk::ImageManager image_manager {instance}; // holds refs
+    vk::ImmediateCommandPool immediate_command_pool{instance};
+    vk::ImageManager image_manager {instance, immediate_command_pool}; // holds refs
     vk::SamplerManager sampler_manager {instance};
     vk::SwapchainControl swapchain {instance, image_manager, sampler_manager};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
     vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
     vk::MeshManager mesh_manager{instance};
-    vk::ImmediateCommandPool immediate_command_pool{instance};
     
     std::vector<std::unique_ptr<VkRenderResource>> resources;
     

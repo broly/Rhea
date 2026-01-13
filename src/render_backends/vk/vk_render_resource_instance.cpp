@@ -51,7 +51,8 @@ void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_objec
         set,
         binding.binding_index,
         image_handle,
-        usage);
+        usage,
+        resource.desc.sampler);
 }
 
 void VkRenderResourceInstance::bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame)

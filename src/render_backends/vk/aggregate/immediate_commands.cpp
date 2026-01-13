@@ -59,3 +59,37 @@ void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& fn)
     vkQueueSubmit(instance.graphics_queue, 1, &submit, fence);
     vkWaitForFences(instance.device, 1, &fence, VK_TRUE, UINT64_MAX);
 }
+
+VkCommandBuffer vk::ImmediateCommandPool::begin_single_time_commands()
+{
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = pool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer cmd;
+    vkAllocateCommandBuffers(instance.device, &allocInfo, &cmd);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(cmd, &beginInfo);
+    return cmd;
+}
+
+void vk::ImmediateCommandPool::end_single_time_commands()
+{
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &cmd;
+
+    vkQueueSubmit(instance.graphics_queue, 1, &submit, VK_NULL_HANDLE);
+    vkQueueWaitIdle(instance.graphics_queue);
+
+    vkFreeCommandBuffers(instance.device, pool, 1, &cmd);
+}

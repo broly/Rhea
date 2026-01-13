@@ -194,6 +194,7 @@ export
         uint32_t height;
         TextureFormat format;
         Mask<RenderTextureUsage::Type> usage;
+        uint32_t mip_levels = 1;
     };
 
     struct RBImageHandle
