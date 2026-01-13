@@ -57,4 +57,13 @@ export namespace glm
     using glm::decompose;
     using glm::rotate;
     using glm::transpose;
+    using glm::determinant;
+    using glm::perspectiveRH_ZO;
+    using glm::perspectiveRH_NO;
+    using glm::perspectiveLH_ZO;
+    using glm::perspectiveLH_NO;
+    using glm::perspectiveZO;
+    using glm::perspectiveNO;
+    using glm::perspectiveRH;
+    using glm::perspectiveLH;
 }

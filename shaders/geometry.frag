@@ -68,9 +68,11 @@ void main()
     vec3 T = normalize(v_world_tangent);
     vec3 B = normalize(v_world_bitangent);
     mat3 TBN = mat3(T, B, N);
-
-    vec3 normal_ts = texture(u_normal_map, v_uv).rgb * 2.0 - 1.0;
-    // normal_ts.z = 1.0 - normal_ts.z;
+    
+    
+    vec3 normal_tx = texture(u_normal_map, v_uv).rgb;
+    normal_tx.y = 1 - normal_tx.y;
+    vec3 normal_ts = normal_tx * 2.0 - 1.0;
     vec3 normal = normalize(TBN * normal_ts);
 
     // ----- View -----
@@ -113,4 +115,5 @@ void main()
     vec3 hdr_color = ambient + Lo + emissive;
 
     out_color = vec4(hdr_color, 1.0);
+    
 }

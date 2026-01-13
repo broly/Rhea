@@ -43,6 +43,39 @@
 						"intensity": 100,
 						"falloff": 100
 					}
+				},
+		
+			]
+		},
+		{
+			"name": "lymphocyte_LIGHT0",
+			"ref": "actors/lymphocyte.json",
+			
+			"components": [
+				{
+					"name": "mesh",
+					"class": "RhComp_StaticMesh",
+					"fields": {
+						"transform": {
+							"position": { "x": -5, "y": -5, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
+					},
+					"materials": [
+						{
+							"base_color": "textures/lymphocyte/Lymphocyte_B.png",
+							"emissive": "textures/lymphocyte/Lymphocyte_E.png",
+							"normal": "textures/lymphocyte/Lymphocyte_N.png",
+							"occlusion_roughness_metallic": "textures/lymphocyte/Lymphocyte_ORM.png",
+							"base_color_mult": 1.0,
+							"emissive_mult": 0.0,
+							"occlusion_mult": 1.0,
+							"roughness_mult": 1.0,
+							"metallic_mult": 1.0
+						}
+					]
 				}
 			]
 		},
@@ -56,7 +89,7 @@
 					"class": "RhComp_Light",
 					"fields": {
 						"transform": {
-							"position": { "x": 0, "y": 0, "z": 5 },
+							"position": { "x": 5.11173, "y": 1.51831, "z": 5.89107 },
 							"rotation": { "x": 0, "y": 0, "z": 0 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
@@ -68,12 +101,79 @@
 			]
 		},
 		{
+			"name": "lymphocyte_LIGHT1",
+			"ref": "actors/lymphocyte.json",
+			
+			"components": [
+				{
+					"__COMMENT__": "5.11173 1.51831 5.89107",
+					"__COMMENT__2": "0 1 5",
+					"name": "mesh",
+					"class": "RhComp_StaticMesh",
+					"fields": {
+						"transform": {
+							"position": { "x": 5.11173, "y": 1.51831, "z": 5.89107 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
+					},
+					"materials": [
+						{
+							"base_color": "textures/lymphocyte/Lymphocyte_B.png",
+							"emissive": "textures/lymphocyte/Lymphocyte_E.png",
+							"normal": "textures/lymphocyte/Lymphocyte_N.png",
+							"occlusion_roughness_metallic": "textures/lymphocyte/Lymphocyte_ORM.png",
+							"base_color_mult": 1.0,
+							"emissive_mult": 0.0,
+							"occlusion_mult": 1.0,
+							"roughness_mult": 1.0,
+							"metallic_mult": 1.0
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "lymphocyte",
+			"ref": "actors/lymphocyte.json",
+			
+			"components": [
+				{
+					"name": "mesh",
+					"class": "RhComp_StaticMesh",
+					"fields": {
+						"transform": {
+							"position": { "x": 0.100292, "y": 0.0493614, "z": -0.416527 },
+							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
+					},
+					"materials": [
+						{
+							"base_color": "textures/lymphocyte/Lymphocyte_B.png",
+							"emissive": "textures/lymphocyte/Lymphocyte_E.png",
+							"normal": "textures/lymphocyte/Lymphocyte_N.png",
+							"occlusion_roughness_metallic": "textures/lymphocyte/Lymphocyte_ORM.png",
+							"base_color_mult": 1.0,
+							"emissive_mult": 0.0,
+							"occlusion_mult": 1.0,
+							"roughness_mult": 1.0,
+							"metallic_mult": 1.0
+						}
+					]
+				}
+			]
+		}
+		,
+		{
 			"name": "imported_scene",
 			"class": "RhActor",
 			
 			"components": [
 				{
-					"name": "light1",
+					"name": "SPONZA",
 					"class": "RhComp_GltfScene",
 					"fields": {
 						"asset_path": "gltf/New_Sponza_001.gltf",

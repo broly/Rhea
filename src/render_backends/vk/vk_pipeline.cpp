@@ -183,16 +183,16 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     viewport_state.pViewports = nullptr;
     viewport_state.scissorCount = 1;
     viewport_state.pScissors = nullptr;
-
-
+    
     VkPipelineRasterizationStateCreateInfo raster{
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO
     };
     raster.polygonMode = VK_POLYGON_MODE_FILL;
     raster.lineWidth = 1.0f;
-    raster.cullMode = VK_CULL_MODE_NONE;
-    raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
+    raster.cullMode = VK_CULL_MODE_BACK_BIT;
+    raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    
+    
     VkPipelineMultisampleStateCreateInfo ms{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
     };

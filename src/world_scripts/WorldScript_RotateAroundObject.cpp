@@ -61,7 +61,6 @@ void WorldScript_RotateAroundObject::tick(double dt)
     auto qrot = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
     
     t.rotation = qrot;
-
     
     float speed = move_speed * (float)dt;
     
@@ -94,5 +93,7 @@ void WorldScript_RotateAroundObject::tick(double dt)
     if (input->is_key_down(Key::Q))
         t.position = t.position.glm() - t.up() * speed;
 
+    
+    // std::cout << t.position.x << " " << t.position.y << " " << t.position.z << std::endl;
     camera_actor->set_transform(t);
 }

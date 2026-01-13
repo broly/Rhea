@@ -70,7 +70,6 @@ std::string clean_material_name(std::string name)
 
 void RhComp_StaticMesh::start()
 {
-    
     RhComp_Renderable::start();
     update_scene_proxy();
     RhGlobals::engine->scene_view->register_scene_view_proxy(scene_proxy, render_info.processor_id, owner->name);

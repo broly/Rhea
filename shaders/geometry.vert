@@ -55,4 +55,5 @@ void main()
     v_world_bitangent = B;
 
     gl_Position = camera.view_proj * world_pos;
+    // gl_Position.y = -gl_Position.y;
 }
