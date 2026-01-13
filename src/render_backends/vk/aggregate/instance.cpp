@@ -64,6 +64,7 @@ void vk::Instance::init(GLFWwindow* in_window)
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
     
+    
     VkDeviceCreateInfo dci{
         VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO
     };

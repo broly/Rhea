@@ -142,7 +142,7 @@ void vk::SwapchainControl::update_depth_descriptior(const RBDescriptorSet& rb_ha
     VkDescriptorImageInfo image_info{};
     image_info.imageView = res.view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_info.sampler = image_manager.get_default_sampler();
+    image_info.sampler = sampler_manager.get_default_sampler();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

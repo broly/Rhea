@@ -14,8 +14,6 @@ namespace vk
             : instance{in_instance}
         {}
         
-        VkSampler get_default_sampler() const;
-        
         RBImageHandle create_image_view(
             VkExtent2D extent, 
             const VkSurfaceFormatKHR& surface_format,

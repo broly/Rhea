@@ -102,7 +102,7 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding
     VkDescriptorImageInfo info{};
     info.imageView   = get_image_view(image);
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    info.sampler     = image_manager.get_default_sampler();
+    info.sampler     = sampler_manager.get_default_sampler();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -760,6 +760,7 @@ void VkRenderBackend::init(RBWindowHandle in_window)
     
     
     instance.init(window);
+    sampler_manager.init();
 
 
     create_descriptor_pool();

@@ -107,7 +107,8 @@ private: // internal section
 public:   /// Aggregate section. These objects have same lifetime with render backend. use refs
     vk::Instance instance {};
     vk::ImageManager image_manager {instance}; // holds refs
-    vk::SwapchainControl swapchain {instance, image_manager};  // holds refs
+    vk::SamplerManager sampler_manager {instance};
+    vk::SwapchainControl swapchain {instance, image_manager, sampler_manager};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
     vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
     vk::MeshManager mesh_manager{instance};

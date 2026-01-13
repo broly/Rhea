@@ -14,3 +14,4 @@ export import :scene_view_proxy.mesh;
 export import :scene_view_proxy.light;
 export import :render_resource;
 export import :render_resource_instance;
+export import :sampler_desc;

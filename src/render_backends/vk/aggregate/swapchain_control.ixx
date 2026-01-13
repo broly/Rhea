@@ -4,6 +4,7 @@ import :context;
 import :instance;
 import :image_mgr;
 import assets;
+import :sampler_mgr;
 import <vulkan/vulkan_core.h>;
 
 class VkRenderBackend;
@@ -20,12 +21,13 @@ namespace vk
     class SwapchainControl
     {
     public:
-        SwapchainControl(vk::Instance& in_instance, vk::ImageManager& in_texture_manager)
+        SwapchainControl(vk::Instance& in_instance, vk::ImageManager& in_texture_manager, vk::SamplerManager& in_sampler_manager)
             : swapchain(VK_NULL_HANDLE)
             , image_manager(in_texture_manager)
             , extent()
             , surface_format()
             , instance(in_instance)
+            , sampler_manager(in_sampler_manager)
         {
         }
 
@@ -59,6 +61,7 @@ namespace vk
         
         vk::Instance& instance;
         vk::ImageManager& image_manager;
+        vk::SamplerManager& sampler_manager;
         std::vector<RBImageHandle> swapchain_image_handles;
         
         

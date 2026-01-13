@@ -7,6 +7,7 @@ import <type_traits>;
 import :asset;
 import :material;
 import rhmath;
+import hash_utils;
 
 #include "common/type_macros.h"
 
@@ -79,10 +80,6 @@ export struct MeshPrimHandle
     }
 };
 
-export void hash_combine(size_t& seed, size_t v)
-{
-    seed ^= v + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
-}
 
 export template<>
 struct std::hash<MeshPrimHandle>
