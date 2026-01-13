@@ -62,6 +62,7 @@ export struct Texture
     uint32_t width;
     uint32_t height;
     TextureFormat format;
+    uint32_t id;
 
     std::vector<uint8_t> pixels;
     

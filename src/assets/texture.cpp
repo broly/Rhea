@@ -18,14 +18,13 @@ std::shared_future<void> TextureHandle::resolve_async()
 {
     checkf(pending_path.has_value(), "pending path is required");
     auto fut = AssetManager::get().load_texture_async(*pending_path);
-    
-    std::shared_future<void> result = std::async(std::launch::async,[this, fut]
-    {
+
+    auto assign_id = std::async(std::launch::async, [this, fut]() {
         auto resolved = fut.get();
-        id = resolved.id;
-    });
-    
-    return result;
+        this->id = resolved.id;
+    }).share();
+
+    return assign_id;
 }
 
 std::optional<Texture> Texture::create_from_file(const std::filesystem::path& path)

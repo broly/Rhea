@@ -6,6 +6,7 @@
 import globals;
 import paths;
 import log;
+import <cassert>;
 #include "logging/log_macro.h"
 
 
@@ -60,9 +61,13 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
     }
     
     Texture texture = std::move(*texture_opt);
+    assert(texture.height > 0);
+    
+    std::scoped_lock<std::mutex> lock(mutex);
     
     texture.name = rel_path;
     const uint32_t texture_id = ++textures_counter;
+    texture.id = texture_id;
     
     const TextureHandle texture_handle {texture_id};
     

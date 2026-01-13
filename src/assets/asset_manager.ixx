@@ -41,6 +41,8 @@ public:
     
     std::vector<StaticMesh> stored_meshes;
     
+    std::mutex load_texture_mutex;
+    
     uint32_t meshes_counter;
     uint32_t textures_counter;
 };

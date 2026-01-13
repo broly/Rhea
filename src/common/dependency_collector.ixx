@@ -7,7 +7,7 @@ export class DependencyCollector
 {
 public:
     
-    void push(std::future<void>&& op)
+    void push(std::shared_future<void>&& op)
     {
         async_load_operations.push_back(std::move(op));
     }
@@ -18,5 +18,5 @@ public:
             op.wait();
     }
     
-    std::vector<std::future<void>> async_load_operations;
+    std::vector<std::shared_future<void>> async_load_operations;
 };
