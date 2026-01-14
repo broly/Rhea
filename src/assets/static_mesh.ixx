@@ -5,7 +5,7 @@ import <string>;
 import <json/value.h>;
 import <type_traits>;
 import :asset;
-import :material;
+import :pbr_material;
 import rhmath;
 import hash_utils;
 

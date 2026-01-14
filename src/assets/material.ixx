@@ -1,4 +1,4 @@
-﻿export module assets:material;
+﻿export module assets:pbr_material;
 import :texture;
 import glm;
 import rhmath;

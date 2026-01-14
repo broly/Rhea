@@ -33,6 +33,38 @@ export namespace reflect_inner
     }
 }
 
+
+
+export struct ObjectInitData
+{
+    std::string name;
+};
+
+export namespace reflect
+{
+    using ObjectFactoryType = std::function<std::shared_ptr<RhObject>(const ObjectInitData& init_data)>;
+    using JsonSerializer = std::function<bool(const Json::Value&, RhObject* Ptr, bool is_loading, DependencyCollector* collector)>;
+    
+    struct ObjectReflectionInfo
+    {
+        std::string_view name;
+        std::set<std::string_view> bases;
+    
+        ObjectFactoryType factory;
+        std::optional<JsonSerializer> serializer;
+        
+        template<typename T>
+        std::shared_ptr<T> instantiate() const;
+    };
+    template<typename T>
+    std::string_view get_object_type_id()
+    {
+        return reflect_inner::RhObjectTraits<T>::type_id;
+    }
+    
+    extern const ObjectReflectionInfo* find_object_reflection_info(std::string_view name);
+}
+
     
 export inline void serialize_json_value(Json::Int& target, const Json::Value& value, DependencyCollector* dc)
 {
@@ -107,6 +139,25 @@ struct is_map<std::map<K, V> >
 
 template<typename T>
 constexpr bool is_map_v = is_map<T>::value;
+
+
+
+
+template<typename>
+struct is_shared_ptr 
+{
+    static bool constexpr value = false;
+};
+
+template<typename T>
+struct is_shared_ptr<std::shared_ptr<T> > 
+{
+    static bool constexpr value = true;
+};
+
+template<typename T>
+constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
+
     
 export namespace reflect::json
 {
@@ -117,8 +168,17 @@ export namespace reflect::json
     template<typename T>
     void do_serialize_json_value(T& target, const Json::Value& value, bool is_loading, DependencyCollector* dc)
     {
-        
-        if constexpr (reflect::is_reflected_v<T>)
+        if constexpr (std::is_enum_v<T> && reflect::is_reflected_v<T>)
+        {
+            target = reflect::ReflectionInfo<T>::template enum_name_to_value(value.asString());
+        } else if constexpr (is_shared_ptr_v<T>)
+        {
+            auto type_id = reflect::get_object_type_id<typename T::element_type>();
+            auto info = reflect::find_object_reflection_info(type_id);
+            target = info->template instantiate<typename T::element_type>();
+            do_serialize_json_value(*target, value, is_loading, dc);
+        }
+        else if constexpr (reflect::is_reflected_v<T>)
         {
             assert(value.isObject());
             visit_serialize(value, target, is_loading, dc);
@@ -203,35 +263,14 @@ export inline bool convert_from_string(float& target, std::string value)
     return true;
 }
 
-export struct ObjectInitData
-{
-    std::string name;
-};
-
 export namespace reflect
 {
-    using ObjectFactoryType = std::function<std::shared_ptr<RhObject>(const ObjectInitData& init_data)>;
-    using JsonSerializer = std::function<bool(const Json::Value&, RhObject* Ptr, bool is_loading, DependencyCollector* collector)>;
-    
-    struct ObjectReflectionInfo
-    {
-        std::string_view name;
-        std::set<std::string_view> bases;
-    
-        ObjectFactoryType factory;
-        std::optional<JsonSerializer> serializer;
-        
-        template<typename T>
-        std::shared_ptr<T> instantiate() const;
-    };
 
     extern void register_object_class_impl(
         std::string_view name, 
         ObjectFactoryType&& factory, 
         std::set<std::string_view>&& bases,
         std::optional<JsonSerializer> serializer);
-    
-    extern const ObjectReflectionInfo* find_object_reflection_info(std::string_view name);
         
     template <typename T>
     inline bool register_actor_class(std::string_view name, std::optional<JsonSerializer>&& Serializer)
@@ -246,12 +285,6 @@ export namespace reflect
         std::set<std::string_view> class_bases = reflect_inner::RhObjectTraits<T>::get_bases();
         register_object_class_impl(name, std::move(factory), std::move(class_bases), std::move(Serializer));
         return true;
-    }
-    
-    template<typename T>
-    std::string_view get_object_type_id()
-    {
-        return reflect_inner::RhObjectTraits<T>::type_id;
     }
     
     template<typename T>

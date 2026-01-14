@@ -178,6 +178,9 @@
 					"fields": {
 						"asset_path": "gltf/New_Sponza_001.gltf",
 						"textures_dir": "textures/sponza",
+						"material": {
+							"domain": "Masked"
+						}
 					}
 				}
 			]

@@ -52,7 +52,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     auto surface_sampler = render_backend->create_sampler(samplers::default_surface());
     auto default_sampler = render_backend->create_sampler(samplers::default_surface());
     
-    auto camera_resource = render_graph->create_resource({
+    camera_resource = render_graph->create_resource({
         .name = "camera",
         .stages = ShaderStage::all,
         .usage_type = ResourceUsageType::frame,
@@ -62,7 +62,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     });
     
     
-    auto model_resource = render_graph->create_resource({
+    model_resource = render_graph->create_resource({
         .name = "model_ubo",
         .stages = ShaderStage::all,
         .usage_type = ResourceUsageType::frame,
@@ -73,7 +73,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     
     
-    auto light_resource = render_graph->create_resource({
+    light_resource = render_graph->create_resource({
         .name = "light",
         .stages = ShaderStage::fragment,
         .usage_type = ResourceUsageType::frame,
@@ -82,7 +82,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
-    auto material_resource = render_graph->create_resource({
+    material_resource = render_graph->create_resource({
         .name = "material",
         .stages = ShaderStage::fragment,
         .usage_type = ResourceUsageType::persistent,
@@ -196,16 +196,6 @@ void GameRenderer::init(RBWindowHandle in_window)
         .usage  = RenderTextureUsage::DepthStencil
     });
     
-    RGTextureDesc color_desc{
-        .width  = 0,
-        .height = 0,
-        .format = TextureFormat::RGBA8_UNORM,
-        .usage  = RenderTextureUsage::Type(RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled),
-        .external = false
-    };
-    
-    
-    
     
     render_graph->add_pass({
         .name = "GeometryForward",
@@ -214,94 +204,17 @@ void GameRenderer::init(RBWindowHandle in_window)
             { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilAttachment } 
         },
-        .resources = { camera_resource, material_resource, light_resource, model_resource },    
+        .resources = { 
+            camera_resource, 
+            material_resource, 
+            light_resource, 
+            model_resource 
+        },    
         .execute = [=](RenderGraphContext& ctx)
         {
             PROFILE("GeometryForward");
-            
-            auto& extractor = engine->scene_view;
-            auto cmd = ctx.cmd;
-            
-            // ---------- Camera ----------
-            auto& camera_processor = extractor->get_processor<SceneViewProcessor_Camera>();
 
-            const RenderObject_Camera* active_camera = camera_processor.get_active_camera();
-            
-            auto [width, height] = ctx.backend.get_viewport_extent();
-
-            CameraUBO camera_ubo;
-            camera_ubo.view_proj =
-                active_camera->get_projection(float(width) / float(height)) *
-                active_camera->view;
-            camera_ubo.camera_pos = active_camera->position;
-            
-            auto cam = camera_resource->query_single();
-            cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo, ctx.frame);
-            cam->bind(ctx.pipeline, cmd, ctx.frame);
-
-            
-            // ---------- Lights ----------
-            auto& point_light_processor = extractor->get_processor<SceneViewProcessor_Light>();
-            const auto [lights, light_num] = point_light_processor.query_nearest_lights_limited<8>(active_camera->position);
-            
-            LightUBO light_ubo{};
-            light_ubo.light_count = light_num;
-            for (int i = 0; i < light_num; ++i)
-            {
-                light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
-                light_ubo.lights[i].color    = glm::vec4(lights[i].color);
-            }
-            {                
-                auto light = light_resource->query_single();
-                light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo, ctx.frame);
-                light->bind(ctx.pipeline, cmd, ctx.frame);
-            }
-
-
-            // ---------- Draw ----------
-            
-            auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
-            for (const auto& ro : meshes_processor.meshes)
-            {
-                checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");
-                
-                for (uint32_t geom_index = 0; auto& geom : ro.mesh.get().mesh_geometry)
-                {
-                    for (uint32_t prim_index = 0; auto& prim : geom.primitives)
-                    {
-                        MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
-
-                        uint32_t material_index = prim.material_index.value_or(0);
-                        auto material_key = ro.material_keys[material_index]; // 0 is temp crutch
-                            
-                        auto material_resource_instance = meshes_processor.get_or_create_material_resource(
-                            material_resource, material_key);
-                            
-                        material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
-                
-                        ctx.backend.get_or_create_mesh_buffers(mesh_prim);
-                        
-                        ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
-                        
-                        auto model = model_resource->query_single();
-                        ModelUBO_Temp model_ubo{ro.world};
-                        model->update_uniform_buffer(ctx.pipeline, "model_ubo", model_ubo, ctx.frame);
-                        model->bind(ctx.pipeline, cmd, ctx.frame);
-                        ctx.backend.push_constants(
-                            cmd, ro.world,
-                            geometry_pipeline->get_pipeline_handle()
-                        );
-
-                        ctx.backend.draw_indexed(
-                            cmd,
-                            prim.indices.size()
-                        );
-                        prim_index++;
-                    }
-                    geom_index++;
-                }
-                
-            }
+            draw_scene(ctx);
         }
     });
     
@@ -381,6 +294,94 @@ void GameRenderer::update_material_resource(RenderResourceInstance* material_res
     material_resource_instance->update_image(geom_pipeline, "u_orm", 
                                              get_texture(material_key.occlusion_roughness_metallic), frame);                
                 
+}
+
+void GameRenderer::draw_scene(RenderGraphContext& ctx) const
+{
+            
+    
+    auto& extractor = engine->scene_view;
+    auto cmd = ctx.cmd;
+            
+    // ---------- Camera ----------
+    auto& camera_processor = extractor->get_processor<SceneViewProcessor_Camera>();
+
+    const RenderObject_Camera* active_camera = camera_processor.get_active_camera();
+            
+    auto [width, height] = ctx.backend.get_viewport_extent();
+
+    CameraUBO camera_ubo;
+    camera_ubo.view_proj =
+        active_camera->get_projection(float(width) / float(height)) *
+        active_camera->view;
+    camera_ubo.camera_pos = active_camera->position;
+            
+    auto cam = camera_resource->query_single();
+    cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo, ctx.frame);
+    cam->bind(ctx.pipeline, cmd, ctx.frame);
+
+            
+    // ---------- Lights ----------
+    auto& point_light_processor = extractor->get_processor<SceneViewProcessor_Light>();
+    const auto [lights, light_num] = point_light_processor.query_nearest_lights_limited<8>(active_camera->position);
+            
+    LightUBO light_ubo{};
+    light_ubo.light_count = light_num;
+    for (int i = 0; i < light_num; ++i)
+    {
+        light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
+        light_ubo.lights[i].color    = glm::vec4(lights[i].color);
+    }
+    {                
+        auto light = light_resource->query_single();
+        light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo, ctx.frame);
+        light->bind(ctx.pipeline, cmd, ctx.frame);
+    }
+
+    
+    // ---------- Draw ----------
+    auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
+    for (const auto& ro : meshes_processor.meshes)
+    {
+        checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");
+        
+        for (uint32_t geom_index = 0; auto& geom : ro.mesh.get().mesh_geometry)
+        {
+            for (uint32_t prim_index = 0; auto& prim : geom.primitives)
+            {
+                MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
+
+                uint32_t material_index = prim.material_index.value_or(0);
+                auto material_key = ro.material_keys[material_index]; // 0 is temp crutch
+                    
+                auto material_resource_instance = meshes_processor.get_or_create_material_resource(
+                    material_resource, material_key);
+                    
+                material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
+        
+                ctx.backend.get_or_create_mesh_buffers(mesh_prim);
+                
+                ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
+                
+                auto model = model_resource->query_single();
+                ModelUBO_Temp model_ubo{ro.world};
+                model->update_uniform_buffer(ctx.pipeline, "model_ubo", model_ubo, ctx.frame);
+                model->bind(ctx.pipeline, cmd, ctx.frame);
+                ctx.backend.push_constants(
+                    cmd, ro.world,
+                    ctx.pipeline->get_pipeline_handle()
+                );
+
+                ctx.backend.draw_indexed(
+                    cmd,
+                    prim.indices.size()
+                );
+                prim_index++;
+            }
+            geom_index++;
+        }
+        
+    }
 }
 
 

@@ -1,4 +1,5 @@
 ﻿export module rhobject:object;
+import dependency_collector;
 
 import <memory>;
 import <string>;
@@ -26,6 +27,8 @@ public:
     {
         return type_id;
     }
+    
+    virtual void on_serialize(DependencyCollector* dc) {}
     
     std::string_view type_id;
     std::string name;

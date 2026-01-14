@@ -7,6 +7,8 @@ import framework;
 #include "object/object_reflection_macro.h"
 import fastgltf;
 import glm;
+import render;
+
 
 class RhComp_GltfScene : public RhComponent
 {
@@ -15,8 +17,10 @@ public:
     std::string asset_path;
     std::string textures_dir;
     
+    std::shared_ptr<MaterialInterface> material;
+    
     
     
 };
 REFLECT_OBJECT_FIELDS(RhComp_GltfScene, RhComponent,
-    asset_path, textures_dir);
+    asset_path, textures_dir, material);
