@@ -13,6 +13,7 @@ import fixed_string;
 import :object;
 import dependency_collector;
 import name;
+import static_name;
 
 #include "common/reflect_macros.h"
 
@@ -23,7 +24,7 @@ export namespace reflect_inner
     
     
     template<typename Class, typename Base>
-    std::set<std::string_view> get_bases_impl(std::string_view ClassName)
+    constexpr std::set<std::string_view> get_bases_impl(std::string_view ClassName)
     {
         std::set<std::string_view> current_bases;
         if constexpr (!std::is_same_v<Class, RhObject> && !std::is_same_v<Base, void>) { 
@@ -38,7 +39,7 @@ export namespace reflect_inner
 
 export struct ObjectInitData
 {
-    std::string name;
+    Name name;
 };
 
 export namespace reflect
@@ -58,12 +59,12 @@ export namespace reflect
         std::shared_ptr<T> instantiate() const;
     };
     template<typename T>
-    std::string_view get_object_type_id()
+    std::string_view get_object_type_name()
     {
-        return reflect_inner::RhObjectTraits<T>::type_id;
+        return reflect_inner::RhObjectTraits<T>::type_name;
     }
     
-    extern const ObjectReflectionInfo* find_object_reflection_info(std::string_view name);
+    extern const ObjectReflectionInfo* find_object_reflection_info(Name name);
 }
 
     
@@ -179,7 +180,7 @@ export namespace reflect::json
             target = reflect::ReflectionInfo<T>::template enum_name_to_value(value.asString());
         } else if constexpr (is_shared_ptr_v<T>)
         {
-            auto type_id = reflect::get_object_type_id<typename T::element_type>();
+            auto type_id = reflect::get_object_type_name<typename T::element_type>();
             auto info = reflect::find_object_reflection_info(type_id);
             target = info->template instantiate<typename T::element_type>();
             do_serialize_json_value(*target, value, is_loading, dc);
@@ -289,7 +290,7 @@ export namespace reflect
         ObjectFactoryType factory = [name](const ObjectInitData& init_data)
         {
             auto object = std::make_shared<T>();
-            object->set_type_id(name);
+            object->set_type_name(name);
             object->set_name(init_data.name);
             return object;
         };
@@ -299,7 +300,7 @@ export namespace reflect
     }
     
     template<typename T>
-    const std::set<std::string_view>& get_object_bases()
+    const std::set<Name>& get_object_bases()
     {
         return reflect_inner::RhObjectTraits<T>::bases;
     }
@@ -308,7 +309,7 @@ export namespace reflect
     template <typename T>
     std::shared_ptr<T> ObjectReflectionInfo::instantiate() const
     {
-        auto type_id = reflect::get_object_type_id<T>();
+        auto type_id = reflect::get_object_type_name<T>();
         assert(bases.contains(type_id));
         std::string obj_name = std::string(name) + "_inst";
         ObjectInitData init_data;

@@ -4,7 +4,7 @@ import :render_backend;
 import :rg_types;
 import <cassert>;
 import <functional>;
-#include <map>
+import <map>;
 import name;
 
 export struct RenderGraphPass

@@ -41,11 +41,11 @@ public:
     template<typename T>
     std::shared_ptr<T> find_component()
     {
-        auto requested_object_type_id = reflect::get_object_type_id<T>();
+        auto requested_object_type_id = reflect::get_object_type_name<T>();
         for (auto component : instanced_components)
         {
             const auto& component_reflection_info = 
-                reflect::find_object_reflection_info(component->get_type_id());
+                reflect::find_object_reflection_info(component->get_type_name());
             if (component_reflection_info->bases.contains(requested_object_type_id))
                 return std::static_pointer_cast<T>(component);
         }
@@ -57,7 +57,7 @@ public:
     template<typename T = RhComponent>
     std::shared_ptr<T> add_component(bool deferred = false)
     {
-        auto requested_object_type_id = reflect::get_object_type_id<T>();
+        auto requested_object_type_id = reflect::get_object_type_name<T>();
         
         const auto& component_reflection_info = 
             reflect::find_object_reflection_info(requested_object_type_id);

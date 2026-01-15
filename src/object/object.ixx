@@ -4,6 +4,8 @@ import dependency_collector;
 import <memory>;
 import <string>;
 import <optional>;
+import static_name;
+import name;
 
 export class RhObject : public std::enable_shared_from_this<RhObject>
 {
@@ -13,24 +15,24 @@ public:
     
     virtual bool is_actor() const { return false; }
     
-    void set_name(const std::string& in_name)
+    void set_name(Name in_name)
     {
         name = in_name;
     }
     
-    void set_type_id(std::string_view in_type_id)
+    void set_type_name(Name in_type_id)
     {
-        type_id = in_type_id;
+        type_name = in_type_id;
     }
     
-    std::string_view get_type_id() const
+    Name get_type_name() const
     {
-        return type_id;
+        return type_name;
     }
     
     virtual void on_serialize(DependencyCollector* dc) {}
     
-    std::string_view type_id;
-    std::string name;
+    Name type_name;
+    Name name;
 };
 

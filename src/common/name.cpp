@@ -9,16 +9,23 @@ import <unordered_map>;
 
 struct NameGlobals
 {
-    DEFAULT_NON_COPYABLE(NameGlobals);
+    NON_COPYABLE(NameGlobals);
     
-    std::vector<std::string> Table;
-    std::unordered_map<std::string, uint32_t> Lookup;
-    std::mutex Mutex;
+    NameGlobals()
+    {
+        table.push_back("<None>");
+        lookup.emplace("<None>", 0);
+    }
+    
+    std::vector<std::string> table;
+    std::unordered_map<std::string, uint32_t> lookup;
+    std::mutex mutex;
 };
 
 static NameGlobals& get_name_globals()
 {
-    static NameGlobals name_globals;
+    static NameGlobals name_globals;   
+    
     return name_globals;
 }
 
@@ -44,15 +51,15 @@ static uint32_t get_or_create_name_id(const std::string& str)
     
     auto& globals = get_name_globals();
     
-    std::lock_guard<std::mutex> lock(globals.Mutex);
+    std::lock_guard<std::mutex> lock(globals.mutex);
 
-    auto it = globals.Lookup.find(str);
-    if (it != globals.Lookup.end())
+    auto it = globals.lookup.find(str);
+    if (it != globals.lookup.end())
         return it->second;
 
-    uint32_t id = static_cast<uint32_t>(globals.Table.size());
-    globals.Table.push_back(str);
-    globals.Lookup.emplace(str, id);
+    uint32_t id = static_cast<uint32_t>(globals.table.size());
+    globals.table.push_back(str);
+    globals.lookup.emplace(str, id);
     
     
     NameDebug::register_name(id, key);
@@ -67,6 +74,11 @@ Name::Name(const char* str)
 
 Name::Name(const std::string& str)
     : id(get_or_create_name_id(str))
+{
+}
+
+Name::Name(const std::string_view& str)
+    : id(get_or_create_name_id(std::string(str)))
 {
 }
 
@@ -86,5 +98,5 @@ Name& Name::operator=(const std::string& str)
 const std::string& Name::to_string() const
 {
     auto& globals = get_name_globals();
-    return globals.Table[id];
+    return globals.table[id];
 }

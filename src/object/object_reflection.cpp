@@ -4,7 +4,7 @@ import <map>;
 
 static auto& get_registry() 
 {
-    static std::map<std::string_view, reflect::ObjectReflectionInfo> registry;
+    static std::map<Name, reflect::ObjectReflectionInfo> registry;
     return registry;
 }
 
@@ -24,7 +24,7 @@ void reflect::register_object_class_impl(
     get_registry().insert({name, data});
 }
 
-const reflect::ObjectReflectionInfo* reflect::find_object_reflection_info(std::string_view name)
+const reflect::ObjectReflectionInfo* reflect::find_object_reflection_info(Name name)
 {
     const auto& registry = get_registry();
     if (registry.contains(name))

@@ -3,7 +3,7 @@ export module rhcomponents:rhcomp_mesh;
 import rhmath;
 import assets;
 import framework;
-
+import name;
 import render_scene;
 
 #include "object/object_reflection_macro.h"
@@ -14,7 +14,7 @@ export struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
     MeshHandle mesh;
     std::vector<PBRMaterial> materials;
     // PBRMaterial material;
-    std::string debug_name;
+    Name debug_name;
     bool auto_retrieve_materials;
 };
 

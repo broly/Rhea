@@ -24,8 +24,6 @@ export struct StaticName
 {
     uint32_t value;
 
-    constexpr explicit StaticName(uint32_t v) : value(v) {}
-
     template<size_t N>
     constexpr explicit StaticName(const FixedString<N>& fs)
         : value(fnv1a_lower(fs.Buffer, N))

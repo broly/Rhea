@@ -8,46 +8,46 @@ import dependency_collector;
 
 #include "common/reflect_macros.h"
 
-#define REFL_OBJECT_TRAITS(Name, Base) \
+#define REFL_OBJECT_TRAITS(cls, base) \
         export template<> \
-        struct RhObjectTraits<Name> {\
-            static constexpr std::string_view type_id = #Name; \
+        struct RhObjectTraits<cls> {\
+            static constexpr std::string_view type_name = #cls; \
             static std::set<std::string_view> get_bases() {\
-                return get_bases_impl<Name, Base>(#Name); \
+                return get_bases_impl<cls, base>(#cls); \
             }\
-            inline static std::set<std::string_view> bases = RhObjectTraits<Name>::get_bases(); \
+            inline static std::set<std::string_view> bases = RhObjectTraits<cls>::get_bases(); \
         }; \
 
-#define REFLECT_OBJECT(Name, Base, ...) \
+#define REFLECT_OBJECT(cls, base, ...) \
     export namespace reflect_inner { \
-        static_assert(std::is_base_of<RhObject, Name>::value, "Can't reflect non-RhObject types");\
-        const bool Name##_registered = \
-            reflect::register_object_class<Name>(\
-                #Name, \
+        static_assert(std::is_base_of<RhObject, cls>::value, "Can't reflect non-RhObject types");\
+        const bool cls##_registered = \
+            reflect::register_object_class<cls>(\
+                #cls, \
                 std::nullopt \
             ); \
-        REFL_OBJECT_TRAITS(Name, Base) \
+        REFL_OBJECT_TRAITS(cls, base) \
     } \
     
 
 
 
-#define REFLECT_OBJECT_FIELDS(Name, Base, ...) \
-    REFLECT_STRUCT(Name, __VA_ARGS__); \
+#define REFLECT_OBJECT_FIELDS(cls, base, ...) \
+    REFLECT_STRUCT(cls, __VA_ARGS__); \
     export namespace reflect_inner { \
-        static_assert(std::is_base_of<RhObject, Name>::value, "Can't reflect non-RhObject types");\
-        const bool Name##_registered = \
-            reflect::register_object_class<Name>(\
-                #Name, \
+        static_assert(std::is_base_of<RhObject, cls>::value, "Can't reflect non-RhObject types");\
+        const bool cls##_registered = \
+            reflect::register_object_class<cls>(\
+                #cls, \
                     [] (const Json::Value& json_object, RhObject* ObjPtr, bool is_loading, DependencyCollector* collector) -> bool { \
-                        using Class = Name;\
-                        auto CastedObjPtr = reinterpret_cast<Name*>(ObjPtr); \
+                        using Class = cls;\
+                        auto CastedObjPtr = reinterpret_cast<cls*>(ObjPtr); \
                         reflect::json::visit_serialize(json_object, *CastedObjPtr, is_loading, collector); \
                         CastedObjPtr->on_serialize(collector); \
                         return true; \
                     }\
                 ); \
-        REFL_OBJECT_TRAITS(Name, Base) \
+        REFL_OBJECT_TRAITS(cls, base) \
     } \
 
 

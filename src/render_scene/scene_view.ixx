@@ -6,6 +6,8 @@ import <unordered_map>;
 
 import <any>;
 
+import name;
+
 import :scene_view_processor;
 
 export class SceneView
@@ -19,7 +21,7 @@ public:
     
     template<typename T>
     requires std::is_base_of_v<SceneViewProxy, T>
-    void register_scene_view_proxy(T& proxy, SceneViewProcId id, const std::string& name)
+    void register_scene_view_proxy(T& proxy, SceneViewProcId id, Name name)
     {
         proxy.debug_name = name;
         proxy.render_id = processors[id]->register_proxy();

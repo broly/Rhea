@@ -5,6 +5,7 @@ import <optional>;
 import <vulkan/vulkan_core.h>;
 import <GLFW/glfw3.h>;
 import <vector>;
+import type_id;
 import assets;
 
 #include "common/type_macros.h"
@@ -23,7 +24,7 @@ export
         
         AUTO_SPACESHIP(RBHandle, handle);
     #if _DEBUG
-        std::optional<const char*> type_id = std::nullopt;
+        TypeId type_id = nullptr;
     #endif
         
         RBHandle()
@@ -33,6 +34,9 @@ export
         
         RBHandle(const RBHandle& Value)
         {
+    #if _DEBUG
+            type_id = Value.type_id;
+    #endif
             handle = Value.handle;
         };
         
@@ -41,7 +45,7 @@ export
         RBHandle(T Value)
         {
     #if _DEBUG
-            type_id = typeid(T).name();
+            type_id = get_type_id<T>();
     #endif
             handle = (uintptr_t)(Value);
         }
@@ -51,9 +55,9 @@ export
         T as() const
         {
     #if _DEBUG
-            if (type_id.has_value())
+            if (type_id)
             {
-                assert(type_id.value() == typeid(T).name());  // todo: debug compare, remake it to strcmp
+                assert(type_id == get_type_id<T>());  // todo: debug compare, remake it to strcmp
             }
     #endif
             return (T)(handle);
@@ -62,9 +66,9 @@ export
         friend bool operator==(RBHandle lhs, RBHandle rhs)
         {
     #if _DEBUG
-            if (lhs.type_id.has_value() && rhs.type_id.has_value())
+            if (lhs.type_id && rhs.type_id)
             {
-                assert(lhs.type_id.value() == rhs.type_id.value());  // todo: debug compare, remake it to strcmp
+                assert(lhs.type_id == rhs.type_id);  // todo: debug compare, remake it to strcmp
             }
     #endif
             return lhs.handle == rhs.handle;
@@ -80,11 +84,11 @@ export
         RBHandle& operator=(T rhs)
         {
     #if _DEBUG
-            if (type_id.has_value())
+            if (type_id)
             {
-                assert(type_id.value() == typeid(T).name());  // todo: debug compare, remake it to strcmp
+                assert(type_id == get_type_id<T>());  // todo: debug compare, remake it to strcmp
             }
-            type_id = typeid(T).name();
+            type_id = get_type_id<T>();
     #endif
             handle = rhs;
             return *this;

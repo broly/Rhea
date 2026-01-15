@@ -4,6 +4,7 @@ import render_scene;
 import glm;
 import <string>;
 import <vector>;
+import name;
 import rhcomponents;
 
 #include "scene_proxy_boilerplate.h"
@@ -18,7 +19,7 @@ export struct RenderObject_Camera
     float near;
     float far;
     bool active;
-    std::string debug_name;
+    Name debug_name;
     
     glm::mat4 get_projection(float aspect) const;
 };

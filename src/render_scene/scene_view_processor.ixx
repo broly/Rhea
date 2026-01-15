@@ -10,6 +10,7 @@ import generator;
 import :render_id;
 import <string>;
 import rhmath;
+import name;
 #include "common/type_macros.h"
 
 
@@ -19,7 +20,7 @@ export class SceneView;
 export struct SceneViewProxy
 {
     RenderId render_id;
-    std::string debug_name;
+    Name debug_name;
 };
 
 export struct SceneViewProxy_Transform : SceneViewProxy

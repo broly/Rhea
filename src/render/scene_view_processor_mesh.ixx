@@ -18,7 +18,7 @@ export struct RenderObject_Mesh
     AABB bounds;
     std::vector<MaterialKey> material_keys;
     std::vector<RenderResourceInstance*> material_instances;
-    std::string debug_name;
+    Name debug_name;
 };
 
 
