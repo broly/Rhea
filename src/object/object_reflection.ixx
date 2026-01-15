@@ -12,6 +12,7 @@ import fixed_string;
 
 import :object;
 import dependency_collector;
+import name;
 
 #include "common/reflect_macros.h"
 
@@ -70,6 +71,11 @@ export inline void serialize_json_value(Json::Int& target, const Json::Value& va
 {
     assert(value.isNumeric() || value.isIntegral());
     target = value.asInt();
+}
+export inline void serialize_json_value(Name& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isString());
+    target = value.asString();
 }
 export inline void serialize_json_value(Json::UInt& target, const Json::Value& value, DependencyCollector* dc)
 {
@@ -198,16 +204,21 @@ export namespace reflect::json
             assert(value.isObject());
             auto member_names = value.getMemberNames();
             
-            static_assert(std::is_same_v<typename T::key_type, std::string>);
+            using KEY = typename T::key_type;
+            
+            static_assert(std::is_same_v<typename T::key_type, std::string> || std::is_same_v<typename T::key_type, Name>);
             
             for (auto& member_name : member_names)
             {
                 typename T::mapped_type map_value;
-                auto [it, inserted] = target.try_emplace(member_name, map_value);
+                
+                KEY key = std::string(member_name);
+                
+                auto [it, inserted] = target.try_emplace(key, map_value);
                 
                 auto& json_value = value[member_name];
                 
-                visit_serialize(json_value, it->second, is_loading, dc);
+                do_serialize_json_value(it->second, json_value, is_loading, dc);
             }
         } else if constexpr (requires { serialize_json_value(target, value, dc); })
         {
@@ -273,7 +284,7 @@ export namespace reflect
         std::optional<JsonSerializer> serializer);
         
     template <typename T>
-    inline bool register_actor_class(std::string_view name, std::optional<JsonSerializer>&& Serializer)
+    inline bool register_object_class(std::string_view name, std::optional<JsonSerializer>&& Serializer)
     {
         ObjectFactoryType factory = [name](const ObjectInitData& init_data)
         {

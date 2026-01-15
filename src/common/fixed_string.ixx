@@ -3,16 +3,16 @@ export module fixed_string;
 export template<size_t Num>
 struct FixedString
 {
-    char Buffer[Num + 1]{};
+    char buffer[Num + 1]{};
     
     constexpr FixedString(char const* s)
     {
         for (size_t i = 0; i != Num; ++i)
-            Buffer[i] = s[i];
+            buffer[i] = s[i];
     }
     constexpr operator char const*() const
     {
-        return Buffer;
+        return buffer;
     }
     
     template<size_t OtherNum>
@@ -22,7 +22,7 @@ struct FixedString
             return false;
         
         for (size_t i = 0; i < Num; ++i)
-            if (Buffer[i] != other.Buffer[i])
+            if (buffer[i] != other.Buffer[i])
                 return false;
         return true;
     }
@@ -39,7 +39,7 @@ struct FixedString
             return false;
         
         for (size_t i = 0; i < Num; ++i)
-            if (Buffer[i] != other[i])
+            if (buffer[i] != other[i])
                 return false;
         return true;
     }
@@ -51,7 +51,7 @@ struct FixedString
             return false;
         
         for (size_t i = 0; i < Num; ++i)
-            if (Buffer[i] == other[i])
+            if (buffer[i] == other[i])
                 return true;
         return false;
     }

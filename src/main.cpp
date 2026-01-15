@@ -6,6 +6,13 @@ import <iostream>;
 import paths;
 import json_utils;
 import game;
+import name;
+
+
+extern "C" const char* NameDebugResolve(uint32_t id)
+{
+    return NameDebug::resolve(id);
+}
 
 int main() {
     paths::init();

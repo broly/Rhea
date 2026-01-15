@@ -22,7 +22,7 @@ import dependency_collector;
     export namespace reflect_inner { \
         static_assert(std::is_base_of<RhObject, Name>::value, "Can't reflect non-RhObject types");\
         const bool Name##_registered = \
-            reflect::register_actor_class<Name>(\
+            reflect::register_object_class<Name>(\
                 #Name, \
                 std::nullopt \
             ); \
@@ -37,7 +37,7 @@ import dependency_collector;
     export namespace reflect_inner { \
         static_assert(std::is_base_of<RhObject, Name>::value, "Can't reflect non-RhObject types");\
         const bool Name##_registered = \
-            reflect::register_actor_class<Name>(\
+            reflect::register_object_class<Name>(\
                 #Name, \
                     [] (const Json::Value& json_object, RhObject* ObjPtr, bool is_loading, DependencyCollector* collector) -> bool { \
                         using Class = Name;\

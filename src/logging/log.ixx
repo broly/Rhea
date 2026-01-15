@@ -92,7 +92,7 @@ struct Logger
                 (char* const)buffer2, 
                 512, 
                 "%s: %s", 
-                name.Buffer, buffer);
+                name.buffer, buffer);
             
             verbosity.output(buffer2);
         }
