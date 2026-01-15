@@ -61,3 +61,12 @@ private:
     uint32_t id = 0;
 };
 
+
+export template<> 
+struct std::hash<Name>
+{
+    size_t operator()(const Name& n) const noexcept
+    {
+        return n.get_id();
+    }
+};

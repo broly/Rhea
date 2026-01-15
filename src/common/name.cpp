@@ -5,11 +5,21 @@ import <variant>;
 import <vector>;
 import <unordered_map>;
 
-namespace
+#include "type_macros.h"
+
+struct NameGlobals
 {
-    std::vector<std::string> GNameTable;
-    std::unordered_map<std::string, uint32_t> GNameLookup;
-    std::mutex GNameMutex;
+    DEFAULT_NON_COPYABLE(NameGlobals);
+    
+    std::vector<std::string> Table;
+    std::unordered_map<std::string, uint32_t> Lookup;
+    std::mutex Mutex;
+};
+
+static NameGlobals& get_name_globals()
+{
+    static NameGlobals name_globals;
+    return name_globals;
 }
 
 static std::string normalize_name(std::string_view str)
@@ -32,16 +42,17 @@ static uint32_t get_or_create_name_id(const std::string& str)
 {
     std::string key = normalize_name(str);
     
+    auto& globals = get_name_globals();
     
-    std::lock_guard<std::mutex> lock(GNameMutex);
+    std::lock_guard<std::mutex> lock(globals.Mutex);
 
-    auto it = GNameLookup.find(str);
-    if (it != GNameLookup.end())
+    auto it = globals.Lookup.find(str);
+    if (it != globals.Lookup.end())
         return it->second;
 
-    uint32_t id = static_cast<uint32_t>(GNameTable.size());
-    GNameTable.push_back(str);
-    GNameLookup.emplace(str, id);
+    uint32_t id = static_cast<uint32_t>(globals.Table.size());
+    globals.Table.push_back(str);
+    globals.Lookup.emplace(str, id);
     
     
     NameDebug::register_name(id, key);
@@ -74,5 +85,6 @@ Name& Name::operator=(const std::string& str)
 
 const std::string& Name::to_string() const
 {
-    return GNameTable[id];
+    auto& globals = get_name_globals();
+    return globals.Table[id];
 }

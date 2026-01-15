@@ -33,7 +33,7 @@ export class Material : public RhObject
 {
 public:
     MaterialBlendMode blend_mode = MaterialBlendMode::opaque;
-    std::map<std::string, MaterialParameterType> parameters;
+    std::map<Name, MaterialParameterType> parameters;
     
     void create_resource();
     

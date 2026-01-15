@@ -30,13 +30,13 @@ import reflect;
     { \
         using type = T; \
         using underlying = std::underlying_type_t<T>; \
-        inline static std::map<underlying, std::string> names = {\
+        inline static std::map<underlying, Name> names = {\
             RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_ENUM_MEMBER_VALUE_TO_NAME,__VA_ARGS__)\
         }; \
-        inline static std::map<std::string, underlying> values = {\
+        inline static std::map<Name, underlying> values = {\
             RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_ENUM_MEMBER_NAME_TO_VALUE,__VA_ARGS__)\
         }; \
-        static T enum_name_to_value(const std::string& s)\
+        static T enum_name_to_value(Name s)\
         {\
             if (values.contains(s))\
                 return (T)values[s];\

@@ -8,6 +8,7 @@ import :handle_types;
 import :rg_types;
 #include "common/assertion_macros.h"
 #include "common/type_macros.h"
+import name;
 
 export
 {
@@ -81,7 +82,7 @@ export
         ShaderStage stages;            // VS | FS
         uint32_t count = 1;            // arrays...
         uint32_t size = 0;
-        std::string name;
+        Name name;
     };
 
     struct PushConstantRange
@@ -95,9 +96,9 @@ export
     {
         uint32_t set_index;
         std::vector<DescriptorBinding> bindings;
-        std::string debug_name;
+        Name debug_name;
         
-        std::tuple<uint32_t, const DescriptorBinding&> get_binding(const char* name) const
+        std::tuple<uint32_t, const DescriptorBinding&> get_binding(Name name) const
         {
             for (uint32_t index = 0; auto& binding : bindings)
             {

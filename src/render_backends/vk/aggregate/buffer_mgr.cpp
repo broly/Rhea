@@ -174,8 +174,9 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
         descriptor_set_layout.set_index
     };
     
+    
     LogRB.Log("created descritpor set layout (debug_name=%s, set_index=%i), identifier: %p, num bindings: %i",
-        descriptor_set_layout.debug_name.c_str(), descriptor_set_layout.set_index, layout, vk_bindings.size());
+        descriptor_set_layout.debug_name.to_string().c_str(), descriptor_set_layout.set_index, layout, vk_bindings.size());
     for (const DescriptorBinding& b : descriptor_set_layout.bindings)
     {
         LogRB.Log("  * binding %i, type %s, stages mask: %i ",

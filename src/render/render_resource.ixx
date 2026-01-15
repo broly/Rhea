@@ -3,16 +3,17 @@
 import <string>;
 import :graphics_pipeline_desc;
 import :render_resource_instance;
+import name;
 
 struct RenderResourceVariable
 {
-    std::string name;
+    Name name;
     size_t size;
 };
 
 export struct RenderResourceDesc
 {
-    std::string name;
+    Name name;
     
     ShaderStage stages = ShaderStage::all;
     ResourceUsageType usage_type = ResourceUsageType::persistent;

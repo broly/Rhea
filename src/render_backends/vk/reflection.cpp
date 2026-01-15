@@ -123,9 +123,9 @@ SpirvReflection::~SpirvReflection()
     spvReflectDestroyShaderModule(&spirv_module);
 }
 
-std::unordered_map<std::string, ReflectedInterfaceVariable> SpirvReflection::get_input_variables() const
+std::unordered_map<Name, ReflectedInterfaceVariable> SpirvReflection::get_input_variables() const
 {
-    std::unordered_map<std::string, ReflectedInterfaceVariable> result;
+    std::unordered_map<Name, ReflectedInterfaceVariable> result;
     
     uint32_t count;
     
@@ -151,9 +151,9 @@ std::unordered_map<std::string, ReflectedInterfaceVariable> SpirvReflection::get
     return result;
 }
 
-std::unordered_map<std::string, ReflectedBinding> SpirvReflection::get_bindings() const
+std::unordered_map<Name, ReflectedBinding> SpirvReflection::get_bindings() const
 {
-    std::unordered_map<std::string, ReflectedBinding> result;
+    std::unordered_map<Name, ReflectedBinding> result;
     
     uint32_t count;
     

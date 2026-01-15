@@ -3,6 +3,7 @@
 import render;
 import :buffer_mgr;
 import :pipeline;
+import name;
 
 
 
@@ -18,9 +19,9 @@ public:
     VkRenderResourceInstance(vk::BufferManager& buffer_manager, const class VkRenderResource& in_resource, ResourceUsageType in_usage);
 
     virtual void update_uniform_buffer_impl(PipelineObject* pipeline_object,
-                                            const char* buffer_name_SUBOPTIMAL, size_t size, void* data, RBFrameHandle frame);
+                                            Name buffer_name, size_t size, void* data, RBFrameHandle frame);
     
-    void update_image(class PipelineObject* pipeline_object, const char* buffer_name_SUBOPTIMAL, RBImageHandle image_handle, RBFrameHandle
+    void update_image(class PipelineObject* pipeline_object, Name buffer_name, RBImageHandle image_handle, RBFrameHandle
                       frame) override;
     
     void bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame) override;
