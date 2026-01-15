@@ -5,12 +5,13 @@ import :rg_types;
 import <cassert>;
 import <functional>;
 #include <map>
+import name;
 
 export struct RenderGraphPass
 {
-    std::string name;
+    Name name;
 
-    PipelineObject* pipeline;
+    std::vector<PipelineObject*> pipelines;
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
     std::vector<RenderResource*> resources;
@@ -32,14 +33,14 @@ public:
         , cmd(in_cmd)
         , framebuffer(in_fb)
         , render_graph(render_graph)
-        , pipeline(nullptr)
+        , pipelines({})
     {}
 
     RenderBackend& backend;
     RBCommandList  cmd;
     RBFramebufferId framebuffer;
     RenderGraph& render_graph;
-    PipelineObject* pipeline;
+    std::vector<PipelineObject*> pipelines;
     RBFrameHandle frame;
     
 };

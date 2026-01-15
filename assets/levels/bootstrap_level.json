@@ -179,7 +179,13 @@
 						"asset_path": "gltf/New_Sponza_001.gltf",
 						"textures_dir": "textures/sponza",
 						"material": {
-							"domain": "Masked"
+							"blend_mode": "masked",
+							"parameters": {
+								"hello": {"r": 1, "g": 0.5, "b": 0.3, "a": 0.1}
+							}
+						},
+						"test": {
+							"hello": "yesss"
 						}
 					}
 				}

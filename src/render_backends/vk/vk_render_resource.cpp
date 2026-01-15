@@ -103,10 +103,6 @@ RenderResourceInstance* VkRenderResource::query_single()
     return single_resource;
 }
 
-void VkRenderResource::bind(PipelineObject* pipeline_object)
-{
-}
-
 void VkRenderResource::provide(PipelineObject* pipeline_object)
 {
     auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);

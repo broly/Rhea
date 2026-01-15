@@ -2,6 +2,7 @@
 
 import <string>;
 import :graphics_pipeline_desc;
+
 export class RenderResourceInstance
 {
 public:

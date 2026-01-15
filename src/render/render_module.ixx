@@ -15,4 +15,4 @@ export import :scene_view_proxy.light;
 export import :render_resource;
 export import :render_resource_instance;
 export import :sampler_desc;
-export import :material_interface;
+export import :material;

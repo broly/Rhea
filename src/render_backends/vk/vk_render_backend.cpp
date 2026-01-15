@@ -588,6 +588,13 @@ void VkRenderBackend::end_commands(RBCommandList cmd_list)
     VK_CHECK(vkEndCommandBuffer(cmd));
 }
 
+RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc& desc)
+{
+    VkRenderPass rp = get_or_create_render_pass(desc);
+    RBSwapchainExtent extent = swapchain.get_extent();
+    return framebuffer_manager.get_or_create_framebuffer(desc, rp, extent);
+}
+
 void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index)
 {
     LogRB.Log<DisplayFn>("begin_render_pass");
@@ -610,17 +617,11 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
     current_render_pass = fb.render_pass;
 }
 
-RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc& desc)
-{
-    VkRenderPass rp = get_or_create_render_pass(desc);
-    RBSwapchainExtent extent = swapchain.get_extent();
-    return framebuffer_manager.get_or_create_framebuffer(desc, rp, extent);
-}
-
 
 void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 {
     LogRB.Log("end_render_pass");
+    
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdEndRenderPass(cmd);
     current_render_pass = VK_NULL_HANDLE;

@@ -8,11 +8,17 @@ import :mesh;
 import :texture;
 import <future>;
 import :asset_scene;
+#include "common/type_macros.h"
 
+enum AssetManagerInit { asset_mgr_init };
 
 export class AssetManager
 {
 public:
+    NON_COPYABLE(AssetManager);
+    
+    AssetManager(AssetManagerInit);;
+    
     MeshHandle load_mesh(const std::string& rel_path);
     TextureHandle load_texture(const std::string& rel_path);
     AssetSceneInfo load_scene(const std::string& rel_path, const std::string& textures_rel_path);

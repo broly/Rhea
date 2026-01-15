@@ -7,33 +7,6 @@ import rhmath;
 import <vector>;
 import profile;
 
-// geometry
-
-// locations
-#define VERT_LOCATION_POSTION 0
-#define VERT_LOCATION_NORMAL 1
-#define VERT_LOCATION_UV 2
-#define VERT_LOCATION_TANGENT 3
-
-// geometry.vert / geometry.frag
-
-#define SET_CAMERA 0
-    #define BINDING_CAMERA_UBO 0
-
-#define SET_MATERIAL 1
-    #define BINDING_MATERIAL_UBO 0
-    #define BINDING_BASE_COLOR 1
-    #define BINDING_EMISSIVE 2
-    #define BINDING_NORMAL_MAP 3
-    #define BINDING_ORM 4
-
-#define SET_LIGHT 2
-    #define BINDING_LIGHT_UBO 0
-
-// tonemap.frag
-
-#define SET_TONEMAPPING 0
-    #define BINDING_HDR_COLOR 0
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -177,9 +150,9 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     };
     auto tonemap_pipeline = render_graph->create_pipeline(tonemap_pipeline_desc);
-    auto geometry_pipeline = render_graph->create_pipeline(geom_pipeline_desc);
+    auto geometry_opaque = render_graph->create_pipeline(geom_pipeline_desc);
     
-    geom_pipeline = geometry_pipeline;
+    geom_pipeline = geometry_opaque;
     
     auto swapchain_extent = render_backend->get_swapchain_extent();
 
@@ -199,7 +172,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_graph->add_pass({
         .name = "GeometryForward",
-        .pipeline = geometry_pipeline,  // added this
+        .pipelines = {geometry_opaque},  // added this
         .writes = { 
             { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilAttachment } 
@@ -214,13 +187,17 @@ void GameRenderer::init(RBWindowHandle in_window)
         {
             PROFILE("GeometryForward");
 
-            draw_scene(ctx);
+            auto pipeline = ctx.pipelines[0];
+            
+            ctx.backend.bind_pipeline(ctx.cmd, pipeline);
+            
+            draw_scene(ctx, pipeline);
         }
     });
     
     render_graph->add_pass({
         .name = "ToneMapping",
-        .pipeline = tonemap_pipeline,
+        .pipelines = {tonemap_pipeline},
         .reads = {
             { hdr_color, RBImageUsage::SampledFragment }
         },
@@ -230,9 +207,12 @@ void GameRenderer::init(RBWindowHandle in_window)
         .resources = { tonemap_resource },
         .execute = [=](RenderGraphContext& ctx)
         {
+            auto pipeline = ctx.pipelines[0];
+            
+            ctx.backend.bind_pipeline(ctx.cmd, pipeline);
             auto tonemap = tonemap_resource->query_single();
-            tonemap->update_image(ctx.pipeline, "u_hdr_color", render_graph->get_image(hdr_color), ctx.frame);
-            tonemap->bind(ctx.pipeline, ctx.cmd, ctx.frame);
+            tonemap->update_image(pipeline, "u_hdr_color", render_graph->get_image(hdr_color), ctx.frame);
+            tonemap->bind(pipeline, ctx.cmd, ctx.frame);
             
             ctx.backend.draw_fullscreen(ctx.cmd);
         }
@@ -296,10 +276,8 @@ void GameRenderer::update_material_resource(RenderResourceInstance* material_res
                 
 }
 
-void GameRenderer::draw_scene(RenderGraphContext& ctx) const
-{
-            
-    
+void GameRenderer::draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline) const
+{    
     auto& extractor = engine->scene_view;
     auto cmd = ctx.cmd;
             
@@ -317,8 +295,8 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx) const
     camera_ubo.camera_pos = active_camera->position;
             
     auto cam = camera_resource->query_single();
-    cam->update_uniform_buffer(ctx.pipeline, "camera", camera_ubo, ctx.frame);
-    cam->bind(ctx.pipeline, cmd, ctx.frame);
+    cam->update_uniform_buffer(pipeline, "camera", camera_ubo, ctx.frame);
+    cam->bind(pipeline, cmd, ctx.frame);
 
             
     // ---------- Lights ----------
@@ -334,8 +312,8 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx) const
     }
     {                
         auto light = light_resource->query_single();
-        light->update_uniform_buffer(ctx.pipeline, "light_ubo", light_ubo, ctx.frame);
-        light->bind(ctx.pipeline, cmd, ctx.frame);
+        light->update_uniform_buffer(pipeline, "light_ubo", light_ubo, ctx.frame);
+        light->bind(pipeline, cmd, ctx.frame);
     }
 
     
@@ -357,7 +335,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx) const
                 auto material_resource_instance = meshes_processor.get_or_create_material_resource(
                     material_resource, material_key);
                     
-                material_resource_instance->bind(ctx.pipeline, cmd, ctx.frame);
+                material_resource_instance->bind(pipeline, cmd, ctx.frame);
         
                 ctx.backend.get_or_create_mesh_buffers(mesh_prim);
                 
@@ -365,11 +343,11 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx) const
                 
                 auto model = model_resource->query_single();
                 ModelUBO_Temp model_ubo{ro.world};
-                model->update_uniform_buffer(ctx.pipeline, "model_ubo", model_ubo, ctx.frame);
-                model->bind(ctx.pipeline, cmd, ctx.frame);
+                model->update_uniform_buffer(pipeline, "model_ubo", model_ubo, ctx.frame);
+                model->bind(pipeline, cmd, ctx.frame);
                 ctx.backend.push_constants(
                     cmd, ro.world,
-                    ctx.pipeline->get_pipeline_handle()
+                    pipeline->get_pipeline_handle()
                 );
 
                 ctx.backend.draw_indexed(

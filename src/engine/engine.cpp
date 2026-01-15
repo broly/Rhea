@@ -20,10 +20,7 @@ void Engine::init()
 }
 
 void Engine::run()
-{
-    asset_manager = std::make_shared<AssetManager>();
-    
-    
+{    
     window_create(window, 1280, 720, "Rhea");
     
     window_handle = {window.handle};

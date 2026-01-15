@@ -186,3 +186,9 @@ add_custom_command(
 )
 
 set_target_properties(compile_shaders PROPERTIES EXCLUDE_FROM_ALL FALSE)
+
+if (MSVC)
+    target_sources(rhea PRIVATE
+        ${CMAKE_SOURCE_DIR}/tools/debugger/Name.natvis
+    )
+endif()

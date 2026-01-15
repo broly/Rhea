@@ -20,7 +20,6 @@ public:
     
     void run();
 
-    std::shared_ptr<AssetManager> asset_manager = nullptr;
     platform::window::Window window = nullptr;
     std::shared_ptr<Input> input = nullptr;
     RBWindowHandle window_handle;

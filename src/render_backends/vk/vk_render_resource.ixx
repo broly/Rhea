@@ -27,9 +27,7 @@ public:
     
     RenderResourceInstance* create_instance() override;
     RenderResourceInstance* query_single() override;
-    
-    void bind(PipelineObject* pipeline_object) override;
-    
+
     virtual void provide(class PipelineObject* pipeline_object) override;
     
     virtual RBDescriptorSetLayout get_descriptor_set_layout(class PipelineObject* pipeline_object) override;

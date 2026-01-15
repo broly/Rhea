@@ -7,10 +7,6 @@ import assets;
 import glm;
 import <string>;
 
-struct RenderProxy
-{
-    
-};
 
 
 export struct MaterialKey

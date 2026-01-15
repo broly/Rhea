@@ -1,9 +1,5 @@
 ﻿module assets:asset_manager;
 
-
-
-
-import globals;
 import paths;
 import log;
 import <cassert>;
@@ -11,6 +7,12 @@ import <cassert>;
 
 
 DEFINE_LOGGER(LogAssets, Log);
+
+AssetManager::AssetManager(AssetManagerInit) 
+    : meshes_counter(0)
+    , textures_counter(0)
+{
+}
 
 MeshHandle AssetManager::load_mesh(const std::string& rel_path)
 {
@@ -107,7 +109,7 @@ std::shared_future<TextureHandle> AssetManager::load_texture_async(const std::st
     }
 
     std::packaged_task<TextureHandle()> task([path]() {
-        return RhGlobals::engine->asset_manager->load_texture(path);
+        return get().load_texture(path);
     });
 
     auto future = task.get_future().share();
@@ -124,7 +126,9 @@ std::shared_future<TextureHandle> AssetManager::load_texture_async(const std::st
 
 AssetManager& AssetManager::get()
 {
-    return *RhGlobals::engine->asset_manager;
+    static AssetManager instance{asset_mgr_init};
+    
+    return instance;
 }
 
 const StaticMesh& AssetManager::get_mesh(MeshHandle id)

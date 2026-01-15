@@ -2,6 +2,7 @@
 
 #include "definitions.glsl"
 #include "pbr_helpers.glsl"
+#include "math.glsl"
 
 // ================== INPUTS ==================
 layout(location = 0) in vec3 v_world_pos;

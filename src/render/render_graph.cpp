@@ -49,9 +49,12 @@ void RenderGraph::compile()
     
     for (auto& pass : passes)
     {
-        auto desc_it = pipelines_descs.find(pass.pipeline);
-        auto& desc = desc_it->second;
-        pass.pipeline->fetch_shaders(desc);
+        for (auto pipeline : pass.pipelines)
+        {
+            auto desc_it = pipelines_descs.find(pipeline);
+            auto& desc = desc_it->second;
+            pipeline->fetch_shaders(desc);
+        }
     }
     
     
@@ -59,19 +62,23 @@ void RenderGraph::compile()
     {
         for (RenderResource* resource : pass.resources)
         {
-            resource->provide(pass.pipeline);
+            for (auto pipeline : pass.pipelines)
+                resource->provide(pipeline);
         }
     }
     
     for (auto& pass : passes)
     {
-        auto desc_it = pipelines_descs.find(pass.pipeline);
-        auto& desc = desc_it->second;
-        for (auto resource : pass.resources)
+        for (auto pipeline : pass.pipelines)
         {
-            desc.layout.sets.push_back(resource->get_descriptor_set_layout(pass.pipeline));
-        }
-        pass.pipeline->prepare(desc);
+            auto desc_it = pipelines_descs.find(pipeline);
+            auto& desc = desc_it->second;
+            for (auto resource : pass.resources)
+            {
+                desc.layout.sets.push_back(resource->get_descriptor_set_layout(pipeline));
+            }
+            pipeline->prepare(desc);
+        };
     }
     
     
@@ -224,10 +231,11 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
         }
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
-        ctx.pipeline = pass.pipeline;
+        ctx.pipelines = pass.pipelines;
         ctx.frame = frame;
         backend->begin_render_pass(cmd, ctx.framebuffer);
-        backend->bind_pipeline(cmd, ctx.pipeline);
+        
+        backend->bind_pipeline(cmd, ctx.pipelines[0]);
         {
             PROFILE("graph execution");
             

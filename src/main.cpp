@@ -14,7 +14,8 @@ extern "C" const char* NameDebugResolve(uint32_t id)
     return NameDebug::resolve(id);
 }
 
-int main() {
+int main() 
+{
     paths::init();
     
     const char* engine_config_path = "system/engine.json";

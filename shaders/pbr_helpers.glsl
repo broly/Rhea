@@ -1,6 +1,7 @@
 #ifndef PBR_HELPERS
 #define PBR_HELPERS
 
+#include "math.glsl"
 
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {

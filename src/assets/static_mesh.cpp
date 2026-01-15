@@ -6,11 +6,10 @@ import <iostream>;
 import glm;
 import <json/value.h>;
 
-import engine;
-import globals;
 import dependency_collector;
 import fastgltf;
 import fastgltf_helper;
+import :asset_manager;
 import :helpers;
 
 std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::path path)
@@ -85,7 +84,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
 
 const StaticMesh& MeshHandle::get() const
 {
-    return RhGlobals::engine->asset_manager->get_mesh(*this);
+    return AssetManager::get().get_mesh(*this);
 }
 
 const Primitive& MeshPrimHandle::get() const
@@ -98,6 +97,6 @@ void serialize_json_value(MeshHandle& target, const Json::Value& value, Dependen
     if (value.isString())
     {
         std::string path = value.asString();
-        target = RhGlobals::engine->asset_manager->load_mesh(path);
+        target = AssetManager::get().load_mesh(path);
     }
 }

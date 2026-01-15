@@ -33,7 +33,6 @@ public:
     virtual void provide(class PipelineObject* pipeline_object) = 0;
     virtual RenderResourceInstance* create_instance() = 0;
     virtual RenderResourceInstance* query_single() = 0;
-    virtual void bind(PipelineObject* pipeline_object) = 0;
     virtual RBDescriptorSetLayout get_descriptor_set_layout(class PipelineObject* pipeline_object) = 0;
     
     const RenderResourceDesc desc;

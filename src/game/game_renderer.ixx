@@ -20,7 +20,7 @@ public:
     
     std::shared_ptr<RenderGraph> render_graph;
     
-    void draw_scene(RenderGraphContext& ctx) const;
+    void draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline) const;
     
     RenderResource* material_resource;
     RenderResource* camera_resource;

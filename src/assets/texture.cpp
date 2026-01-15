@@ -5,13 +5,14 @@ import <json/value.h>;
 
 import globals;
 import engine;
+import :asset_manager;
 import <future>;
 
 #include "common/assertion_macros.h"
 
 const Texture& TextureHandle::get() const
 {
-    return RhGlobals::engine->asset_manager->get_texture(*this);
+    return AssetManager::get().get_texture(*this);
 }
 
 std::shared_future<void> TextureHandle::resolve_async()
@@ -64,10 +65,7 @@ void serialize_json_value(TextureHandle& target, const Json::Value& value, Depen
     std::string path = value.asString();
     target.pending_path = path;
     
-    auto texture_future =
-        RhGlobals::engine
-            ->asset_manager
-            ->load_texture_async(path);
+    auto texture_future = AssetManager::get().load_texture_async(path);
     
     dc->push(std::async(
         std::launch::async,

@@ -33,7 +33,7 @@ export class Name
 {
 public:
     Name() = default;
-    explicit Name(const char* str);
+    Name(const char* str);
     Name(const std::string& str);
     explicit Name(StaticName n) 
         : id(n.value) 
