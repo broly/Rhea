@@ -33,13 +33,35 @@ export struct SceneViewProxy_Transform : SceneViewProxy
 
 using ProxySize = unsigned short int;
 
+static std::unordered_map<Name, size_t> indices{};
+
 export class SceneViewProcessor : public RhObject
 {
     friend SceneView;
 public:
     NON_COPYABLE(SceneViewProcessor);
     
-    SceneViewProcessor() {}
+    SceneViewProcessor()
+        : index(0)
+    {}
+    
+    template<typename T>
+    requires std::is_base_of_v<SceneViewProxy_Transform, T>
+    static inline size_t scene_view_proxy_size_v = sizeof(T);
+    
+    void on_init() override
+    {
+        if (is_default && type_name != reflect::get_object_type_name<SceneViewProcessor>())
+        {
+            static size_t counter = 0;
+            index = counter++;
+            indices.insert({type_name, index});
+        } else if (!is_default)
+        {
+            auto info = reflect::find_object_reflection_info(type_name);
+            index = static_cast<SceneViewProcessor*>(info->default_object.get())->index;
+        }
+    }
     
     virtual RenderId register_proxy() { unreachable("todo"); };
     virtual void unregister_proxy(RenderId Id) { unreachable("todo"); };
@@ -105,6 +127,8 @@ public:
         return svp_id;
     }
     
+    
+    size_t index;
 private:
     static std::vector<Factory>& get_factories()
     {

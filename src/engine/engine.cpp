@@ -12,7 +12,7 @@ import WorldScript_RotateAroundObject;
 import profile;
 
 
-void Engine::init()
+void Engine::engine_init()
 {
     // render_backend = RenderBackend::create<VkRenderBackend>(window_handle);
     // render_graph = std::make_unique<RenderGraph>();
@@ -28,7 +28,7 @@ void Engine::run()
     
     platform::window::set_input(input.get());
     
-    init();
+    engine_init();
     
     
     

@@ -7,6 +7,16 @@ import <optional>;
 import static_name;
 import name;
 
+
+
+
+export struct ObjectInitData
+{
+    Name name;
+    bool is_default = false;
+};
+
+
 export class RhObject : public std::enable_shared_from_this<RhObject>
 {
 public:
@@ -14,6 +24,16 @@ public:
     virtual ~RhObject() {};
     
     virtual bool is_actor() const { return false; }
+    
+    void init(Name type_name, const ObjectInitData& init_data)
+    {
+        set_type_name(type_name);
+        set_name(init_data.name);
+        is_default = init_data.is_default;
+        on_init();
+    }
+    
+    virtual void on_init() {}
     
     void set_name(Name in_name)
     {
@@ -34,5 +54,6 @@ public:
     
     Name type_name;
     Name name;
+    bool is_default;
 };
 

@@ -3,13 +3,13 @@ import rhmath;
 import globals;
 import <cassert>;
 #include "common/offsetof.h"
+import render;
 
 RhComp_Camera::RhComp_Camera()
 {
-    
     render_info.scene_proxy_offset = offsetof(RhComp_Camera, scene_proxy);
     render_info.is_explicitly_null = false;
-    render_info.type_id = 1;  // SceneViewProcessor_Camera
+    render_info.type_id = reflect::get_default<SceneViewProcessor_Camera>()->index;
 }
 
 void RhComp_Camera::start()

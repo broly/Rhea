@@ -37,18 +37,10 @@ public:
     template<typename T>
     T& get_processor()
     {
-        return *reinterpret_cast<T*>(processors[T::type_id].get());
+        auto processor_id = reflect::get_default<T>()->index;
+        return *reinterpret_cast<T*>(processors[processor_id].get());
     }
     
-    
-    template<typename P, typename T>
-    requires std::is_base_of_v<SceneViewProxy, T>
-    void push(const T& proxy)
-    {
-        SceneViewProcessor* procesor_raw = processors[P::type_id].get();
-        P* processor_typed = reinterpret_cast<P*>(procesor_raw);
-        processor_typed->push(proxy);
-    }
     
     void submit_raw(SceneViewProcId svp_id, const void* scene_proxy_ptr)
     {

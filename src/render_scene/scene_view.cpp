@@ -9,6 +9,12 @@ SceneView::SceneView(std::shared_ptr<class World> in_world, std::shared_ptr<clas
     world = in_world;
     renderer = in_renderer;
     
+    for (auto type_info : reflect::get_subtypes<SceneViewProcessor>())
+    {
+        auto ptr = type_info->instantiate_unique<SceneViewProcessor>();
+        processors.push_back(std::move(ptr));
+    }
+    
     for (const auto& factory : SceneViewProcessor::get_factories())
     {
         if (factory.has_value())

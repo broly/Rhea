@@ -35,16 +35,10 @@ export namespace reflect_inner
     }
 }
 
-
-
-export struct ObjectInitData
-{
-    Name name;
-};
-
 export namespace reflect
 {
     using ObjectFactoryType = std::function<std::shared_ptr<RhObject>(const ObjectInitData& init_data)>;
+    using UniqueObjectFactoryType = std::function<std::unique_ptr<RhObject>(const ObjectInitData& init_data)>;
     using JsonSerializer = std::function<bool(const Json::Value&, RhObject* Ptr, bool is_loading, DependencyCollector* collector)>;
     
     struct ObjectReflectionInfo
@@ -53,10 +47,18 @@ export namespace reflect
         std::set<std::string_view> bases;
     
         ObjectFactoryType factory;
+        UniqueObjectFactoryType unique_factory;
         std::optional<JsonSerializer> serializer;
         
         template<typename T>
         std::shared_ptr<T> instantiate() const;
+        
+        template<typename T>
+        std::unique_ptr<T> instantiate_unique() const;
+        
+        void instantiate_default();
+        
+        std::unique_ptr<RhObject> default_object = nullptr;
     };
     template<typename T>
     std::string_view get_object_type_name()
@@ -281,6 +283,7 @@ export namespace reflect
     extern void register_object_class_impl(
         std::string_view name, 
         ObjectFactoryType&& factory, 
+        UniqueObjectFactoryType&& unique_factory, 
         std::set<std::string_view>&& bases,
         std::optional<JsonSerializer> serializer);
         
@@ -290,12 +293,17 @@ export namespace reflect
         ObjectFactoryType factory = [name](const ObjectInitData& init_data)
         {
             auto object = std::make_shared<T>();
-            object->set_type_name(name);
-            object->set_name(init_data.name);
+            object->init(name, init_data);
+            return object;
+        };
+        UniqueObjectFactoryType unique_factory = [name](const ObjectInitData& init_data)
+        {
+            auto object = std::make_unique<T>();
+            object->init(name, init_data);
             return object;
         };
         std::set<std::string_view> class_bases = reflect_inner::RhObjectTraits<T>::get_bases();
-        register_object_class_impl(name, std::move(factory), std::move(class_bases), std::move(Serializer));
+        register_object_class_impl(name, std::move(factory), std::move(unique_factory), std::move(class_bases), std::move(Serializer));
         return true;
     }
     
@@ -318,6 +326,19 @@ export namespace reflect
         return std::static_pointer_cast<T>(object);
     }
     
+    template <typename T>
+    std::unique_ptr<T> ObjectReflectionInfo::instantiate_unique() const
+    {
+        auto type_id = reflect::get_object_type_name<T>();
+        assert(bases.contains(type_id));
+        std::string obj_name = std::string(name) + "_inst";
+        ObjectInitData init_data;
+        init_data.name = obj_name;
+        auto object = (unique_factory)(init_data);
+        return std::unique_ptr<T>{static_cast<T*>(object.release())};
+    }
+    
+    
     std::vector<const ObjectReflectionInfo*> get_subtypes(Name type_name, bool include_parent = false);
     
     template<typename T>
@@ -326,6 +347,22 @@ export namespace reflect
         Name type_name = get_object_type_name<T>();
         return get_subtypes(type_name);
     }
+    
+    template<typename T>
+    const ObjectReflectionInfo* find_info()
+    {
+        auto type_name = get_object_type_name<T>();
+        return find_object_reflection_info(type_name);
+    }
+    
+    template<typename T>
+    const T* get_default()
+    {
+        auto info = find_info<T>();
+        return (const T*)info->default_object.get();
+    }
+    
+    void create_defaults();
     
 }
 

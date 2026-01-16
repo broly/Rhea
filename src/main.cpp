@@ -24,6 +24,8 @@ int main()
     LogMain.Log("Engine init");
     paths::init();
     
+    reflect::create_defaults();
+    
     auto object_types = reflect::get_subtypes<RhObject>();
     
     LogMain.Log("Known RhObjects (%i):", object_types.size());

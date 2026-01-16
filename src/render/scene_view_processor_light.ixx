@@ -7,7 +7,6 @@ import <array>;
 import <vector>;
 import glm;
 import <algorithm>;
-#include "scene_proxy_boilerplate.h"
 #include "object/object_reflection_macro.h"
 
 
@@ -21,7 +20,10 @@ export struct RenderObject_Light
 export class SceneViewProcessor_Light : public SceneViewProcessor
 {
 public:
-    SCENE_PROXY_BOILERPLATE(SceneViewProcessor_Light, SceneViewProcessor, SceneViewProxy_Light, 2);
+    SceneViewProcessor_Light()
+    {
+        scene_proxy_size = scene_view_proxy_size_v<SceneViewProxy_Light>;
+    }
     
     RenderId register_proxy() override;
     void unregister_proxy(RenderId render_id) override;
@@ -60,5 +62,4 @@ public:
         return {result, std::min(NumLights, sorted_lights.size())};
     }
 };
-REGISTER_SCENE_PROXY_PROCESSOR(SceneViewProcessor_Light);
 REFLECT_OBJECT(SceneViewProcessor_Light, SceneViewProcessor);

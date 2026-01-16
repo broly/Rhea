@@ -16,7 +16,7 @@ import input;
 export class Engine : public RhObject
 {
 public:
-    virtual void init();
+    virtual void engine_init();
     
     void run();
 

@@ -3,6 +3,7 @@
 
 
 import globals;
+import render;
 #include "common/offsetof.h"
 
 
@@ -11,7 +12,7 @@ RhComp_Light::RhComp_Light()
 {
     render_info.scene_proxy_offset = offsetof(RhComp_Light, scene_proxy);
     render_info.is_explicitly_null = false;
-    render_info.type_id = 2;  // SceneViewProcessor_Light
+    render_info.type_id = reflect::get_default<SceneViewProcessor_Light>()->index;
 }
 
 void RhComp_Light::start()

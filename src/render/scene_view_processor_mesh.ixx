@@ -8,7 +8,6 @@ import assets;
 import :render_objects;
 import :render_resource;
 import rhcomponents;
-#include "scene_proxy_boilerplate.h"
 import <unordered_map>;
 
 #include "object/object_reflection_macro.h"
@@ -28,7 +27,10 @@ export struct RenderObject_Mesh
 export class SceneViewProcessor_Mesh : public SceneViewProcessor
 {
 public:
-    SCENE_PROXY_BOILERPLATE(SceneViewProcessor_Mesh, SceneViewProcessor, SceneViewProxy_Mesh, 0);
+    SceneViewProcessor_Mesh()
+    {
+        scene_proxy_size = scene_view_proxy_size_v<SceneViewProxy_Mesh>;
+    }
     
     RenderId register_proxy() override;
     void unregister_proxy(RenderId render_id) override;
@@ -42,5 +44,4 @@ public:
     
     std::unordered_map<MaterialKey, RenderResourceInstance*, MaterialKeyHash> material_cache;
 };
-REGISTER_SCENE_PROXY_PROCESSOR(SceneViewProcessor_Mesh)
 REFLECT_OBJECT(SceneViewProcessor_Mesh, SceneViewProcessor);

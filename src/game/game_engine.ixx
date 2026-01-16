@@ -7,6 +7,6 @@ import engine;
 class GameEngine : public Engine
 {
 public:
-    void init() override;
+    void engine_init() override;
 };
 REFLECT_OBJECT(GameEngine, Engine);

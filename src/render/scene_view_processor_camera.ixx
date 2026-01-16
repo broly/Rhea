@@ -7,7 +7,6 @@ import <vector>;
 import name;
 import rhcomponents;
 
-#include "scene_proxy_boilerplate.h"
 #include "object/object_reflection_macro.h"
 
 export struct RenderObject_Camera
@@ -29,7 +28,10 @@ export struct RenderObject_Camera
 export class SceneViewProcessor_Camera : public SceneViewProcessor
 {
 public:
-    SCENE_PROXY_BOILERPLATE(SceneViewProcessor_Camera, SceneViewProcessor, SceneViewProxy_Camera, 1);
+    SceneViewProcessor_Camera()
+    {
+        scene_proxy_size = scene_view_proxy_size_v<SceneViewProxy_Camera>;
+    }
     
     RenderId register_proxy() override;
     void unregister_proxy(RenderId render_id) override;
@@ -49,5 +51,4 @@ public:
     
     RenderId active_camera_id {0};
 };
-REGISTER_SCENE_PROXY_PROCESSOR(SceneViewProcessor_Camera);
 REFLECT_OBJECT(SceneViewProcessor_Camera, SceneViewProcessor);
