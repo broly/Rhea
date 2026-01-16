@@ -34,3 +34,10 @@ import <source_location>;
         __debugbreak(); \
         std::terminate(); \
     }
+
+#define todo(...) \
+    {\
+        print_error(std::source_location::current(), "todo: " ##__VA_ARGS__); \
+        __debugbreak(); \
+        std::terminate(); \
+    }

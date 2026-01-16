@@ -3,6 +3,7 @@
 #include "definitions.glsl"
 #include "pbr_helpers.glsl"
 #include "math.glsl"
+#include "layout.glsl"
 
 // ================== INPUTS ==================
 layout(location = 0) in vec3 v_world_pos;
@@ -15,7 +16,7 @@ layout(location = 4) in vec3 v_world_bitangent;
 layout(location = 0) out vec4 out_color;
 
 // ================== MATERIAL ==================
-layout(set = 1, binding = 0) uniform MaterialUBO
+layout(set = SET_MATERIAL, binding = 0) uniform MaterialUBO
 {
     float base_color_mult;
     float emissive_mult;
@@ -24,13 +25,13 @@ layout(set = 1, binding = 0) uniform MaterialUBO
     float metallic_mult;
 } material;
 
-layout(set = 1, binding = 1) uniform sampler2D u_base_color;
-layout(set = 1, binding = 2) uniform sampler2D u_emissive;
-layout(set = 1, binding = 3) uniform sampler2D u_normal_map;
-layout(set = 1, binding = 4) uniform sampler2D u_orm;
+layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_ALBEDO) uniform sampler2D u_base_color;
+layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_EMISSIVE) uniform sampler2D u_emissive;
+layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_NORMAL) uniform sampler2D u_normal_map;
+layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_ORM) uniform sampler2D u_orm;
 
 // ================== CAMERA ==================
-layout(set = 0, binding = 0) uniform CameraUBO
+layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
 {
     mat4 view_proj;
     vec4 camera_pos;
@@ -43,7 +44,7 @@ struct Light
     vec4 color;
 };
 
-layout(set = 2, binding = 0) uniform LightUBO
+layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 {
     Light lights[8];
     int light_count;

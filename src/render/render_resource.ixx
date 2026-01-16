@@ -8,6 +8,9 @@ import name;
 struct RenderResourceVariable
 {
     Name name;
+    uint16_t set;
+    uint16_t binding;
+    
     size_t size;
 };
 

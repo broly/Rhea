@@ -6,6 +6,8 @@ import linear_color;
 import assets;
 #include "common/assertion_macros.h"
 
+import globals;
+
 void serialize_json_value(MaterialParameterType& target, const Json::Value& value, DependencyCollector* dc)
 {
     if (value.isNumeric())
@@ -39,7 +41,13 @@ void serialize_json_value(MaterialParameterType& target, const Json::Value& valu
 
 void Material::create_resource()
 {
+    RenderResourceDesc desc {
+        .name = name,
+        .stages = ShaderStage::all,
+        .variables = {},
+    };
     
+    resource = RhGlobals::engine->renderer->create_material_resource(desc); // add permutations support
 }
 
 std::shared_ptr<MaterialInstance> Material::create_instance() const

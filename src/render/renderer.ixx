@@ -34,14 +34,6 @@ export class Renderer
 public:
     virtual ~Renderer() = default;
     virtual void init(RBWindowHandle in_window);
-    virtual void update_material_descriptor(const RenderMaterial& rm, const MaterialKey& key);
-    
-    virtual RBDescriptorSet allocate_material_descriptor();
-    virtual RBBufferHandle create_material_ubo();
-    
-    virtual RBDescriptorSetLayout get_material_layout() const;;
-
-    virtual void bind_material_ubo(const RenderMaterial& rm);
 
     virtual void execute() {}
     
@@ -55,5 +47,7 @@ public:
     std::shared_ptr<RenderBackend> render_backend;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
+    
+    RenderResource* create_material_resource(const RenderResourceDesc& desc);
     
 };

@@ -33,3 +33,4 @@ HIGHLIGHT_FORMAT inline void print_error(std::source_location sl, Fmt&& fmt, Arg
     
     std::cerr << buffer;
 }
+

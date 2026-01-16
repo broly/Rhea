@@ -1,11 +1,12 @@
 #version 450
 #include "definitions.glsl"
+#include "layout.glsl"
 
 // ---------- Vertex inputs ----------
-layout(location = 0) in vec3 in_position;
-layout(location = 1) in vec3 in_normal;
-layout(location = 2) in vec2 in_uv;
-layout(location = 3) in vec4 in_tangent;
+layout(location = LOCATION_ATTR_POSITION) in vec3 in_position;
+layout(location = LOCATION_ATTR_NORMAL) in vec3 in_normal;
+layout(location = LOCATION_ATTR_UV) in vec2 in_uv;
+layout(location = LOCATION_ATTR_TANGENT) in vec4 in_tangent;
 
 // ---------- Outputs ----------
 layout(location = 0) out vec3 v_world_pos;
@@ -15,13 +16,13 @@ layout(location = 3) out vec3 v_world_tangent;
 layout(location = 4) out vec3 v_world_bitangent;
 
 // ---------- Camera ----------
-layout(set = 0, binding = 0) uniform CameraUBO
+layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
 {
     mat4 view_proj;
     vec4 camera_pos;
 } camera;
 
-layout(set = 3, binding = 0) uniform ModelUBO
+layout(set = SET_MODEL, binding = BINDING_UBO_MODEL) uniform ModelUBO
 {
     mat4 model;
 } model_ubo;

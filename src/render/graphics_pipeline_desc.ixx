@@ -134,6 +134,7 @@ export
     struct VertexAttributeInfo
     {
         const char* variable_name;
+        uint16_t location;
         uint32_t offset;
     };
     

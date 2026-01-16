@@ -7,6 +7,7 @@ import rhmath;
 import <vector>;
 import profile;
 
+#include "render_layout.h"
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -30,7 +31,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .stages = ShaderStage::all,
         .usage_type = ResourceUsageType::frame,
         .variables = {
-            { "camera", sizeof(CameraUBO) }
+            { "camera", SET_CAMERA, BINDING_UBO_CAMERA, sizeof(CameraUBO) }
         }
     });
     
@@ -40,7 +41,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .stages = ShaderStage::all,
         .usage_type = ResourceUsageType::frame,
         .variables = {
-            { "model_ubo", sizeof(ModelUBO_Temp) }
+            { "model_ubo", SET_MODEL, BINDING_UBO_MODEL, sizeof(ModelUBO_Temp) }
         }
     });
     
@@ -51,32 +52,32 @@ void GameRenderer::init(RBWindowHandle in_window)
         .stages = ShaderStage::fragment,
         .usage_type = ResourceUsageType::frame,
         .variables = {
-            { "light_ubo", sizeof(LightUBO) }
+            { "light_ubo", SET_LIGHT, BINDING_UBO_LIGHT, sizeof(LightUBO) }
         }
     });
     
+    
+    // TODO: hardcoded general material case
     material_resource = render_graph->create_resource({
         .name = "material",
         .stages = ShaderStage::fragment,
         .usage_type = ResourceUsageType::persistent,
         .sampler = surface_sampler,
         .variables = {
-            { "material", sizeof(MaterialUBO) },
-            { "u_base_color" },
-            { "u_emissive" },
-            { "u_normal_map" },
-            { "u_orm" },
+            { "material",  SET_MATERIAL, BINDING_UBO_MATERIAL, sizeof(MaterialUBO) },
+            { "u_base_color", SET_MATERIAL, BINDING_SAMPLER_ALBEDO },
+            { "u_emissive", SET_MATERIAL, BINDING_SAMPLER_EMISSIVE },
+            { "u_normal_map", SET_MATERIAL, BINDING_SAMPLER_NORMAL },
+            { "u_orm", SET_MATERIAL, BINDING_SAMPLER_ORM },
         },
     });
-    
-    _mat_res = material_resource;
     
     auto tonemap_resource = render_graph->create_resource({
         .name = "tonemap",
         .stages = ShaderStage::fragment,
         .usage_type = ResourceUsageType::frame,
         .variables = {
-            { "u_hdr_color" },
+            { "u_hdr_color", SET_TONEMAP, BINDING_UBO_TONEMAP },
         },
     });
     
@@ -101,10 +102,10 @@ void GameRenderer::init(RBWindowHandle in_window)
                             .binding_index = 0,
                             .stride = sizeof(Vertex),
                             .attributes = {
-                                { "in_position", offsetof(Vertex, position) },
-                                { "in_normal", offsetof(Vertex, normal) },
-                                { "in_uv", offsetof(Vertex, tex_coord) },
-                                { "in_tangent", offsetof(Vertex, tangent) }
+                                { "in_position", LOCATION_ATTR_POSITION, offsetof(Vertex, position) },
+                                { "in_normal", LOCATION_ATTR_NORMAL, offsetof(Vertex, normal) },
+                                { "in_uv", LOCATION_ATTR_UV, offsetof(Vertex, tex_coord) },
+                                { "in_tangent", LOCATION_ATTR_TANGENT, offsetof(Vertex, tangent) }
                             }
                         }
                     }
@@ -250,7 +251,7 @@ void GameRenderer::execute()
 
 RenderResource* GameRenderer::get_material_resource()
 {
-    return _mat_res;
+    return material_resource;
 }
 
 void GameRenderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame)

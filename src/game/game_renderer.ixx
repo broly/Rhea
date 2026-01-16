@@ -22,11 +22,11 @@ public:
     
     void draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline) const;
     
+    // will be deprecated soon
     RenderResource* material_resource;
     RenderResource* camera_resource;
     RenderResource* model_resource;
     RenderResource* light_resource;
     
-    RenderResource* _mat_res;
     PipelineObject* geom_pipeline;
 };
