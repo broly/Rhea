@@ -34,7 +34,7 @@ void RhComp_Transform::render_submit() const
 {
     assert(render_info.is_explicitly_null || render_info.scene_proxy_offset >= sizeof(RhComp_Transform));
     const void* ptr = get_scene_proxy_address();
-    RhGlobals::engine->scene_view->submit_raw(render_info.processor_id, ptr);
+    RhGlobals::engine->scene_view->submit_raw(render_info.type_id, ptr);
 }
 
 void* RhComp_Transform::get_scene_proxy_address() const

@@ -7,7 +7,12 @@ import paths;
 import json_utils;
 import game;
 import name;
+import log;
+import rhobject;
 
+#include "logging/log_macro.h"
+
+DEFINE_LOGGER(LogMain, DisplayFn);
 
 extern "C" const char* NameDebugResolve(uint32_t id)
 {
@@ -16,7 +21,14 @@ extern "C" const char* NameDebugResolve(uint32_t id)
 
 int main() 
 {
+    LogMain.Log("Engine init");
     paths::init();
+    
+    auto object_types = reflect::get_subtypes<RhObject>();
+    
+    LogMain.Log("Known RhObjects (%i):", object_types.size());
+    for (auto type : object_types)
+        LogMain.Log(" * %s", std::string(type->name).c_str());
     
     const char* engine_config_path = "system/engine.json";
     

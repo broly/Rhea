@@ -317,7 +317,15 @@ export namespace reflect
         auto object = (factory)(init_data);
         return std::static_pointer_cast<T>(object);
     }
-
+    
+    std::vector<const ObjectReflectionInfo*> get_subtypes(Name type_name, bool include_parent = false);
+    
+    template<typename T>
+    std::vector<const ObjectReflectionInfo*> get_subtypes(bool include_parent = false)
+    {
+        Name type_name = get_object_type_name<T>();
+        return get_subtypes(type_name);
+    }
     
 }
 

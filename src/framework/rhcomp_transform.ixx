@@ -11,7 +11,7 @@ struct RhCompRenderInfo
 {
     ptrdiff_t scene_proxy_offset = -1;
     bool is_explicitly_null = false;
-    size_t processor_id;
+    size_t type_id;
 };
 
 export class RhComp_Transform : public RhComponent

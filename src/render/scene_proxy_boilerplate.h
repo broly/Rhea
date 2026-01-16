@@ -1,8 +1,8 @@
 ﻿#pragma once
 
 #define SCENE_PROXY_BOILERPLATE(Name, Super, ProxyName, Id) \
-    Name(SceneView& in_view) \
-        : Super(in_view) \
+    Name() \
+        : Super() \
     { \
         scene_proxy_size = sizeof(ProxyName); \
     } \

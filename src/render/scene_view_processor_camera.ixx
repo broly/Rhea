@@ -8,6 +8,7 @@ import name;
 import rhcomponents;
 
 #include "scene_proxy_boilerplate.h"
+#include "object/object_reflection_macro.h"
 
 export struct RenderObject_Camera
 {
@@ -49,3 +50,4 @@ public:
     RenderId active_camera_id {0};
 };
 REGISTER_SCENE_PROXY_PROCESSOR(SceneViewProcessor_Camera);
+REFLECT_OBJECT(SceneViewProcessor_Camera, SceneViewProcessor);

@@ -12,7 +12,7 @@ RhComp_StaticMesh::RhComp_StaticMesh()
 {
     render_info.scene_proxy_offset = offsetof(RhComp_StaticMesh, scene_proxy);
     render_info.is_explicitly_null = false;
-    render_info.processor_id = 0;  // SceneViewProcessor_Mesh
+    render_info.type_id = 0;  // SceneViewProcessor_Mesh
 }
 
 
@@ -72,13 +72,13 @@ void RhComp_StaticMesh::start()
 {
     RhComp_Renderable::start();
     update_scene_proxy();
-    RhGlobals::engine->scene_view->register_scene_view_proxy(scene_proxy, render_info.processor_id, owner->name);
+    RhGlobals::engine->scene_view->register_scene_view_proxy(scene_proxy, render_info.type_id, owner->name);
 }
 
 void RhComp_StaticMesh::finish()
 {
     RhComp_Renderable::finish();
-    RhGlobals::engine->scene_view->unregister_scene_view_proxy(scene_proxy, render_info.processor_id);
+    RhGlobals::engine->scene_view->unregister_scene_view_proxy(scene_proxy, render_info.type_id);
 }
 void RhComp_StaticMesh::on_serialize(DependencyCollector* dc)
 {

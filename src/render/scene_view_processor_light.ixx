@@ -8,6 +8,7 @@ import <vector>;
 import glm;
 import <algorithm>;
 #include "scene_proxy_boilerplate.h"
+#include "object/object_reflection_macro.h"
 
 
 export struct RenderObject_Light
@@ -60,3 +61,4 @@ public:
     }
 };
 REGISTER_SCENE_PROXY_PROCESSOR(SceneViewProcessor_Light);
+REFLECT_OBJECT(SceneViewProcessor_Light, SceneViewProcessor);

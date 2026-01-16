@@ -11,6 +11,8 @@ import rhcomponents;
 #include "scene_proxy_boilerplate.h"
 import <unordered_map>;
 
+#include "object/object_reflection_macro.h"
+
 export struct RenderObject_Mesh
 {
     MeshHandle mesh;
@@ -41,3 +43,4 @@ public:
     std::unordered_map<MaterialKey, RenderResourceInstance*, MaterialKeyHash> material_cache;
 };
 REGISTER_SCENE_PROXY_PROCESSOR(SceneViewProcessor_Mesh)
+REFLECT_OBJECT(SceneViewProcessor_Mesh, SceneViewProcessor);

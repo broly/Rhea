@@ -56,7 +56,7 @@ static uint32_t get_or_create_name_id(const std::string& str)
     auto it = globals.lookup.find(str);
     if (it != globals.lookup.end())
         return it->second;
-
+    
     uint32_t id = static_cast<uint32_t>(globals.table.size());
     globals.table.push_back(str);
     globals.lookup.emplace(str, id);

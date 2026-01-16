@@ -14,7 +14,7 @@ SceneView::SceneView(std::shared_ptr<class World> in_world, std::shared_ptr<clas
         if (factory.has_value())
         {
             const auto& func = factory.value();
-            processors.push_back(func(*this));
+            processors.push_back(func());
         } else
         {
             processors.push_back(nullptr); // to access via correct index

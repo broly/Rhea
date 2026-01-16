@@ -23,10 +23,7 @@ export namespace NameDebug
     {
         auto& registry = get_registry();
         
-        
         std::lock_guard lock(registry.mutex);
-
-
         registry.map.try_emplace(hash, str);
     }
 

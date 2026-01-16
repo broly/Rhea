@@ -11,7 +11,10 @@ import :render_id;
 import <string>;
 import rhmath;
 import name;
+import rhobject;
+#include "common/assertion_macros.h"
 #include "common/type_macros.h"
+#include "object/object_reflection_macro.h"
 
 
 export class SceneView;
@@ -30,24 +33,21 @@ export struct SceneViewProxy_Transform : SceneViewProxy
 
 using ProxySize = unsigned short int;
 
-export class SceneViewProcessor
+export class SceneViewProcessor : public RhObject
 {
     friend SceneView;
 public:
     NON_COPYABLE(SceneViewProcessor);
     
-    SceneViewProcessor(SceneView& in_view)
-        : view(in_view)
-    {}
+    SceneViewProcessor() {}
     
-    virtual RenderId register_proxy() = 0;
-    virtual void unregister_proxy(RenderId Id) = 0;
-    virtual void process() = 0;
+    virtual RenderId register_proxy() { unreachable("todo"); };
+    virtual void unregister_proxy(RenderId Id) { unreachable("todo"); };
+    virtual void process() { unreachable("todo"); };
     virtual ~SceneViewProcessor() {}
 
     
 protected:
-    SceneView& view;
     
     static constexpr ProxySize invalid_proxy_size = std::numeric_limits<ProxySize>::max();
     ProxySize scene_proxy_size = invalid_proxy_size;
@@ -82,7 +82,7 @@ protected:
     std::vector<std::byte> submission_buffer;
     
     using FactoryResult = std::unique_ptr<SceneViewProcessor>;
-    using Factory = std::optional<std::function<FactoryResult(SceneView& scene_view)>>;
+    using Factory = std::optional<std::function<FactoryResult()>>;
     
 public:
     template<typename T>
@@ -98,9 +98,9 @@ public:
         // factory could be registered once!
         assert(factories[svp_id] == std::nullopt);
         
-        factories[svp_id] = [] (SceneView& scene_view)
+        factories[svp_id] = [] ()
         {
-            return std::make_unique<T>(scene_view);
+            return std::make_unique<T>();
         };
         return svp_id;
     }
@@ -112,4 +112,4 @@ private:
         return factories;
     }
 };
-
+REFLECT_OBJECT(SceneViewProcessor, RhObject);
