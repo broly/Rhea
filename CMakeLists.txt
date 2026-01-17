@@ -94,7 +94,6 @@ target_link_libraries(rhea
 		fastgltf::module
 )
 
-
 target_compile_definitions(rhea
     PRIVATE 
         GLFW_INCLUDE_VULKAN

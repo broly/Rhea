@@ -127,18 +127,23 @@ void VkRenderResource::provide(PipelineObject* pipeline_object)
                 continue;
 
             const auto& rb = it->second;
+            
+            checkf(var.set == rb.set,
+                "Set forr material %s mismatched, is %i, but should be %i",
+                var.name.to_string().c_str(), var.set, rb.set);
 
             if (!set_index)
                 set_index = rb.set;
             else
-                checkf(set_index == rb.set, "Different set index for same resource");
+                checkf(set_index == rb.set, "Different set index for same resource '%s'",
+                    var.name.to_string().c_str());
 
             if (occupied_bindings.contains(rb.binding))
                 continue;
 
             DescriptorBinding binding{};
             binding.name          = var.name;
-            binding.binding_index = rb.binding;
+            binding.binding_index = var.binding;
             binding.count         = rb.count;
             binding.size          = var.size;
             binding.stages        = desc.stages;

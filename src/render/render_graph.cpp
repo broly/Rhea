@@ -325,6 +325,15 @@ PipelineObject* RenderGraph::create_pipeline(const GraphicsPipelineDesc& desc)
     return pipeline;
 }
 
+PipelineObject* RenderGraph::request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key)
+{
+    assert(!graph_compiled);
+    PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key);
+    pipelines_descs.insert({pipeline, pipeline_family.desc});
+    pipelines.push_back(pipeline);
+    return pipeline;
+}
+
 RenderResource* RenderGraph::create_resource(const RenderResourceDesc& desc)
 {
     assert(!graph_compiled);

@@ -11,6 +11,8 @@ import :render_resource;
 #include "vk_macro.h"
 import <bit>;
 
+#include "common/assertion_macros.h"
+
 class VkRenderBackend;
 
 VkPipelineObject::VkPipelineObject(
@@ -139,9 +141,13 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
                     assert(stage_reflection.input_variables.contains(attribute_info.variable_name));
 
                     ReflectedInterfaceVariable& reflection_info = stage_reflection.input_variables[attribute_info.variable_name];
+                    
+                    checkf(reflection_info.location == attribute_info.location,
+                        "Attribute %s location mismatch %i and %i",
+                        attribute_info.variable_name, attribute_info.location, reflection_info.location);
                 
                     VkVertexInputAttributeDescription attr;
-                    attr.location = reflection_info.location;
+                    attr.location = attribute_info.location;
                     attr.offset = attribute_info.offset;
                     attr.format = reflection_info.format;
                     attr.binding = layout.binding_index;

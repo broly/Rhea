@@ -93,6 +93,11 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     
     GraphicsPipelineDesc geom_pipeline_desc{
+        .features = {
+            ShaderFeatureEnum("BLEND_MODE", {"BLEND_MODE_OPAQUE", "BLEND_MODE_MASKED", "BLEND_MODE_TRANSPARENT"}),
+            ShaderFeatureFlag("USE_DEBUG"),
+            ShaderFeatureFlag("USE_NORMAL"),
+        },
         .stages = {
             {
                 .stage = ShaderStage::vertex,
@@ -130,6 +135,8 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     };
     
+    PipelineFamily geom_pipeline_family(geom_pipeline_desc, render_backend);
+    
     
     GraphicsPipelineDesc tonemap_pipeline_desc{
         .stages = {
@@ -150,8 +157,16 @@ void GameRenderer::init(RBWindowHandle in_window)
             .has_depth = false
         }
     };
+    
+    ShaderKey shader_key = geom_pipeline_family.make_shader_key({
+        {"BLEND_MODE", "BLEND_MODE_TRANSPARENT"},
+        {"USE_DEBUG", true},
+        {"USE_NORMAL", true},
+    });
+    
     auto tonemap_pipeline = render_graph->create_pipeline(tonemap_pipeline_desc);
     auto geometry_opaque = render_graph->create_pipeline(geom_pipeline_desc);
+    //auto geometry_opaque = render_graph->request_pipeline(geom_pipeline_family, shader_key);
     
     geom_pipeline = geometry_opaque;
     

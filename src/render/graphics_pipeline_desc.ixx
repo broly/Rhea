@@ -6,6 +6,8 @@ import <memory>;
 import <bit>;
 import :handle_types;
 import :rg_types;
+#include <variant>
+
 #include "common/assertion_macros.h"
 #include "common/type_macros.h"
 import name;
@@ -153,12 +155,23 @@ export
         std::vector<VertexLayoutData> vertex_layouts;
     };
     
+    struct ShaderFeatureEnum
+    {
+        Name name;
+        std::vector<Name> members;
+    };
+    
+    struct ShaderFeatureFlag
+    {
+        Name name;
+    };
+    
+    using ShaderFeature = std::variant<ShaderFeatureEnum, ShaderFeatureFlag>;
+    
     struct GraphicsPipelineDesc
     {
+        std::vector<ShaderFeature> features;
         std::vector<GraphicsPipelineStage> stages;
-        // std::string vertex_shader;
-        // std::string fragment_shader;
-        // VertexLayoutData vertex_layout;
         PipelineLayoutDesc layout;
         bool depth_test;
         

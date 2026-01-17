@@ -6,16 +6,25 @@ import <cassert>;
 import <functional>;
 import <map>;
 import name;
+import :pipeline_family;
 
 export struct RenderGraphPass
 {
     Name name;
-
+    
+    [[deprecated("to be moved out from RenderGraph")]]
     std::vector<PipelineObject*> pipelines;
+    
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
+    
+    [[deprecated("to be moved out from RenderGraph")]]
     std::vector<RenderResource*> resources;
+    
+    [[deprecated("to be moved out from RenderGraph")]]
     RBDescriptorSetLayout descriptor_layout{};
+    
+    [[deprecated("to be moved out from RenderGraph")]]
     RBDescriptorSet descriptor_set{};
 
     std::function<void(class RenderGraphContext&)> execute;
@@ -77,6 +86,7 @@ public:
     void rebuild_resources();
     
     PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
+    PipelineObject* request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key);
 
     RenderResource* create_resource(const RenderResourceDesc& desc);
 
