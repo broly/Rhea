@@ -70,5 +70,5 @@ void VkRenderResourceInstance::bind(class PipelineObject* pipeline_object, RBCom
         command_list,
         pipe_info.descritor_set_layout_desc.set_index,
         set,
-        pipeline_object->get_pipeline_handle());
+        vk_pipeline->get_pipeline_handle());
 }

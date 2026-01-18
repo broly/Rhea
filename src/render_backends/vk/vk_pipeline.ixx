@@ -24,7 +24,7 @@ public:
 
     void prepare(const GraphicsPipelineDesc& in_desc) override;
 
-    RBPipelineHandle get_pipeline_handle() const override
+    RBPipelineHandle get_pipeline_handle() const
     {
         assert(vk_pipeline != VK_NULL_HANDLE); 
         return vk_pipeline;

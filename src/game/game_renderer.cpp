@@ -356,7 +356,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline)
                 model->bind(pipeline, cmd, ctx.frame);
                 ctx.backend.push_constants(
                     cmd, ro.world,
-                    pipeline->get_pipeline_handle()
+                    pipeline
                 );
 
                 ctx.backend.draw_indexed(

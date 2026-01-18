@@ -452,12 +452,14 @@ void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, R
     mesh_manager.bind(cmd, mesh);
 }
 
-void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix, RBPipelineHandle pipeline_handle)
+void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix, PipelineObject* pipeline_object)
 {
     PROFILE(__FUNCTION__);
+    
+    auto as_vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
     vkCmdPushConstants(
         cmd,
-        pipelines[pipeline_handle]->get_pipeline_layout(),
+        pipelines[as_vk_pipeline->get_pipeline_handle()]->get_pipeline_layout(),
         VK_SHADER_STAGE_VERTEX_BIT, 
         0, 
         sizeof(glm::mat4),
