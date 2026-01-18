@@ -122,7 +122,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         },
         
         .layout = {
-            .sets = {}, 
+            .resources = {camera_resource, material_resource, light_resource, model_resource }, 
             .push_constants = {{
                 .stages = ShaderStage::vertex,
                 .offset = 0,
@@ -150,7 +150,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             }
         },
         .layout = {
-            .sets = {  },
+            .resources = { tonemap_resource },
         },
         .rt_compat = {
             .color_attachment_count = 1,
@@ -193,12 +193,6 @@ void GameRenderer::init(RBWindowHandle in_window)
             { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilAttachment } 
         },
-        .resources = { 
-            camera_resource, 
-            material_resource, 
-            light_resource, 
-            model_resource 
-        },    
         .execute = [=](RenderGraphContext& ctx)
         {
             PROFILE("GeometryForward");
@@ -220,7 +214,6 @@ void GameRenderer::init(RBWindowHandle in_window)
         .writes = {
             { swapchain_color, RBImageUsage::ColorAttachment }
         },
-        .resources = { tonemap_resource },
         .execute = [=](RenderGraphContext& ctx)
         {
             auto pipeline = ctx.pipelines[0];

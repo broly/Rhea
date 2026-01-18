@@ -12,6 +12,9 @@ import :rg_types;
 #include "common/type_macros.h"
 import name;
 
+export class RenderResource;
+
+
 export
 {
 
@@ -114,7 +117,8 @@ export
 
     struct PipelineLayoutDesc
     {
-        std::vector<RBDescriptorSetLayout> sets;
+        // std::vector<RBDescriptorSetLayout> sets;
+        std::vector<RenderResource*> resources;
         std::vector<PushConstantRange> push_constants;
     };
 

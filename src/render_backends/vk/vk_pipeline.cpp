@@ -58,9 +58,12 @@ void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
     GraphicsPipelineDesc& desc = *pipeline_desc;
     
     std::vector<VkDescriptorSetLayout> vk_layouts;
-
-    for (RBDescriptorSetLayout h : desc.layout.sets)
+    
+    for (auto resource : desc.layout.resources)
     {
+        resource->provide(this);
+        
+        auto h = resource->get_descriptor_set_layout(this);
         vk_layouts.push_back(
             buffer_manager.get_vk_descriptor_set_layout(h).vk_layout
         );

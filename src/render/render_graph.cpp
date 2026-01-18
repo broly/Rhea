@@ -58,14 +58,17 @@ void RenderGraph::compile()
     }
     
     
-    for (auto& pass : passes)
-    {
-        for (RenderResource* resource : pass.resources)
-        {
-            for (auto pipeline : pass.pipelines)
-                resource->provide(pipeline);
-        }
-    }
+    // for (auto& pass : passes)
+    // {
+    //     for (auto pipeline : pass.pipelines)
+    //     {
+    //         for (RenderResource* resource : pipeline->resources)
+    //         {
+    //             for (auto pipeline : pass.pipelines)
+    //                 resource->provide(pipeline);
+    //         }
+    //     }
+    // }
     
     for (auto& pass : passes)
     {
@@ -73,10 +76,10 @@ void RenderGraph::compile()
         {
             auto desc_it = pipelines_descs.find(pipeline);
             auto& desc = desc_it->second;
-            for (auto resource : pass.resources)
-            {
-                desc.layout.sets.push_back(resource->get_descriptor_set_layout(pipeline));
-            }
+            // for (auto resource : pass.resources)
+            // {
+            //     desc.layout.sets.push_back(resource->get_descriptor_set_layout(pipeline));
+            // }
             pipeline->prepare(desc);
         };
     }
