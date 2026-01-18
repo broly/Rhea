@@ -17,12 +17,6 @@ export struct RenderGraphPass
     
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
-    
-    [[deprecated("to be moved out from RenderGraph")]]
-    RBDescriptorSetLayout descriptor_layout{};
-    
-    [[deprecated("to be moved out from RenderGraph")]]
-    RBDescriptorSet descriptor_set{};
 
     std::function<void(class RenderGraphContext&)> execute;
 };

@@ -188,7 +188,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_graph->add_pass({
         .name = "GeometryForward",
-        .pipelines = {geometry_opaque},  // added this
+        .pipelines = {geometry_opaque},
         .writes = { 
             { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilAttachment } 

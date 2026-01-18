@@ -426,12 +426,6 @@ RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle
     
 }
 
-void VkRenderBackend::update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value,
-    TextureFormat format)
-{
-    swapchain.update_depth_descriptior(rb_handle, value);
-}
-
 
 RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
 {

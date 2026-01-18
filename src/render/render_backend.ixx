@@ -41,7 +41,7 @@ public:
     }
 
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
-    virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) = 0;
+
     virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) = 0;
 
 

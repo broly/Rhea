@@ -74,7 +74,6 @@ public:   /// API Section
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
-    virtual void update_depth_descriptor(const RBDescriptorSet& rb_handle, RBImageHandle value, TextureFormat format) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) override;
     std::pair<uint32_t, uint32_t> get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;

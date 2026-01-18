@@ -53,33 +53,6 @@ void RenderGraph::compile()
         {
             auto desc_it = pipelines_descs.find(pipeline);
             auto& desc = desc_it->second;
-            pipeline->fetch_shaders(desc);
-        }
-    }
-    
-    
-    // for (auto& pass : passes)
-    // {
-    //     for (auto pipeline : pass.pipelines)
-    //     {
-    //         for (RenderResource* resource : pipeline->resources)
-    //         {
-    //             for (auto pipeline : pass.pipelines)
-    //                 resource->provide(pipeline);
-    //         }
-    //     }
-    // }
-    
-    for (auto& pass : passes)
-    {
-        for (auto pipeline : pass.pipelines)
-        {
-            auto desc_it = pipelines_descs.find(pipeline);
-            auto& desc = desc_it->second;
-            // for (auto resource : pass.resources)
-            // {
-            //     desc.layout.sets.push_back(resource->get_descriptor_set_layout(pipeline));
-            // }
             pipeline->prepare(desc);
         };
     }
@@ -98,32 +71,6 @@ void RenderGraph::compile()
         };
         tex.image = backend->create_image(desc);
     }
-    
-    for (auto& pass : passes)
-    {
-        if (!pass.descriptor_set)
-            continue;
-
-        for (auto tex_handle : pass.reads)
-        {
-            const RGTexture& tex = textures[tex_handle.texture.id];
-            
-            if (tex.desc.external)
-                continue;
-
-            if (!(tex.desc.usage & RenderTextureUsage::DepthStencil))
-                continue; 
-            
-            auto image = resolve_image(tex);
-
-            backend->update_depth_descriptor(
-                pass.descriptor_set,
-                image,
-                tex.desc.format
-            );
-        }
-    }
-    
     
     pass_barriers.clear();
     pass_barriers.resize(passes.size());
@@ -296,26 +243,6 @@ void RenderGraph::rebuild_resources()
             .usage  = tex.desc.usage
         };
         tex.image = backend->create_image(desc);
-    }
-    
-    for (auto& pass : passes)
-    {
-        if (!pass.descriptor_set)
-            continue;
-
-        for (auto tex_handle : pass.reads)
-        {
-            const RGTexture& tex = textures[tex_handle.texture.id];
-
-            if (!(tex.desc.usage & RenderTextureUsage::DepthStencil))
-                continue;
-
-            backend->update_depth_descriptor(
-                pass.descriptor_set,
-                tex.image.value(),
-                tex.desc.format
-            );
-        }
     }
 }
 

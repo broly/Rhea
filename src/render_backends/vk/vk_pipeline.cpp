@@ -35,7 +35,7 @@ VkPipelineObject::~VkPipelineObject()
         vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
 }
 
-void VkPipelineObject::fetch_shaders(const GraphicsPipelineDesc& in_desc)
+void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
 {
     pipeline_desc = in_desc;
 
@@ -48,14 +48,6 @@ void VkPipelineObject::fetch_shaders(const GraphicsPipelineDesc& in_desc)
         reflect_shader(stage_shader, stage.stage);
         shaders.push_back(std::move(stage_shader));
     }
-}
-
-void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
-{
-    
-    pipeline_desc = in_desc;
-
-    GraphicsPipelineDesc& desc = *pipeline_desc;
     
     std::vector<VkDescriptorSetLayout> vk_layouts;
     

@@ -37,7 +37,6 @@ namespace vk
         
         RBImageView get_image_view() const;
         RBImageHandle get_image() const;
-        void update_depth_descriptior(const RBDescriptorSet& rb_handle, RBImageHandle value);
         bool acquire_next_image(RBFrameHandle frame_handle);
         void submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list);
         void advance_frame();

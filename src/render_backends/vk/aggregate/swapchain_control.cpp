@@ -134,27 +134,6 @@ RBImageHandle vk::SwapchainControl::get_image() const
     return swapchain_image_handles[current_swapchain_index];
 }
 
-void vk::SwapchainControl::update_depth_descriptior(const RBDescriptorSet& rb_handle, RBImageHandle value)
-{
-    const auto& res = image_manager.get_image_resource(value);
-    
-
-    VkDescriptorImageInfo image_info{};
-    image_info.imageView = res.view;
-    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_info.sampler = sampler_manager.get_default_sampler();
-
-    VkWriteDescriptorSet write{};
-    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = rb_handle.as<VkDescriptorSet>();
-    write.dstBinding = 0; // u_depth
-    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write.descriptorCount = 1;
-    write.pImageInfo = &image_info;
-
-    vkUpdateDescriptorSets(instance.device, 1, &write, 0, nullptr);
-}
-
 
 bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 {
