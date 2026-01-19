@@ -7,6 +7,7 @@ import assets;
 import linear_color;
 import <future>;
 import :render_resource;
+import :renderer;
 #include "object/object_reflection_macro.h"
 
 
@@ -32,15 +33,13 @@ export void serialize_json_value(MaterialParameterType& target, const Json::Valu
 export class Material : public RhObject
 {
 public:
-    MaterialBlendMode blend_mode = MaterialBlendMode::opaque;
-    
+    Name model;
     std::map<Name, MaterialParameterType> parameters;
     
-    void create_resource();
     
-    std::shared_ptr<class MaterialInstance> create_instance() const;
+    std::shared_ptr<class MaterialInstance> create_instance(Renderer* renderer) const;
     
-    RenderResource* resource = nullptr;
+    // RenderResource* resource = nullptr;
 };
 REFLECT_OBJECT_FIELDS(Material, RhObject,
-    blend_mode, parameters);
+    model, parameters);

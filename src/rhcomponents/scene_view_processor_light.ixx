@@ -1,8 +1,7 @@
-﻿export module render:scene_view_proxy.light;
+﻿export module rhcomponents:scene_view_proxy.light;
 
-import rhcomponents;
 import render_scene;
-
+import :rhcomp_light;
 import <array>;
 import <vector>;
 import glm;

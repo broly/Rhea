@@ -28,7 +28,7 @@ void Renderer::load_schemas()
     for (auto& file : files)
     {
         if (auto obj = json_object::load_object<MaterialModel>(file))
-            schemas.insert({obj->model_name, obj});
+            models.insert({obj->model_name, obj});
     }
 }
 
@@ -57,6 +57,11 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
         return it->second;
 
     return create_texture_from_asset(handle);
+}
+
+std::shared_ptr<PipelineFamily> Renderer::get_or_create_material_pipeline_family(Name model_name)
+{
+    todo("not implemented yet");
 }
 
 RenderResource* Renderer::get_material_resource()

@@ -2,6 +2,7 @@
 #include "definitions.glsl"
 #include "layout.glsl"
 
+
 // ---------- Vertex inputs ----------
 layout(location = LOCATION_ATTR_POSITION) in vec3 in_position;
 layout(location = LOCATION_ATTR_NORMAL) in vec3 in_normal;

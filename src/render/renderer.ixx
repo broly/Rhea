@@ -7,6 +7,7 @@ import :handle_types;
 import :render_objects;
 import :render_backend;
 import :material_model;
+import :pipeline_family;
 
 #include "common/reflect_macros.h"
 
@@ -49,10 +50,14 @@ public:
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
     
+    std::shared_ptr<PipelineFamily> get_or_create_material_pipeline_family(Name model_name);
+    
+    std::vector<std::shared_ptr<PipelineFamily>> material_pipeline_families;
+    
     virtual RenderResource* get_material_resource();
     
     std::shared_ptr<RenderBackend> render_backend;
-    std::map<Name, std::shared_ptr<MaterialModel>> schemas;
+    std::map<Name, std::shared_ptr<MaterialModel>> models;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
     

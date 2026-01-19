@@ -1,11 +1,11 @@
-﻿export module render:scene_view_proxy.camera;
+﻿export module rhcomponents:scene_view_proxy.camera;
 
 import render_scene;
 import glm;
 import <string>;
 import <vector>;
 import name;
-import rhcomponents;
+import :rhcomp_camera;
 
 #include "object/object_reflection_macro.h"
 

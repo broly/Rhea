@@ -1,13 +1,16 @@
-﻿export module render:scene_view_proxy.mesh;
+﻿export module rhcomponents:scene_view_proxy.mesh;
 
 import render_scene;
 import <cassert>;
 import glm;
 import <string>;
 import assets;
-import :render_objects;
-import :render_resource;
-import rhcomponents;
+import :rhcomp_mesh;
+
+import render;
+import name;
+import rhmath;
+import render;
 import <unordered_map>;
 
 #include "object/object_reflection_macro.h"
@@ -19,6 +22,7 @@ export struct RenderObject_Mesh
     AABB bounds;
     std::vector<MaterialKey> material_keys;
     std::vector<RenderResourceInstance*> material_instances;
+    std::vector<std::shared_ptr<MaterialInstance>> mat_instances;
     Name debug_name;
 };
 

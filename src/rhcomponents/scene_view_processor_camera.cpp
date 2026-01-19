@@ -1,6 +1,5 @@
-﻿module render:scene_view_proxy.camera;
+﻿module rhcomponents:scene_view_proxy.camera;
 import render_scene;
-import rhcomponents;
 
 
 glm::mat4 RenderObject_Camera::get_projection(float aspect) const

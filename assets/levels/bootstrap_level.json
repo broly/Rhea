@@ -75,6 +75,22 @@
 							"roughness_mult": 1.0,
 							"metallic_mult": 1.0
 						}
+					],
+					"mats": [
+						{
+							"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/lymphocyte/Lymphocyte_B.png)",
+								"emissive": "TEXTURE(textures/lymphocyte/Lymphocyte_E.png)",
+								"normal": "TEXTURE(textures/lymphocyte/Lymphocyte_N.png)",
+								"orm": "TEXTURE(textures/lymphocyte/Lymphocyte_ORM.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 0.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+						}
 					]
 				}
 			]
@@ -130,6 +146,22 @@
 							"roughness_mult": 1.0,
 							"metallic_mult": 1.0
 						}
+					],
+					"mats": [
+						{
+							"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/lymphocyte/Lymphocyte_B.png)",
+								"emissive": "TEXTURE(textures/lymphocyte/Lymphocyte_E.png)",
+								"normal": "TEXTURE(textures/lymphocyte/Lymphocyte_N.png)",
+								"orm": "TEXTURE(textures/lymphocyte/Lymphocyte_ORM.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 0.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+						}
 					]
 				}
 			]
@@ -161,6 +193,22 @@
 							"occlusion_mult": 1.0,
 							"roughness_mult": 1.0,
 							"metallic_mult": 1.0
+						}
+					],
+					"mats": [
+						{
+							"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/lymphocyte/Lymphocyte_B.png)",
+								"emissive": "TEXTURE(textures/lymphocyte/Lymphocyte_E.png)",
+								"normal": "TEXTURE(textures/lymphocyte/Lymphocyte_N.png)",
+								"orm": "TEXTURE(textures/lymphocyte/Lymphocyte_ORM.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 0.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
 						}
 					]
 				}

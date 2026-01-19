@@ -15,6 +15,8 @@ import dependency_collector;
 import name;
 import static_name;
 
+#include <iostream>
+
 #include "common/reflect_macros.h"
 
 
@@ -210,6 +212,7 @@ export namespace reflect::json
         else if constexpr (reflect::is_reflected_v<T>)
         {
             assert(value.isObject());
+            auto names = value.getMemberNames();
             visit_serialize(value, target, is_loading, dc);
         } else if constexpr (is_vector_v<std::decay_t<T>>)
         {

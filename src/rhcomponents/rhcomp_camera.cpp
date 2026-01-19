@@ -2,9 +2,10 @@
 import rhmath;
 import globals;
 import <cassert>;
-#include "common/offsetof.h"
 import render;
+import :scene_view_proxy.camera;
 
+#include "common/offsetof.h"
 
 void RhComp_Camera::on_init()
 {

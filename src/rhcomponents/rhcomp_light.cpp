@@ -1,6 +1,7 @@
 ﻿module rhcomponents:rhcomp_light;
 
 
+import :scene_view_proxy.light;
 
 import globals;
 import render;

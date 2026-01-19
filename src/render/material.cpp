@@ -64,20 +64,27 @@ void serialize_json_value(MaterialParameterType& target, const Json::Value& valu
     }
 }
 
-void Material::create_resource()
-{
-    RenderResourceDesc desc {
-        .name = name,
-        .stages = ShaderStage::all,
-        .variables = {},
-    };
-    
-    resource = RhGlobals::engine->renderer->create_material_resource(desc); // add permutations support
-}
+// void Material::create_resource()
+// {
+//     RenderResourceDesc desc{
+//         .name = "material",
+//         .stages = ShaderStage::fragment,
+//         .usage_type = ResourceUsageType::persistent,
+//         .sampler = surface_sampler,
+//         .variables = {
+//             { "material",  SET_MATERIAL, BINDING_UBO_MATERIAL, sizeof(MaterialUBO) },
+//             { "u_base_color", SET_MATERIAL, BINDING_SAMPLER_ALBEDO },
+//             { "u_emissive", SET_MATERIAL, BINDING_SAMPLER_EMISSIVE },
+//             { "u_normal_map", SET_MATERIAL, BINDING_SAMPLER_NORMAL },
+//             { "u_orm", SET_MATERIAL, BINDING_SAMPLER_ORM },
+//         },
+//     });
+//     
+//     resource = RhGlobals::engine->renderer->create_material_resource(desc); // add permutations support
+// }
 
-std::shared_ptr<MaterialInstance> Material::create_instance() const
+std::shared_ptr<MaterialInstance> Material::create_instance(Renderer* renderer) const
 {
-    checkf(resource != nullptr, "creating material instance is prohibited without render resource");
     const std::shared_ptr<const Material> as_material = std::static_pointer_cast<const Material>(shared_from_this());
-    return std::make_shared<MaterialInstance>(as_material);
+    return std::make_shared<MaterialInstance>(as_material, renderer);
 }

@@ -1,8 +1,10 @@
-﻿module render:scene_view_proxy.mesh;
+﻿module rhcomponents:scene_view_proxy.mesh;
+
 import render_scene;
 import framework;
 import globals;
 import profile;
+
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -49,6 +51,7 @@ void SceneViewProcessor_Mesh::process()
         
         mesh_ro.material_keys.resize(submitted.materials.size());
         mesh_ro.material_instances.resize(submitted.materials.size());
+        mesh_ro.mat_instances.resize(submitted.mats.size());
         
         for (uint32_t index = 0; auto material : submitted.materials)
         {
@@ -57,6 +60,12 @@ void SceneViewProcessor_Mesh::process()
             index++;
         }
         
+        for (uint32_t index = 0; auto material : submitted.mats)
+        {
+            // material->create_resource();
+            // mesh_ro.mat_instances[index] = material->create_instance();
+            // mesh_ro.mat_instances[index]->c
+        }
         mesh_ro.mesh = mesh_handle;
         mesh_ro.bounds = mesh.bounds;
         mesh_ro.mesh = mesh_handle;

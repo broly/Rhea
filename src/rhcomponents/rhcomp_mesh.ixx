@@ -5,6 +5,7 @@ import assets;
 import framework;
 import name;
 import render_scene;
+import render;
 
 #include "object/object_reflection_macro.h"
 
@@ -13,9 +14,9 @@ export struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
 {
     MeshHandle mesh;
     std::vector<PBRMaterial> materials;
+    std::vector<std::shared_ptr<Material>> mats;
     // PBRMaterial material;
     Name debug_name;
-    bool auto_retrieve_materials;
 };
 
 
@@ -35,11 +36,11 @@ public:
     std::vector<PBRMaterial> materials;
     
     MeshHandle mesh;
-    
-    bool auto_retrieve_materials = false;
+
+    std::vector<std::shared_ptr<Material>> mats;
 };
 
 REFLECT_OBJECT_FIELDS(RhComp_StaticMesh, RhComp_Renderable, 
-    transform, materials, mesh, auto_retrieve_materials);
+    transform, materials, mesh, mats);
 
 

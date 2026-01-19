@@ -7,6 +7,8 @@ import rhmath;
 import <vector>;
 import profile;
 
+import rhcomponents;
+
 #include "render_layout.h"
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
@@ -57,7 +59,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     });
     
     
-    auto& schema = schemas.find("PBR")->second;
+    auto& schema = models.find("PBR")->second;
     
     // TODO: hardcoded general material case
     material_resource = render_graph->create_resource({
@@ -124,7 +126,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         },
         
         .layout = {
-            .resources = {camera_resource, material_resource, light_resource, model_resource }, 
+            .resources = {camera_resource, light_resource, model_resource, material_resource }, 
             .push_constants = {{
                 .stages = ShaderStage::vertex,
                 .offset = 0,

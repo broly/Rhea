@@ -6,18 +6,18 @@
 #define SET_CAMERA 0 
     #define BINDING_UBO_CAMERA 0
 
-#define SET_LIGHT 2
+#define SET_LIGHT 1
     #define BINDING_UBO_LIGHT 0
 
-#define SET_MATERIAL 1 
+#define SET_MODEL 2
+    #define BINDING_UBO_MODEL 0
+
+#define SET_MATERIAL 3
     #define BINDING_UBO_MATERIAL 0
     #define BINDING_SAMPLER_ALBEDO 1
     #define BINDING_SAMPLER_EMISSIVE 2
     #define BINDING_SAMPLER_NORMAL 3
     #define BINDING_SAMPLER_ORM 4
-
-#define SET_MODEL 3
-    #define BINDING_UBO_MODEL 0
 
 #define SET_TONEMAP 0
     #define BINDING_UBO_TONEMAP 0
