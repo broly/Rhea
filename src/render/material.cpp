@@ -8,6 +8,25 @@ import assets;
 
 import globals;
 
+static std::optional<std::string> parse_texture_string(const std::string& str)
+{
+    constexpr const char* prefix = "TEXTURE(";
+    constexpr char suffix = ')';
+
+    if (!str.starts_with(prefix) || str.back() != suffix)
+        return std::nullopt;
+
+    std::string path = str.substr(
+        std::strlen(prefix),
+        str.size() - std::strlen(prefix) - 1
+    );
+
+    if (path.empty())
+        return std::nullopt;
+
+    return path;
+}
+
 void serialize_json_value(MaterialParameterType& target, const Json::Value& value, DependencyCollector* dc)
 {
     if (value.isNumeric())
@@ -15,22 +34,28 @@ void serialize_json_value(MaterialParameterType& target, const Json::Value& valu
         target.data = value.asFloat();
     } else if (value.isString())
     {
-        target.data = TextureHandle{};
-        auto& texture_handle = std::get<TextureHandle>(target.data);
-        if (!value.isString())
-            return;
+        const std::string str = value.asString();
+        
+        if (auto texture_path = parse_texture_string(str); texture_path.has_value())
+        {
+            target.data = TextureHandle{};
+            auto& texture_handle = std::get<TextureHandle>(target.data);
 
-        std::string path = value.asString();
-        texture_handle.pending_path = path;
+            std::string path = *texture_path;
+            texture_handle.pending_path = path;
     
-        auto texture_future = AssetManager::get().load_texture_async(path);
+            auto texture_future = AssetManager::get().load_texture_async(path);
     
-        dc->push(std::async(
-            std::launch::async,
-            [&target, texture_future, &texture_handle]() mutable
-            {
-                texture_handle = texture_future.get();
-            }));
+            dc->push(std::async(
+                std::launch::async,
+                [&target, texture_future, &texture_handle]() mutable
+                {
+                    texture_handle = texture_future.get();
+                }));
+        } else
+        {
+            target.data = Name(str);
+        }
     } else if (value.isObject())
     {
         target.data = LinearColor();

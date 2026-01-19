@@ -74,10 +74,10 @@ export namespace reflect
         const std::vector<FieldRuntimeReflectionInfo>& fields);
     bool register_basic_type(TypeId type_id, size_t size, type_initializer initializer);
     
-    RuntimeReflectionInfo* find_runtime_info(TypeId type_id);
+    const RuntimeReflectionInfo* find_runtime_info(TypeId type_id);
     
     
-    RuntimeReflectionInfo* find_runtime_info(Name type_name)
+    const RuntimeReflectionInfo* find_runtime_info(Name type_name)
     {
         return find_runtime_info(TypeId(type_name));
     }

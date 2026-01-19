@@ -6,7 +6,7 @@ import <map>;
 import :handle_types;
 import :render_objects;
 import :render_backend;
-import :material_schema;
+import :material_model;
 
 #include "common/reflect_macros.h"
 
@@ -52,7 +52,7 @@ public:
     virtual RenderResource* get_material_resource();
     
     std::shared_ptr<RenderBackend> render_backend;
-    std::vector<std::shared_ptr<MaterialSchema>> schemas;
+    std::map<Name, std::shared_ptr<MaterialModel>> schemas;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
     

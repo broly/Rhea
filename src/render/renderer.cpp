@@ -27,8 +27,8 @@ void Renderer::load_schemas()
     
     for (auto& file : files)
     {
-        if (auto obj = json_object::load_object<MaterialSchema>(file))
-            schemas.emplace_back(obj);
+        if (auto obj = json_object::load_object<MaterialModel>(file))
+            schemas.insert({obj->model_name, obj});
     }
 }
 

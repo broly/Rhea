@@ -1,5 +1,5 @@
 {
-	"name": "PBR",
+	"model_name": "PBR",
 	
 	"enums": {
 		"blend_mode": [
@@ -10,58 +10,82 @@
 	},
 	
 	"uniform_buffers": {
-		"material": "MaterialUBO"
+		"material": {
+			"type_name": "MaterialUBO",
+			"binding": 0
+		}
 	},
 	
 	"parameters": {
 		"blend_mode": {
 			"type": "blend_mode",
-			"shader_parameter": null
+			"dynamic": false,
+			"shader_parameter": null,
+			"ubo": null,
+			"binding": null
 		},
 		"base_color": {
 			"type": "sampler",
+			"dynamic": true,
 			"shader_parameter": "u_base_color",
-			"ubo": null
+			"ubo": null,
+			"binding": 1
 		},
 		"emissive": {
 			"type": "sampler",
+			"dynamic": true,
 			"shader_parameter": "u_emissive",
-			"ubo": null
+			"ubo": null,
+			"binding": 2
 		},
 		"normal": {
 			"type": "sampler",
+			"dynamic": true,
 			"shader_parameter": "u_normal_map",
-			"ubo": null
+			"ubo": null,
+			"binding": 3
 		},
 		"orm": {
 			"type": "sampler",
+			"dynamic": true,
 			"shader_parameter": "u_orm",
-			"ubo": null
+			"ubo": null,
+			"binding": 4
 		},
 		"base_color_factor": {
 			"type": "vec4",
+			"dynamic": true,
 			"shader_parameter": null,
-			"ubo": "material"
+			"ubo": "material",
+			"binding": null
 		},
 		"emissive_factor": {
 			"type": "vec4",
+			"dynamic": true,
 			"shader_parameter": null,
-			"ubo": "material"
+			"ubo": "material",
+			"binding": null
 		},
 		"occlusion_factor": {
 			"type": "vec4",
+			"dynamic": true,
 			"shader_parameter": null,
-			"ubo": "material"
+			"ubo": "material",
+			"binding": null
 		},
 		"metallic_factor": {
 			"type": "vec4",
+			"dynamic": true,
 			"shader_parameter": null,
-			"ubo": "material"
+			"ubo": "material",
+			"binding": null
 		},
 		"roughness_factor": {
 			"type": "vec4",
+			"dynamic": true,
 			"shader_parameter": null,
-			"ubo": "material"
+			"ubo": "material",
+			"binding": null
 		}
 	},
 	"permutations": {

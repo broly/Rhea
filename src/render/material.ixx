@@ -24,7 +24,7 @@ REFLECT_ENUM(MaterialBlendMode,
 
 struct MaterialParameterType
 {
-    std::variant<float, LinearColor, TextureHandle> data;
+    std::variant<float, LinearColor, TextureHandle, Name> data;
 };
 
 export void serialize_json_value(MaterialParameterType& target, const Json::Value& value, DependencyCollector* dc);

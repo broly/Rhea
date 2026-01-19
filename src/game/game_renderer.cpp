@@ -57,6 +57,8 @@ void GameRenderer::init(RBWindowHandle in_window)
     });
     
     
+    auto& schema = schemas.find("PBR")->second;
+    
     // TODO: hardcoded general material case
     material_resource = render_graph->create_resource({
         .name = "material",

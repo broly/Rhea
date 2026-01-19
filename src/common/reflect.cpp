@@ -42,7 +42,7 @@ bool reflect::register_basic_type(TypeId id, size_t size, type_initializer initi
     return true;
 }
 
-reflect::RuntimeReflectionInfo* reflect::find_runtime_info(TypeId type_id)
+const reflect::RuntimeReflectionInfo* reflect::find_runtime_info(TypeId type_id)
 {
     auto& registry = get_types_registry();
     
