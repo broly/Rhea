@@ -1,12 +1,37 @@
 ﻿module render:renderer;
 
 import :render_backend;
+import paths;
+import <filesystem>;
 #include "common/assertion_macros.h"
 
 
 void Renderer::init(RBWindowHandle in_window)
 {
     // world = in_world;
+    
+    load_schemas();
+}
+
+void Renderer::load_schemas()
+{
+    auto dir = paths::get_assets_path() / "render" / "schemas";
+    
+    std::vector<std::filesystem::path> files;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        if (entry.is_regular_file()) {
+            if (entry.path().extension() == ".json")
+            {
+                files.emplace_back(entry.path().string());
+            }
+        }
+    }
+    
+    for (auto& file : files)
+    {
+        if (auto obj = json_object::load_object<MaterialSchema>(file))
+            schemas.emplace_back(obj);
+    }
 }
 
 void Renderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame)

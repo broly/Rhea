@@ -6,6 +6,7 @@ import <map>;
 import :handle_types;
 import :render_objects;
 import :render_backend;
+import :material_schema;
 
 export struct MaterialUBO
 {
@@ -34,6 +35,8 @@ export class Renderer
 public:
     virtual ~Renderer() = default;
     virtual void init(RBWindowHandle in_window);
+    
+    void load_schemas();
 
     virtual void execute() {}
     
@@ -45,6 +48,7 @@ public:
     virtual RenderResource* get_material_resource();
     
     std::shared_ptr<RenderBackend> render_backend;
+    std::vector<std::shared_ptr<MaterialSchema>> schemas;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
     

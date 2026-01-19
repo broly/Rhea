@@ -105,7 +105,8 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     
     for (auto& stage : desc.stages)
     {
-        request_permutation(stage.shader, key, options);
+        auto compiled_shader_path = request_permutation(stage.shader, key, options);
+        stage.compiled_shader = compiled_shader_path.string();
     }
     
     return backend->create_pipeline();
@@ -159,7 +160,7 @@ std::filesystem::path PipelineFamily::request_permutation(const std::string& sha
         std::string saved_timestamp = string_helpers::trim_and_remove_newlines(file_helpers::load_text_from_file(hashed_shader_name + ".timestamp"));
         if (actual_timestamp == saved_timestamp)
         {
-            return compiled_permutation_filename;
+            return compiled_shader_permutation_file;
         }
     }
     
@@ -201,6 +202,6 @@ std::filesystem::path PipelineFamily::request_permutation(const std::string& sha
         file_helpers::save_text_to_file(timestamp_file_name, timestamp);
     }
     
-    return compiled_permutation_filename;
+    return compiled_shader_permutation_file;
 }
 

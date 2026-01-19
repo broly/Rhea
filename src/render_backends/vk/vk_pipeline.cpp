@@ -44,7 +44,8 @@ void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
     
     for (auto& stage : desc.stages)
     {
-        VkShader stage_shader(instance.device, stage.shader);
+        checkf(stage.compiled_shader.has_value(), "shader not compiled!");
+        VkShader stage_shader(instance.device, *stage.compiled_shader);
         reflect_shader(stage_shader, stage.stage);
         shaders.push_back(std::move(stage_shader));
     }

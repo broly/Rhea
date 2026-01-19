@@ -101,7 +101,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .stages = {
             {
                 .stage = ShaderStage::vertex,
-                .shader = "shaders/geometry.vert.spv",
+                .shader = "geometry.vert",
                 .vertex_layouts = {
                     VertexLayoutData {
                             .binding_index = 0,
@@ -117,7 +117,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             },
             {
                 .stage = ShaderStage::fragment,
-                .shader = "shaders/geometry.frag.spv"
+                .shader = "geometry.frag"
             }
         },
         
@@ -139,14 +139,15 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     
     GraphicsPipelineDesc tonemap_pipeline_desc{
+        .features = {},
         .stages = {
             {
                 .stage = ShaderStage::vertex,
-                .shader = "shaders/fullscreen.vert.spv",
+                .shader = "fullscreen.vert",
             },
             {
                 .stage = ShaderStage::fragment,
-                .shader = "shaders/tonemap.frag.spv",
+                .shader = "tonemap.frag",
             }
         },
         .layout = {
@@ -158,17 +159,19 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     };
     
-    ShaderKey shader_key = geom_pipeline_family.make_shader_key({
+    ShaderKey geometry_opaque_shader_key = geom_pipeline_family.make_shader_key({
         {"BLEND_MODE", "BLEND_MODE_TRANSPARENT"},
         {"USE_DEBUG", true},
         {"USE_NORMAL", true},
     });
-    
-    auto tonemap_pipeline = render_graph->create_pipeline(tonemap_pipeline_desc);
-    auto geometry_opaque = render_graph->create_pipeline(geom_pipeline_desc);
-    //auto geometry_opaque = render_graph->request_pipeline(geom_pipeline_family, shader_key);
-    
+
+    auto geometry_opaque = render_graph->request_pipeline(geom_pipeline_family, geometry_opaque_shader_key);
     geom_pipeline = geometry_opaque;
+    
+    
+    PipelineFamily tonemap_pipeline_family(tonemap_pipeline_desc, render_backend);
+    ShaderKey tonemap_shader_key = tonemap_pipeline_family.make_shader_key({});
+    auto tonemap_pipeline = render_graph->request_pipeline(tonemap_pipeline_family, tonemap_shader_key);
     
     auto swapchain_extent = render_backend->get_swapchain_extent();
 
@@ -287,11 +290,11 @@ void GameRenderer::update_material_resource(RenderResourceInstance* material_res
 
 void GameRenderer::draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline) const
 {    
-    auto& extractor = engine->scene_view;
+    auto& scene_view = engine->scene_view;
     auto cmd = ctx.cmd;
             
     // ---------- Camera ----------
-    auto& camera_processor = extractor->get_processor<SceneViewProcessor_Camera>();
+    auto& camera_processor = scene_view->get_processor<SceneViewProcessor_Camera>();
 
     const RenderObject_Camera* active_camera = camera_processor.get_active_camera();
             
@@ -309,7 +312,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline)
 
             
     // ---------- Lights ----------
-    auto& point_light_processor = extractor->get_processor<SceneViewProcessor_Light>();
+    auto& point_light_processor = scene_view->get_processor<SceneViewProcessor_Light>();
     const auto [lights, light_num] = point_light_processor.query_nearest_lights_limited<8>(active_camera->position);
             
     LightUBO light_ubo{};
@@ -327,7 +330,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline)
 
     
     // ---------- Draw ----------
-    auto& meshes_processor = extractor->get_processor<SceneViewProcessor_Mesh>();
+    auto& meshes_processor = scene_view->get_processor<SceneViewProcessor_Mesh>();
     for (const auto& ro : meshes_processor.meshes)
     {
         checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");

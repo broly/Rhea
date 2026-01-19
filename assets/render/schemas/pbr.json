@@ -1,0 +1,55 @@
+{
+	"name": "PBR",
+	
+	"enums": {
+		"blend_mode": [
+			"opaque",
+			"masked",
+			"translucent"
+		]
+	},
+	"parameters": {
+		"blend_mode": "blend_mode",
+		"base_color": "sampler",
+		"emissive": "sampler",
+		"normal": "sampler",
+		"orm": "sampler",
+		"base_color_factor": "vec4",
+		"emissive_factor": "vec4",
+		"occlusion_factor": "vec4",
+		"metallic_factor": "vec4",
+		"roughness_factor": "vec4"
+	},
+	"permutations": {
+		"flags": {
+			"USE_BASE_COLOR": "base_color || base_color_factor",
+			"USE_NORMAL_MAP": "normal",
+			"USE_ORM": "orm || metallic_factor || roughness_factor"
+		},
+		"enums": {
+			"blend_mode": {
+				"opaque": "BLEND_MODE_OPAQUE",
+				"masked": "BLEND_MODE_MASKED",
+				"translucent": "BLEND_MODE_TRANSLUCENT",
+			}
+		}
+	},
+	"passes": [	
+		{
+			"name": "GeometryBase",
+			"requirements": "blend_mode != translucent",
+			"shaders": {
+				"vertex": "geometry.vert",
+				"fragment": "geometry.frag"
+			}
+		},
+		{
+			"name": "GeometryTranslucent",
+			"requirements": "blend_mode == translucent",
+			"shaders": {
+				"vertex": "geometry.vert",
+				"fragment": "geometry.frag"
+			}
+		}
+	]
+}

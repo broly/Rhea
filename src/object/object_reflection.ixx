@@ -17,6 +17,57 @@ import static_name;
 
 #include "common/reflect_macros.h"
 
+
+    
+export inline void serialize_json_value(Json::Int& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asInt();
+}
+export inline void serialize_json_value(Name& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isString());
+    target = value.asString();
+}
+export inline void serialize_json_value(Json::UInt& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asUInt();
+}
+export inline void serialize_json_value(Json::Int64& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asInt64();
+}
+export inline void serialize_json_value(Json::UInt64& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asUInt64();
+}
+export inline void serialize_json_value(std::string& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isString());
+    target = value.asString();
+}
+
+
+export inline void serialize_json_value(float& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isNumeric() || value.isIntegral() || value.isDouble());
+    target = value.asFloat();
+}
+export inline void serialize_json_value(double& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isNumeric() || value.isIntegral() || value.isDouble());
+    target = value.asDouble();
+}
+export inline void serialize_json_value(bool& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isBool());
+    target = value.asBool();
+}
+
+
 export namespace reflect_inner
 {
     template<typename T>
@@ -67,55 +118,6 @@ export namespace reflect
     }
     
     extern const ObjectReflectionInfo* find_object_reflection_info(Name name);
-}
-
-    
-export inline void serialize_json_value(Json::Int& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isNumeric() || value.isIntegral());
-    target = value.asInt();
-}
-export inline void serialize_json_value(Name& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isString());
-    target = value.asString();
-}
-export inline void serialize_json_value(Json::UInt& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isNumeric() || value.isIntegral());
-    target = value.asUInt();
-}
-export inline void serialize_json_value(Json::Int64& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isNumeric() || value.isIntegral());
-    target = value.asInt64();
-}
-export inline void serialize_json_value(Json::UInt64& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isNumeric() || value.isIntegral());
-    target = value.asUInt64();
-}
-export inline void serialize_json_value(std::string& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isString());
-    target = value.asString();
-}
-
-
-export inline void serialize_json_value(float& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isNumeric() || value.isIntegral() || value.isDouble());
-    target = value.asFloat();
-}
-export inline void serialize_json_value(double& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isNumeric() || value.isIntegral() || value.isDouble());
-    target = value.asDouble();
-}
-export inline void serialize_json_value(bool& target, const Json::Value& value, DependencyCollector* dc)
-{
-    assert(value.isBool());
-    target = value.asBool();
 }
 
 template<typename T>
@@ -200,7 +202,7 @@ export namespace reflect::json
                 typename T::value_type array_item;
                 // serialize_json_value(array_item, json_item);
                 target.push_back(array_item);
-                visit_serialize(json_item, target.back(), is_loading, dc);
+                do_serialize_json_value(target.back(), json_item, is_loading, dc);
             }
         } else if constexpr (is_map_v<std::decay_t<T>>)
         {

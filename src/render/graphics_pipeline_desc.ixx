@@ -156,6 +156,7 @@ export
     {
         ShaderStage stage;
         std::string shader;
+        std::optional<std::string> compiled_shader;
         std::vector<VertexLayoutData> vertex_layouts;
     };
     
