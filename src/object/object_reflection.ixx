@@ -136,6 +136,24 @@ template<typename T>
 constexpr bool is_vector_v = is_vector<T>::value;
 
 
+
+
+template<typename T>
+struct is_optional
+{
+    static bool constexpr value = false;
+};
+
+template<typename T>
+struct is_optional<std::optional<T>> 
+{
+    static bool constexpr value = true;
+};
+
+template<typename T>
+constexpr bool is_optional_v = is_optional<T>::value;
+
+
 template<typename>
 struct is_map 
 {
@@ -203,6 +221,18 @@ export namespace reflect::json
                 // serialize_json_value(array_item, json_item);
                 target.push_back(array_item);
                 do_serialize_json_value(target.back(), json_item, is_loading, dc);
+            }
+        } else if constexpr (is_optional_v<std::decay_t<T>>)
+        {
+            if (value.isNull())
+            {
+                target.reset();
+            }
+            else
+            {
+                typename T::value_type item;
+                target.emplace(item);
+                do_serialize_json_value(target.value(), value, is_loading, dc);
             }
         } else if constexpr (is_map_v<std::decay_t<T>>)
         {

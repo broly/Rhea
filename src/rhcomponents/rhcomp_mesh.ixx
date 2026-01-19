@@ -22,8 +22,8 @@ export struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
 export class RhComp_StaticMesh : public RhComp_Renderable
 {
 public:    
-    RhComp_StaticMesh();
     
+    void on_init() override;
     void start() override;
     void finish() override;
     void on_serialize(DependencyCollector* dc) override;

@@ -21,7 +21,7 @@ export struct SceneViewProxy_Camera : public SceneViewProxy_Transform
 export class RhComp_Camera : public RhComp_Renderable
 {
 public:
-    RhComp_Camera();
+    void on_init() override;
     
     void start() override;
     void finish() override;

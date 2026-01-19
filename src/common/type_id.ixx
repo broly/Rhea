@@ -4,6 +4,13 @@ export module type_id;
 import <string_view>;
 import name;
 
+consteval std::string_view RemoveStructPrefix(std::string_view name)
+{
+	constexpr std::string_view prefix = "struct ";
+	if (name.starts_with(prefix))
+		return name.substr(prefix.size());
+	return name;
+}
 
 #ifndef _MSC_VER
 consteval std::string_view ExtractTypeNameFromSourceLocation(std::string_view input) 
@@ -18,7 +25,7 @@ consteval std::string_view ExtractTypeNameFromSourceLocation(std::string_view in
     if (end == -1) 
         return {};
 
-    return input.substr(start, end - start);
+	return RemoveStructPrefix(input.substr(start, end - start));
 }
 #else
 consteval std::string_view extract_type(std::string_view input) 
@@ -33,7 +40,7 @@ consteval std::string_view extract_type(std::string_view input)
     if (end_index == -1) 
         return {}; 
 
-    return input.substr(start_index, end_index - start_index);
+	return RemoveStructPrefix(input.substr(start_index, end_index - start_index));
 }
 #endif
 
@@ -61,14 +68,19 @@ export struct TypeId
 	}
 	
 	Name name;
-
-	bool operator==(const TypeId& Other) const
-    {
-        return name == Other.name;
-    }
-	bool operator!=(const TypeId& Other) const
+	
+	bool operator<(const TypeId& other) const
 	{
-		return !operator==(Other);
+		return name < other.name;
+	}
+
+	bool operator==(const TypeId& other) const
+    {
+        return name == other.name;
+    }
+	bool operator!=(const TypeId& other) const
+	{
+		return !operator==(other);
 	}
 
 	~TypeId() = default;

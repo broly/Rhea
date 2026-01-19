@@ -8,6 +8,8 @@ import :render_objects;
 import :render_backend;
 import :material_schema;
 
+#include "common/reflect_macros.h"
+
 export struct MaterialUBO
 {
     float base_color_mult;
@@ -16,6 +18,8 @@ export struct MaterialUBO
     float roughness_mult;
     float metallic_mult;
 };
+REFLECT_STRUCT_RUNTIME(MaterialUBO,
+    base_color_mult, emissive_mult, occlusion_mult, roughness_mult, metallic_mult);
 
 export struct Light
 {

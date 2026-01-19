@@ -8,17 +8,61 @@
 			"translucent"
 		]
 	},
+	
+	"uniform_buffers": {
+		"material": "MaterialUBO"
+	},
+	
 	"parameters": {
-		"blend_mode": "blend_mode",
-		"base_color": "sampler",
-		"emissive": "sampler",
-		"normal": "sampler",
-		"orm": "sampler",
-		"base_color_factor": "vec4",
-		"emissive_factor": "vec4",
-		"occlusion_factor": "vec4",
-		"metallic_factor": "vec4",
-		"roughness_factor": "vec4"
+		"blend_mode": {
+			"type": "blend_mode",
+			"shader_parameter": null
+		},
+		"base_color": {
+			"type": "sampler",
+			"shader_parameter": "u_base_color",
+			"ubo": null
+		},
+		"emissive": {
+			"type": "sampler",
+			"shader_parameter": "u_emissive",
+			"ubo": null
+		},
+		"normal": {
+			"type": "sampler",
+			"shader_parameter": "u_normal_map",
+			"ubo": null
+		},
+		"orm": {
+			"type": "sampler",
+			"shader_parameter": "u_orm",
+			"ubo": null
+		},
+		"base_color_factor": {
+			"type": "vec4",
+			"shader_parameter": null,
+			"ubo": "material"
+		},
+		"emissive_factor": {
+			"type": "vec4",
+			"shader_parameter": null,
+			"ubo": "material"
+		},
+		"occlusion_factor": {
+			"type": "vec4",
+			"shader_parameter": null,
+			"ubo": "material"
+		},
+		"metallic_factor": {
+			"type": "vec4",
+			"shader_parameter": null,
+			"ubo": "material"
+		},
+		"roughness_factor": {
+			"type": "vec4",
+			"shader_parameter": null,
+			"ubo": "material"
+		}
 	},
 	"permutations": {
 		"flags": {

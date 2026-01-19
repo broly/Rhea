@@ -190,7 +190,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     
     render_graph->add_pass({
-        .name = "GeometryForward",
+        .name = "GeometryBase",
         .pipelines = {geometry_opaque},
         .writes = { 
             { hdr_color, RBImageUsage::ColorAttachment }, 
@@ -198,7 +198,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         },
         .execute = [=](RenderGraphContext& ctx)
         {
-            PROFILE("GeometryForward");
+            PROFILE("GeometryBase");
 
             auto pipeline = ctx.pipelines[0];
             

@@ -9,11 +9,14 @@ import <future>;
 import render;
 
 
-RhComp_StaticMesh::RhComp_StaticMesh()
+void RhComp_StaticMesh::on_init()
 {
-    render_info.scene_proxy_offset = offsetof(RhComp_StaticMesh, scene_proxy);
-    render_info.is_explicitly_null = false;
-    render_info.type_id = reflect::get_default<SceneViewProcessor_Mesh>()->index;
+    if (!is_default)
+    {
+        render_info.scene_proxy_offset = offsetof(RhComp_StaticMesh, scene_proxy);
+        render_info.is_explicitly_null = false;
+        render_info.type_id = reflect::get_default<SceneViewProcessor_Mesh>()->index;
+    }
 }
 
 

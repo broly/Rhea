@@ -7,12 +7,14 @@ import render;
 #include "common/offsetof.h"
 
 
-
-RhComp_Light::RhComp_Light()
+void RhComp_Light::on_init()
 {
-    render_info.scene_proxy_offset = offsetof(RhComp_Light, scene_proxy);
-    render_info.is_explicitly_null = false;
-    render_info.type_id = reflect::get_default<SceneViewProcessor_Light>()->index;
+    if (!is_default)
+    {
+        render_info.scene_proxy_offset = offsetof(RhComp_Light, scene_proxy);
+        render_info.is_explicitly_null = false;
+        render_info.type_id = reflect::get_default<SceneViewProcessor_Light>()->index;
+    }
 }
 
 void RhComp_Light::start()

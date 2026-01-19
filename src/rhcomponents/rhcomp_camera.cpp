@@ -5,11 +5,15 @@ import <cassert>;
 #include "common/offsetof.h"
 import render;
 
-RhComp_Camera::RhComp_Camera()
+
+void RhComp_Camera::on_init()
 {
-    render_info.scene_proxy_offset = offsetof(RhComp_Camera, scene_proxy);
-    render_info.is_explicitly_null = false;
-    render_info.type_id = reflect::get_default<SceneViewProcessor_Camera>()->index;
+    if (!is_default)
+    {
+        render_info.scene_proxy_offset = offsetof(RhComp_Camera, scene_proxy);
+        render_info.is_explicitly_null = false;
+        render_info.type_id = reflect::get_default<SceneViewProcessor_Camera>()->index;
+    }
 }
 
 void RhComp_Camera::start()

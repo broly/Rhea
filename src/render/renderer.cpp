@@ -8,8 +8,6 @@ import <filesystem>;
 
 void Renderer::init(RBWindowHandle in_window)
 {
-    // world = in_world;
-    
     load_schemas();
 }
 

@@ -19,7 +19,7 @@ export struct SceneViewProxy_Light : public SceneViewProxy_Transform
 export class RhComp_Light : public RhComp_Renderable
 {
 public:    
-    RhComp_Light();
+    void on_init() override;
     void start() override;
     void finish() override;
 
