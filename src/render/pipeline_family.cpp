@@ -12,107 +12,116 @@ import string_helpers;
 
 #include "common/assertion_macros.h"
 
-PipelineFamily::PipelineFamily(const GraphicsPipelineDesc& in_desc, std::shared_ptr<RenderBackend> in_backend)
-    : desc(in_desc)
-    , backend(in_backend)
+PipelineFamily::PipelineFamily(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend)
+    : backend(in_backend)
+    , model(model)
 {
-    
+    pass = model->get_pass_info(in_pass_name);
+    checkf(pass, "MaterialModel has no pass '%s'", in_pass_name.to_string().c_str());
 }
 
-ShaderKey PipelineFamily::make_shader_key(const std::map<Name, ShaderOptionValue>& in_options) const
+ShaderKey PipelineFamily::make_shader_key(const std::map<Name, ShaderOptionValue>& options) const
 {
-    std::set<Name> processed_options;
-    
     uint64_t bits = 0;
-    
-    
     uint8_t bit_index = 0;
-    
-    for (auto& feature : desc.features)
-    {
-        if (std::holds_alternative<ShaderFeatureEnum>(feature))
-        {
-            ShaderFeatureEnum feature_enum = std::get<ShaderFeatureEnum>(feature);
-            auto option_value = in_options.find(feature_enum.name);
-            if (option_value != in_options.end())
-            {
-                uint16_t num_variants = feature_enum.members.size();
-                uint8_t num_bits = log2(num_variants + 1);
-                
-                checkf(std::holds_alternative<Name>(option_value->second), "Invalid option type");
-                auto enum_value = std::get<Name>(option_value->second);
-                auto it = std::find(feature_enum.members.begin(), feature_enum.members.end(), enum_value);
-                std::size_t index = std::distance(feature_enum.members.begin(), it);
-                
-                bits |= index << bit_index;
-                processed_options.insert(feature_enum.name);
-                bit_index += num_bits;
-            }
-        } else if (std::holds_alternative<ShaderFeatureFlag>(feature))
-        {
-            auto feature_flag = std::get<ShaderFeatureFlag>(feature);
-            auto option_value = in_options.find(feature_flag.name);
 
-            checkf(std::holds_alternative<bool>(option_value->second), "Invalid option type");
-            
-            bool value = std::get<bool>(option_value->second);
-            
-            bits |= value << bit_index;
-            processed_options.insert(feature_flag.name);
-            
-            bit_index += 1;
-        }
-    }
-    
-    for (auto& [option_name, _] : in_options)
+    std::set<Name> consumed;
+
+    // enum
+    for (const auto& [enum_name, enum_values] : model->permutations.enums)
     {
-        checkf(processed_options.contains(option_name), "Unidentified option detected: %s", option_name.to_string().c_str());
+        auto it = options.find(enum_name);
+        checkf(it != options.end(), "Missing enum option %s", enum_name.to_string().c_str());
+        checkf(std::holds_alternative<Name>(it->second), "Enum option must be Name");
+
+        const Name value = std::get<Name>(it->second);
+        auto vit = enum_values.find(value);
+        checkf(vit != enum_values.end(), "Invalid enum value");
+
+        const uint32_t index = std::distance(enum_values.begin(), vit);
+        const uint8_t bits_needed = uint8_t(std::ceil(std::log2(enum_values.size())));
+
+        bits |= (uint64_t(index) << bit_index);
+        bit_index += bits_needed;
+        consumed.insert(enum_name);
     }
+
+    // flags
+    for (const auto& [flag_name, _] : model->permutations.flags)
+    {
+        auto it = options.find(flag_name);
+        bool value = (it != options.end()) && std::get<bool>(it->second);
+
+        bits |= (uint64_t(value) << bit_index);
+        bit_index += 1;
+        consumed.insert(flag_name);
+    }
+
+    for (const auto& [name, _] : options)
+        checkf(consumed.contains(name), "Unknown shader option %s", name.to_string().c_str());
+
+    checkf(bit_index <= 64, "ShaderKey overflow");
+
     return ShaderKey(bits);
 }
 
 
-PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
+PipelineObject* PipelineFamily::request_pipeline(ShaderKey key, const PipelineLayoutDesc& layout)
 {
-    uint8_t bit_index = 0;
-    std::map<Name, bool> options;
-    for (auto& feature : desc.features)
+    if (auto it = pipelines.find(key.key); it != pipelines.end())
+        return it->second;
+
+    std::map<Name, bool> defines;
+    decode_key_to_defines(key, defines);
+
+    GraphicsPipelineDesc desc;
+    desc.pass_name = pass->name;
+
+    for (const auto& [stage_enum, shader_name] : pass->shaders)
     {
-        const uint64_t current_bits = key.key >> bit_index;
-        if (std::holds_alternative<ShaderFeatureEnum>(feature))
-        {
-            auto feature_enum = std::get<ShaderFeatureEnum>(feature);
-            uint16_t num_variants = feature_enum.members.size();
-            checkf(num_variants != 0, "ShaderFeatureEnum can't contain 0 variants");
-            uint8_t num_bits = log2(num_variants + 1);
-            
-            uint8_t value = current_bits & ((1 << num_bits) - 1);
-            for (int32_t index = 0; index < feature_enum.members.size(); index++)
-            {
-                options[feature_enum.members[index]] = value == index;
-            }
-            bit_index += num_bits;
-        } else if (std::holds_alternative<ShaderFeatureFlag>(feature))
-        {
-            auto feature_flag = std::get<ShaderFeatureFlag>(feature);
-            uint8_t value = current_bits & 1;
-            options[feature_flag.name] = value;
-            bit_index += 1;
-        }
-        
-        checkf(bit_index < 64, "ShaderKey bits exceeded");
+        GraphicsPipelineStage stage;
+        stage.stage = stage_enum;
+        stage.compiled_shader = request_permutation(shader_name, key, defines).string();
+        desc.stages.push_back(stage);
     }
-    
-    for (auto& stage : desc.stages)
-    {
-        auto compiled_shader_path = request_permutation(stage.shader, key, options);
-        stage.compiled_shader = compiled_shader_path.string();
-    }
-    
-    return backend->create_pipeline();
+    desc.layout = layout;
+
+    auto pipeline = backend->create_pipeline(desc);
+    pipelines[key.key] = pipeline;
+
+    return pipeline;
 }
 
-std::filesystem::path PipelineFamily::request_permutation(const std::string& shader_name, ShaderKey key, const std::map<Name, bool>& options)
+
+void PipelineFamily::decode_key_to_defines(ShaderKey key, std::map<Name, bool>& out_defines) const
+{
+    uint8_t bit_index = 0;
+
+    for (const auto& [enum_name, enum_values] : model->permutations.enums)
+    {
+        const uint8_t bits_needed =
+            uint8_t(std::ceil(std::log2(enum_values.size())));
+
+        uint64_t value = (key.key >> bit_index) & ((1ull << bits_needed) - 1);
+
+        uint32_t idx = 0;
+        for (const auto& [name, _] : enum_values)
+        {
+            out_defines[name] = (idx == value);
+            ++idx;
+        }
+
+        bit_index += bits_needed;
+    }
+
+    for (const auto& [flag_name, _] : model->permutations.flags)
+    {
+        out_defines[flag_name] = ((key.key >> bit_index) & 1) != 0;
+        bit_index += 1;
+    }
+}
+
+std::filesystem::path PipelineFamily::request_permutation(const std::string& shader_name, ShaderKey key, const std::map<Name, bool>& defines)
 {
     const std::filesystem::path shaders_dir = paths::get_project_path() / "shaders";
     const std::filesystem::path shader_path = shaders_dir / shader_name;
@@ -174,9 +183,9 @@ std::filesystem::path PipelineFamily::request_permutation(const std::string& sha
     
     new_shader_lines.push_back(version_line);
     
-    for (auto option : options)
+    for (auto define : defines)
     {
-        auto new_line = std::string("#define ") + option.first.to_string() + " " + (option.second ? "1" : "0");
+        auto new_line = std::string("#define ") + define.first.to_string() + " " + (define.second ? "1" : "0");
         new_shader_lines.push_back(new_line);
     }
     

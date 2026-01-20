@@ -679,9 +679,9 @@ void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
 }
 
 
-PipelineObject* VkRenderBackend::create_pipeline()
+PipelineObject* VkRenderBackend::create_pipeline(const GraphicsPipelineDesc& desc)
 {
-    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(instance, swapchain, resource_manager);
+    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(instance, swapchain, resource_manager, desc);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;

@@ -59,7 +59,8 @@ void GameRenderer::init(RBWindowHandle in_window)
     });
     
     
-    auto& schema = models.find("PBR")->second;
+    auto& pbr_model = models.find("PBR")->second;
+    auto& tonemap_model = models.find("tonemap")->second;
     
     // TODO: hardcoded general material case
     material_resource = render_graph->create_resource({
@@ -95,87 +96,95 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     auto hdr_color = render_graph->create_texture(hdr_color_desc);
     
-    
-    GraphicsPipelineDesc geom_pipeline_desc{
-        .features = {
-            ShaderFeatureEnum("BLEND_MODE", {"BLEND_MODE_OPAQUE", "BLEND_MODE_MASKED", "BLEND_MODE_TRANSPARENT"}),
-            ShaderFeatureFlag("USE_DEBUG"),
-            ShaderFeatureFlag("USE_NORMAL"),
-        },
-        .stages = {
-            {
-                .stage = ShaderStage::vertex,
-                .shader = "geometry.vert",
-                .vertex_layouts = {
-                    VertexLayoutData {
-                            .binding_index = 0,
-                            .stride = sizeof(Vertex),
-                            .attributes = {
-                                { "in_position", LOCATION_ATTR_POSITION, offsetof(Vertex, position) },
-                                { "in_normal", LOCATION_ATTR_NORMAL, offsetof(Vertex, normal) },
-                                { "in_uv", LOCATION_ATTR_UV, offsetof(Vertex, tex_coord) },
-                                { "in_tangent", LOCATION_ATTR_TANGENT, offsetof(Vertex, tangent) }
-                            }
-                        }
+    VertexLayout vertex_layout = {
+        VertexLayout {
+            .layouts = {
+                VertexLayoutData{
+                    .binding_index = 0,
+                    .stride = sizeof(Vertex),
+                    .attributes = {
+                          { "in_position",LOCATION_ATTR_POSITION, offsetof(Vertex, position) },
+                          { "in_normal",  LOCATION_ATTR_NORMAL,   offsetof(Vertex, normal) },
+                          { "in_uv",      LOCATION_ATTR_UV,       offsetof(Vertex, tex_coord) },
+                          { "in_tangent", LOCATION_ATTR_TANGENT,  offsetof(Vertex, tangent) }
                     }
-            },
-            {
-                .stage = ShaderStage::fragment,
-                .shader = "geometry.frag"
+                }
             }
-        },
-        
-        .layout = {
-            .resources = {camera_resource, light_resource, model_resource, material_resource }, 
-            .push_constants = {{
-                .stages = ShaderStage::vertex,
-                .offset = 0,
-                .size = sizeof(glm::mat4),
-            }}
-        },
-        .rt_compat = {
-            .color_attachment_count = 1,
-            .has_depth = true
         }
     };
     
-    PipelineFamily geom_pipeline_family(geom_pipeline_desc, render_backend);
-    
-    
-    GraphicsPipelineDesc tonemap_pipeline_desc{
-        .features = {},
-        .stages = {
-            {
-                .stage = ShaderStage::vertex,
-                .shader = "fullscreen.vert",
-            },
-            {
-                .stage = ShaderStage::fragment,
-                .shader = "tonemap.frag",
-            }
-        },
-        .layout = {
-            .resources = { tonemap_resource },
-        },
-        .rt_compat = {
-            .color_attachment_count = 1,
-            .has_depth = false
-        }
+    PipelineLayoutDesc geom_pipeline_layout = {
+        .vertex_layout = vertex_layout,
+        .resources = {camera_resource, light_resource, model_resource, material_resource }, 
+        .push_constants = {{
+            .stages = ShaderStage::vertex,
+            .offset = 0,
+            .size = sizeof(glm::mat4),
+        }}
     };
+    
+    PipelineLayoutDesc tonemap_pipeline_layout = {
+        .vertex_layout = {},
+        .resources = { tonemap_resource }, 
+        .push_constants = {}
+    };
+    
+    // GraphicsPipelineDesc geom_pipeline_desc{
+    //     .stages = {
+    //         {
+    //             .stage = ShaderStage::vertex,
+    //             .shader = "geometry.vert",
+    //         },
+    //         {
+    //             .stage = ShaderStage::fragment,
+    //             .shader = "geometry.frag"
+    //         }
+    //     },
+    //     .layout = geom_pipeline_layout,
+    //     .rt_compat = {
+    //         .color_attachment_count = 1,
+    //         .has_depth = true
+    //     }
+    // };
+    
+    
+    PipelineFamily geom_pipeline_family("GeometryBase", pbr_model, render_backend);
+    PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, render_backend);
+    
+    
+    // GraphicsPipelineDesc tonemap_pipeline_desc{
+    //     .stages = {
+    //         {
+    //             .stage = ShaderStage::vertex,
+    //             .shader = "fullscreen.vert",
+    //         },
+    //         {
+    //             .stage = ShaderStage::fragment,
+    //             .shader = "tonemap.frag",
+    //         }
+    //     },
+    //     .layout = {
+    //         .resources = { tonemap_resource },
+    //     },
+    //     .rt_compat = {
+    //         .color_attachment_count = 1,
+    //         .has_depth = false
+    //     }
+    // };
     
     ShaderKey geometry_opaque_shader_key = geom_pipeline_family.make_shader_key({
-        {"BLEND_MODE", "BLEND_MODE_TRANSPARENT"},
-        {"USE_DEBUG", true},
-        {"USE_NORMAL", true},
+        {"blend_mode", "opaque"},
+        {"USE_NORMAL_MAP", true},
     });
 
-    auto geometry_opaque = render_graph->request_pipeline(geom_pipeline_family, geometry_opaque_shader_key);
+    auto geometry_opaque = render_graph->request_pipeline(geom_pipeline_family, geometry_opaque_shader_key, geom_pipeline_layout);
     geom_pipeline = geometry_opaque;
     
     
-    PipelineFamily tonemap_pipeline_family(tonemap_pipeline_desc, render_backend);
-    ShaderKey tonemap_shader_key = tonemap_pipeline_family.make_shader_key({});
-    auto tonemap_pipeline = render_graph->request_pipeline(tonemap_pipeline_family, tonemap_shader_key);
+
+    
+    
+    auto tonemap_pipeline = render_graph->request_pipeline(tonemap_pipeline_family, {}, tonemap_pipeline_layout);
     
     auto swapchain_extent = render_backend->get_swapchain_extent();
 

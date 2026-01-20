@@ -12,7 +12,8 @@ public:
     
     MaterialInstance(const std::shared_ptr<const Material>& in_material, Renderer* renderer);
     
-    
+    std::shared_ptr<PipelineFamily> pipeline_family;
     std::shared_ptr<const Material> material;
-    RenderResourceInstance* render_resource_instance = nullptr;
+    RenderResource* render_resource;
+    std::map<Name, RenderResourceInstance*> render_resource_instances_per_pass;  // maybe multiple resources?
 };

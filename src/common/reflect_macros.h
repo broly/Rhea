@@ -76,6 +76,10 @@ import type_id;
                 return (T)values[s];\
             return T{};\
         }\
+        static Name enum_value_to_name(T value) \
+        {\
+            return names[(int)value]; \
+        }\
         static constexpr bool reflected = true; \
     };
 

@@ -50,9 +50,9 @@ public:
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
     
-    std::shared_ptr<PipelineFamily> get_or_create_material_pipeline_family(Name model_name);
+    std::shared_ptr<PipelineFamily> get_or_create_material_pipeline_family(Name pass_name, Name model_name);
     
-    std::vector<std::shared_ptr<PipelineFamily>> material_pipeline_families;
+    std::map<std::pair<Name, Name>, std::shared_ptr<PipelineFamily>> material_pipeline_families;
     
     virtual RenderResource* get_material_resource();
     

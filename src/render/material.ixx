@@ -11,18 +11,6 @@ import :renderer;
 #include "object/object_reflection_macro.h"
 
 
-
-
-export enum class MaterialBlendMode
-{
-    opaque = 0,
-    masked = 1,
-    transparent = 2,
-};
-REFLECT_ENUM(MaterialBlendMode,
-    opaque, masked, transparent);
-
-
 struct MaterialParameterType
 {
     std::variant<float, LinearColor, TextureHandle, Name> data;
@@ -39,7 +27,6 @@ public:
     
     std::shared_ptr<class MaterialInstance> create_instance(Renderer* renderer) const;
     
-    // RenderResource* resource = nullptr;
 };
 REFLECT_OBJECT_FIELDS(Material, RhObject,
     model, parameters);

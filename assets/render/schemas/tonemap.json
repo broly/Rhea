@@ -1,0 +1,37 @@
+{
+	"model_name": "Tonemap",
+	
+	"enums": {
+	},
+	
+	"uniform_buffers": {
+	},
+	
+	"parameters": {
+		"hdr_color": {
+			"type": "sampler",
+			"dynamic": true,
+			"shader_parameter": "u_hdr_color",
+			"ubo": null,
+			"binding": 0
+		}
+	},	
+	"permutations": {
+		"flags": {
+		},
+		"enums": {
+		}
+	},
+	"passes": [
+		{
+			"name": "ToneMapping",
+			"requirements": "",
+			"enum_white_list": {
+			},
+			"shaders": {
+				"vertex": "fullscreen.vert",
+				"fragment": "tonemap.frag"
+			}
+		}
+	]
+}

@@ -1,6 +1,8 @@
 module name;
 
 import <future>;
+import <iostream>;
+import <ostream>;
 import <variant>;
 import <vector>;
 import <unordered_map>;
@@ -53,13 +55,20 @@ static uint32_t get_or_create_name_id(const std::string& str)
     
     std::lock_guard<std::mutex> lock(globals.mutex);
 
-    auto it = globals.lookup.find(str);
+    auto it = globals.lookup.find(key);
     if (it != globals.lookup.end())
         return it->second;
     
+    
     uint32_t id = static_cast<uint32_t>(globals.table.size());
-    globals.table.push_back(str);
-    globals.lookup.emplace(str, id);
+    
+    if (id == 61 || id == 96)
+    {
+        std::cout << str << std::endl;
+    }
+    
+    globals.table.push_back(key);
+    globals.lookup.emplace(key, id);
     
     
     NameDebug::register_name(id, key);

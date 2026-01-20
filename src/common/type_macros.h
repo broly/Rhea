@@ -21,25 +21,25 @@ import <compare>;
         return lhs.Field <=> rhs.Field; \
     }
 
-#define ENUM_MASK_OPS(Enum) \
-    inline Enum operator|(Enum a, Enum b) \
+#define ENUM_MASK_OPS(Enum, _export) \
+    _export inline Enum operator|(Enum a, Enum b) \
     { \
         return static_cast<Enum>( \
             static_cast<std::underlying_type_t<Enum>>(a) | static_cast<std::underlying_type_t<Enum>>(b) \
         ); \
     } \
-    inline Enum operator|=(Enum& a, Enum b) \
+    _export inline Enum operator|=(Enum& a, Enum b) \
     { \
         a = a | b; \
         return a; \
     } \
-    inline Enum operator&(Enum a, Enum b) \
+    _export inline Enum operator&(Enum a, Enum b) \
     { \
         return static_cast<Enum>( \
             static_cast<std::underlying_type_t<Enum>>(a) & static_cast<std::underlying_type_t<Enum>>(b) \
         ); \
     } \
-    inline Enum operator~(Enum a) \
+    _export inline Enum operator~(Enum a) \
     { \
         return static_cast<Enum>( \
             ~static_cast<std::underlying_type_t<Enum>>(a) \

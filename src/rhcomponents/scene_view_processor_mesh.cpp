@@ -63,7 +63,7 @@ void SceneViewProcessor_Mesh::process()
         for (uint32_t index = 0; auto material : submitted.mats)
         {
             // material->create_resource();
-            // mesh_ro.mat_instances[index] = material->create_instance();
+            // mesh_ro.mat_instances[index] = material->create_instance(renderer.get());
             // mesh_ro.mat_instances[index]->c
         }
         mesh_ro.mesh = mesh_handle;

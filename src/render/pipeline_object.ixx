@@ -6,6 +6,6 @@ import :render_resource;
 export class PipelineObject
 {
 public:
-    virtual void prepare(const GraphicsPipelineDesc& in_desc) = 0;
+
 };
 

@@ -18,12 +18,14 @@ class VkRenderBackend;
 VkPipelineObject::VkPipelineObject(
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
-    vk::BufferManager& in_buffer_manager)
-        : pipeline_desc({})
+    vk::BufferManager& in_buffer_manager,
+    const GraphicsPipelineDesc& desc)
+        : pipeline_desc(desc)
         , instance(in_instance)
         , swapchain(in_swapchain)
         , buffer_manager(in_buffer_manager)
 {
+    prepare();
 }
 
 VkPipelineObject::~VkPipelineObject()
@@ -35,9 +37,8 @@ VkPipelineObject::~VkPipelineObject()
         vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
 }
 
-void VkPipelineObject::prepare(const GraphicsPipelineDesc& in_desc)
+void VkPipelineObject::prepare()
 {
-    pipeline_desc = in_desc;
 
     GraphicsPipelineDesc& desc = *pipeline_desc;
     
@@ -101,10 +102,44 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     };
     
     
-    std::optional<VkPipelineVertexInputStateCreateInfo> o_vertex_input = std::nullopt;
     std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
     std::vector<VkVertexInputAttributeDescription> vk_attrs;
+    VkPipelineVertexInputStateCreateInfo vertex_input = VkPipelineVertexInputStateCreateInfo {
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+    };
+            
+    for (const auto& layout : pipeline_desc->layout.vertex_layout.layouts)
+    {
+        VkVertexInputBindingDescription vertex_input_binding;
+        vertex_input_binding.stride = layout.stride;
+        vertex_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        vertex_input_binding.binding = layout.binding_index;
+                
+        for (const auto& attribute_info : layout.attributes)
+        {
+            auto stage_reflection = pipeline_reflection[ShaderStage::vertex];
+            assert(stage_reflection.input_variables.contains(attribute_info.variable_name));
 
+            ReflectedInterfaceVariable& reflection_info = stage_reflection.input_variables[attribute_info.variable_name];
+                    
+            checkf(reflection_info.location == attribute_info.location,
+                "Attribute %s location mismatch %i and %i",
+                attribute_info.variable_name, attribute_info.location, reflection_info.location);
+                
+            VkVertexInputAttributeDescription attr;
+            attr.location = attribute_info.location;
+            attr.offset = attribute_info.offset;
+            attr.format = reflection_info.format;
+            attr.binding = layout.binding_index;
+            vk_attrs.push_back(attr);
+        }
+        vertex_input_bindings.push_back(vertex_input_binding);
+    }
+
+    vertex_input.vertexBindingDescriptionCount = vertex_input_bindings.size();
+    vertex_input.pVertexBindingDescriptions = vertex_input_bindings.data();
+    vertex_input.vertexAttributeDescriptionCount = vk_attrs.size();
+    vertex_input.pVertexAttributeDescriptions = vk_attrs.data();
     
     for (uint32_t stage_index = 0; auto& stage : pipeline_desc->stages)
     {
@@ -117,46 +152,6 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
             "main"
         };
         vk_stages.push_back(vk_stage);
-        
-        if (stage.stage == ShaderStage::vertex)
-        {            
-            o_vertex_input = VkPipelineVertexInputStateCreateInfo {
-                VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
-            };
-            
-            for (const auto& layout : stage.vertex_layouts)
-            {
-                VkVertexInputBindingDescription vertex_input_binding;
-                vertex_input_binding.stride = layout.stride;
-                vertex_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-                vertex_input_binding.binding = layout.binding_index;
-                
-                for (const auto& attribute_info : layout.attributes)
-                {
-                    auto stage_reflection = pipeline_reflection[stage.stage];
-                    assert(stage_reflection.input_variables.contains(attribute_info.variable_name));
-
-                    ReflectedInterfaceVariable& reflection_info = stage_reflection.input_variables[attribute_info.variable_name];
-                    
-                    checkf(reflection_info.location == attribute_info.location,
-                        "Attribute %s location mismatch %i and %i",
-                        attribute_info.variable_name, attribute_info.location, reflection_info.location);
-                
-                    VkVertexInputAttributeDescription attr;
-                    attr.location = attribute_info.location;
-                    attr.offset = attribute_info.offset;
-                    attr.format = reflection_info.format;
-                    attr.binding = layout.binding_index;
-                    vk_attrs.push_back(attr);
-                }
-                vertex_input_bindings.push_back(vertex_input_binding);
-            }
-
-            o_vertex_input->vertexBindingDescriptionCount = vertex_input_bindings.size();
-            o_vertex_input->pVertexBindingDescriptions = vertex_input_bindings.data();
-            o_vertex_input->vertexAttributeDescriptionCount = vk_attrs.size();
-            o_vertex_input->pVertexAttributeDescriptions = vk_attrs.data();
-        }
         
         stage_index++;
     }
@@ -224,7 +219,7 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 
     pci.stageCount = vk_stages.size();
     pci.pStages = vk_stages.data();
-    pci.pVertexInputState = o_vertex_input.has_value() ? &o_vertex_input.value() : nullptr;
+    pci.pVertexInputState = &vertex_input;
     pci.pInputAssemblyState = &input_assembly;
     pci.pViewportState = &viewport_state;
     pci.pRasterizationState = &raster;

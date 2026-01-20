@@ -81,6 +81,20 @@ export namespace reflect
     {
         return find_runtime_info(TypeId(type_name));
     }
+    
+    template<typename E>
+    Name enum_name(E value)
+    {
+        static_assert(requires {reflect::ReflectionInfo<E>::reflected; }, "enum not reflected");
+        return reflect::ReflectionInfo<E>::enum_value_to_name(value);
+    }
+    
+    template<typename E>
+    E name_to_enum(Name name)
+    {
+        static_assert(requires {reflect::ReflectionInfo<E>::reflected; }, "enum not reflected");
+        return reflect::ReflectionInfo<E>::enum_name_to_value(name);
+    }
 }
 
 

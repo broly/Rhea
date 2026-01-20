@@ -7,9 +7,11 @@ MaterialInstance::MaterialInstance(const std::shared_ptr<const Material>& in_mat
 {
     Name model_name = material->model;
     auto model_it = renderer->models.find(model_name);
-    checkf(model_it == renderer->models.end(), "Could not find specified model");
+    checkf(model_it != renderer->models.end(), "Could not find specified model");
     
-    // auto pipeline_family = renderer->get_or_create_pipeline_family(model_name);
+    // pipeline_family = renderer->get_or_create_material_pipeline_family(model_name);
     
     std::shared_ptr<MaterialModel> model = model_it->second;
+    
+    
 }

@@ -47,17 +47,6 @@ void RenderGraph::compile()
     assert(!graph_compiled);
     
     
-    for (auto& pass : passes)
-    {
-        for (auto pipeline : pass.pipelines)
-        {
-            auto desc_it = pipelines_descs.find(pipeline);
-            auto& desc = desc_it->second;
-            pipeline->prepare(desc);
-        };
-    }
-    
-    
     for (auto& tex : textures)
     {
         if (tex.desc.external)
@@ -249,17 +238,15 @@ void RenderGraph::rebuild_resources()
 PipelineObject* RenderGraph::create_pipeline(const GraphicsPipelineDesc& desc)
 {
     assert(!graph_compiled);
-    PipelineObject* pipeline = backend->create_pipeline();
-    pipelines_descs.insert({pipeline, desc});
+    PipelineObject* pipeline = backend->create_pipeline(desc);
     pipelines.push_back(pipeline);
     return pipeline;
 }
 
-PipelineObject* RenderGraph::request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key)
+PipelineObject* RenderGraph::request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout)
 {
     assert(!graph_compiled);
-    PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key);
-    pipelines_descs.insert({pipeline, pipeline_family.desc});
+    PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key, layout);
     pipelines.push_back(pipeline);
     return pipeline;
 }

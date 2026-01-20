@@ -77,7 +77,7 @@ public:
     void rebuild_resources();
     
     PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
-    PipelineObject* request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key);
+    PipelineObject* request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout);
 
     RenderResource* create_resource(const RenderResourceDesc& desc);
 
@@ -87,7 +87,6 @@ private:
         RGResourceType type;
     };
 
-    std::map<PipelineObject*, GraphicsPipelineDesc> pipelines_descs;
     std::vector<RGResource> rg_resources;
     std::vector<RenderGraphPass> passes;
 

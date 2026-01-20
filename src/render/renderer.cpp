@@ -59,9 +59,21 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
     return create_texture_from_asset(handle);
 }
 
-std::shared_ptr<PipelineFamily> Renderer::get_or_create_material_pipeline_family(Name model_name)
+std::shared_ptr<PipelineFamily> Renderer::get_or_create_material_pipeline_family(Name pass_name, Name model_name)
 {
-    todo("not implemented yet");
+    if (material_pipeline_families.contains({pass_name, model_name}))
+        return material_pipeline_families.at({pass_name, model_name});
+    
+    auto model_it = models.find(model_name);
+    checkf(model_it != models.end(), "Could not find specified model");
+
+    std::shared_ptr<MaterialModel> model = model_it->second;
+    
+    auto family = std::make_shared<PipelineFamily>(pass_name, model, render_backend);
+    
+    material_pipeline_families.insert({{pass_name, model_name}, family});
+    
+    return family;
 }
 
 RenderResource* Renderer::get_material_resource()

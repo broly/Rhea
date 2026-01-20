@@ -242,20 +242,31 @@ export namespace reflect::json
             assert(value.isObject());
             auto member_names = value.getMemberNames();
             
-            using KEY = typename T::key_type;
+            using KEY = T::key_type;
             
-            static_assert(std::is_same_v<typename T::key_type, std::string> || std::is_same_v<typename T::key_type, Name>);
+            static_assert(
+                std::is_same_v<KEY, std::string> || 
+                std::is_same_v<KEY, Name> ||
+                (std::is_enum_v<KEY> && reflect::is_reflected_v<KEY>));
             
             for (auto& member_name : member_names)
             {
                 typename T::mapped_type map_value;
                 
-                KEY key = std::string(member_name);
-                
+                auto from_string = [] (const std::string& name) -> KEY
+                {
+                    if constexpr (std::is_enum_v<KEY>)
+                        return reflect::name_to_enum<KEY>(name);
+                    else
+                        return std::string(name);
+                };
+            
+                KEY key = from_string(member_name);
+            
                 auto [it, inserted] = target.try_emplace(key, map_value);
-                
+            
                 auto& json_value = value[member_name];
-                
+            
                 do_serialize_json_value(it->second, json_value, is_loading, dc);
             }
         } else if constexpr (requires { serialize_json_value(target, value, dc); })
@@ -374,12 +385,12 @@ export namespace reflect
     }
     
     
-    std::vector<const ObjectReflectionInfo*> get_subtypes(Name type_name, bool include_parent = false);
+    std::vector<const ObjectReflectionInfo*> get_subtypes(std::string_view type_name, bool include_parent = false);
     
     template<typename T>
     std::vector<const ObjectReflectionInfo*> get_subtypes(bool include_parent = false)
     {
-        Name type_name = get_object_type_name<T>();
+        std::string_view type_name = get_object_type_name<T>();
         return get_subtypes(type_name);
     }
     

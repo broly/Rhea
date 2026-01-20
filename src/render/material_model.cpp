@@ -2,6 +2,16 @@ module render:material_model;
 #include "common/assertion_macros.h"
 
 
+const MatModel_Pass* MaterialModel::get_pass_info(Name pass_name) const
+{
+    for (auto& pass : passes)
+    {
+        if (pass.name == pass_name)
+            return &pass;
+    }
+    return nullptr;
+}
+
 void MaterialModel::on_serialize(DependencyCollector* dc)
 {
     RhObject::on_serialize(dc);
