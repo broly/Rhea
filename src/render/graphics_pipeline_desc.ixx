@@ -103,7 +103,7 @@ export
                     return {index, binding};
                 index++;
             }
-            unreachable("Could not find binding named %s", name);
+            unreachable("Could not find binding named %s", name.to_string().c_str());
         }
     };
 
@@ -140,6 +140,7 @@ export
         std::vector<RenderResource*> resources;
         std::vector<PushConstantRange> push_constants;
     };
+    
 
 
     struct GraphicsPipelineStage
@@ -165,6 +166,7 @@ export
     struct GraphicsPipelineDesc
     {
         Name pass_name;
+        uint64_t permutation_value;
         std::vector<GraphicsPipelineStage> stages;
         PipelineLayoutDesc layout;
         bool depth_test;

@@ -31,8 +31,8 @@ void reflect::register_object_class_impl(
 std::vector<const reflect::ObjectReflectionInfo*> reflect::get_subtypes(std::string_view type_name, bool include_parent)
 {
     std::vector<const reflect::ObjectReflectionInfo*> subtypes;
-    auto& registry = get_registry();
-    for (auto& [name, info] : get_registry())
+    const auto& registry = get_registry();
+    for (auto& [name, info] : registry)
     {
         if (Name(type_name) == name && !include_parent)
             continue;

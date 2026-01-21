@@ -51,51 +51,17 @@ RenderResourceInstance* VkRenderResource::create_instance()
     auto instance = std::make_unique<VkRenderResourceInstance>(
         buffer_manager, *this, desc.usage_type);
 
-    for (auto& [pipeline, info] : info_by_pipeline)
-    {
-        auto& inst = instance->per_pipeline[pipeline];
-
-        inst.sets_per_frame =
-            buffer_manager.allocate_descriptor_sets_for_layout(
-                info.layout, desc.usage_type);
-
-        inst.buffers.resize(info.descritor_set_layout_desc.bindings.size());
-
-        for (size_t binding_index = 0;
-             binding_index < info.descritor_set_layout_desc.bindings.size();
-             ++binding_index)
-        {
-            const auto& binding =
-                info.descritor_set_layout_desc.bindings[binding_index];
-
-            if (binding.type != DescriptorType::UniformBuffer)
-                continue;
-
-            auto& buffers_per_frame = inst.buffers[binding_index];
-
-            for (size_t frame = 0; frame < inst.sets_per_frame.size(); ++frame)
-            {
-                RBBufferHandle buffer =
-                    buffer_manager.create_uniform_buffer(binding.size, desc.usage_type);
-
-                buffer_manager.bind_buffer_to_descriptor(
-                    inst.sets_per_frame[frame],
-                    binding.binding_index,
-                    buffer,
-                    frame);
-
-                buffers_per_frame.push_back(buffer);
-            }
-        }
-    }
-
     instances.push_back(std::move(instance));
+    
+    update_buffers_per_pipeline();
+    
     return instances.back().get();
 }
 
 
-RenderResourceInstance* VkRenderResource::query_single()
+RenderResourceInstance* VkRenderResource::query_single(PipelineObject* pipeline_object)
 {
+    provide(pipeline_object);
     if (single_resource)
         return single_resource;
     auto resource = create_instance();
@@ -103,8 +69,58 @@ RenderResourceInstance* VkRenderResource::query_single()
     return single_resource;
 }
 
+void VkRenderResource::update_buffers_per_pipeline()
+{
+    for (auto& instance : instances)
+    {
+        for (auto& [pipeline, info] : info_by_pipeline)
+        {
+            if (instance->per_pipeline.contains(pipeline))
+                continue;
+            
+            auto& inst = instance->per_pipeline[pipeline];
+
+            inst.sets_per_frame =
+                buffer_manager.allocate_descriptor_sets_for_layout(
+                    info.layout, desc.usage_type);
+
+            inst.buffers.resize(info.descritor_set_layout_desc.bindings.size());
+
+            for (size_t binding_index = 0;
+                 binding_index < info.descritor_set_layout_desc.bindings.size();
+                 ++binding_index)
+            {
+                const auto& binding =
+                    info.descritor_set_layout_desc.bindings[binding_index];
+
+                if (binding.type != DescriptorType::UniformBuffer)
+                    continue;
+
+                auto& buffers_per_frame = inst.buffers[binding_index];
+
+                for (size_t frame = 0; frame < inst.sets_per_frame.size(); ++frame)
+                {
+                    RBBufferHandle buffer =
+                        buffer_manager.create_uniform_buffer(binding.size, desc.usage_type);
+
+                    buffer_manager.bind_buffer_to_descriptor(
+                        inst.sets_per_frame[frame],
+                        binding.binding_index,
+                        buffer,
+                        frame);
+
+                    buffers_per_frame.push_back(buffer);
+                }
+            }
+        }
+    }
+}
+
 void VkRenderResource::provide(PipelineObject* pipeline_object)
 {
+    if (info_by_pipeline.contains((VkPipelineObject*)pipeline_object))
+        return;
+    
     auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
     const auto& reflection = vk_pipeline->get_reflection();
 
@@ -161,6 +177,8 @@ void VkRenderResource::provide(PipelineObject* pipeline_object)
     info.layout = buffer_manager.create_descriptor_set_layout(layout_desc);
 
     info_by_pipeline[vk_pipeline] = info;
+    
+    update_buffers_per_pipeline();
 }
 
 

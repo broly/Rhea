@@ -1,6 +1,7 @@
 export module assets:types;
-
+import :material;
 import :mesh;
+
 
 export struct AssetSceneObject
 {
@@ -11,6 +12,6 @@ export struct AssetSceneObject
 export struct AssetSceneInfo
 {
     std::vector<AssetSceneObject> objects;
-    std::map<std::string, PBRMaterial> materials;
+    std::map<std::string, std::shared_ptr<Material>> materials;
     
 };

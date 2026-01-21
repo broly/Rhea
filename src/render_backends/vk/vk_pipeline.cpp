@@ -25,6 +25,8 @@ VkPipelineObject::VkPipelineObject(
         , swapchain(in_swapchain)
         , buffer_manager(in_buffer_manager)
 {
+    debug_name = desc.pass_name;
+    permutation_value = desc.permutation_value;
     prepare();
 }
 

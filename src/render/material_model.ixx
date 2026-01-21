@@ -36,7 +36,7 @@ export struct MatModel_Parameter
     bool dynamic;
     std::optional<Name> shader_parameter;
     std::optional<Name> ubo;
-    std::optional<uint32_t> binding;
+    std::optional<uint16_t> binding;
 };
 REFLECT_STRUCT(MatModel_Parameter,
     type, dynamic, shader_parameter, ubo, binding);
@@ -44,7 +44,7 @@ REFLECT_STRUCT(MatModel_Parameter,
 export struct MatModel_UniformBuffer
 {
     Name type_name;
-    int32_t binding;
+    uint16_t binding;
 };
 REFLECT_STRUCT(MatModel_UniformBuffer,
     type_name, binding);
@@ -61,6 +61,10 @@ public:
     MatModel_Permutations permutations;
     std::vector<MatModel_Pass> passes;
     
+    Name sampler;
+    
+    uint16_t set;
+    
     std::map<Name, TypeId> ubo_types;
     
     const MatModel_Pass* get_pass_info(Name pass_name) const;
@@ -68,4 +72,4 @@ public:
     void on_serialize(DependencyCollector* dc) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, uniform_buffers, parameters, permutations, passes);
+                      model_name, enums, uniform_buffers, set, parameters, sampler, permutations, passes);

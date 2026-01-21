@@ -117,5 +117,8 @@ void main()
     vec3 hdr_color = ambient + Lo + emissive;
 
     out_color = vec4(hdr_color, 1.0);
-    
+#if BLEND_MODE_TRANSLUCENT
+    out_color = vec4(1.0, 0.0, 0.0, 0.0);
+#endif    
+    // out_color = vec4(material.base_color_mult, 1.0, 1.0, 1.0);
 }

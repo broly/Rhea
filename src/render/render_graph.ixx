@@ -12,8 +12,6 @@ export struct RenderGraphPass
 {
     Name name;
     
-    [[deprecated("to be moved out from RenderGraph")]]
-    std::vector<PipelineObject*> pipelines;
     
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
@@ -33,14 +31,13 @@ public:
         , cmd(in_cmd)
         , framebuffer(in_fb)
         , render_graph(render_graph)
-        , pipelines({})
     {}
 
+    Name pass_name;
     RenderBackend& backend;
     RBCommandList  cmd;
     RBFramebufferId framebuffer;
     RenderGraph& render_graph;
-    std::vector<PipelineObject*> pipelines;
     RBFrameHandle frame;
     
 };
@@ -77,7 +74,8 @@ public:
     void rebuild_resources();
     
     PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
-    PipelineObject* request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout);
+    PipelineObject* request_pipeline(
+        PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout);
 
     RenderResource* create_resource(const RenderResourceDesc& desc);
 

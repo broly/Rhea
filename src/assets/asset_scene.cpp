@@ -9,6 +9,7 @@ import dependency_collector;
 import fastgltf;
 import fastgltf_helper;
 import :helpers;
+#include "common/assertion_macros.h"
 
 AssetSceneInfo AssetSceneHandle::load(const std::filesystem::path& path, const std::string& rel_textures_path)
 {
@@ -70,51 +71,81 @@ AssetSceneInfo AssetSceneHandle::load(const std::filesystem::path& path, const s
             result_meshes);
     }
     
-    std::map<std::string, PBRMaterial> result_materials;
+    std::map<std::string, std::shared_ptr<Material>> result_materials;
     
     for (auto& scene_mat : asset.materials)
     {
-        PBRMaterial mat;
-        if (scene_mat.pbrData.baseColorTexture.has_value())
+        std::shared_ptr<Material> mat = std::make_shared<Material>();
+        mat->model = "pbr";
+        switch (scene_mat.alphaMode)
         {
-            auto& texture_info = scene_mat.pbrData.baseColorTexture.value();
-            std::string texture_name = asset.textures[texture_info.textureIndex].name.c_str();
-            auto full_texture_path = rel_textures_path + "/" + texture_name;
-            mat.base_color = TextureHandle::make_pending(full_texture_path);
+        case fastgltf::AlphaMode::Opaque:
+            mat->parameters["blend_mode"] = "opaque";
+            break;
+        case fastgltf::AlphaMode::Mask:
+            mat->parameters["blend_mode"] = "masked";
+            break;
+        case fastgltf::AlphaMode::Blend:
+            mat->parameters["blend_mode"] = "translucent";
+            break;
+        default: ;
         }
-        
         if (scene_mat.pbrData.baseColorTexture.has_value())
         {
             auto& texture_info = scene_mat.pbrData.baseColorTexture.value();
             std::string texture_name = asset.textures[texture_info.textureIndex].name.c_str();
             auto full_texture_path = rel_textures_path + "/" + texture_name;
-            mat.base_color = TextureHandle::make_pending(full_texture_path);
+            mat->parameters["base_color"] = TextureHandle::make_pending(full_texture_path);
+            LinearColor base_color_factor = {scene_mat.pbrData.baseColorFactor.x(), scene_mat.pbrData.baseColorFactor.y(), scene_mat.pbrData.baseColorFactor.z(), 1.0f};
+            mat->parameters["base_color_factor"] = base_color_factor;
+        }
+        else
+        {
+            mat->parameters["base_color_factor"] = LinearColor(1.0, 1.0, 1.0, 1.0);
+            mat->parameters["base_color"] = TextureHandle::invalid();
         }
         if (scene_mat.pbrData.metallicRoughnessTexture.has_value())
         {
             auto& texture_info = scene_mat.pbrData.metallicRoughnessTexture.value();
             std::string texture_name = asset.textures[texture_info.textureIndex].name.c_str();
             auto full_texture_path = rel_textures_path + "/" + texture_name;
-            mat.occlusion_roughness_metallic = TextureHandle::make_pending(full_texture_path);
-            mat.roughness_mult = scene_mat.pbrData.roughnessFactor;
-            mat.metallic_mult = scene_mat.pbrData.metallicFactor;
+            mat->parameters["orm"] = TextureHandle::make_pending(full_texture_path);
+            const float rv = scene_mat.pbrData.roughnessFactor;
+            const float mv = scene_mat.pbrData.metallicFactor;
+            mat->parameters["roughness_factor"] = LinearColor(rv, rv, rv, 1.0);
+            mat->parameters["metallic_factor"] = LinearColor(mv, mv, mv, 1.0);
+        }
+        else
+        {
+            mat->parameters["roughness_factor"] = LinearColor(1.0, 1.0, 1.0, 1.0);
+            mat->parameters["metallic_factor"] = LinearColor(1.0, 1.0, 1.0, 1.0);
+            mat->parameters["orm"] = TextureHandle::invalid();
         }
         if (scene_mat.normalTexture.has_value())
         {
             auto& texture_info = scene_mat.normalTexture.value();
             std::string texture_name = asset.textures[texture_info.textureIndex].name.c_str();
             auto full_texture_path = rel_textures_path + "/" + texture_name;
-            mat.normal = TextureHandle::make_pending(full_texture_path);
+            mat->parameters["normal"] = TextureHandle::make_pending(full_texture_path);
+        }
+        else
+        {
+            mat->parameters["normal"] = TextureHandle::invalid();
         }
         if (scene_mat.emissiveTexture.has_value())
         {
             auto& texture_info = scene_mat.emissiveTexture.value();
             std::string texture_name = asset.textures[texture_info.textureIndex].name.c_str();
             auto full_texture_path = rel_textures_path + "/" + texture_name;
-            mat.emissive = TextureHandle::make_pending(full_texture_path);
-            mat.emissive_mult = scene_mat.emissiveFactor.x();
+            mat->parameters["emissive"] = TextureHandle::make_pending(full_texture_path);
+            LinearColor emissive_factor = {scene_mat.emissiveFactor.x(), scene_mat.emissiveFactor.y(), scene_mat.emissiveFactor.z(), 1.0f};
+            mat->parameters["emissive_factor"] = emissive_factor;
         }
-        
+        else
+        {
+            mat->parameters["emissive_factor"] = LinearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            mat->parameters["emissive"] = TextureHandle::invalid();
+        }
         std::string mat_name = scene_mat.name.c_str();
         result_materials.insert({mat_name, mat});
     }

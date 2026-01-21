@@ -9,6 +9,7 @@ import fastgltf;
 import glm;
 import render;
 import name;
+import assets;
 
 class RhComp_GltfScene : public RhComponent
 {

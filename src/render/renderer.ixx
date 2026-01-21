@@ -13,14 +13,14 @@ import :pipeline_family;
 
 export struct MaterialUBO
 {
-    float base_color_mult;
-    float emissive_mult;
-    float occlusion_mult;
-    float roughness_mult;
-    float metallic_mult;
+    float base_color_factor;
+    float emissive_factor;
+    float occlusion_factor;
+    float roughness_factor;
+    float metallic_factor;
 };
 REFLECT_STRUCT_RUNTIME(MaterialUBO,
-    base_color_mult, emissive_mult, occlusion_mult, roughness_mult, metallic_mult);
+    base_color_factor, emissive_factor, occlusion_factor, roughness_factor, metallic_factor);
 
 export struct Light
 {
@@ -35,7 +35,7 @@ export struct LightUBO
 };
 
 
-export class Renderer
+export class Renderer : public std::enable_shared_from_this<Renderer>
 {
 public:
     virtual ~Renderer() = default;
@@ -44,23 +44,25 @@ public:
     void load_schemas();
 
     virtual void execute() {}
-    
-    virtual void update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
     
-    std::shared_ptr<PipelineFamily> get_or_create_material_pipeline_family(Name pass_name, Name model_name);
+    std::shared_ptr<PipelineFamily> get_or_create_material_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model_name);
     
-    std::map<std::pair<Name, Name>, std::shared_ptr<PipelineFamily>> material_pipeline_families;
+    RenderResource* get_or_create_resource_from_model(std::shared_ptr<MaterialModel> model, Name pass_name);
     
-    virtual RenderResource* get_material_resource();
-    
+    mutable std::map<std::pair<Name, std::shared_ptr<MaterialModel>>, std::shared_ptr<PipelineFamily>> material_pipeline_families;
+
     std::shared_ptr<RenderBackend> render_backend;
     std::map<Name, std::shared_ptr<MaterialModel>> models;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
     
     RenderResource* create_material_resource(const RenderResourceDesc& desc);
+    
+    std::map<std::pair<Name, std::shared_ptr<MaterialModel>>, RenderResource*> material_resources;
+    
+    std::map<Name, RBSampler> samplers;
     
 };

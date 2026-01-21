@@ -8,24 +8,49 @@ import <fstream>;
 import <filesystem>;
 import file_helpers;
 import string_helpers;
-
+import expr;
+import assets;
+import :renderer;
 
 #include "common/assertion_macros.h"
+#include "common/projection.h"
 
-PipelineFamily::PipelineFamily(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend)
+PipelineFamily::PipelineFamily(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend,
+                               std::shared_ptr<Renderer> in_renderer)
     : backend(in_backend)
     , model(model)
+    , renderer(in_renderer)
 {
     pass = model->get_pass_info(in_pass_name);
     checkf(pass, "MaterialModel has no pass '%s'", in_pass_name.to_string().c_str());
 }
 
-ShaderKey PipelineFamily::make_shader_key(const std::map<Name, ShaderOptionValue>& options) const
+ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<Material> material, Name pass_name) const
 {
+    auto options = material->get_shader_options(pass_name);
+    
     uint64_t bits = 0;
     uint8_t bit_index = 0;
+    
+    std::vector<Name> provided_options;
 
     std::set<Name> consumed;
+    
+    expr::Context ctx;
+    
+    for (const auto& [param_name, param_info] : model->parameters)
+    {
+        if (param_info.type == "sampler" || param_info.type == "vec4" || param_info.type == "float")
+        {
+            const bool provided = material->parameters.contains(param_name);
+            ctx[param_name.to_string()] = provided;
+        } else
+        {
+            ctx[param_name.to_string()] = material->parameters[param_name.to_string()].as<Name>().to_string();
+        }
+    }
+    
+    
 
     // enum
     for (const auto& [enum_name, enum_values] : model->permutations.enums)
@@ -47,18 +72,19 @@ ShaderKey PipelineFamily::make_shader_key(const std::map<Name, ShaderOptionValue
     }
 
     // flags
-    for (const auto& [flag_name, _] : model->permutations.flags)
+    for (const auto& [flag_name, expression] : model->permutations.flags)
     {
-        auto it = options.find(flag_name);
-        bool value = (it != options.end()) && std::get<bool>(it->second);
+        // auto it = options.find(flag_name);
+        // bool value = (it != options.end()) && std::get<bool>(it->second);
+        
+
+        expr::CompiledExpr compiled = expr::compile(expression);
+        bool value = expr::eval_node(compiled.root, compiled.nodes, ctx);
 
         bits |= (uint64_t(value) << bit_index);
         bit_index += 1;
         consumed.insert(flag_name);
     }
-
-    for (const auto& [name, _] : options)
-        checkf(consumed.contains(name), "Unknown shader option %s", name.to_string().c_str());
 
     checkf(bit_index <= 64, "ShaderKey overflow");
 
@@ -76,6 +102,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key, const PipelineLa
 
     GraphicsPipelineDesc desc;
     desc.pass_name = pass->name;
+    desc.permutation_value = key.key;
 
     for (const auto& [stage_enum, shader_name] : pass->shaders)
     {
@@ -85,6 +112,10 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key, const PipelineLa
         desc.stages.push_back(stage);
     }
     desc.layout = layout;
+
+    RenderResource* material_resource =
+        renderer->get_or_create_resource_from_model(model, pass->name);
+    desc.layout.resources.push_back(material_resource);
 
     auto pipeline = backend->create_pipeline(desc);
     pipelines[key.key] = pipeline;
@@ -105,9 +136,9 @@ void PipelineFamily::decode_key_to_defines(ShaderKey key, std::map<Name, bool>& 
         uint64_t value = (key.key >> bit_index) & ((1ull << bits_needed) - 1);
 
         uint32_t idx = 0;
-        for (const auto& [name, _] : enum_values)
+        for (const auto& [name, define_name] : enum_values)
         {
-            out_defines[name] = (idx == value);
+            out_defines[define_name] = (idx == value);
             ++idx;
         }
 
@@ -166,7 +197,7 @@ std::filesystem::path PipelineFamily::request_permutation(const std::string& sha
         
         std::filesystem::file_time_type filetime = std::filesystem::last_write_time(shader_path);
         std::string actual_timestamp = file_helpers::file_time_to_string(filetime);
-        std::string saved_timestamp = string_helpers::trim_and_remove_newlines(file_helpers::load_text_from_file(hashed_shader_name + ".timestamp"));
+        std::string saved_timestamp = string_helpers::trim_and_remove_newlines(file_helpers::load_text_from_file(timestamp_file_name));
         if (actual_timestamp == saved_timestamp)
         {
             return compiled_shader_permutation_file;
@@ -185,7 +216,10 @@ std::filesystem::path PipelineFamily::request_permutation(const std::string& sha
     
     for (auto define : defines)
     {
-        auto new_line = std::string("#define ") + define.first.to_string() + " " + (define.second ? "1" : "0");
+        auto define_str = define.first.to_string();
+        std::transform(define_str.begin(), define_str.end(), define_str.begin(), PROJECTION(std::toupper));
+        
+        auto new_line = std::string("#define ") + define_str + " " + (define.second ? "1" : "0");
         new_shader_lines.push_back(new_line);
     }
     

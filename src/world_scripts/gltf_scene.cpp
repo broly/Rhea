@@ -18,7 +18,7 @@ void RhComp_GltfScene::on_serialize(DependencyCollector* dc)
     std::vector<std::shared_ptr<RhComp_StaticMesh>> pending_mesh_comps;
     for (auto& obj : scene.objects)
     {
-        std::vector<PBRMaterial> mesh_materials;
+        std::vector<std::shared_ptr<Material>> mesh_materials;
         for (auto& mat_name : obj.mesh.material_names)
             mesh_materials.push_back(scene.materials[mat_name]);
             
@@ -27,7 +27,7 @@ void RhComp_GltfScene::on_serialize(DependencyCollector* dc)
         std::shared_ptr<RhComp_StaticMesh> comp = owner->add_component<RhComp_StaticMesh>(true);
         comp->name = mesh_name;
         comp->mesh = mesh_handle;
-        comp->materials = mesh_materials;
+        comp->mats = mesh_materials;
         
         pending_mesh_comps.push_back(comp);  
     }
@@ -36,16 +36,16 @@ void RhComp_GltfScene::on_serialize(DependencyCollector* dc)
     
     for (auto comp : pending_mesh_comps)
     {
-        for (auto& mat: comp->materials)
+        for (auto& mat: comp->mats)
         {
-            if (mat.base_color.is_pending())
-                futures.push_back(mat.base_color.resolve_async());
-            if (mat.normal.is_pending())
-                futures.push_back(mat.normal.resolve_async());
-            if (mat.emissive.is_pending())
-                futures.push_back(mat.emissive.resolve_async());
-            if (mat.occlusion_roughness_metallic.is_pending())
-                futures.push_back(mat.occlusion_roughness_metallic.resolve_async());
+            for (auto& [name, param] : mat->parameters)
+            {
+                if (param.is<TextureHandle>())
+                {
+                    if (param.as<TextureHandle>() != TextureHandle::invalid())
+                        futures.push_back(param.as<TextureHandle>().resolve_async());
+                }
+            }
         }
     }
     

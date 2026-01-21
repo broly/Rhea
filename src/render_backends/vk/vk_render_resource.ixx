@@ -26,7 +26,9 @@ public:
     VkRenderBackend& backend;
     
     RenderResourceInstance* create_instance() override;
-    RenderResourceInstance* query_single() override;
+    RenderResourceInstance* query_single(PipelineObject* pipeline_object) override;
+    
+    void update_buffers_per_pipeline();
 
     virtual void provide(class PipelineObject* pipeline_object) override;
     

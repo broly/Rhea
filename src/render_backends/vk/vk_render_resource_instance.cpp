@@ -14,7 +14,7 @@ VkRenderResourceInstance::VkRenderResourceInstance(vk::BufferManager& buffer_man
 void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeline_object,
                                                           Name buffer_name, size_t size, void* data, RBFrameHandle frame)
 {
-    auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
+    auto* vk_pipeline    = static_cast<VkPipelineObject*>(pipeline_object);
     auto& pipe_info = resource.info_by_pipeline.at(vk_pipeline);
     auto& inst_info = per_pipeline.at(vk_pipeline);
 

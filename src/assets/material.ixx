@@ -1,20 +1,14 @@
-export module render:material;
+export module assets:material;
 
-import rhobject;
 import <variant>;
-
-import assets;
 import linear_color;
+import :material_parameter_type;
 import <future>;
-import :render_resource;
-import :renderer;
+import rhobject;
 #include "object/object_reflection_macro.h"
 
 
-struct MaterialParameterType
-{
-    std::variant<float, LinearColor, TextureHandle, Name> data;
-};
+export using ShaderOptionValue = std::variant<bool, Name>;
 
 export void serialize_json_value(MaterialParameterType& target, const Json::Value& value, DependencyCollector* dc);
 
@@ -24,8 +18,14 @@ public:
     Name model;
     std::map<Name, MaterialParameterType> parameters;
     
-    
-    std::shared_ptr<class MaterialInstance> create_instance(Renderer* renderer) const;
+    template<typename T>
+    void static_set_parameter(std::string_view key, T&& value)
+    {
+        parameters[key] = MaterialParameterType(value);
+    }
+
+
+    std::map<Name, ShaderOptionValue> get_shader_options(Name pass_name) const;
     
 };
 REFLECT_OBJECT_FIELDS(Material, RhObject,

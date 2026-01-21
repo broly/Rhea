@@ -16,6 +16,8 @@
 		}
 	},
 	
+	"sampler": "surface",
+	
 	"parameters": {
 		"blend_mode": {
 			"type": "blend_mode",
@@ -102,6 +104,7 @@
 			}
 		}
 	},
+	"set": 3,
 	"passes": [	
 		{
 			"name": "GeometryBase",

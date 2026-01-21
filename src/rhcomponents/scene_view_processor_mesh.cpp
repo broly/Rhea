@@ -44,50 +44,23 @@ void SceneViewProcessor_Mesh::process()
         const MeshHandle mesh_handle = submitted.mesh;
         auto& mesh = mesh_handle.get();
         
-        if (mesh_ro.material_keys.size() > 0 && mesh_ro.material_keys.size() < submitted.materials.size())
-        {
-            checkf(false, "unsupported materials changing behaviour");
-        }
-        
-        mesh_ro.material_keys.resize(submitted.materials.size());
-        mesh_ro.material_instances.resize(submitted.materials.size());
-        mesh_ro.mat_instances.resize(submitted.mats.size());
-        
-        for (uint32_t index = 0; auto material : submitted.materials)
-        {
-            mesh_ro.material_keys[index] = MaterialKey::make_key(material);
-            mesh_ro.material_instances[index] = get_or_create_material_resource(renderer->get_material_resource(), mesh_ro.material_keys[index]);
-            index++;
-        }
+        mesh_ro.mats.resize(submitted.mats.size());
+        mesh_ro.mats_instances.resize(submitted.mats.size());
         
         for (uint32_t index = 0; auto material : submitted.mats)
         {
-            // material->create_resource();
-            // mesh_ro.mat_instances[index] = material->create_instance(renderer.get());
-            // mesh_ro.mat_instances[index]->c
+            mesh_ro.mats[index] = submitted.mats[index];
+            // if (!mesh_ro.mats_instances[index])
+            // {
+            //     mesh_ro.mats_instances[index] = mesh_ro.mats[index]->create_instance(renderer);
+            // }
+            index++;
         }
+        
         mesh_ro.mesh = mesh_handle;
         mesh_ro.bounds = mesh.bounds;
         mesh_ro.mesh = mesh_handle;
         mesh_ro.world = submitted.transform.matrix();
         mesh_ro.debug_name = submitted.debug_name;
     }
-}
-
-
-RenderResourceInstance* SceneViewProcessor_Mesh::get_or_create_material_resource(RenderResource* resource, const MaterialKey& key, RBFrameHandle frame_handle)
-{
-    PROFILE("SceneViewProcessor_Mesh::get_or_create_material_resource");
-    auto it = material_cache.find(key);
-    if (it != material_cache.end())
-        return it->second;
-    
-    auto resource_instance = resource->create_instance();
-    
-    
-    auto renderer = RhGlobals::engine->renderer;  // crutch
-    renderer->update_material_resource(resource_instance, key, frame_handle);
-    
-    auto [new_it, _] = material_cache.emplace(key, resource_instance);
-    return new_it->second;
 }

@@ -170,14 +170,12 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
         }
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
-        ctx.pipelines = pass.pipelines;
         ctx.frame = frame;
         backend->begin_render_pass(cmd, ctx.framebuffer);
         
-        backend->bind_pipeline(cmd, ctx.pipelines[0]);
         {
             PROFILE("graph execution");
-            
+            ctx.pass_name = pass.name;
             pass.execute(ctx);
         }
         backend->end_render_pass(cmd);
@@ -243,7 +241,8 @@ PipelineObject* RenderGraph::create_pipeline(const GraphicsPipelineDesc& desc)
     return pipeline;
 }
 
-PipelineObject* RenderGraph::request_pipeline(PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout)
+PipelineObject* RenderGraph::request_pipeline(
+    PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout)
 {
     assert(!graph_compiled);
     PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key, layout);

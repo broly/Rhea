@@ -6,6 +6,7 @@ import :render_resource;
 export class PipelineObject
 {
 public:
-
+    Name debug_name;
+    uint64_t permutation_value;
 };
 

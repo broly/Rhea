@@ -12,7 +12,6 @@ export import :ubos;
 export import :render_resource;
 export import :render_resource_instance;
 export import :sampler_desc;
-export import :material;
 export import :material_instance;
 export import :pipeline_family;
 export import :shader_key;

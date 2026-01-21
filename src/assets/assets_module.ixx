@@ -7,3 +7,5 @@ export import :asset_manager;
 export import :pbr_material;
 export import :asset_scene;
 export import :types;
+export import :material;
+export import :material_parameter_type;

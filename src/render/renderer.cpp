@@ -3,6 +3,7 @@
 import :render_backend;
 import paths;
 import <filesystem>;
+import reflect;
 #include "common/assertion_macros.h"
 
 
@@ -32,11 +33,6 @@ void Renderer::load_schemas()
     }
 }
 
-void Renderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame)
-{
-    unreachable("pure virtual");
-}
-
 RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
 {
     const Texture& data = handle.get();
@@ -59,26 +55,62 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
     return create_texture_from_asset(handle);
 }
 
-std::shared_ptr<PipelineFamily> Renderer::get_or_create_material_pipeline_family(Name pass_name, Name model_name)
+std::shared_ptr<PipelineFamily> Renderer::get_or_create_material_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model)
 {
-    if (material_pipeline_families.contains({pass_name, model_name}))
-        return material_pipeline_families.at({pass_name, model_name});
+    if (material_pipeline_families.contains({pass_name, model}))
+        return material_pipeline_families.at({pass_name, model});
     
-    auto model_it = models.find(model_name);
-    checkf(model_it != models.end(), "Could not find specified model");
-
-    std::shared_ptr<MaterialModel> model = model_it->second;
+    auto family = std::make_shared<PipelineFamily>(pass_name, model, render_backend, shared_from_this());
     
-    auto family = std::make_shared<PipelineFamily>(pass_name, model, render_backend);
-    
-    material_pipeline_families.insert({{pass_name, model_name}, family});
+    material_pipeline_families.insert({{pass_name, model}, family});
     
     return family;
 }
 
-RenderResource* Renderer::get_material_resource()
+RenderResource* Renderer::get_or_create_resource_from_model(std::shared_ptr<MaterialModel> model, Name pass_name)
 {
-    unreachable("pure virtual");
+    if (material_resources.contains({pass_name, model}))
+        return material_resources.at({pass_name, model});
+    
+    const MatModel_Pass* pass = model->get_pass_info(pass_name);
+    checkf(pass, "MaterialModel has no pass");
+
+    RenderResourceDesc desc{};
+    desc.name = model->model_name;
+    desc.usage_type = ResourceUsageType::persistent;
+    desc.sampler = samplers[model->sampler];
+
+    // UBOs
+    for (const auto& [ubo_name, ubo] : model->uniform_buffers)
+    {
+        auto info = reflect::find_runtime_info(ubo.type_name);
+        checkf(info, "Could not find type");
+        desc.variables.push_back(RenderResourceVariable{
+            .name = ubo_name,
+            .set = model->set,
+            .binding = ubo.binding,
+            .size = info->size,
+        });
+    }
+
+    // Parameters
+    for (const auto& [param_name, param] : model->parameters)
+    {
+        if (param.shader_parameter)
+        {
+            desc.variables.push_back(RenderResourceVariable{
+                .name = *param.shader_parameter,
+                .set = model->set,
+                .binding = *param.binding,
+            });
+        }
+    }
+    
+    auto resource =  render_backend->create_resource(desc);
+    
+    material_resources.insert({std::pair{pass_name, model}, resource});
+    
+    return resource;
 }
 
 RenderResource* Renderer::create_material_resource(const RenderResourceDesc& desc)

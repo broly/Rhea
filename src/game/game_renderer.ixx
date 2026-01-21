@@ -2,7 +2,10 @@
 import <memory>;
 import render;
 import engine;
+import <map>;
 import <vector>;
+import name;
+import assets;
 
 export class GameRenderer : public Renderer
 {
@@ -11,22 +14,22 @@ public:
 
     void init(RBWindowHandle in_window) override;
     void execute() override;
-    
-    RenderResource* get_material_resource() override;
-    
-    void update_material_resource(RenderResourceInstance* material_resource_inst, MaterialKey material_key, RBFrameHandle frame) override;
-    
+
     std::shared_ptr<Engine> engine;
     
     std::shared_ptr<RenderGraph> render_graph;
     
-    void draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline) const;
+    void draw_scene(RenderGraphContext& ctx) ;
     
-    // will be deprecated soon
-    RenderResource* material_resource;
+    std::shared_ptr<MaterialInstance> get_or_create_material_instance(std::shared_ptr<Material> material, Name pass_name);
+
+    PipelineLayoutDesc geom_pipeline_layout;
+
     RenderResource* camera_resource;
     RenderResource* model_resource;
     RenderResource* light_resource;
     
     PipelineObject* geom_pipeline;
+    
+    std::map<std::pair<std::shared_ptr<Material>, Name>, std::shared_ptr<MaterialInstance>> material_instances;
 };

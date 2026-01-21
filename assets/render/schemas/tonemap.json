@@ -22,6 +22,7 @@
 		"enums": {
 		}
 	},
+	"set": 0,
 	"passes": [
 		{
 			"name": "ToneMapping",

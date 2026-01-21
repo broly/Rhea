@@ -31,6 +31,12 @@ export inline void serialize_json_value(Name& target, const Json::Value& value, 
     assert(value.isString());
     target = value.asString();
 }
+
+export inline void serialize_json_value(uint16_t& target, const Json::Value& value, DependencyCollector* dc)
+{
+    assert(value.isNumeric() || value.isIntegral());
+    target = value.asUInt();
+}
 export inline void serialize_json_value(Json::UInt& target, const Json::Value& value, DependencyCollector* dc)
 {
     assert(value.isNumeric() || value.isIntegral());

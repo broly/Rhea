@@ -1,12 +1,10 @@
-module render:material;
+module assets:material;
 
-import :material_instance;
 
 import linear_color;
-import assets;
+import :asset_manager;
 #include "common/assertion_macros.h"
 
-import globals;
 
 static std::optional<std::string> parse_texture_string(const std::string& str)
 {
@@ -83,8 +81,49 @@ void serialize_json_value(MaterialParameterType& target, const Json::Value& valu
 //     resource = RhGlobals::engine->renderer->create_material_resource(desc); // add permutations support
 // }
 
-std::shared_ptr<MaterialInstance> Material::create_instance(Renderer* renderer) const
+std::map<Name, ShaderOptionValue> Material::get_shader_options(Name pass_name) const
 {
-    const std::shared_ptr<const Material> as_material = std::static_pointer_cast<const Material>(shared_from_this());
-    return std::make_shared<MaterialInstance>(as_material, renderer);
+    std::map<Name, ShaderOptionValue> options;
+
+    for (const auto& [param_name, param] : parameters)
+    {
+        const auto& value = param.data;
+
+        // ----------------------------------
+        // ENUMS (Name)
+        // ----------------------------------
+        if (std::holds_alternative<Name>(value))
+        {
+            options.emplace(param_name, std::get<Name>(value));
+            continue;
+        }
+
+        // ----------------------------------
+        // Presence-based flags (raw facts)
+        // ----------------------------------
+        if (std::holds_alternative<TextureHandle>(value))
+        {
+            const auto& tex = std::get<TextureHandle>(value);
+            options.emplace(param_name, tex.is_valid());
+            continue;
+        }
+
+        // ----------------------------------
+        // Scalars / colors
+        // ----------------------------------
+        if (std::holds_alternative<float>(value))
+        {
+            options.emplace(param_name, true);
+            continue;
+        }
+
+        if (std::holds_alternative<LinearColor>(value))
+        {
+            options.emplace(param_name, true);
+            continue;
+        }
+    }
+
+    return options;
 }
+

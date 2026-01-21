@@ -6,7 +6,8 @@ import glm;
 import rhmath;
 import <vector>;
 import profile;
-
+import name;
+import <unordered_map>;
 import rhcomponents;
 
 #include "render_layout.h"
@@ -25,8 +26,8 @@ void GameRenderer::init(RBWindowHandle in_window)
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     render_graph = std::make_shared<RenderGraph>(render_backend);
 
-    auto surface_sampler = render_backend->create_sampler(samplers::default_surface());
-    auto default_sampler = render_backend->create_sampler(samplers::default_surface());
+    samplers["default"] = render_backend->create_sampler(samplers::default_surface());
+    samplers["surface"] = render_backend->create_sampler(samplers::default_surface());
     
     camera_resource = render_graph->create_resource({
         .name = "camera",
@@ -59,32 +60,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     });
     
     
-    auto& pbr_model = models.find("PBR")->second;
     auto& tonemap_model = models.find("tonemap")->second;
-    
-    // TODO: hardcoded general material case
-    material_resource = render_graph->create_resource({
-        .name = "material",
-        .stages = ShaderStage::fragment,
-        .usage_type = ResourceUsageType::persistent,
-        .sampler = surface_sampler,
-        .variables = {
-            { "material",  SET_MATERIAL, BINDING_UBO_MATERIAL, sizeof(MaterialUBO) },
-            { "u_base_color", SET_MATERIAL, BINDING_SAMPLER_ALBEDO },
-            { "u_emissive", SET_MATERIAL, BINDING_SAMPLER_EMISSIVE },
-            { "u_normal_map", SET_MATERIAL, BINDING_SAMPLER_NORMAL },
-            { "u_orm", SET_MATERIAL, BINDING_SAMPLER_ORM },
-        },
-    });
-    
-    auto tonemap_resource = render_graph->create_resource({
-        .name = "tonemap",
-        .stages = ShaderStage::fragment,
-        .usage_type = ResourceUsageType::frame,
-        .variables = {
-            { "u_hdr_color", SET_TONEMAP, BINDING_UBO_TONEMAP },
-        },
-    });
     
     RGTextureDesc hdr_color_desc{
         .width  = 0,
@@ -113,9 +89,9 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     };
     
-    PipelineLayoutDesc geom_pipeline_layout = {
+    geom_pipeline_layout = {
         .vertex_layout = vertex_layout,
-        .resources = {camera_resource, light_resource, model_resource, material_resource }, 
+        .resources = {camera_resource, light_resource, model_resource }, 
         .push_constants = {{
             .stages = ShaderStage::vertex,
             .offset = 0,
@@ -125,66 +101,16 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     PipelineLayoutDesc tonemap_pipeline_layout = {
         .vertex_layout = {},
-        .resources = { tonemap_resource }, 
+        .resources = {  }, 
         .push_constants = {}
     };
     
-    // GraphicsPipelineDesc geom_pipeline_desc{
-    //     .stages = {
-    //         {
-    //             .stage = ShaderStage::vertex,
-    //             .shader = "geometry.vert",
-    //         },
-    //         {
-    //             .stage = ShaderStage::fragment,
-    //             .shader = "geometry.frag"
-    //         }
-    //     },
-    //     .layout = geom_pipeline_layout,
-    //     .rt_compat = {
-    //         .color_attachment_count = 1,
-    //         .has_depth = true
-    //     }
-    // };
     
-    
-    PipelineFamily geom_pipeline_family("GeometryBase", pbr_model, render_backend);
-    PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, render_backend);
-    
-    
-    // GraphicsPipelineDesc tonemap_pipeline_desc{
-    //     .stages = {
-    //         {
-    //             .stage = ShaderStage::vertex,
-    //             .shader = "fullscreen.vert",
-    //         },
-    //         {
-    //             .stage = ShaderStage::fragment,
-    //             .shader = "tonemap.frag",
-    //         }
-    //     },
-    //     .layout = {
-    //         .resources = { tonemap_resource },
-    //     },
-    //     .rt_compat = {
-    //         .color_attachment_count = 1,
-    //         .has_depth = false
-    //     }
-    // };
-    
-    ShaderKey geometry_opaque_shader_key = geom_pipeline_family.make_shader_key({
-        {"blend_mode", "opaque"},
-        {"USE_NORMAL_MAP", true},
-    });
+    PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, render_backend, shared_from_this());
 
-    auto geometry_opaque = render_graph->request_pipeline(geom_pipeline_family, geometry_opaque_shader_key, geom_pipeline_layout);
-    geom_pipeline = geometry_opaque;
-    
-    
 
-    
-    
-    auto tonemap_pipeline = render_graph->request_pipeline(tonemap_pipeline_family, {}, tonemap_pipeline_layout);
+    PipelineObject* tonemap_pipeline = render_graph->request_pipeline(
+        tonemap_pipeline_family, {}, tonemap_pipeline_layout);
     
     auto swapchain_extent = render_backend->get_swapchain_extent();
 
@@ -204,44 +130,41 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_graph->add_pass({
         .name = "GeometryBase",
-        .pipelines = {geometry_opaque},
         .writes = { 
-            { hdr_color, RBImageUsage::ColorAttachment }, 
-            { depth_texture, RBImageUsage::DepthStencilAttachment } 
-        },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            PROFILE("GeometryBase");
-
-            auto pipeline = ctx.pipelines[0];
+            // { hdr_color, RBImageUsage::ColorAttachment }, 
+            { depth_texture, RBImageUsage::DepthStencilAttachment },
             
-            ctx.backend.bind_pipeline(ctx.cmd, pipeline);
-            
-            draw_scene(ctx, pipeline);
-        }
-    });
-    
-    render_graph->add_pass({
-        .name = "ToneMapping",
-        .pipelines = {tonemap_pipeline},
-        .reads = {
-            { hdr_color, RBImageUsage::SampledFragment }
-        },
-        .writes = {
             { swapchain_color, RBImageUsage::ColorAttachment }
         },
         .execute = [=](RenderGraphContext& ctx)
         {
-            auto pipeline = ctx.pipelines[0];
+            PROFILE("GeometryBase");
             
-            ctx.backend.bind_pipeline(ctx.cmd, pipeline);
-            auto tonemap = tonemap_resource->query_single();
-            tonemap->update_image(pipeline, "u_hdr_color", render_graph->get_image(hdr_color), ctx.frame);
-            tonemap->bind(pipeline, ctx.cmd, ctx.frame);
-            
-            ctx.backend.draw_fullscreen(ctx.cmd);
+            draw_scene(ctx);
         }
     });
+    
+    // render_graph->add_pass({
+    //     .name = "ToneMapping",
+    //     .reads = {
+    //         { hdr_color, RBImageUsage::SampledFragment }
+    //     },
+    //     .writes = {
+    //         { swapchain_color, RBImageUsage::ColorAttachment }
+    //     },
+    //     .execute = [=](RenderGraphContext& ctx)
+    //     {
+    //         
+    //         ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
+    //         
+    //         get_or_create_material_instance()
+    //         auto tonemap = tonemap_resource->query_single();
+    //         tonemap->update_image(tonemap_pipeline, "u_hdr_color", render_graph->get_image(hdr_color), ctx.frame);
+    //         tonemap->bind(tonemap_pipeline, ctx.cmd, ctx.frame);
+    //         
+    //         ctx.backend.draw_fullscreen(ctx.cmd);
+    //     }
+    // });
 
     
     render_graph->compile();
@@ -273,118 +196,180 @@ void GameRenderer::execute()
 
 }
 
-RenderResource* GameRenderer::get_material_resource()
-{
-    return material_resource;
-}
-
-void GameRenderer::update_material_resource(RenderResourceInstance* material_resource_instance, MaterialKey material_key, RBFrameHandle frame)
-{
-    PROFILE("GeometryForward:update_material_resource");
-    material_resource_instance->update_uniform_buffer(geom_pipeline, "material", 
-                                                      MaterialUBO{
-                                                          .base_color_mult = material_key.base_color_mult,
-                                                          .emissive_mult = material_key.emissive_mult,
-                                                          .occlusion_mult = material_key.occlusion_mult,
-                                                          .roughness_mult = material_key.roughness_mult,
-                                                          .metallic_mult = material_key.metallic_mult,
-                                                      }, frame);
-                
-    material_resource_instance->update_image(geom_pipeline, "u_base_color", 
-                                             get_texture(material_key.base_color), frame);
-    material_resource_instance->update_image(geom_pipeline, "u_emissive", 
-                                             get_texture(material_key.emissive), frame);
-    material_resource_instance->update_image(geom_pipeline, "u_normal_map", 
-                                             get_texture(material_key.normal), frame);
-    material_resource_instance->update_image(geom_pipeline, "u_orm", 
-                                             get_texture(material_key.occlusion_roughness_metallic), frame);                
-                
-}
-
-void GameRenderer::draw_scene(RenderGraphContext& ctx, PipelineObject* pipeline) const
+void GameRenderer::draw_scene(RenderGraphContext& ctx)
 {    
+
     auto& scene_view = engine->scene_view;
     auto cmd = ctx.cmd;
-            
-    // ---------- Camera ----------
-    auto& camera_processor = scene_view->get_processor<SceneViewProcessor_Camera>();
+    auto frame = ctx.frame;
 
-    const RenderObject_Camera* active_camera = camera_processor.get_active_camera();
-            
-    auto [width, height] = ctx.backend.get_viewport_extent();
+    Name pass_name = ctx.pass_name;
+    // ============================================================
+    // 1. Pass-level resources (camera, light)
+    // ============================================================
 
-    CameraUBO camera_ubo;
-    camera_ubo.view_proj =
-        active_camera->get_projection(float(width) / float(height)) *
-        active_camera->view;
-    camera_ubo.camera_pos = active_camera->position;
-            
-    auto cam = camera_resource->query_single();
-    cam->update_uniform_buffer(pipeline, "camera", camera_ubo, ctx.frame);
-    cam->bind(pipeline, cmd, ctx.frame);
+    PipelineObject* current_pipeline = nullptr;
 
-            
-    // ---------- Lights ----------
-    auto& point_light_processor = scene_view->get_processor<SceneViewProcessor_Light>();
-    const auto [lights, light_num] = point_light_processor.query_nearest_lights_limited<8>(active_camera->position);
-            
-    LightUBO light_ubo{};
-    light_ubo.light_count = light_num;
-    for (int i = 0; i < light_num; ++i)
+    auto bind_pass_resources = [&](PipelineObject* pipeline)
     {
-        light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
-        light_ubo.lights[i].color    = glm::vec4(lights[i].color);
-    }
-    {                
-        auto light = light_resource->query_single();
-        light->update_uniform_buffer(pipeline, "light_ubo", light_ubo, ctx.frame);
-        light->bind(pipeline, cmd, ctx.frame);
-    }
+        if (pipeline == current_pipeline)
+            return;
 
-    
-    // ---------- Draw ----------
-    auto& meshes_processor = scene_view->get_processor<SceneViewProcessor_Mesh>();
+        current_pipeline = pipeline;
+
+        // ---------- Camera ----------
+        auto& camera_processor =
+            scene_view->get_processor<SceneViewProcessor_Camera>();
+
+        const RenderObject_Camera* cam_ro =
+            camera_processor.get_active_camera();
+
+        auto [width, height] = ctx.backend.get_viewport_extent();
+
+        CameraUBO camera_ubo;
+        camera_ubo.view_proj =
+            cam_ro->get_projection(float(width) / float(height)) *
+            cam_ro->view;
+        camera_ubo.camera_pos = cam_ro->position;
+
+        auto cam = camera_resource->query_single(pipeline);
+        cam->update_uniform_buffer(pipeline, "camera", camera_ubo, frame);
+        cam->bind(pipeline, cmd, frame);
+
+        // ---------- Lights ----------
+        auto& light_processor =
+            scene_view->get_processor<SceneViewProcessor_Light>();
+
+        const auto [lights, light_num] =
+            light_processor.query_nearest_lights_limited<8>(cam_ro->position);
+
+        LightUBO light_ubo{};
+        light_ubo.light_count = light_num;
+        for (int i = 0; i < light_num; ++i)
+        {
+            light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
+            light_ubo.lights[i].color    = glm::vec4(lights[i].color);
+        }
+
+        auto light = light_resource->query_single(pipeline);
+        light->update_uniform_buffer(pipeline, "light_ubo", light_ubo, frame);
+        light->bind(pipeline, cmd, frame);
+    };
+
+    // ============================================================
+    // 2. Collect draw items
+    // ============================================================
+
+    struct DrawItem
+    {
+        MeshPrimHandle mesh;
+        glm::mat4 world;
+        std::shared_ptr<Material> material;
+    };
+
+    using DrawBatch = std::vector<DrawItem>;
+    std::unordered_map<ShaderKey, DrawBatch> batches;
+
+    auto& meshes_processor =
+        scene_view->get_processor<SceneViewProcessor_Mesh>();
+
     for (const auto& ro : meshes_processor.meshes)
     {
-        checkf(ro.material_keys.size() == ro.material_instances.size(), "size differs. invalid behaviour");
-        
-        for (uint32_t geom_index = 0; auto& geom : ro.mesh.get().mesh_geometry)
+        for (uint32_t geom_index = 0;
+             geom_index < ro.mesh.get().mesh_geometry.size();
+             ++geom_index)
         {
-            for (uint32_t prim_index = 0; auto& prim : geom.primitives)
+            const auto& geom = ro.mesh.get().mesh_geometry[geom_index];
+
+            for (uint32_t prim_index = 0;
+                 prim_index < geom.primitives.size();
+                 ++prim_index)
             {
-                MeshPrimHandle mesh_prim{ro.mesh, geom_index, prim_index};
+                const auto& prim = geom.primitives[prim_index];
 
-                uint32_t material_index = prim.material_index.value_or(0);
-                auto material_key = ro.material_keys[material_index]; // 0 is temp crutch
-                    
-                auto material_resource_instance = meshes_processor.get_or_create_material_resource(
-                    material_resource, material_key);
-                    
-                material_resource_instance->bind(pipeline, cmd, ctx.frame);
-        
-                ctx.backend.get_or_create_mesh_buffers(mesh_prim);
+                uint32_t mat_index = prim.material_index.value_or(0);
+                std::shared_ptr<Material> material = ro.mats[mat_index];
                 
-                ctx.backend.bind_mesh(cmd, mesh_prim, ctx.frame);
-                
-                auto model = model_resource->query_single();
-                ModelUBO_Temp model_ubo{ro.world};
-                model->update_uniform_buffer(pipeline, "model_ubo", model_ubo, ctx.frame);
-                model->bind(pipeline, cmd, ctx.frame);
-                ctx.backend.push_constants(
-                    cmd, ro.world,
-                    pipeline
-                );
+                auto model = models.find(material->model)->second;
 
-                ctx.backend.draw_indexed(
-                    cmd,
-                    prim.indices.size()
-                );
-                prim_index++;
+                // --------- Pipeline key ---------
+                auto pipeline_family =
+                    get_or_create_material_pipeline_family(
+                        pass_name, model);
+
+                ShaderKey key =
+                    pipeline_family->make_shader_key(material, pass_name);
+
+                batches[key].push_back({
+                    .mesh     = MeshPrimHandle{ro.mesh, geom_index, prim_index},
+                    .world    = ro.world,
+                    .material = material
+                });
             }
-            geom_index++;
         }
+    }
+
+    // ============================================================
+    // 3. Draw batches
+    // ============================================================
+
+    for (auto& [key, batch] : batches)
+    {
+        std::shared_ptr<Material> first_material = batch[0].material;
         
+        auto model = models.find(first_material->model)->second;
+
+        auto pipeline_family =
+            get_or_create_material_pipeline_family(
+                pass_name, model);
+
+        PipelineObject* pipeline =
+            pipeline_family->request_pipeline(key, geom_pipeline_layout);
+
+        ctx.backend.bind_pipeline(cmd, pipeline);
+        bind_pass_resources(pipeline);
+
+        for (auto& item : batch)
+        {
+            // ---------- Material ----------
+            std::shared_ptr<MaterialInstance> material_instance =
+                get_or_create_material_instance(item.material, pass_name);
+
+            material_instance->bind(pipeline, cmd, frame);
+
+            // ---------- Mesh ----------
+            ctx.backend.get_or_create_mesh_buffers(item.mesh);
+            ctx.backend.bind_mesh(cmd, item.mesh, frame);
+
+            // ---------- Model ----------
+            auto model_resource_instance = model_resource->query_single(pipeline);
+            ModelUBO_Temp model_ubo{ item.world };
+            model_resource_instance->update_uniform_buffer(
+                pipeline, "model_ubo", model_ubo, frame);
+            model_resource_instance->bind(pipeline, cmd, frame);
+
+            // ---------- Push constants ----------
+            ctx.backend.push_constants(cmd, item.world, pipeline);
+
+            ctx.backend.draw_indexed(
+                cmd,
+                item.mesh.get().indices.size()
+            );
+        }
     }
 }
 
+std::shared_ptr<MaterialInstance> GameRenderer::get_or_create_material_instance(
+    std::shared_ptr<Material> material, Name pass_name)
+{
+    auto it = material_instances.find({material, pass_name});
+    if (it != material_instances.end())
+        return it->second;
 
+    auto ptr = std::static_pointer_cast<Renderer>(shared_from_this());
+    
+    auto instance = std::make_shared<MaterialInstance>(material, shared_from_this(), pass_name);
+
+    material_instances.emplace(std::pair{material, pass_name}, instance);
+    return instance;
+}
