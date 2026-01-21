@@ -16,6 +16,33 @@ import <cassert>;
 
 export namespace vk
 {
+    VkAttachmentStoreOp vk_convert_attachment_store(RBStoreOp op)
+    {
+        switch (op)
+        {
+        case RBStoreOp::Store:
+            return VK_ATTACHMENT_STORE_OP_STORE;
+        case RBStoreOp::DontCare:
+            return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        default: ;
+        }
+        throw std::runtime_error("bad enum");
+    }
+    
+    VkAttachmentLoadOp vk_convert_attachment_load(RBLoadOp op)
+    {
+        switch (op)
+        {
+        case RBLoadOp::Load:
+            return VK_ATTACHMENT_LOAD_OP_LOAD;
+        case RBLoadOp::DontCare:
+            return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        case RBLoadOp::Clear:
+            return VK_ATTACHMENT_LOAD_OP_CLEAR;
+        }
+        throw std::runtime_error("bad enum");
+    }
+    
     
     struct SwapchainSupport {
         std::vector<VkPresentModeKHR> present_modes;
@@ -347,6 +374,25 @@ export namespace vk
         VkPipelineStageFlags stage;
         VkAccessFlags access;
     };
+    
+    VkImageLayout to_attachment_layout(RBImageUsage usage)
+    {
+        switch (usage)
+        {
+        case RBImageUsage::ColorAttachment:
+            return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        case RBImageUsage::DepthStencilAttachment:
+            return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        case RBImageUsage::DepthStencilReadOnly:
+            return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+        default:
+            assert(false);
+            return VK_IMAGE_LAYOUT_UNDEFINED;
+        }
+    }
     
     ImageState to_vk_state(RBImageUsage usage)
     {

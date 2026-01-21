@@ -29,11 +29,11 @@ namespace vk
                 return false;
             
             for (uint32_t i = 0; i < desc.color_attachments.size(); ++i)
-                if (desc.color_attachments[i] != in_desc.color_attachments[i])
+                if (desc.color_attachments[i].image != in_desc.color_attachments[i].image)
                     return false;
             
             if (desc.depth_attachment.has_value() && in_desc.depth_attachment.has_value())
-                return desc.depth_attachment.value() == in_desc.depth_attachment.value();
+                return desc.depth_attachment.value().image == in_desc.depth_attachment.value().image;
             
             if (!desc.depth_attachment.has_value() && !in_desc.depth_attachment.has_value())
                 return true;

@@ -23,6 +23,8 @@ public:
     {
         parameters[key] = MaterialParameterType(value);
     }
+    
+    Name get_enum_parameter(Name key);
 
 
     std::map<Name, ShaderOptionValue> get_shader_options(Name pass_name) const;

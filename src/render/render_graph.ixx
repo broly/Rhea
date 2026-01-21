@@ -52,7 +52,6 @@ public:
     
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
-    RGResourceHandle create_buffer(const RGBufferDesc& desc);
 
     RGPassId add_pass(RenderGraphPass&& pass);
 

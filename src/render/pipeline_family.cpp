@@ -103,6 +103,9 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key, const PipelineLa
     GraphicsPipelineDesc desc;
     desc.pass_name = pass->name;
     desc.permutation_value = key.key;
+    desc.depth_test = pass->depth_test;
+    desc.depth_write = pass->depth_write;
+    desc.is_translucent = pass->translucent;
 
     for (const auto& [stage_enum, shader_name] : pass->shaders)
     {

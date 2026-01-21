@@ -21,6 +21,61 @@ import :framebuffer_mgr;
 import :render_resource;
 
 
+struct RenderPassAttachmentInfo
+{
+    RBFormat format;
+    RBLoadOp load_op;
+    RBStoreOp store_op;
+    RBImageUsage usage;
+};
+
+
+struct RenderPassDesc
+{
+    Name name;
+    std::vector<RenderPassAttachmentInfo> color_attachments;
+    std::optional<RenderPassAttachmentInfo> depth_attachment;
+        
+
+    bool operator==(const RenderPassDesc& other) const
+    {
+        if (name != other.name)
+            return false;
+        
+        if (color_attachments.size() != other.color_attachments.size())
+            return false;
+        
+        for (auto index = 0; index < color_attachments.size(); index++)
+            if (color_attachments[index].format != other.color_attachments[index].format)
+                return false;
+        
+        if (depth_attachment.has_value() != other.depth_attachment.has_value())
+            return false;
+        
+        if (!depth_attachment.has_value() && !other.depth_attachment.has_value())
+            return true;
+            
+        if (depth_attachment->format != other.depth_attachment->format)
+            return false;
+        
+        return true;
+    };
+};
+
+struct RenderPassDescHash
+{
+    size_t operator()(const RenderPassDesc& d) const
+    {
+        size_t h = d.color_attachments.size();
+        for (auto f : d.color_attachments)
+            h ^= std::hash<uint32_t>()(f.format + 0x9e3779b9 + (h<<6) + (h>>2));
+
+        if (d.depth_attachment.has_value())
+            h ^= std::hash<uint32_t>()(d.depth_attachment->format);
+
+        return h;
+    }
+};
 
 
 export class VkRenderBackend final : public RenderBackend

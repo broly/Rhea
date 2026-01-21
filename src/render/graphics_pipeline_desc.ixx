@@ -170,6 +170,8 @@ export
         std::vector<GraphicsPipelineStage> stages;
         PipelineLayoutDesc layout;
         bool depth_test;
+        bool depth_write;
+        bool is_translucent;
 
         PipelineRenderTargetDesc rt_compat;
     };

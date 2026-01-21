@@ -7,6 +7,7 @@ import <GLFW/glfw3.h>;
 import <vector>;
 import type_id;
 import assets;
+import name;
 
 #include "common/type_macros.h"
 
@@ -105,6 +106,20 @@ export
         {
             return handle != 0;
         }
+    };
+
+    enum class RBLoadOp
+    {
+        Load,
+        Clear,
+        DontCare
+    };
+    
+    
+    enum class RBStoreOp
+    {
+        Store,
+        DontCare,
     };
 
 
@@ -211,12 +226,40 @@ export
     using RBImageView = RBHandle<VkImageView>;
 
     using RBSampler = RBHandle<VkSampler>;
+    
+    
+    enum class RBImageUsage
+    {
+        Undefined,
+
+        ColorAttachment,
+        DepthStencilAttachment,
+        DepthStencilReadOnly,
+
+        SampledFragment,
+        SampledVertex,
+
+        TransferSrc,
+        TransferDst,
+
+        Present
+    };
+
+    struct AttachmentDesc
+    {
+        RBImageHandle image;
+        RBLoadOp load;
+        RBStoreOp store;
+        RBImageUsage usage;
+    };
 
 
     struct FramebufferDesc
     {
-        std::vector<RBImageHandle> color_attachments;
-        std::optional<RBImageHandle> depth_attachment;
+        Name pass;
+        std::vector<AttachmentDesc> color_attachments;
+        std::optional<AttachmentDesc> depth_attachment;
+        
 
         uint32_t width  = 0;
         uint32_t height = 0;
@@ -238,20 +281,4 @@ export
     
     
     
-    enum class RBImageUsage
-    {
-        Undefined,
-
-        ColorAttachment,
-        DepthStencilAttachment,
-        DepthStencilReadOnly,
-
-        SampledFragment,
-        SampledVertex,
-
-        TransferSrc,
-        TransferDst,
-
-        Present
-    };
 }

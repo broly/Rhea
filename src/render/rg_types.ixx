@@ -35,6 +35,7 @@ export
 
     struct RGTextureDesc
     {
+        Name name;
         uint32_t width  = 0;
         uint32_t height = 0;    
 
@@ -80,6 +81,7 @@ export
     struct RGTextureHandle
     {
         uint32_t id;
+        Name name;
     };
 
     struct RGImageBarrier
@@ -89,40 +91,13 @@ export
         RBImageUsage    after;
     };
 
-
     struct RGImageUse
     {
         RGTextureHandle texture;
         RBImageUsage    usage;
+        RBLoadOp load_op = RBLoadOp::Load;
     };
 
     using RBFormat = RBHandle<VkFormat>;
-
-
-
-
-    struct RenderPassDesc
-    {
-        std::vector<RBFormat> color_formats;
-        RBFormat depth_format;
-        
-        bool has_depth = false;
-
-        bool operator==(const RenderPassDesc&) const = default;
-    };
-
-    struct RenderPassDescHash
-    {
-        size_t operator()(const RenderPassDesc& d) const
-        {
-            size_t h = d.color_formats.size();
-            for (auto f : d.color_formats)
-                h ^= std::hash<uint32_t>()(f + 0x9e3779b9 + (h<<6) + (h>>2));
-
-            if (d.has_depth)
-                h ^= std::hash<uint32_t>()(d.depth_format);
-
-            return h;
-        }
-    };
+    
 }

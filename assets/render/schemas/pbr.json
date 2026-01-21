@@ -115,7 +115,10 @@
 			"shaders": {
 				"vertex": "geometry.vert",
 				"fragment": "geometry.frag"
-			}
+			},
+			"depth_write": true,
+			"depth_test": true,
+			"translucent": false
 		},
 		{
 			"name": "GeometryTranslucent",
@@ -126,7 +129,10 @@
 			"shaders": {
 				"vertex": "geometry.vert",
 				"fragment": "geometry.frag"
-			}
+			},
+			"depth_write": false,
+			"depth_test": true,
+			"translucent": true
 		}
 	]
 }

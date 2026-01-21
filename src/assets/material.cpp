@@ -81,6 +81,11 @@ void serialize_json_value(MaterialParameterType& target, const Json::Value& valu
 //     resource = RhGlobals::engine->renderer->create_material_resource(desc); // add permutations support
 // }
 
+Name Material::get_enum_parameter(Name key)
+{
+    return parameters[key].as<Name>();
+}
+
 std::map<Name, ShaderOptionValue> Material::get_shader_options(Name pass_name) const
 {
     std::map<Name, ShaderOptionValue> options;

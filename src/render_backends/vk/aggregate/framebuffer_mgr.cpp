@@ -33,13 +33,13 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
 
     std::vector<VkImageView> attachments;
 
-    for (RBImageHandle img : desc.color_attachments)
+    for (auto attachment : desc.color_attachments)
     {
-        attachments.push_back(image_manager.get_image_view(img));
+        attachments.push_back(image_manager.get_image_view(attachment.image));
     }
 
     if (desc.depth_attachment)
-        attachments.push_back(image_manager.get_image_view(*desc.depth_attachment));
+        attachments.push_back(image_manager.get_image_view(desc.depth_attachment->image));
 
     VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     info.renderPass = render_pass;

@@ -44,16 +44,29 @@ RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb)
 {
     RenderPassDesc rp{};
 
-    for (auto img : fb.color_attachments)
+    for (auto attachment : fb.color_attachments)
     {
-        VkFormat format = get_image_format(img);
-        rp.color_formats.push_back(format);
+        VkFormat format = get_image_format(attachment.image);
+        
+        rp.color_attachments.push_back(RenderPassAttachmentInfo{
+            .format = format,
+            .load_op = attachment.load,
+            .store_op = attachment.store,
+            .usage = attachment.usage,
+        });
     }
 
     if (fb.depth_attachment)
     {
-        auto format = get_image_format(*fb.depth_attachment);
-        rp.depth_format = format;
+        auto attachment = *fb.depth_attachment;
+        
+        VkFormat format = get_image_format(attachment.image);
+        rp.depth_attachment.emplace(RenderPassAttachmentInfo{
+            .format = format,
+            .load_op = attachment.load,
+            .store_op = attachment.store,
+            .usage = attachment.usage,
+        });
     }
 
     return rp;
@@ -331,16 +344,20 @@ RBImageHandle VkRenderBackend::get_swapchain_image(std::optional<RBFrameHandle> 
 RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& fb)
 {
     RenderPassDesc desc{};
-
-    for (RBImageHandle image : fb.color_attachments)
+    desc.name = fb.pass;
+    for (auto& attachment : fb.color_attachments)
     {
-        desc.color_formats.push_back(get_image_format(image));
+        desc.color_attachments.push_back({get_image_format(attachment.image), attachment.load, attachment.store, attachment.usage});
     }
 
     if (fb.depth_attachment)
     {
-        desc.has_depth = true;
-        desc.depth_format = get_image_format(*fb.depth_attachment);
+        auto attachment = *fb.depth_attachment;
+        desc.depth_attachment.emplace(RenderPassAttachmentInfo{});
+        desc.depth_attachment->format = get_image_format(attachment.image);
+        desc.depth_attachment->load_op = fb.depth_attachment->load;
+        desc.depth_attachment->store_op = fb.depth_attachment->store;
+        desc.depth_attachment->usage = attachment.usage;
     }
 
     auto it = render_pass_cache.find(desc);
@@ -353,16 +370,20 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     uint32_t index = 0;
     
     
-    for (VkFormat fmt : desc.color_formats)
+    for (auto& attachment : desc.color_attachments)
     {
+        VkImageLayout layout = vk::to_attachment_layout(attachment.usage);
+        
         attachments.push_back({
-            .format = fmt,
+            .format = attachment.format,
             .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .loadOp = vk::vk_convert_attachment_load(attachment.load_op), // VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = vk::vk_convert_attachment_store(attachment.store_op),  // VK_ATTACHMENT_STORE_OP_STORE
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .initialLayout = attachment.load_op == RBLoadOp::Load
+                    ? layout
+                    : VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
         });
 
@@ -373,22 +394,31 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     }
 
     VkAttachmentReference depth_ref{};
-    if (desc.has_depth)
+    if (desc.depth_attachment.has_value())
     {
+        auto& attachment = *desc.depth_attachment;
+        
+        
+        VkImageLayout layout = vk::to_attachment_layout(attachment.usage);
+        
         attachments.push_back({
-            .format = desc.depth_format,
+            .format = attachment.format,
             .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .loadOp = vk::vk_convert_attachment_load(attachment.load_op), // VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = vk::vk_convert_attachment_store(attachment.store_op),  // VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+            .initialLayout = attachment.load_op == RBLoadOp::Load
+                ? layout
+                : VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = attachment.usage == RBImageUsage::DepthStencilReadOnly ?
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         });
 
         depth_ref = {
             .attachment = index,
-            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+            .layout = layout
         };
     }
 
@@ -396,7 +426,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = uint32_t(color_refs.size());
     subpass.pColorAttachments = color_refs.data();
-    if (desc.has_depth)
+    if (desc.depth_attachment.has_value())
         subpass.pDepthStencilAttachment = &depth_ref;
 
     VkRenderPassCreateInfo rpci{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };

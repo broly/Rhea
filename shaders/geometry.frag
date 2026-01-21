@@ -54,13 +54,22 @@ layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 void main()
 {
     // ----- Textures (linear space) -----
-    vec3 albedo = pow(texture(u_base_color, v_uv).rgb, vec3(2.2))
-    * material.base_color_mult;
-
-    vec3 emissive = texture(u_emissive, v_uv).rgb
-    * material.emissive_mult;
+    vec4 base_color_tx = texture(u_base_color, v_uv);
+    
+    vec3 albedo =
+        pow(base_color_tx.rgb, vec3(2.2))
+        * material.base_color_mult;
+    
+#if BLEND_MODE_TRANSLUCENT
+    float alpha = base_color_tx.a;
+#endif
+    
+    vec3 emissive = 
+        texture(u_emissive, v_uv).rgb
+        * material.emissive_mult;
 
     vec3 orm = texture(u_orm, v_uv).rgb;
+    
     float ao        = orm.r * material.occlusion_mult;
     float roughness = orm.g * material.roughness_mult;
     float metallic  = orm.b * material.metallic_mult;
@@ -102,9 +111,9 @@ void main()
         vec3  F   = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
         vec3 specular =
-        (NDF * G * F) /
-        max(4.0 * max(dot(normal, V), 0.0)
-            * max(dot(normal, L), 0.0), 0.001);
+            (NDF * G * F) /
+            max(4.0 * max(dot(normal, V), 0.0)
+                * max(dot(normal, L), 0.0), 0.001);
 
         vec3 kS = F;
         vec3 kD = (1.0 - kS) * (1.0 - metallic);
@@ -116,9 +125,9 @@ void main()
     vec3 ambient = vec3(0.01) * albedo * ao;
     vec3 hdr_color = ambient + Lo + emissive;
 
-    out_color = vec4(hdr_color, 1.0);
 #if BLEND_MODE_TRANSLUCENT
-    out_color = vec4(1.0, 0.0, 0.0, 0.0);
-#endif    
-    // out_color = vec4(material.base_color_mult, 1.0, 1.0, 1.0);
+    out_color = vec4(hdr_color, alpha);
+#else
+    out_color = vec4(hdr_color, 1.0);
+#endif
 }

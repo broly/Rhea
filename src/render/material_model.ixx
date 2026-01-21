@@ -26,9 +26,12 @@ export struct MatModel_Pass
     std::string requirements;
     std::map<Name, std::vector<Name>> enum_whitelist;
     std::map<ShaderStage, std::string> shaders;
+    bool depth_test;
+    bool depth_write;
+    bool translucent;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, shaders);
+    name, requirements, shaders, depth_test, depth_write, translucent);
 
 export struct MatModel_Parameter
 {

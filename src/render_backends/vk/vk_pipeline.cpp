@@ -203,6 +203,19 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         VK_COLOR_COMPONENT_G_BIT |
         VK_COLOR_COMPONENT_B_BIT |
         VK_COLOR_COMPONENT_A_BIT;
+    
+    if (pipeline_desc->is_translucent)
+    {
+        color.blendEnable = VK_TRUE; 
+        color.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; 
+        color.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
+        color.colorBlendOp = VK_BLEND_OP_ADD; 
+        color.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; 
+        color.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
+        color.alphaBlendOp = VK_BLEND_OP_ADD;
+    }
+    
+    
 
     VkPipelineColorBlendStateCreateInfo blend{
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO
@@ -213,8 +226,8 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     VkPipelineDepthStencilStateCreateInfo depth_ci{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO
     };
-    depth_ci.depthTestEnable = VK_TRUE;
-    depth_ci.depthWriteEnable = VK_TRUE;
+    depth_ci.depthTestEnable = pipeline_desc->depth_test ? VK_TRUE : VK_FALSE;
+    depth_ci.depthWriteEnable = pipeline_desc->depth_write ? VK_TRUE : VK_FALSE;
     depth_ci.depthCompareOp = VK_COMPARE_OP_LESS;
     depth_ci.depthBoundsTestEnable = VK_FALSE;
     depth_ci.stencilTestEnable = VK_FALSE;

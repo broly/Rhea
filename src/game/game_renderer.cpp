@@ -19,6 +19,17 @@ void GameRenderer::set_engine(const std::shared_ptr<Engine>& in_engine)
     engine = in_engine;
 }
 
+namespace Names
+{
+    static Name pass_geometry_base = "GeometryBase";
+    static Name pass_geometry_translucent = "GeometryTranslucent";
+    
+    static Name blend_mode = "blend_mode";
+    static Name blend_mode_opaque = "opaque";
+    static Name blend_mode_masked = "masked";
+    static Name blend_mode_trasnlucent = "translucent";
+}
+
 void GameRenderer::init(RBWindowHandle in_window)
 {
     Renderer::init(in_window);
@@ -63,6 +74,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     auto& tonemap_model = models.find("tonemap")->second;
     
     RGTextureDesc hdr_color_desc{
+        .name = "hdr_color",
         .width  = 0,
         .height = 0,
         .format = TextureFormat::RGBA16F,
@@ -115,6 +127,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     auto swapchain_extent = render_backend->get_swapchain_extent();
 
     auto swapchain_color = render_graph->create_texture({
+        .name = "swapchain",
         .width = swapchain_extent.width,
         .height = swapchain_extent.height,
         .format   = render_backend->get_swapchain_format(),
@@ -123,22 +136,39 @@ void GameRenderer::init(RBWindowHandle in_window)
     });
     
     auto depth_texture = render_graph->create_texture({
+        .name = "depth",
         .format = TextureFormat::Depth24Stencil8,
         .usage  = RenderTextureUsage::DepthStencil
     });
     
     
     render_graph->add_pass({
-        .name = "GeometryBase",
+        .name = Names::pass_geometry_base,
         .writes = { 
             // { hdr_color, RBImageUsage::ColorAttachment }, 
-            { depth_texture, RBImageUsage::DepthStencilAttachment },
-            
-            { swapchain_color, RBImageUsage::ColorAttachment }
+            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
+            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
         .execute = [=](RenderGraphContext& ctx)
         {
             PROFILE("GeometryBase");
+            
+            draw_scene(ctx);
+        }
+    });
+    
+    render_graph->add_pass({
+        .name = Names::pass_geometry_translucent,
+        .reads = {
+        },
+        .writes = { 
+            // { hdr_color, RBImageUsage::ColorAttachment }, 
+            { depth_texture, RBImageUsage::DepthStencilReadOnly, RBLoadOp::Load },
+            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [=](RenderGraphContext& ctx)
+        {
+            PROFILE("Translucent");
             
             draw_scene(ctx);
         }
@@ -289,6 +319,15 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
 
                 uint32_t mat_index = prim.material_index.value_or(0);
                 std::shared_ptr<Material> material = ro.mats[mat_index];
+                
+                Name blend_mode = material->get_enum_parameter(Names::blend_mode);
+                
+                const bool should_draw = 
+                    (pass_name == Names::pass_geometry_base && blend_mode == Names::blend_mode_opaque) ||
+                    (pass_name == Names::pass_geometry_translucent && blend_mode == Names::blend_mode_trasnlucent);    
+                
+                if (!should_draw)
+                    continue;
                 
                 auto model = models.find(material->model)->second;
 

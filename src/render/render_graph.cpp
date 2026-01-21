@@ -19,17 +19,9 @@ RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
 {
     RGTextureHandle handle;
     handle.id = uint32_t(textures.size());
+    handle.name = desc.name;
 
     textures.push_back({ desc, {} });
-    return handle;
-}
-
-RGResourceHandle RenderGraph::create_buffer(const RGBufferDesc&)
-{
-    RGResourceHandle handle;
-    handle.id = static_cast<uint32_t>(rg_resources.size());
-
-    rg_resources.push_back({ RGResourceKind::Buffer });
     return handle;
 }
 
@@ -154,6 +146,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 
         // framebuffer build
         FramebufferDesc fb_desc{};
+        fb_desc.pass = pass.name;
         for (auto handle : pass.writes)
         {
             const RGTexture& tex = textures[handle.texture.id];
@@ -164,9 +157,24 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
                     : tex.image.value();
 
             if (tex.desc.usage & RenderTextureUsage::DepthStencil)
-                fb_desc.depth_attachment = image;
+                fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
             else
-                fb_desc.color_attachments.push_back(image);
+                fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::Store, handle.usage});
+        }
+        
+        for (auto handle : pass.reads)
+        {
+            const RGTexture& tex = textures[handle.texture.id];
+
+            RBImageHandle image =
+                tex.desc.external
+                    ? backend->get_swapchain_image()
+                    : tex.image.value();
+
+            if (tex.desc.usage & RenderTextureUsage::DepthStencil)
+                fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
+            else
+                fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::DontCare, handle.usage});
         }
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
