@@ -26,7 +26,6 @@ public:
     PipelineLayoutDesc geom_pipeline_layout;
 
     RenderResource* camera_resource;
-    RenderResource* model_resource;
     RenderResource* light_resource;
     
     PipelineObject* geom_pipeline;

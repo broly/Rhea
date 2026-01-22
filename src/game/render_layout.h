@@ -13,10 +13,7 @@
 #define SET_LIGHT 1
     #define BINDING_UBO_LIGHT 0
 
-#define SET_MODEL 2
-    #define BINDING_UBO_MODEL 0
-
-#define SET_MATERIAL 3
+#define SET_MATERIAL 2
     #define BINDING_UBO_MATERIAL 0
     #define BINDING_SAMPLER_ALBEDO 1
     #define BINDING_SAMPLER_EMISSIVE 2

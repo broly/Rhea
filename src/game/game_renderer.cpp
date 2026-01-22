@@ -50,17 +50,6 @@ void GameRenderer::init(RBWindowHandle in_window)
     });
     
     
-    model_resource = render_graph->create_resource({
-        .name = "model_ubo",
-        .stages = ShaderStage::all,
-        .usage_type = ResourceUsageType::frame,
-        .variables = {
-            { "model_ubo", SET_MODEL, BINDING_UBO_MODEL, sizeof(ModelUBO_Temp) }
-        }
-    });
-    
-    
-    
     light_resource = render_graph->create_resource({
         .name = "light",
         .stages = ShaderStage::fragment,
@@ -103,7 +92,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     geom_pipeline_layout = {
         .vertex_layout = vertex_layout,
-        .resources = {camera_resource, light_resource, model_resource }, 
+        .resources = {camera_resource, light_resource }, 
         .push_constants = {{
             .stages = ShaderStage::vertex,
             .offset = 0,
@@ -379,13 +368,6 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
             // ---------- Mesh ----------
             ctx.backend.get_or_create_mesh_buffers(item.mesh);
             ctx.backend.bind_mesh(cmd, item.mesh, frame);
-
-            // ---------- Model ----------
-            auto model_resource_instance = model_resource->query_single(pipeline);
-            ModelUBO_Temp model_ubo{ item.world };
-            model_resource_instance->update_uniform_buffer(
-                pipeline, "model_ubo", model_ubo, frame);
-            model_resource_instance->bind(pipeline, cmd, frame);
 
             // ---------- Push constants ----------
             ctx.backend.push_constants(cmd, item.world, pipeline);

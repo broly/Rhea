@@ -23,17 +23,12 @@ layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
     vec4 camera_pos;
 } camera;
 
-layout(set = SET_MODEL, binding = BINDING_UBO_MODEL) uniform ModelUBO
-{
-    mat4 model;
-} model_ubo;
-
-
 // ---------- Push constants ----------
 layout(push_constant) uniform PushConstants
 {
     mat4 model;
 } pc;
+
 
 void main()
 {
