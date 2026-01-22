@@ -41,10 +41,32 @@
 						},
 						"color": { "x": 400, "y": 0, "z": 0 },
 						"intensity": 100,
-						"falloff": 100
+						"falloff": 100,
+						"type": "point"
 					}
-				},
-		
+				}
+			]
+		},
+		{
+			"name": "dir_light0",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "dir_light",
+					"class": "RhComp_Light",
+					"fields": {
+						"transform": {
+							"position": { "x": 4, "y": 19, "z": -2 },
+							"rotation": { "x": -1.9, "y": 2.28, "z": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"color": { "x": 400, "y": 400, "z": 200 },
+						"intensity": 100,
+						"falloff": 100,
+						"type": "directional"
+					}
+				}
 			]
 		},
 		{
@@ -111,7 +133,8 @@
 						},
 						"color": { "x": 100, "y": 100, "z": 100 },
 						"intensity": 100,
-						"falloff": 100
+						"falloff": 100,
+						"type": "point"
 					}
 				}
 			]

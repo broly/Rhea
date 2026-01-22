@@ -14,6 +14,13 @@ void WorldScript_RotateAroundObject::tick(double dt)
         camera_actor = world->find_actor_by_name("viewer");
     if (!camera_actor)
         return;
+    
+    
+    if (!dir_light_actor)
+        dir_light_actor = world->find_actor_by_name("dir_light0");
+    if (!dir_light_actor)
+        return;
+
 
     auto input = RhGlobals::engine->input;
     Transform t = camera_actor->get_transform();
@@ -26,6 +33,7 @@ void WorldScript_RotateAroundObject::tick(double dt)
         
         t.position = glm::vec3{0.0f, 0.0f, 10.0f};
         camera_actor->set_transform(t);
+        // dir_light_actor->set_transform(t);
     }
 
     // =========================
@@ -96,4 +104,5 @@ void WorldScript_RotateAroundObject::tick(double dt)
     
     // std::cout << t.position.x << " " << t.position.y << " " << t.position.z << std::endl;
     camera_actor->set_transform(t);
+        // dir_light_actor->set_transform(t);
 }

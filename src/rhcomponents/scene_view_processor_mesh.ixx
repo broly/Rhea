@@ -43,8 +43,5 @@ public:
 
     std::vector<RenderObject_Mesh> meshes;
     std::vector<RenderId> vacated_mesh_ids;
-
-
-    std::unordered_map<MaterialKey, RenderResourceInstance*, MaterialKeyHash> material_cache;
 };
 REFLECT_OBJECT(SceneViewProcessor_Mesh, SceneViewProcessor);

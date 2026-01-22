@@ -32,8 +32,11 @@ void SceneViewProcessor_Light::process()
     {
         auto& light_ro = lights[submitted.render_id.identifier];
         
+        
         light_ro.position = submitted.transform.position;
         light_ro.color = submitted.color;
+        light_ro.direction = glm::normalize(submitted.transform.forward());
+        light_ro.type = submitted.light_type;
         // light_ro.attenuation = submitted.attenuation;
     }
 }

@@ -40,38 +40,6 @@ void VkRenderBackend::transition_image(
     image_manager.transition_image(cmd, image, before, after);
 }
 
-RenderPassDesc VkRenderBackend::make_render_pass_desc(const FramebufferDesc& fb) const
-{
-    RenderPassDesc rp{};
-
-    for (auto attachment : fb.color_attachments)
-    {
-        VkFormat format = get_image_format(attachment.image);
-        
-        rp.color_attachments.push_back(RenderPassAttachmentInfo{
-            .format = format,
-            .load_op = attachment.load,
-            .store_op = attachment.store,
-            .usage = attachment.usage,
-        });
-    }
-
-    if (fb.depth_attachment)
-    {
-        auto attachment = *fb.depth_attachment;
-        
-        VkFormat format = get_image_format(attachment.image);
-        rp.depth_attachment.emplace(RenderPassAttachmentInfo{
-            .format = format,
-            .load_op = attachment.load,
-            .store_op = attachment.store,
-            .usage = attachment.usage,
-        });
-    }
-
-    return rp;
-}
-
 
 void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
 {
@@ -381,12 +349,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),  // VK_ATTACHMENT_STORE_OP_STORE
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = attachment.load_op == RBLoadOp::Load
-                    ? layout
-                    : VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = attachment.usage == RBImageUsage::SampledFragment
-                    ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            .initialLayout = vk::to_attachment_layout(attachment.usage),
+            .finalLayout   = vk::to_attachment_layout(attachment.usage),
         });
 
         color_refs.push_back({
@@ -410,7 +374,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),  // VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = attachment.load_op == RBLoadOp::Load
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
                 ? layout
                 : VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout = attachment.usage == RBImageUsage::DepthStencilReadOnly ?

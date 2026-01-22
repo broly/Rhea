@@ -7,7 +7,6 @@ export import :handle_types;
 export import :pipeline_object;
 export import :graphics_pipeline_desc;
 export import :rg_types;
-export import :render_objects;
 export import :ubos;
 export import :render_resource;
 export import :render_resource_instance;

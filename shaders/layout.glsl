@@ -9,7 +9,11 @@
 #define SET_LIGHT 1
     #define BINDING_UBO_LIGHT 0
 
-#define SET_MATERIAL 2
+
+#define SET_SHADOW 2
+    #define BINDING_UBO_SHADOW 0
+
+#define SET_MATERIAL 3
     #define BINDING_UBO_MATERIAL 0
     #define BINDING_SAMPLER_ALBEDO 1
     #define BINDING_SAMPLER_EMISSIVE 2

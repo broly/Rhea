@@ -150,9 +150,7 @@ private: // internal section
     void update_viewport_extent(const RBCommandList& cmd);
     
     vk::DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
-    
-    RenderPassDesc make_render_pass_desc(const FramebufferDesc& fb) const;
-    
+
     VkFormat get_image_format(RBImageHandle handle) const;
     
     RBPipelineHandle get_or_create_pipeline(

@@ -66,4 +66,5 @@ export namespace glm
     using glm::perspectiveNO;
     using glm::perspectiveRH;
     using glm::perspectiveLH;
+    using glm::ortho;
 }

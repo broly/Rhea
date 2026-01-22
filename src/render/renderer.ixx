@@ -4,7 +4,6 @@ import <memory>;
 import <map>;
 
 import :handle_types;
-import :render_objects;
 import :render_backend;
 import :material_model;
 import :pipeline_family;
@@ -22,16 +21,28 @@ export struct MaterialUBO
 REFLECT_STRUCT_RUNTIME(MaterialUBO,
     base_color_factor, emissive_factor, occlusion_factor, roughness_factor, metallic_factor);
 
-export struct Light
+export struct PointLight
 {
     glm::vec4 position;
     glm::vec4 color;
 };
 
+export struct DirectionalLight
+{
+    glm::vec4 direction; // xyz normalized (world)
+    glm::vec4 color;     // rgb * intensity
+    glm::mat4 light_vp;  // view-projection for shadow
+};
+
 export struct LightUBO
 {
-    Light lights[8];
+    PointLight lights[8];
     int light_count;
+    glm::vec3 _pad0;
+    
+    DirectionalLight dir_light;
+    int has_dir_light;
+    glm::vec3 _pad1;
 };
 
 

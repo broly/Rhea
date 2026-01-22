@@ -38,17 +38,54 @@ layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
 } camera;
 
 // ================== LIGHT ==================
-struct Light
+struct PointLight
 {
     vec4 position;
     vec4 color;
 };
 
+struct DirectionalLight
+{
+    vec4 direction; // xyz normalized (world)
+    vec4 color;     // rgb * intensity
+    mat4 light_vp;  // view-projection for shadow
+};
+
 layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 {
-    Light lights[8];
+    PointLight lights[8];
     int light_count;
+
+    DirectionalLight dir_light;
+    int has_dir_light;
+
 } light_ubo;
+
+
+
+layout(set = SET_SHADOW, binding = BINDING_UBO_SHADOW) uniform sampler2DShadow u_shadow_map;
+
+
+
+float shadow_factor(vec3 world_pos)
+{
+    vec4 light_space =
+    light_ubo.dir_light.light_vp * vec4(world_pos, 1.0);
+
+    vec3 proj = light_space.xyz / light_space.w;
+    proj = proj * 0.5 + 0.5;
+
+    if (proj.z > 1.0)
+    return 1.0;
+
+    float shadow = texture(
+        u_shadow_map,
+        vec3(proj.xy, proj.z - 0.005)
+    );
+
+    return shadow;
+}
+
 
 // ================== MAIN ==================
 void main()
@@ -122,6 +159,21 @@ void main()
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
 
+    if (light_ubo.has_dir_light == 1)
+    {
+        vec3 L = normalize(-light_ubo.dir_light.direction.xyz);
+        vec3 H = normalize(V + L);
+
+        float shadow = shadow_factor(v_world_pos);
+
+        float NdotL = max(dot(normal, L), 0.0);
+
+        vec3 radiance = light_ubo.dir_light.color.rgb * shadow;
+
+        Lo += radiance * NdotL;
+
+    }
+
     vec3 ambient = vec3(0.01) * albedo * ao;
     vec3 hdr_color = ambient + Lo + emissive;
 
@@ -130,4 +182,5 @@ void main()
 #else
     out_color = vec4(hdr_color, 1.0);
 #endif
+    
 }

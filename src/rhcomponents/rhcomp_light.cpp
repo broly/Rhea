@@ -39,4 +39,5 @@ void RhComp_Light::update_scene_proxy()
     scene_proxy.color = color;
     scene_proxy.intensity = intensity;
     scene_proxy.falloff = falloff;
+    scene_proxy.light_type = type;
 }

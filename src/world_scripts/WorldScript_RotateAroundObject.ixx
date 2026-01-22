@@ -18,5 +18,6 @@ public:
     float mouse_sensitivity = 0.0025f;
     float move_speed = 10.0f;
     std::shared_ptr<RhActor> camera_actor = nullptr;
+    std::shared_ptr<RhActor> dir_light_actor = nullptr;
 
 };

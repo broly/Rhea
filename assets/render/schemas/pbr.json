@@ -106,7 +106,7 @@
 			}
 		}
 	},
-	"set": 2,
+	"set": 3,
 	"passes": [	
 		{
 			"name": "GeometryBase",

@@ -59,6 +59,23 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
+    light_resource_shadow = render_graph->create_resource({
+        .name = "shadow_light",
+        .stages = ShaderStage::vertex,
+        .usage_type = ResourceUsageType::persistent,
+        .variables = {
+            { "shadow_light_ubo", 0, 0, sizeof(LightUBO) }
+        }
+    });
+    
+    shadow_resource = render_graph->create_resource({
+        .name = "shadow",
+        .stages = ShaderStage::fragment,
+        .usage_type = ResourceUsageType::frame,
+        .variables = {
+            { "u_shadow_map", SET_SHADOW, BINDING_UBO_SHADOW }
+        }
+    });
     
     auto& tonemap_model = models.find("tonemap")->second;
     
@@ -73,7 +90,7 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     auto hdr_color = render_graph->create_texture(hdr_color_desc);
     
-    VertexLayout vertex_layout = {
+    VertexLayout geom_vertex_layout = {
         VertexLayout {
             .layouts = {
                 VertexLayoutData{
@@ -90,15 +107,41 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     };
     
+    VertexLayout shadow_vertex_layout = {
+        VertexLayout {
+            .layouts = {
+                VertexLayoutData{
+                    .binding_index = 0,
+                    .stride = sizeof(Vertex),
+                    .attributes = {
+                        { "in_position", LOCATION_ATTR_POSITION, offsetof(Vertex, position) }
+                    }
+                }
+            }
+        }
+    };
+
+    
     geom_pipeline_layout = {
-        .vertex_layout = vertex_layout,
-        .resources = {camera_resource, light_resource }, 
+        .vertex_layout = geom_vertex_layout,
+        .resources = {camera_resource, light_resource, shadow_resource }, 
         .push_constants = {{
             .stages = ShaderStage::vertex,
             .offset = 0,
             .size = sizeof(glm::mat4),
         }}
     };
+    
+    shadow_pipeline_layout = {
+        .vertex_layout = shadow_vertex_layout,
+        .resources = { light_resource_shadow },
+        .push_constants = {{
+            .stages = ShaderStage::vertex,
+            .offset = 0,
+            .size = sizeof(glm::mat4),
+        }}
+    };
+    
     
     PipelineLayoutDesc tonemap_pipeline_layout = {
         .vertex_layout = {},
@@ -130,9 +173,30 @@ void GameRenderer::init(RBWindowHandle in_window)
         .usage  = RenderTextureUsage::DepthStencil
     });
     
+    shadow_map = render_graph->create_texture({
+        .name = "shadow_map",
+        .width = 2048,
+        .height = 2048,
+        .format = TextureFormat::Depth32F,
+        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
+    });
+    
+    render_graph->add_pass({
+        .name = "ShadowMap",
+        .writes = {
+            { shadow_map, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear }
+        },
+        .execute = [=](RenderGraphContext& ctx)
+        {
+            draw_scene_shadow(ctx);
+        }
+    });
     
     render_graph->add_pass({
         .name = Names::pass_geometry_base,
+        .reads = {
+            {  shadow_map, RBImageUsage::SampledFragment }
+        },
         .writes = { 
             // { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
@@ -180,7 +244,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             
             std::shared_ptr<MaterialInstance> material_instance =
                 get_or_create_material_instance(tonemap_material, ctx.pass_name);
-
+    
             auto* tonemap_instance =
                 material_instance->get_or_create_resource_instance(
                     tonemap_pipeline,
@@ -287,11 +351,41 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         {
             light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
             light_ubo.lights[i].color    = glm::vec4(lights[i].color);
+            
         }
+        
+        const auto dir_light = light_processor.get_directional_light();
+        if (dir_light)
+        {
+            light_ubo.has_dir_light = true;
+            light_ubo.dir_light.direction = glm::vec4(dir_light->direction, 1.f);
+            light_ubo.dir_light.color = glm::vec4(dir_light->color);
+            // --- build VP ---
+            glm::vec3 center = glm::vec3(0.0f);
+            float size = 50.0f;
+
+            glm::mat4 view =
+                glm::lookAt(
+                    center - dir_light->direction * size,
+                    center,
+                    glm::vec3(0,1,0)
+                );
+
+            glm::mat4 proj =
+                glm::ortho(-size, size, -size, size, 0.1f, 200.f);
+
+            light_ubo.dir_light.light_vp = proj * view;
+        }
+        
 
         auto light = light_resource->query_single(pipeline);
         light->update_uniform_buffer(pipeline, "light_ubo", light_ubo, frame);
         light->bind(pipeline, cmd, frame);
+        
+        auto shadow = shadow_resource->query_single(pipeline);
+        shadow->update_image(pipeline, "u_shadow_map", 
+                render_graph->get_image(shadow_map), frame);
+        shadow->bind(pipeline, cmd, frame);
     };
 
     // ============================================================
@@ -398,6 +492,137 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         }
     }
 }
+
+void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
+{
+    PROFILE("ShadowPass");
+
+    auto& scene_view = engine->scene_view;
+    auto cmd = ctx.cmd;
+    auto frame = ctx.frame;
+
+    PipelineObject* current_pipeline = nullptr;
+
+    auto bind_light = [&](PipelineObject* pipeline)
+    {
+        if (pipeline == current_pipeline)
+            return;
+
+        current_pipeline = pipeline;
+
+        auto& light_processor =
+            scene_view->get_processor<SceneViewProcessor_Light>();
+
+        LightUBO light_ubo{};
+        light_ubo.has_dir_light = 0;
+
+        for (auto& l : light_processor.lights)
+        {
+            if (l.type == LightType::directional)
+            {
+                light_ubo.has_dir_light = 1;
+                light_ubo.dir_light.direction =
+                    glm::vec4(l.direction, 0.0f);
+                light_ubo.dir_light.color = l.color;
+
+                // --- build VP ---
+                glm::vec3 center = glm::vec3(0.0f);
+                float size = 50.0f;
+
+                glm::mat4 view =
+                    glm::lookAt(
+                        center - l.direction * size,
+                        center,
+                        glm::vec3(0,1,0)
+                    );
+
+                glm::mat4 proj =
+                    glm::ortho(-size, size, -size, size, 0.1f, 200.f);
+
+                light_ubo.dir_light.light_vp = proj * view;
+                
+                break;
+            }
+        }
+
+        auto light = light_resource_shadow->query_single(pipeline);
+        light->update_uniform_buffer(
+            pipeline, "shadow_light_ubo", light_ubo, frame);
+        light->bind(pipeline, cmd, frame);
+    };
+
+    // =======================
+    // Collect draw items
+    // =======================
+
+    struct DrawItem
+    {
+        MeshPrimHandle mesh;
+        glm::mat4 world;
+    };
+
+    std::vector<DrawItem> items;
+
+    auto& mesh_processor =
+        scene_view->get_processor<SceneViewProcessor_Mesh>();
+
+    for (const auto& ro : mesh_processor.meshes)
+    {
+        for (uint32_t geom = 0; geom < ro.mesh.get().mesh_geometry.size(); ++geom)
+        {
+            for (uint32_t prim = 0;
+                 prim < ro.mesh.get().mesh_geometry[geom].primitives.size();
+                 ++prim)
+            {
+                uint32_t mat_index =
+                    ro.mesh.get().mesh_geometry[geom]
+                        .primitives[prim].material_index.value_or(0);
+
+                auto material = ro.mats[mat_index];
+                Name blend_mode =
+                    material->get_enum_parameter(Names::blend_mode);
+
+                if (blend_mode != Names::blend_mode_opaque)
+                    continue;
+
+                items.push_back({
+                    .mesh = MeshPrimHandle{ro.mesh, geom, prim},
+                    .world = ro.world
+                });
+            }
+        }
+    }
+
+    // =======================
+    // Draw
+    // =======================
+
+    for (auto& item : items)
+    {
+        auto pipeline_family =
+            get_or_create_material_pipeline_family(
+                "ShadowMap",
+                models.find("Shadow")->second
+            );
+
+        PipelineObject* pipeline =
+            pipeline_family->request_pipeline({}, shadow_pipeline_layout);
+
+        ctx.backend.bind_pipeline(cmd, pipeline);
+        bind_light(pipeline);
+
+        ctx.backend.get_or_create_mesh_buffers(item.mesh);
+        ctx.backend.bind_mesh(cmd, item.mesh, frame);
+
+        ctx.backend.push_constants(cmd, item.world, pipeline);
+
+        ctx.backend.draw_indexed(
+            cmd,
+            item.mesh.get().indices.size()
+        );
+    }
+}
+
 
 std::shared_ptr<MaterialInstance> GameRenderer::get_or_create_material_instance(
     std::shared_ptr<Material> material, Name pass_name)

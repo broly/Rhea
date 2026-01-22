@@ -12,8 +12,10 @@ import <algorithm>;
 export struct RenderObject_Light
 {
     glm::vec3 position;
+    glm::vec3 direction;
     glm::vec4 color;
     float attenuation;
+    LightType type;
 };
 
 export class SceneViewProcessor_Light : public SceneViewProcessor
@@ -38,6 +40,7 @@ public:
         size_t
     > query_nearest_lights_limited(glm::vec3 origin)
     {
+        bool has_dir_light = false;
         std::array<RenderObject_Light, NumLights> result;
         std::vector<RenderObject_Light> sorted_lights = lights;
         
@@ -50,7 +53,11 @@ public:
         for (int i = 0; i < NumLights; i++)
         {
             if (i < sorted_lights.size())
+            {
+                if (sorted_lights[i].type == LightType::directional)
+                    has_dir_light = true;
                 result[i] = sorted_lights[i];
+            }
             else
             {
                 result[i].position = {};
@@ -58,7 +65,17 @@ public:
             }
         }
         
-        return {result, std::min(NumLights, sorted_lights.size())};
+        
+        const size_t num_lights = sorted_lights.size() - (int)has_dir_light;
+        return {result, std::min(NumLights, num_lights)};
+    }
+    
+    std::optional<RenderObject_Light> get_directional_light()
+    {
+        for (auto& light : lights)
+            if (light.type == LightType::directional)
+                return light;
+        return std::nullopt;
     }
 };
 REFLECT_OBJECT(SceneViewProcessor_Light, SceneViewProcessor);

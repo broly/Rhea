@@ -133,7 +133,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
     for (auto& tex : textures)
     {
         if (tex.desc.external)
-            tex.current_usage = RBImageUsage::Undefined;
+            tex.current_usage = RBImageUsage::Present;
     }
 
     for (size_t i = 0; i < execution_order.size(); ++i)
