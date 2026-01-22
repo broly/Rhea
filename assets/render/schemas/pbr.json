@@ -1,6 +1,8 @@
 {
 	"model_name": "PBR",
 	
+	"usage_type": "persistent",
+	
 	"enums": {
 		"blend_mode": [
 			"opaque",

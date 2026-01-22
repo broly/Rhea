@@ -384,7 +384,9 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .initialLayout = attachment.load_op == RBLoadOp::Load
                     ? layout
                     : VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            .finalLayout = attachment.usage == RBImageUsage::SampledFragment
+                    ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
         });
 
         color_refs.push_back({

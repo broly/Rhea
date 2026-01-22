@@ -136,7 +136,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         .writes = { 
             // { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
-            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
         .execute = [=](RenderGraphContext& ctx)
         {
@@ -151,9 +151,8 @@ void GameRenderer::init(RBWindowHandle in_window)
         .reads = {
         },
         .writes = { 
-            // { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilReadOnly, RBLoadOp::Load },
-            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color, RBImageUsage::ColorAttachment }, 
         },
         .execute = [=](RenderGraphContext& ctx)
         {
@@ -163,27 +162,47 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
-    // render_graph->add_pass({
-    //     .name = "ToneMapping",
-    //     .reads = {
-    //         { hdr_color, RBImageUsage::SampledFragment }
-    //     },
-    //     .writes = {
-    //         { swapchain_color, RBImageUsage::ColorAttachment }
-    //     },
-    //     .execute = [=](RenderGraphContext& ctx)
-    //     {
-    //         
-    //         ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
-    //         
-    //         get_or_create_material_instance()
-    //         auto tonemap = tonemap_resource->query_single();
-    //         tonemap->update_image(tonemap_pipeline, "u_hdr_color", render_graph->get_image(hdr_color), ctx.frame);
-    //         tonemap->bind(tonemap_pipeline, ctx.cmd, ctx.frame);
-    //         
-    //         ctx.backend.draw_fullscreen(ctx.cmd);
-    //     }
-    // });
+    auto tonemap_material = std::make_shared<Material>();
+    tonemap_material->model = "Tonemap";
+    
+    render_graph->add_pass({
+        .name = "ToneMapping",
+        .reads = {
+            { hdr_color, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { swapchain_color, RBImageUsage::ColorAttachment }
+        },
+        .execute = [=](RenderGraphContext& ctx)
+        {
+            
+            ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
+            
+            std::shared_ptr<MaterialInstance> material_instance =
+                get_or_create_material_instance(tonemap_material, ctx.pass_name);
+
+            auto* tonemap_instance =
+                material_instance->get_or_create_resource_instance(
+                    tonemap_pipeline,
+                    ctx.frame
+                );
+            
+            tonemap_instance->update_image(
+                tonemap_pipeline,
+                "u_hdr_color",
+                render_graph->get_image(hdr_color),
+                ctx.frame
+            );
+            
+            tonemap_instance->bind(
+                tonemap_pipeline,
+                ctx.cmd,
+                ctx.frame
+            );
+            
+            ctx.backend.draw_fullscreen(ctx.cmd);
+        }
+    });
 
     
     render_graph->compile();

@@ -9,10 +9,22 @@ import type_id;
 import assets;
 import name;
 
+#include "common/reflect_macros.h"
 #include "common/type_macros.h"
 
+import <map>;
 import type_utils;
 import enum_helpers;
+
+
+
+export enum class ResourceUsageType
+{
+    frame,      // per-frame (camera, per-frame UBOs)
+    persistent  // materials, textures etc.
+};
+REFLECT_ENUM(ResourceUsageType,
+    frame, persistent);
 
 export 
 {
@@ -137,12 +149,6 @@ export
     //     Depth32F
     // };
 
-
-    enum class ResourceUsageType
-    {
-        frame,      // per-frame (camera, per-frame UBOs)
-        persistent  // materials, textures etc.
-    };
 
     struct RBBufferHandle
     {

@@ -109,6 +109,19 @@ void RenderGraph::compile()
     graph_compiled = true;
 }
 
+bool is_attachment(RBImageUsage usage)
+{
+    switch (usage)
+    {
+    case RBImageUsage::ColorAttachment:
+    case RBImageUsage::DepthStencilAttachment:
+    case RBImageUsage::DepthStencilReadOnly:
+        return true;
+    default:
+        return false;
+    }
+}
+
 
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 {
@@ -156,10 +169,13 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
                     ? backend->get_swapchain_image()
                     : tex.image.value();
 
-            if (tex.desc.usage & RenderTextureUsage::DepthStencil)
-                fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
-            else
-                fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::Store, handle.usage});
+            if (is_attachment(handle.usage))
+            {
+                if (tex.desc.usage & RenderTextureUsage::DepthStencil)
+                    fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
+                else
+                    fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::Store, handle.usage});
+            }
         }
         
         for (auto handle : pass.reads)
@@ -171,10 +187,15 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
                     ? backend->get_swapchain_image()
                     : tex.image.value();
 
-            if (tex.desc.usage & RenderTextureUsage::DepthStencil)
-                fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
-            else
-                fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::DontCare, handle.usage});
+            if (is_attachment(handle.usage))
+            {
+                if (tex.desc.usage & RenderTextureUsage::DepthStencil)
+                    fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
+                else
+                {
+                    fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::DontCare, handle.usage});
+                }
+            }
         }
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);

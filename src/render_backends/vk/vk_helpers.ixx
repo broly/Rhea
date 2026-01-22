@@ -388,6 +388,22 @@ export namespace vk
         case RBImageUsage::DepthStencilReadOnly:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
+        case RBImageUsage::SampledFragment:
+        case RBImageUsage::SampledVertex:
+            return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        case RBImageUsage::TransferSrc:
+            return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+        case RBImageUsage::TransferDst:
+            return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+        case RBImageUsage::Present:
+            return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        case RBImageUsage::Undefined:
+            return VK_IMAGE_LAYOUT_UNDEFINED;
+
         default:
             assert(false);
             return VK_IMAGE_LAYOUT_UNDEFINED;

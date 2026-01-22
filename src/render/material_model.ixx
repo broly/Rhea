@@ -72,7 +72,9 @@ public:
     
     const MatModel_Pass* get_pass_info(Name pass_name) const;
     
+    ResourceUsageType usage_type;
+    
     void on_serialize(DependencyCollector* dc) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, uniform_buffers, set, parameters, sampler, permutations, passes);
+                      model_name, enums, uniform_buffers, set, parameters, sampler, permutations, passes, usage_type);

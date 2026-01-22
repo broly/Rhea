@@ -77,7 +77,7 @@ RenderResource* Renderer::get_or_create_resource_from_model(std::shared_ptr<Mate
 
     RenderResourceDesc desc{};
     desc.name = model->model_name;
-    desc.usage_type = ResourceUsageType::persistent;
+    desc.usage_type = model->usage_type;
     desc.sampler = samplers[model->sampler];
 
     // UBOs

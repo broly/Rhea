@@ -1,11 +1,14 @@
 {
 	"model_name": "Tonemap",
 	
+	"usage_type": "frame",
+	
 	"enums": {
 	},
 	
 	"uniform_buffers": {
 	},
+	"sampler": "default",
 	
 	"parameters": {
 		"hdr_color": {
