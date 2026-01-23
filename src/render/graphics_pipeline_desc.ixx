@@ -34,6 +34,21 @@ REFLECT_ENUM(ShaderStage,
     none, vertex, fragment, reserved2, reserved3, reserved4, reserved5, reserved6, reserved7);
 ENUM_MASK_OPS(ShaderStage, export);
 
+export enum class CullMode
+{
+    none, front, back, both
+};
+REFLECT_ENUM(CullMode,
+    none, front, back, both);
+
+
+export enum class FrontFace
+{
+    CW, CCW,
+};
+REFLECT_ENUM(FrontFace,
+    CW, CCW);
+
 struct VertexAttributeInfo
 {
     const char* variable_name;
@@ -172,6 +187,9 @@ export
         bool depth_test;
         bool depth_write;
         bool is_translucent;
+        CullMode cull_mode;
+        FrontFace front_face;
+        
 
         PipelineRenderTargetDesc rt_compat;
     };

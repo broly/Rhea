@@ -90,6 +90,31 @@ static constexpr std::array<VkShaderStageFlagBits, MAX_STAGES> get_vk_stages()
 
 constexpr std::array<VkShaderStageFlagBits, MAX_STAGES> STAGES_VK_BITS = get_vk_stages();
 
+VkCullModeFlags conv_cull_mode(CullMode cull_mode)
+{
+    switch (cull_mode) {
+    case CullMode::none:
+        return VK_CULL_MODE_NONE;
+    case CullMode::front:
+        return VK_CULL_MODE_FRONT_BIT;
+    case CullMode::back:
+        return VK_CULL_MODE_BACK_BIT;
+    case CullMode::both:
+        return VK_CULL_MODE_FRONT_AND_BACK;
+    }
+    unreachable("error");
+}
+
+VkFrontFace conv_front_face(FrontFace front_face)
+{
+    switch (front_face) {
+    case FrontFace::CW:
+        return VK_FRONT_FACE_CLOCKWISE;
+    case FrontFace::CCW:
+        return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    }
+    unreachable("error");
+}
 
 VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 {
@@ -188,8 +213,8 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     };
     raster.polygonMode = VK_POLYGON_MODE_FILL;
     raster.lineWidth = 1.0f;
-    raster.cullMode = VK_CULL_MODE_BACK_BIT;
-    raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    raster.cullMode = conv_cull_mode(pipeline_desc->cull_mode); // VK_CULL_MODE_BACK_BIT;
+    raster.frontFace = conv_front_face(pipeline_desc->front_face); // VK_FRONT_FACE_CLOCKWISE;
     
     
     VkPipelineMultisampleStateCreateInfo ms{
@@ -228,7 +253,7 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     };
     depth_ci.depthTestEnable = pipeline_desc->depth_test ? VK_TRUE : VK_FALSE;
     depth_ci.depthWriteEnable = pipeline_desc->depth_write ? VK_TRUE : VK_FALSE;
-    depth_ci.depthCompareOp = VK_COMPARE_OP_LESS;
+    depth_ci.depthCompareOp = pipeline_desc->cull_mode == CullMode::none ? VK_COMPARE_OP_ALWAYS : VK_COMPARE_OP_LESS;
     depth_ci.depthBoundsTestEnable = VK_FALSE;
     depth_ci.stencilTestEnable = VK_FALSE;
 

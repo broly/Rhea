@@ -1,0 +1,43 @@
+{
+	"model_name": "shadow",
+	
+	"usage_type": "frame",
+	
+	"enums": {
+	},
+	
+	"uniform_buffers": {
+	},
+	
+	"sampler": "surface",
+	
+	"parameters": {
+		"base_color": {
+			"type": "sampler",
+			"dynamic": true,
+			"shader_parameter": "u_base_color",
+			"ubo": null,
+			"binding": 1
+		},
+	},	
+	"permutations": {
+	},
+	"set": 0,
+	"passes": [	
+		{
+			"name": "shadowmap",
+			"requirements": "",
+			"enum_white_list": {
+			},
+			"shaders": {
+				"vertex": "shadow.vert",
+				"fragment": "shadow.frag"
+			},
+			"depth_write": true,
+			"depth_test": true,
+			"translucent": false,
+			"cull_mode": "none",
+			"front_face": "CCW"
+		}
+	]
+}

@@ -47,16 +47,26 @@ public:
         std::sort(sorted_lights.begin(), sorted_lights.end(),
             [origin](const RenderObject_Light& a, const RenderObject_Light& b) {
                 
-                return glm::distance(a.position, origin) < glm::distance(b.position, origin);
+                if (a.type == LightType::directional &&
+                    b.type != LightType::directional)
+                    return false;
+
+                if (a.type != LightType::directional &&
+                    b.type == LightType::directional)
+                    return true;
+
+                return glm::distance(a.position, origin) <
+                       glm::distance(b.position, origin);
             });
+        
+        size_t num_lights = 0;
         
         for (int i = 0; i < NumLights; i++)
         {
-            if (i < sorted_lights.size())
+            if (i < sorted_lights.size() && sorted_lights[i].type == LightType::point)
             {
-                if (sorted_lights[i].type == LightType::directional)
-                    has_dir_light = true;
                 result[i] = sorted_lights[i];
+                num_lights++;
             }
             else
             {
@@ -66,7 +76,6 @@ public:
         }
         
         
-        const size_t num_lights = sorted_lights.size() - (int)has_dir_light;
         return {result, std::min(NumLights, num_lights)};
     }
     

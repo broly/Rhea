@@ -120,7 +120,9 @@
 			},
 			"depth_write": true,
 			"depth_test": true,
-			"translucent": false
+			"translucent": false,
+			"cull_mode": "back",
+			"front_face": "CW"
 		},
 		{
 			"name": "GeometryTranslucent",
@@ -134,7 +136,9 @@
 			},
 			"depth_write": false,
 			"depth_test": true,
-			"translucent": true
+			"translucent": true,
+			"cull_mode": "back",
+			"front_face": "CW"
 		}
 	]
 }

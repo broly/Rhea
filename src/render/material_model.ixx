@@ -29,9 +29,11 @@ export struct MatModel_Pass
     bool depth_test;
     bool depth_write;
     bool translucent;
+    CullMode cull_mode;
+    FrontFace front_face;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, shaders, depth_test, depth_write, translucent);
+    name, requirements, shaders, depth_test, depth_write, translucent, cull_mode, front_face);
 
 export struct MatModel_Parameter
 {

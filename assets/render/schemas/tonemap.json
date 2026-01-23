@@ -35,7 +35,9 @@
 			"shaders": {
 				"vertex": "fullscreen.vert",
 				"fragment": "tonemap.frag"
-			}
+			},
+			"cull_mode": "none",
+			"front_face": "CW"
 		}
 	]
 }

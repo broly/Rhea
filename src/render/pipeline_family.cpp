@@ -106,6 +106,8 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key, const PipelineLa
     desc.depth_test = pass->depth_test;
     desc.depth_write = pass->depth_write;
     desc.is_translucent = pass->translucent;
+    desc.cull_mode = pass->cull_mode;
+    desc.front_face = pass->front_face;
 
     for (const auto& [stage_enum, shader_name] : pass->shaders)
     {
