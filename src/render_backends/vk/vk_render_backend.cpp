@@ -354,8 +354,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .finalLayout   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .initialLayout = vk::to_attachment_layout(attachment.usage),
+            .finalLayout   = vk::to_attachment_layout(attachment.usage),
         });
 
         color_refs.push_back({
@@ -379,8 +379,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, // vk::to_attachment_layout(attachment.usage),
-            .finalLayout   = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL // vk::to_attachment_layout(attachment.usage),
+            .initialLayout = vk::to_attachment_layout(attachment.usage), // vk::to_attachment_layout(attachment.usage),
+            .finalLayout   = vk::to_attachment_layout(attachment.usage) // vk::to_attachment_layout(attachment.usage),
         });
 
 
