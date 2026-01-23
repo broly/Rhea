@@ -43,7 +43,7 @@ public:
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
 
     virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) = 0;
-
+    virtual void update_viewport(const RBCommandList& cmd, uint32_t width, uint32_t height) = 0;
 
     template<RenderBackendType T>
     static std::shared_ptr<RenderBackend> create(RBWindowHandle window_handle)
@@ -91,8 +91,8 @@ public:
     virtual void transition_image(
         RBCommandList cmd,
         RBImageHandle image,
-        RBImageUsage before,
-        RBImageUsage after) = 0;
+        RBImageLayout before,
+        RBImageLayout after) = 0;
     
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
     

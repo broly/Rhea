@@ -77,6 +77,34 @@ public:
         PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout);
 
     RenderResource* create_resource(const RenderResourceDesc& desc);
+    
+    static RBImageLayout layout_for(RBImageUsage usage)
+    {
+        switch (usage)
+        {
+        case RBImageUsage::ColorAttachment:
+            return RBImageLayout::color_attachment_optimal;
+        case RBImageUsage::DepthStencilAttachment:
+            return RBImageLayout::depth_stencil_attachment_optimal;
+        case RBImageUsage::DepthStencilReadOnly:
+            return RBImageLayout::depth_stencil_read_only_optimal;
+        case RBImageUsage::SampledFragment:
+            return RBImageLayout::shader_read_only_optimal;
+        case RBImageUsage::TransferDst:
+            return RBImageLayout::transfer_dst_optimal;
+        case RBImageUsage::TransferSrc:
+            return RBImageLayout::transfer_src_optimal;
+        case RBImageUsage::Present:
+            return RBImageLayout::transfer_present;
+        default:
+            return RBImageLayout::undefined;
+        }
+    }
+    
+    void transition_if_needed(
+        RBCommandList cmd,
+        RGTexture& tex,
+        RBImageUsage next_usage) const;
 
 private:
     struct Resource

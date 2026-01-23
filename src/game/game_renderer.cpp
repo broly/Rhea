@@ -215,8 +215,8 @@ void GameRenderer::init(RBWindowHandle in_window)
         .reads = {
         },
         .writes = { 
-            { depth_texture, RBImageUsage::DepthStencilReadOnly, RBLoadOp::Load },
-            { hdr_color, RBImageUsage::ColorAttachment }, 
+            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },   
         },
         .execute = [=](RenderGraphContext& ctx)
         {
@@ -616,6 +616,7 @@ void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
 
         ctx.backend.push_constants(cmd, item.world, pipeline);
 
+        ctx.backend.update_viewport(cmd, 2048, 2048);
         ctx.backend.draw_indexed(
             cmd,
             item.mesh.get().indices.size()

@@ -258,6 +258,20 @@ export
         RBStoreOp store;
         RBImageUsage usage;
     };
+    
+    enum class RBImageLayout
+    {
+        undefined,
+        general,
+        color_attachment_optimal,
+        depth_stencil_attachment_optimal,
+        depth_stencil_read_only_optimal,
+        shader_read_only_optimal,
+        transfer_src_optimal,
+        transfer_dst_optimal,
+        preinitialized,
+        transfer_present,
+    };
 
 
     struct FramebufferDesc

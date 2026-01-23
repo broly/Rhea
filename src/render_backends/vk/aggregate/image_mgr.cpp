@@ -209,8 +209,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
             transition_image(
                 cmd,
                 image,
-                RBImageUsage::Undefined,
-                RBImageUsage::TransferDst);
+                RBImageLayout::undefined,
+                RBImageLayout::transfer_dst_optimal);
 
             VkBufferImageCopy copy{};
             copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -229,8 +229,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
             transition_image(
                 cmd,
                 image,
-                RBImageUsage::TransferDst,
-                RBImageUsage::SampledFragment);
+                RBImageLayout::transfer_dst_optimal,
+                RBImageLayout::shader_read_only_optimal); 
         });
 
         vk::destroy_buffer(
@@ -293,8 +293,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
         transition_image(
             cmd,
             image,
-            RBImageUsage::Undefined,
-            RBImageUsage::TransferDst
+            RBImageLayout::undefined,
+            RBImageLayout::transfer_dst_optimal
         );
     
         VkBufferImageCopy copy{};
@@ -338,7 +338,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
     return image;
 }
 
-void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageUsage before, RBImageUsage after)
+void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after)
 {
     auto src = vk::to_vk_state(before);
     auto dst = vk::to_vk_state(after);

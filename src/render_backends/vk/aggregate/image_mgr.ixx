@@ -41,8 +41,8 @@ namespace vk
         void transition_image(
             RBCommandList cmd,
             RBImageHandle image,
-            RBImageUsage before,
-            RBImageUsage after);
+            RBImageLayout before,
+            RBImageLayout after);
         
         void generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image, uint32_t width, uint32_t height, uint32_t mip_levels);
         

@@ -102,8 +102,8 @@ public:   /// API Section
     virtual void transition_image(
         RBCommandList cmd,
         RBImageHandle image,
-        RBImageUsage before,
-        RBImageUsage after) override;
+        RBImageLayout before,
+        RBImageLayout after) override;
     virtual void update_sampled_image(
         RBDescriptorSet set,
         uint32_t binding,
@@ -133,7 +133,23 @@ public:   /// API Section
     std::pair<uint32_t, uint32_t> get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     
-    
+    virtual void update_viewport(const RBCommandList& cmd, uint32_t width, uint32_t height) override
+    {
+        VkViewport viewport{};
+        viewport.x = 0;
+        viewport.y = 0;
+        viewport.width  = float(width);
+        viewport.height = float(height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = {width, height};
+
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+        vkCmdSetScissor (cmd, 0, 1, &scissor);
+    }
 // Initialization section
     void create_frame_sync_objects();
     void create_descriptor_pool();

@@ -8,6 +8,7 @@ import <vulkan/vulkan_core.h>;
 import :context;
 
 #include "vk_macro.h"
+#include "common/assertion_macros.h"
 import platform;
 import render;
 import assets;
@@ -410,57 +411,60 @@ export namespace vk
         }
     }
     
-    ImageState to_vk_state(RBImageUsage usage)
+    ImageState to_vk_state(RBImageLayout layout)
     {
-        switch (usage)
+        switch (layout)
         {
-        case RBImageUsage::ColorAttachment:
+        case RBImageLayout::color_attachment_optimal:
             return {
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
             };
 
-        case RBImageUsage::DepthStencilAttachment:
+        case RBImageLayout::depth_stencil_attachment_optimal:
             return {
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
             };
-            
-        case RBImageUsage::DepthStencilReadOnly:
+
+        case RBImageLayout::depth_stencil_read_only_optimal:
             return {
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 VK_ACCESS_SHADER_READ_BIT
             };
 
-        case RBImageUsage::SampledFragment:
+        case RBImageLayout::shader_read_only_optimal:
             return {
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 VK_ACCESS_SHADER_READ_BIT
             };
 
-        case RBImageUsage::Present:
-            return {
-                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                0
-            };
-        case RBImageUsage::TransferDst:
+        case RBImageLayout::transfer_dst_optimal:
             return {
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 VK_PIPELINE_STAGE_TRANSFER_BIT,
                 VK_ACCESS_TRANSFER_WRITE_BIT
             };
 
-        default:
+        case RBImageLayout::transfer_present:
+            return {
+                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                0
+            };
+
+        case RBImageLayout::undefined:
             return {
                 VK_IMAGE_LAYOUT_UNDEFINED,
                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                 0
             };
+        default:
+            unreachable("wrong code path");
         }
     }
     

@@ -75,7 +75,7 @@ export
         RGTextureDesc desc;
         std::optional<RBImageHandle> image;      // backend image
         
-        RBImageUsage current_usage = RBImageUsage::Undefined;
+        RBImageLayout current_layout = RBImageLayout::undefined;
     };
 
     struct RGTextureHandle
@@ -87,8 +87,8 @@ export
     struct RGImageBarrier
     {
         RGTextureHandle texture;
-        RBImageUsage    before;
-        RBImageUsage    after;
+        RBImageLayout before;
+        RBImageLayout after;
     };
 
     struct RGImageUse
@@ -96,6 +96,7 @@ export
         RGTextureHandle texture;
         RBImageUsage    usage;
         RBLoadOp load_op = RBLoadOp::Load;
+        RBStoreOp store_op = RBStoreOp::Store;
     };
 
     using RBFormat = RBHandle<VkFormat>;

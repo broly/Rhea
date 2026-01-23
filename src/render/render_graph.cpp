@@ -34,80 +34,100 @@ RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
     return id;
 }
 
+
+static RBImageLayout layout_from_usage(RBImageUsage usage)
+{
+    switch (usage)
+    {
+    case RBImageUsage::ColorAttachment:
+        return RBImageLayout::color_attachment_optimal;
+
+    case RBImageUsage::DepthStencilAttachment:
+        return RBImageLayout::depth_stencil_attachment_optimal;
+
+    case RBImageUsage::DepthStencilReadOnly:
+        return RBImageLayout::depth_stencil_read_only_optimal;
+
+    case RBImageUsage::SampledFragment:
+        return RBImageLayout::shader_read_only_optimal;
+
+    case RBImageUsage::TransferDst:
+        return RBImageLayout::transfer_dst_optimal;
+
+    case RBImageUsage::Present:
+        return RBImageLayout::transfer_present;
+
+    default:
+        return RBImageLayout::undefined;
+    }
+}
+
+
 void RenderGraph::compile()
 {
     assert(!graph_compiled);
-    
-    
+
+    // 1. create images
     for (auto& tex : textures)
     {
+        tex.current_layout = RBImageLayout::undefined;
+
         if (tex.desc.external)
             continue;
-        
-        RBImageDesc desc = {
+
+        RBImageDesc desc{
             .width  = tex.desc.width,
             .height = tex.desc.height,
             .format = tex.desc.format,
             .usage  = tex.desc.usage
         };
+
         tex.image = backend->create_image(desc);
     }
-    
+
+    // 2. build barriers
     pass_barriers.clear();
     pass_barriers.resize(passes.size());
-    
+
     for (size_t pass_index = 0; pass_index < passes.size(); ++pass_index)
     {
         auto& pass = passes[pass_index];
         auto& barriers = pass_barriers[pass_index];
 
-        // READS
-        for (const auto& read : pass.reads)
+        auto process = [&](RGImageUse access)
         {
-            RGTexture& tex = textures[read.texture.id];
-            
-            if (tex.desc.external)
-                continue;
+            RGTexture& tex = textures[access.texture.id];
 
-            if (tex.current_usage != read.usage)
+            if (tex.desc.external)
+                return;
+
+            RBImageLayout required =
+                layout_from_usage(access.usage);
+
+            if (tex.current_layout != required)
             {
                 barriers.push_back({
-                    read.texture,
-                    tex.current_usage,
-                    read.usage
+                    access.texture,
+                    tex.current_layout,
+                    required
                 });
 
-                tex.current_usage = read.usage;
+                tex.current_layout = required;
             }
-        }
+        };
 
-        // WRITES
-        for (const auto& write : pass.writes)
-        {
-            RGTexture& tex = textures[write.texture.id];
-            
-            if (tex.desc.external)
-                continue; 
-            
-            if (tex.current_usage != write.usage)
-            {
-                barriers.push_back({
-                    write.texture,
-                    tex.current_usage,
-                    write.usage
-                });
-
-                tex.current_usage = write.usage;
-            }
-        }
+        for (auto& r : pass.reads)  process(r);
+        for (auto& w : pass.writes) process(w);
     }
 
-    execution_order.clear();
-    for (uint32_t i = 0; i < passes.size(); ++i)
-        execution_order.push_back(i);
-    
+    // linear execution
+    execution_order.resize(passes.size());
+    std::iota(execution_order.begin(), execution_order.end(), 0);
+
     graph_compiled = true;
 }
+
+
 
 bool is_attachment(RBImageUsage usage)
 {
@@ -122,112 +142,143 @@ bool is_attachment(RBImageUsage usage)
     }
 }
 
-
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 {
     PROFILE();
     assert(graph_compiled);
-    
+
     RenderGraphContext ctx(*backend, cmd, {}, *this);
-    
+    ctx.frame = frame;
+
+    /* --------------------------------------------------------------------
+       1. Initialize external image layouts (swapchain)
+       -------------------------------------------------------------------- */
+
     for (auto& tex : textures)
     {
         if (tex.desc.external)
-            tex.current_usage = RBImageUsage::Present;
+        {
+            // Swapchain images are acquired in PRESENT layout
+            tex.current_layout = RBImageLayout::transfer_present;
+        }
     }
 
-    for (size_t i = 0; i < execution_order.size(); ++i)
-    {
-        uint32_t pass_index = execution_order[i];
-        auto& pass = passes[pass_index];
+    /* --------------------------------------------------------------------
+       2. Execute passes in order
+       -------------------------------------------------------------------- */
 
-        // 1. Apply barriers
+    for (uint32_t pass_index : execution_order)
+    {
+        const RenderGraphPass& pass = passes[pass_index];
+
+        /* ------------------------------------------------------------
+           2.1 Apply layout transitions required by this pass
+           ------------------------------------------------------------ */
+
         for (const auto& barrier : pass_barriers[pass_index])
         {
-            auto tex = textures[barrier.texture.id];
-            
-            
-            RBImageHandle image = resolve_image(tex, frame);
-            
+            RGTexture& tex = textures[barrier.texture.id];
+
+            RBImageHandle image =
+                tex.desc.external
+                    ? backend->get_swapchain_image(frame)
+                    : tex.image.value();
+
             backend->transition_image(
                 cmd,
                 image,
                 barrier.before,
                 barrier.after
             );
+
+            tex.current_layout = barrier.after;
         }
 
-        // framebuffer build
+        /* ------------------------------------------------------------
+           2.2 Build framebuffer description
+           ------------------------------------------------------------ */
+
         FramebufferDesc fb_desc{};
         fb_desc.pass = pass.name;
-        for (auto handle : pass.writes)
+
+        // Attachments written by this pass
+        for (const auto& write : pass.writes)
         {
-            const RGTexture& tex = textures[handle.texture.id];
+            if (!is_attachment(write.usage))
+                continue;
+
+            const RGTexture& tex = textures[write.texture.id];
 
             RBImageHandle image =
                 tex.desc.external
-                    ? backend->get_swapchain_image()
+                    ? backend->get_swapchain_image(frame)
                     : tex.image.value();
 
-            if (is_attachment(handle.usage))
+            if (tex.desc.usage & RenderTextureUsage::DepthStencil)
             {
-                if (tex.desc.usage & RenderTextureUsage::DepthStencil)
-                    fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
-                else
-                    fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::Store, handle.usage});
+                fb_desc.depth_attachment = {
+                    image,
+                    write.load_op,
+                    write.store_op,
+                    write.usage
+                };
+            }
+            else
+            {
+                fb_desc.color_attachments.push_back({
+                    image,
+                    write.load_op,
+                    RBStoreOp::Store,
+                    write.usage
+                });
             }
         }
-        
-        for (auto handle : pass.reads)
-        {
-            const RGTexture& tex = textures[handle.texture.id];
 
-            RBImageHandle image =
-                tex.desc.external
-                    ? backend->get_swapchain_image()
-                    : tex.image.value();
+        // NOTE:
+        // Reads are NOT attachments.
+        // Sampled images are bound via descriptors only.
+        // Depth preservation is controlled by LOAD_OP_LOAD.
 
-            if (is_attachment(handle.usage))
-            {
-                if (tex.desc.usage & RenderTextureUsage::DepthStencil)
-                    fb_desc.depth_attachment = {image, handle.load_op, RBStoreOp::DontCare, handle.usage};
-                else
-                {
-                    fb_desc.color_attachments.push_back({image, handle.load_op, RBStoreOp::DontCare, handle.usage});
-                }
-            }
-        }
+        /* ------------------------------------------------------------
+           2.3 Begin render pass
+           ------------------------------------------------------------ */
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
-        ctx.frame = frame;
+
         backend->begin_render_pass(cmd, ctx.framebuffer);
-        
+
         {
-            PROFILE("graph execution");
+            PROFILE("RenderGraph Pass");
             ctx.pass_name = pass.name;
             pass.execute(ctx);
         }
+
         backend->end_render_pass(cmd);
     }
-    
-    
-    PROFILE("transition");
+
+    /* --------------------------------------------------------------------
+       3. Transition external images back to PRESENT
+       -------------------------------------------------------------------- */
+
     for (auto& tex : textures)
     {
-        if (tex.desc.external &&
-            tex.current_usage != RBImageUsage::Present)
+        if (!tex.desc.external)
+            continue;
+
+        if (tex.current_layout != RBImageLayout::transfer_present)
         {
             backend->transition_image(
                 cmd,
-                resolve_image(tex),
-                tex.current_usage,
-                RBImageUsage::Present
+                backend->get_swapchain_image(frame),
+                tex.current_layout,
+                RBImageLayout::transfer_present
             );
 
-            tex.current_usage = RBImageUsage::Present;
+            tex.current_layout = RBImageLayout::transfer_present;
         }
     }
 }
+
 
 RBImageHandle RenderGraph::resolve_image(const RGTexture& tex, std::optional<RBFrameHandle> frame)
 {
@@ -285,4 +336,21 @@ RenderResource* RenderGraph::create_resource(const RenderResourceDesc& desc)
     RenderResource* resource = backend->create_resource(desc);
     resources.push_back(resource);
     return resource;
+}
+
+void RenderGraph::transition_if_needed(RBCommandList cmd, RGTexture& tex, RBImageUsage next_usage) const
+{
+    RBImageLayout new_layout = layout_for(next_usage);
+
+    if (tex.current_layout == new_layout)
+        return;
+
+    backend->transition_image(
+        cmd,
+        tex.image.value(),
+        tex.current_layout,
+        new_layout
+    );
+
+    tex.current_layout = new_layout;
 }
