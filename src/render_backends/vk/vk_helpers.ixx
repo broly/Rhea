@@ -365,6 +365,8 @@ export namespace vk
             return VK_FORMAT_D24_UNORM_S8_UINT;
         case TextureFormat::Depth32F:
             return VK_FORMAT_D32_SFLOAT;
+        case TextureFormat::Depth16UNorm:
+            return VK_FORMAT_D16_UNORM;
         }
         return VK_FORMAT_UNDEFINED;
     }

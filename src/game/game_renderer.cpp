@@ -28,17 +28,24 @@ namespace Names
     static Name blend_mode_opaque = "opaque";
     static Name blend_mode_masked = "masked";
     static Name blend_mode_trasnlucent = "translucent";
+    
+    static Name debug_shadow = "debug_shadow";
 }
+
+constexpr bool debug_shadow_pass = false;
 
 void GameRenderer::init(RBWindowHandle in_window)
 {
     Renderer::init(in_window);
+    
+    set_flag(Names::debug_shadow, false);
     
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     render_graph = std::make_shared<RenderGraph>(render_backend);
 
     samplers["default"] = render_backend->create_sampler(samplers::default_surface());
     samplers["surface"] = render_backend->create_sampler(samplers::default_surface());
+    samplers["shadow"] = render_backend->create_sampler(samplers::default_shadow());
     
     camera_resource = render_graph->create_resource({
         .name = "camera",
@@ -61,23 +68,26 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     light_resource_shadow = render_graph->create_resource({
         .name = "shadow_light",
-        .stages = ShaderStage::vertex,
+        .stages = ShaderStage::all,
         .usage_type = ResourceUsageType::persistent,
         .variables = {
-            { "shadow_light_ubo", 0, 0, sizeof(LightUBO) }
+            { "shadow_light_ubo", 0, 0, sizeof(LightUBO) },
+            { "u_shadow_depth", 0, 1 }
         }
     });
     
     shadow_resource = render_graph->create_resource({
         .name = "shadow",
-        .stages = ShaderStage::fragment,
+        .stages = ShaderStage::all,
         .usage_type = ResourceUsageType::frame,
+        .sampler = samplers["shadow"],
         .variables = {
-            { "u_shadow_map", SET_SHADOW, BINDING_UBO_SHADOW }
+            { "u_shadow_depth", SET_SHADOW, BINDING_UBO_SHADOW }
         }
     });
     
     auto& tonemap_model = models.find("tonemap")->second;
+    auto& shadow_debug_model = models.find("shadow_debug")->second;
     
     RGTextureDesc hdr_color_desc{
         .name = "hdr_color",
@@ -132,7 +142,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         }}
     };
     
-    shadow_pipeline_layout = {
+   shadow_pipeline_layout = {
         .vertex_layout = shadow_vertex_layout,
         .resources = { light_resource_shadow },
         .push_constants = {{
@@ -150,11 +160,22 @@ void GameRenderer::init(RBWindowHandle in_window)
     };
     
     
+    PipelineLayoutDesc shadow_debug_pipeline_layout = {
+        .vertex_layout = {},
+        .resources = { light_resource_shadow }, 
+        .push_constants = {}
+    };
+    
     PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, render_backend, shared_from_this());
-
-
+    
     PipelineObject* tonemap_pipeline = render_graph->request_pipeline(
         tonemap_pipeline_family, {}, tonemap_pipeline_layout);
+    
+    PipelineFamily shadow_debug_pipeline_family("ShadowDebug", shadow_debug_model, render_backend, shared_from_this());
+    PipelineObject* shadow_debug_pipeline =
+        shadow_debug_pipeline_family.request_pipeline({}, shadow_debug_pipeline_layout);
+    auto shadow_debug_material = std::make_shared<Material>();
+    shadow_debug_material->model = "shadow_debug";
     
     auto swapchain_extent = render_backend->get_swapchain_extent();
 
@@ -173,10 +194,12 @@ void GameRenderer::init(RBWindowHandle in_window)
         .usage  = RenderTextureUsage::DepthStencil
     });
     
+    shadowmap_extent = {2048, 2048};
+    
     shadow_map = render_graph->create_texture({
         .name = "shadow_map",
-        .width = 2048,
-        .height = 2048,
+        .width = shadowmap_extent.width,
+        .height = shadowmap_extent.height,
         .format = TextureFormat::Depth32F,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
@@ -189,6 +212,46 @@ void GameRenderer::init(RBWindowHandle in_window)
         .execute = [=](RenderGraphContext& ctx)
         {
             draw_scene_shadow(ctx);
+        }
+    });
+    
+    render_graph->add_pass({
+        .name = "ShadowDebug",
+        .condition = [this] () { return render_flags[Names::debug_shadow]; },
+        .reads = {
+            { shadow_map, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [=](RenderGraphContext& ctx)
+        {
+            // Bind your fullscreen debug pipeline
+            ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
+            
+            auto shadow_debug_material_instance = get_or_create_material_instance(shadow_debug_material, ctx.pass_name);
+            
+            auto* shadow_debug_instance =
+                shadow_debug_material_instance->get_or_create_resource_instance(
+                    shadow_debug_pipeline,
+                    ctx.frame
+                );
+            // Bind shadow map as sampler
+            shadow_debug_instance->update_image(
+                shadow_debug_pipeline,
+                "u_shadow_depth",
+                render_graph->get_image(shadow_map),
+                ctx.frame
+            );
+    
+            shadow_debug_instance->bind(
+                shadow_debug_pipeline,
+                ctx.cmd,
+                ctx.frame
+            );
+    
+            // Draw fullscreen quad
+            ctx.backend.draw_fullscreen(ctx.cmd);
         }
     });
     
@@ -231,6 +294,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_graph->add_pass({
         .name = "ToneMapping",
+        .condition = [this] () { return !is_debugging(); },
         .reads = {
             { hdr_color, RBImageUsage::SampledFragment }
         },
@@ -298,6 +362,67 @@ void GameRenderer::execute()
 
 }
 
+bool GameRenderer::is_debugging() const
+{
+    auto result = render_flags.find(Names::debug_shadow);
+    return result != render_flags.end() && result->second;
+}
+
+glm::mat4 GameRenderer::build_dir_light_vp() const
+{
+    auto& scene_view = engine->scene_view;
+    auto& light_processor = scene_view->get_processor<SceneViewProcessor_Light>();
+
+    auto dir = light_processor.get_directional_light();
+    if (!dir)
+        return glm::mat4(1.0f);
+
+
+    const AABB& aabb = scene_view->world_aabb;
+    glm::vec3 center = aabb.center();
+
+
+    glm::vec3 lightDir = glm::normalize(dir->direction);
+
+    glm::vec3 up =
+        fabs(glm::dot(lightDir, glm::vec3(0,1,0))) > 0.99f
+            ? glm::vec3(0,0,1)
+            : glm::vec3(0,1,0);
+
+
+    float dist = aabb.scalar_radius();
+    glm::vec3 lightPos = center - lightDir * dist;
+
+
+    glm::mat4 lightView = glm::lookAt(lightPos, center, up);
+
+
+    glm::vec3 corners[8];
+    aabb.get_corners(corners);
+
+    glm::vec3 minLS( FLT_MAX);
+    glm::vec3 maxLS(-FLT_MAX);
+
+    for (int i = 0; i < 8; ++i)
+    {
+        glm::vec3 p = glm::vec3(lightView * glm::vec4(corners[i], 1.0f));
+        minLS = glm::min(minLS, p);
+        maxLS = glm::max(maxLS, p);
+    }
+
+    // --- 6. Orthographic projection (Vulkan ZO)
+    
+    
+    glm::mat4 lightProj = glm::orthoZO(
+        minLS.x, maxLS.x,
+        minLS.y, maxLS.y,
+        -maxLS.z, -minLS.z * 10
+    );
+
+    return lightProj * lightView;
+}
+
+
 void GameRenderer::draw_scene(RenderGraphContext& ctx)
 {    
 
@@ -358,23 +483,10 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         if (dir_light)
         {
             light_ubo.has_dir_light = true;
-            light_ubo.dir_light.direction = glm::vec4(dir_light->direction, 1.f);
+            light_ubo.dir_light.direction = glm::vec4(glm::normalize(dir_light->direction), 0.f);
             light_ubo.dir_light.color = glm::vec4(dir_light->color);
-            // --- build VP ---
-            glm::vec3 center = glm::vec3(0.0f);
-            float size = 50.0f;
 
-            glm::mat4 view =
-                glm::lookAt(
-                    center - dir_light->direction * size,
-                    center,
-                    glm::vec3(0,1,0)
-                );
-
-            glm::mat4 proj =
-                glm::ortho(-size, size, -size, size, 0.1f, 200.f);
-
-            light_ubo.dir_light.light_vp = proj * view;
+            light_ubo.dir_light.light_vp = build_dir_light_vp();
         }
         
 
@@ -383,7 +495,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         light->bind(pipeline, cmd, frame);
         
         auto shadow = shadow_resource->query_single(pipeline);
-        shadow->update_image(pipeline, "u_shadow_map", 
+        shadow->update_image(pipeline, "u_shadow_depth", 
                 render_graph->get_image(shadow_map), frame);
         shadow->bind(pipeline, cmd, frame);
     };
@@ -487,7 +599,11 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
 
             ctx.backend.draw_indexed(
                 cmd,
-                item.mesh.get().indices.size()
+                item.mesh.get().indices.size(),
+                RBDrawParams {
+                    .update_viewport_extent = true,
+                    .use_swapchain_extent = true
+                }
             );
         }
     }
@@ -521,28 +637,17 @@ void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
             if (l.type == LightType::directional)
             {
                 light_ubo.has_dir_light = 1;
-                light_ubo.dir_light.direction =
-                    glm::vec4(l.direction, 0.0f);
-                light_ubo.dir_light.color = l.color;
+                light_ubo.dir_light.direction = glm::vec4(glm::normalize(l.direction), 0.0f);
+                light_ubo.dir_light.color     = l.color;
 
-                // --- build VP ---
-                glm::vec3 center = glm::vec3(0.0f);
-                float size = 50.0f;
+                auto& camera_processor = scene_view->get_processor<SceneViewProcessor_Camera>();
+                const RenderObject_Camera* cam_ro = camera_processor.get_active_camera();
 
-                glm::mat4 view =
-                    glm::lookAt(
-                        center - l.direction * size,
-                        center,
-                        glm::vec3(0,1,0)
-                    );
+                light_ubo.dir_light.light_vp = build_dir_light_vp();
 
-                glm::mat4 proj =
-                    glm::ortho(-size, size, -size, size, 0.1f, 200.f);
-
-                light_ubo.dir_light.light_vp = proj * view;
-                
-                break;
+                break; 
             }
+
         }
 
         auto light = light_resource_shadow->query_single(pipeline);
@@ -616,10 +721,14 @@ void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
 
         ctx.backend.push_constants(cmd, item.world, pipeline);
 
-        ctx.backend.update_viewport(cmd, 2048, 2048);
         ctx.backend.draw_indexed(
             cmd,
-            item.mesh.get().indices.size()
+            item.mesh.get().indices.size(),
+             RBDrawParams{
+                 .update_viewport_extent = true,
+                 .use_swapchain_extent = false,
+                 .extent = shadowmap_extent
+             }
         );
     }
 }

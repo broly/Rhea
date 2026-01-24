@@ -1,6 +1,7 @@
 module vk:sampler_mgr;
 
 import <vulkan/vulkan_core.h>;
+import :log;
 import :sampler_desc;
 
 void vk::SamplerManager::init()
@@ -64,6 +65,9 @@ RBSampler vk::SamplerManager::get_or_create(const ::SamplerDesc& sampler_info)
     VkSampler sampler;
 
     vkCreateSampler(instance.get_device(), &info, nullptr, &sampler);
+    
+    LogVkSamplerManager.Log("Created sampler %p",
+        sampler);
     
     cache[sampler_info] = (RBSampler)sampler;
     

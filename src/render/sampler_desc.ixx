@@ -133,4 +133,30 @@ export namespace samplers
         
         return surface_sampler;
     }
+    
+    constexpr SamplerDesc default_shadow()
+    {
+        SamplerDesc sampler{};
+        sampler.min_filter   = SamplerFilter::Linear;
+        sampler.mag_filter   = SamplerFilter::Linear;
+        sampler.mipmap_mode  = SamplerMipMapMode::Linear;
+
+        sampler.address_u = SamplerAddressMode::ClampToBorder;
+        sampler.address_v = SamplerAddressMode::ClampToBorder;
+        sampler.address_w = SamplerAddressMode::ClampToBorder;
+
+        sampler.min_lod_bias = 0.0f;
+        sampler.min_lod      = 0.0f;
+        sampler.max_lod      = 1000.0f;
+
+        sampler.anisotropy     = true;
+        sampler.max_anisotropy = 8.0f; 
+
+        sampler.comparison = true;
+        sampler.compare_op = SamplerCompareOp::LessOrEqual;
+
+        sampler.border_color = SamplerBorderColor::float_opaque_white;
+        
+        return sampler;
+    }
 }

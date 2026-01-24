@@ -76,6 +76,10 @@ void vk::SwapchainControl::init()
     vkGetSwapchainImagesKHR(instance.device, swapchain, 
         &sc_image_count, swapchain_images.data());
     
+    LogVkSwapchain.Log("Swapchain images: ");
+    for (auto img : swapchain_images)
+        LogVkSwapchain.Log(" * image %p", img);
+    
     swapchain_image_handles.clear();
     swapchain_image_handles.resize(sc_image_count);
     
@@ -89,7 +93,7 @@ void vk::SwapchainControl::init()
 
 void vk::SwapchainControl::recreate_swapchain()
 {
-    LogRB.Log("recreate_swapchain");
+    LogVkSwapchain.Log("recreate_swapchain");
 
     int width = 0;
     int height = 0;
@@ -124,11 +128,6 @@ RBSwapchainExtent vk::SwapchainControl::get_extent() const
     return RBSwapchainExtent{extent.width, extent.height};
 }
 
-RBImageView vk::SwapchainControl::get_image_view() const
-{
-    return image_views[current_swapchain_index];
-}
-
 RBImageHandle vk::SwapchainControl::get_image() const
 {
     return swapchain_image_handles[current_swapchain_index];
@@ -137,7 +136,7 @@ RBImageHandle vk::SwapchainControl::get_image() const
 
 bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 {
-    LogRB.Log("acquire_next_image");
+    LogVkSwapchain.Log<VeryVerbose>("acquire_next_image");
     
     auto& frame = frames[frame_handle];
 
@@ -162,7 +161,7 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 
 void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list)
 {
-    LogRB.Log("submit_frame");
+    LogVkSwapchain.Log<VeryVerbose>("submit_frame");
     auto& frame = frames[frame_handle];
 
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
@@ -215,22 +214,12 @@ void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBComm
 
 void vk::SwapchainControl::advance_frame()
 {
-    LogRB.Log("advance_frame");
+    LogVkSwapchain.Log<VeryVerbose>("advance_frame");
     current_frame = (current_frame + 1) % vk::MAX_FRAMES_IN_FLIGHT;
 }
 
 void vk::SwapchainControl::cleanup()
 {
-    
-    // --- Image views ---
-    for (auto iv : image_views)
-    {
-        if (iv != VK_NULL_HANDLE)
-        {
-            vkDestroyImageView(instance.device, iv, nullptr);
-        }
-    }
-    image_views.clear();
 
     // --- Depth resources ---
     if (depth_image_view != VK_NULL_HANDLE)
@@ -294,7 +283,7 @@ void vk::SwapchainControl::create_sync_objects()
 
 void vk::SwapchainControl::wait_for_frame(RBFrameHandle frame_handle)
 {
-    LogRB.Log("wait_for_frame");
+    LogVkSwapchain.Log<VeryVerbose>("wait_for_frame");
     
     auto& f = frames[frame_handle];
 

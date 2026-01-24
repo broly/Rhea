@@ -3,7 +3,7 @@
 import <cassert>;
 import <fstream>;
 import <vector>;
-
+import :log;
 #include "vk_macro.h"
 
 static std::vector<uint32_t> read_file(const std::string& path)
@@ -36,6 +36,9 @@ VkShader::VkShader(VkDevice device, const std::string& path)
 
     VK_CHECK(vkCreateShaderModule(
         device_, &ci, nullptr, &shader_module));
+    
+    LogVkShader.Log("Created shader %p, path: %s",
+        shader_module, path.c_str());
 }
 
 VkShader::~VkShader()

@@ -4,7 +4,6 @@ import :rhcomp_transform;
 import rhmath;
 import assets;
 
-import render_scene;
 
 #include "object/object_reflection_macro.h"
 
@@ -15,6 +14,8 @@ public:
     
     void start() override;
     void finish() override;
+    
+    virtual AABB get_aabb() const;
     
     
 };

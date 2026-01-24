@@ -8,7 +8,9 @@ import <cassert>;
 import spirv_reflect;
 import :reflection;
 import :render_resource;
+import :log;
 #include "vk_macro.h"
+import reflect;
 import <bit>;
 
 #include "common/assertion_macros.h"
@@ -101,6 +103,30 @@ VkCullModeFlags conv_cull_mode(CullMode cull_mode)
         return VK_CULL_MODE_BACK_BIT;
     case CullMode::both:
         return VK_CULL_MODE_FRONT_AND_BACK;
+    }
+    unreachable("error");
+}
+
+
+VkCompareOp conv_compare_op(CompareOp compare_op)
+{
+    switch (compare_op) {
+    case CompareOp::never:
+        return VK_COMPARE_OP_NEVER;
+    case CompareOp::less:
+        return VK_COMPARE_OP_LESS;
+    case CompareOp::equal:
+        return VK_COMPARE_OP_EQUAL;
+    case CompareOp::less_or_equal:
+        return VK_COMPARE_OP_LESS_OR_EQUAL;
+    case CompareOp::greater:
+        return VK_COMPARE_OP_GREATER;
+    case CompareOp::not_equal:
+        return VK_COMPARE_OP_NOT_EQUAL;
+    case CompareOp::greater_or_equal:
+        return VK_COMPARE_OP_GREATER_OR_EQUAL;
+    case CompareOp::always:
+        return VK_COMPARE_OP_ALWAYS;
     }
     unreachable("error");
 }
@@ -215,6 +241,13 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     raster.lineWidth = 1.0f;
     raster.cullMode = conv_cull_mode(pipeline_desc->cull_mode); // VK_CULL_MODE_BACK_BIT;
     raster.frontFace = conv_front_face(pipeline_desc->front_face); // VK_FRONT_FACE_CLOCKWISE;
+    if (pipeline_desc->depth_bias.enable)
+    {
+        raster.depthBiasConstantFactor = pipeline_desc->depth_bias.constant_factor;
+        raster.depthBiasClamp = pipeline_desc->depth_bias.clamp;
+        raster.depthBiasSlopeFactor = pipeline_desc->depth_bias.slope_factor;
+    }
+    
     
     
     VkPipelineMultisampleStateCreateInfo ms{
@@ -253,7 +286,7 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     };
     depth_ci.depthTestEnable = pipeline_desc->depth_test ? VK_TRUE : VK_FALSE;
     depth_ci.depthWriteEnable = pipeline_desc->depth_write ? VK_TRUE : VK_FALSE;
-    depth_ci.depthCompareOp = pipeline_desc->cull_mode == CullMode::none ? VK_COMPARE_OP_ALWAYS : VK_COMPARE_OP_LESS;
+    depth_ci.depthCompareOp = conv_compare_op(pipeline_desc->compare_op);
     depth_ci.depthBoundsTestEnable = VK_FALSE;
     depth_ci.stencilTestEnable = VK_FALSE;
 
@@ -278,6 +311,16 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         &pci,
         nullptr,
         &vk_pipeline));
+    
+    LogVkPipeline.Log<DisplayFn>("Created graphics pipeline %p (pass: %s):",
+        vk_pipeline, pipeline_desc->pass_name.to_string().c_str());
+    for (auto& stage : pipeline_desc->stages)
+    {
+        LogVkPipeline.Log<DisplayFn>(" * stage '%s', shader: '%s'", 
+            reflect::enum_name(stage.stage).to_string().c_str(),
+            stage.compiled_shader->c_str());
+    }
+    
     return vk_pipeline;
 }
 

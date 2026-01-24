@@ -1,6 +1,7 @@
 ﻿export module glm;
 
 #define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include <glm/fwd.hpp>
 #include <glm/vec2.hpp>
@@ -66,5 +67,16 @@ export namespace glm
     using glm::perspectiveNO;
     using glm::perspectiveRH;
     using glm::perspectiveLH;
+    using glm::orthoZO;
+    
+    using glm::orthoLH_ZO;
+    using glm::orthoLH_NO;
+    using glm::orthoRH_ZO;
+    using glm::orthoRH_NO;
+    using glm::orthoNO;
+    using glm::orthoLH;
+    using glm::orthoRH;
     using glm::ortho;
+    using glm::dot;
+    using glm::abs;
 }

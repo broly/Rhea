@@ -34,8 +34,7 @@ namespace vk
         void init();
         void recreate_swapchain();
         RBSwapchainExtent get_extent() const;
-        
-        RBImageView get_image_view() const;
+
         RBImageHandle get_image() const;
         bool acquire_next_image(RBFrameHandle frame_handle);
         void submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list);
@@ -47,8 +46,6 @@ namespace vk
 
         VkSwapchainKHR swapchain = VK_NULL_HANDLE;
         VkExtent2D extent;
-
-        std::vector<VkImageView> image_views;
     
         VkImage depth_image = VK_NULL_HANDLE;
         VkDeviceMemory depth_memory = VK_NULL_HANDLE;

@@ -215,6 +215,7 @@ export
 
     struct RBImageDesc
     {
+        Name name;
         uint32_t width;
         uint32_t height;
         TextureFormat format;
@@ -288,6 +289,13 @@ export
     struct RBSwapchainExtent
     {
         uint32_t width, height;
+    };
+    
+    struct RBDrawParams
+    {
+        bool update_viewport_extent = false;
+        bool use_swapchain_extent = false;
+        RBSwapchainExtent extent;
     };
 
     using RBRenderPass = RBHandle<VkRenderPass>;

@@ -5,6 +5,7 @@ import engine;
 import <map>;
 import <vector>;
 import name;
+import glm;
 import assets;
 
 export class GameRenderer : public Renderer
@@ -18,6 +19,10 @@ public:
     std::shared_ptr<Engine> engine;
     
     std::shared_ptr<RenderGraph> render_graph;
+    
+    bool is_debugging() const;
+    
+    glm::mat4 build_dir_light_vp() const;
     
     void draw_scene(RenderGraphContext& ctx);
     void draw_scene_shadow(RenderGraphContext& ctx);
@@ -33,6 +38,7 @@ public:
     RenderResource* shadow_resource;
     
     RGTextureHandle shadow_map;
+    RBSwapchainExtent shadowmap_extent;
     
     PipelineObject* geom_pipeline;
     

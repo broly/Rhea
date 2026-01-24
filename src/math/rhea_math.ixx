@@ -36,5 +36,27 @@ export namespace math
         glm::mat3 m(right, up, forward);
         return glm::quat_cast(m);
     }
+    
+    glm::quat look_at(
+        const glm::vec3& origin,
+        const glm::vec3& target,
+        const glm::vec3& up = glm::vec3(0, -1, 0)
+    )
+    {
+        glm::vec3 forward = glm::normalize(target - origin);
+
+
+        if (glm::abs(glm::dot(forward, up)) > 0.999f)
+        {
+
+            return look_at(origin, target, glm::vec3(1, 0, 0));
+        }
+
+        glm::vec3 right = glm::normalize(glm::cross(up, forward));
+        glm::vec3 realUp = glm::cross(forward, right);
+
+        glm::mat3 rotMat(right, realUp, forward);
+        return glm::quat_cast(rotMat);
+    }
 
 }

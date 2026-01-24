@@ -6,6 +6,7 @@ import <vulkan/vulkan_core.h>;
 
 import <cassert>;
 import :helpers;
+import :log;
 
 
 RBImageHandle vk::ImageManager::create_image_view(
@@ -107,6 +108,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VK_CHECK(vkCreateImage(instance.device, &image_info, nullptr, &res.image));
+    
 
     VkMemoryRequirements mem_req;
     vkGetImageMemoryRequirements(instance.device, res.image, &mem_req);
@@ -137,6 +139,8 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     };
 
     VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &res.view));
+    
+    LogVkImageManager.Log("Created image %p (view %p) '%s'", res.image, res.view, desc.name.to_string().c_str());
 
     uint32_t id = static_cast<uint32_t>(image_resources.size());
     image_resources.push_back(res);
@@ -170,6 +174,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
 
         // --- create 1x1 black texture ---
         RBImageDesc desc;
+        desc.name = std::string("TEX_B_") + tex.name;
         desc.width  = 1;
         desc.height = 1;
         desc.format = format;
@@ -245,6 +250,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
     uint32_t mip_levels = static_cast<uint32_t>(std::floor(std::log2(std::max(tex.width, tex.height))) ) + 1;
     
     RBImageDesc desc;
+    desc.name = std::string("TEX_") + tex.name;
     desc.mip_levels = mip_levels;  // here
     desc.width  = tex.width;
     desc.height = tex.height;

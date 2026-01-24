@@ -29,9 +29,9 @@ export struct PointLight
 
 export struct DirectionalLight
 {
+    glm::mat4 light_vp;  // view-projection for shadow
     glm::vec4 direction; // xyz normalized (world)
     glm::vec4 color;     // rgb * intensity
-    glm::mat4 light_vp;  // view-projection for shadow
 };
 
 export struct LightUBO
@@ -55,6 +55,9 @@ public:
     void load_schemas();
 
     virtual void execute() {}
+    
+    void set_flag(Name name, bool value);
+    void toggle_flag(Name name);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
@@ -76,4 +79,5 @@ public:
     
     std::map<Name, RBSampler> samplers;
     
+    std::map<Name, bool> render_flags;
 };

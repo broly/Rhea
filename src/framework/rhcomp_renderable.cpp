@@ -21,3 +21,8 @@ void RhComp_Renderable::finish()
     
 }
 
+AABB RhComp_Renderable::get_aabb() const
+{
+    return AABB();
+}
+

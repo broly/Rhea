@@ -33,6 +33,16 @@ void Renderer::load_schemas()
     }
 }
 
+void Renderer::set_flag(Name name, bool value)
+{
+    render_flags[name] = value;
+}
+
+void Renderer::toggle_flag(Name name)
+{
+    render_flags[name] = !render_flags[name];
+}
+
 RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
 {
     const Texture& data = handle.get();

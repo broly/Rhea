@@ -43,7 +43,7 @@ public:
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
 
     virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) = 0;
-    virtual void update_viewport(const RBCommandList& cmd, uint32_t width, uint32_t height) = 0;
+    virtual void update_viewport(const RBCommandList& cmd, RBSwapchainExtent extent) = 0;
 
     template<RenderBackendType T>
     static std::shared_ptr<RenderBackend> create(RBWindowHandle window_handle)
@@ -77,13 +77,12 @@ public:
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
     virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, PipelineObject* pipeline_object) = 0;
-    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
+    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) = 0;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual RBImageView get_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
-    virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) = 0;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) = 0;

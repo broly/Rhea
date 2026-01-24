@@ -1,7 +1,7 @@
 ﻿module render_scene:scene_view;
 
 import <cassert>;
-
+import framework;
 import :scene_view_processor;
 
 SceneView::SceneView(std::shared_ptr<class World> in_world, std::shared_ptr<class Renderer> in_renderer)
@@ -35,4 +35,12 @@ void SceneView::perform_extraction()
         if (processor)
             processor->process();
 }
+
+void SceneView::submit_raw(SceneViewProcId svp_id, const void* scene_proxy_ptr)
+{
+    processors[svp_id]->submit(scene_proxy_ptr);
+    if (world.get() != nullptr)
+        world_aabb = world->get_world_aabb();  // todo: crutch
+}
+
 

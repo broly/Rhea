@@ -75,6 +75,7 @@ void RenderGraph::compile()
         if (!tex.desc.external)
         {
             RBImageDesc desc{
+                .name = std::string("RG_") + tex.desc.name.to_string(),
                 .width  = tex.desc.width,
                 .height = tex.desc.height,
                 .format = tex.desc.format,
@@ -90,6 +91,7 @@ void RenderGraph::compile()
     for (uint32_t pass_index = 0; pass_index < passes.size(); ++pass_index)
     {
         auto& pass = passes[pass_index];
+        
         auto& barriers = pass_barriers[pass_index];
 
         auto process = [&](const RGImageUse& access)
@@ -155,6 +157,9 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
     for (uint32_t pass_index : execution_order)
     {
         const RenderGraphPass& pass = passes[pass_index];
+        
+        if (pass.condition && !pass.condition())
+            continue;
 
         // Apply transitions
         for (const auto& barrier : pass_barriers[pass_index])
@@ -288,6 +293,7 @@ void RenderGraph::rebuild_resources()
             continue;
         
         RBImageDesc desc = {
+            .name = std::string("RG_") + tex.desc.name.to_string(),
             .width  = tex.desc.width,
             .height = tex.desc.height,
             .format = tex.desc.format,

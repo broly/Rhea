@@ -5,6 +5,7 @@ import <string>;
 import :engine_clock;
 import :core;
 import dependency_collector;
+import rhmath;
 // import :scene_extractor;
 
 
@@ -21,6 +22,8 @@ public:
     void add_actor(std::shared_ptr<RhActor> actor);
     
     std::shared_ptr<RhActor> spawn(const std::string& name);
+    
+    AABB get_world_aabb() const;
 
     template<typename T>
     void add_script()

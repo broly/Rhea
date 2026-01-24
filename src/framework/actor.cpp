@@ -2,6 +2,7 @@
 
 import :rhcomponent;
 import :rhcomp_transform;
+import :rhcomp_renderable;
 import :core;
 
 import <unordered_map>;
@@ -125,13 +126,19 @@ void RhActor::set_transform(const Transform& transform)
     transform_comp->set_transform(transform);
 }
 
-Transform RhActor::get_transform()
+Transform RhActor::get_transform() const
 {
     auto transform_comp = find_component<RhComp_Transform>();
     
     assert(transform_comp != nullptr);
     
     return transform_comp->get_transform();
+}
+
+AABB RhActor::get_aabb() const
+{
+    auto t = find_component<RhComp_Renderable>();
+    return t->get_aabb();
 }
 
 std::shared_ptr<RhComponent> RhActor::find_component_by_name(const std::string& name)

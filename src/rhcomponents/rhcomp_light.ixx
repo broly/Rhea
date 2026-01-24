@@ -36,6 +36,8 @@ public:
 
     void update_scene_proxy();
     
+    void on_serialize(DependencyCollector* dc) override;
+    
     vec4 color;
     float intensity;
     float falloff;

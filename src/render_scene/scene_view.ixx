@@ -3,6 +3,7 @@ import <vector>;
 
 import <memory>;
 import <unordered_map>;
+import framework;
 
 import <any>;
 
@@ -42,15 +43,14 @@ public:
     }
     
     
-    void submit_raw(SceneViewProcId svp_id, const void* scene_proxy_ptr)
-    {
-        processors[svp_id]->submit(scene_proxy_ptr);
-    }
-    
-    
+    void submit_raw(SceneViewProcId svp_id, const void* scene_proxy_ptr);
+
+
     std::shared_ptr<class World> world;
 
     std::shared_ptr<Renderer> renderer;
     
     std::vector<std::unique_ptr<SceneViewProcessor>> processors;
+    
+    AABB world_aabb;
 };

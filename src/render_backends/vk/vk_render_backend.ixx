@@ -118,13 +118,12 @@ public:   /// API Section
     virtual void advance_frame() override;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, PipelineObject* pipeline_object) override;
-    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
+    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) override;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) override;
     virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual RBImageView get_image_view(RBImageHandle handle) override;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
-    virtual RBImageView get_swapchain_image_view(RBFrameHandle frame) override;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
@@ -133,24 +132,8 @@ public:   /// API Section
     std::pair<uint32_t, uint32_t> get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     
-    virtual void update_viewport(const RBCommandList& cmd, uint32_t width, uint32_t height) override
-    {
-        VkViewport viewport{};
-        viewport.x = 0;
-        viewport.y = 0;
-        viewport.width  = float(width);
-        viewport.height = float(height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-
-        VkRect2D scissor{};
-        scissor.offset = {0, 0};
-        scissor.extent = {width, height};
-
-        vkCmdSetViewport(cmd, 0, 1, &viewport);
-        vkCmdSetScissor (cmd, 0, 1, &scissor);
-    }
-// Initialization section
+    virtual void update_viewport(const RBCommandList& cmd, RBSwapchainExtent extent) override;
+    // Initialization section
     void create_frame_sync_objects();
     void create_descriptor_pool();
     void create_command_pool();

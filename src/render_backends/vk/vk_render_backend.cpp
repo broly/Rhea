@@ -99,6 +99,7 @@ void VkRenderBackend::create_depth_resources()
     VK_CHECK(vkCreateImage(
         instance.get_device(), &image_ci, nullptr, &swapchain.depth_image
     ));
+    
 
     VkMemoryRequirements mem_req;
     vkGetImageMemoryRequirements(
@@ -141,6 +142,9 @@ void VkRenderBackend::create_depth_resources()
         nullptr,
         &swapchain.depth_image_view
     ));
+    
+    LogVkSamplerManager.Log("Created depth image: %p. View: %p", 
+        swapchain.depth_image, swapchain.depth_image_view);
 }
 
 VkImageSubresourceRange VkRenderBackend::full_subresource_range(RBImageHandle image)
@@ -192,6 +196,26 @@ void VkRenderBackend::update_viewport_extent(const RBCommandList& cmd)
     vkCmdSetViewport(cmd, 0, 1, &viewport);
     vkCmdSetScissor (cmd, 0, 1, &scissor);
 }
+
+
+void VkRenderBackend::update_viewport(const RBCommandList& cmd, RBSwapchainExtent extent)
+{
+    VkViewport viewport{};
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width  = float(extent.width);
+    viewport.height = float(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {extent.width, extent.height};
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor (cmd, 0, 1, &scissor);
+}
+
 
 
 RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout)
@@ -297,11 +321,6 @@ size_t hash_framebuffer(
     return h;
 }
 
-
-RBImageView VkRenderBackend::get_swapchain_image_view(RBFrameHandle frame)
-{
-    return swapchain.get_image_view();
-}
 
 RBImageHandle VkRenderBackend::get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const
 {
@@ -465,11 +484,13 @@ void VkRenderBackend::push_constants(const RBCommandList& cmd, glm::mat4 matrix,
     );
 }
 
-void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)
+void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params)
 {
     PROFILE("draw_indexed");
-    update_viewport_extent(cmd);
-    
+    if (params.update_viewport_extent)
+    {
+        update_viewport(cmd, params.use_swapchain_extent ? get_swapchain_extent() : params.extent);
+    }
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 }
 
@@ -624,7 +645,7 @@ void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 
 void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object)
 {
-    LogRB.Log("bind_pipeline");
+    LogRB.Log<Verbose>("bind_pipeline");
     
     auto vk_pipeline_object = static_cast<VkPipelineObject*>(pipeline_object);
     

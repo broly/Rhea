@@ -7,6 +7,7 @@ import rhmath;
 import globals;
 import input;
 import profile;
+import rhmath;
 
 void WorldScript_RotateAroundObject::tick(double dt)
 {
@@ -31,16 +32,35 @@ void WorldScript_RotateAroundObject::tick(double dt)
     {
         do_once = true;
         
-        t.position = glm::vec3{0.0f, 0.0f, 10.0f};
+        t.position = glm::vec3{0.0f, 30.0f, 10.0f};
+        
+        auto aabb = world->get_world_aabb();
+        auto origin = t.position.glm();
+        auto target = aabb.center();
+        auto result = math::look_at(origin, target);
+        t.rotation = result;
+        camera_actor->set_transform(t);
+        glm::vec3 dir = glm::normalize(target - origin);
+        pitch = asinf(glm::clamp(dir.y, -1.0f, 1.0f));
+        yaw = atan2f(dir.x, -dir.z);
+        auto qrot = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
+    
+        t.rotation = qrot;
         camera_actor->set_transform(t);
         // dir_light_actor->set_transform(t);
     }
-
+    
     // =========================
     // MOUSE
     // =========================
     glm::vec2 mouse{ input->mouse_x, input->mouse_y };
 
+    bool handled = false;
+    
+    auto aabb = world->get_world_aabb();
+    auto origin = t.position.glm();
+    auto target = aabb.center();
+    
     if (input->is_key_down(Key::MouseLeft))
     {
         if (!rotation_started)
@@ -60,17 +80,20 @@ void WorldScript_RotateAroundObject::tick(double dt)
             -glm::radians(89.0f),
              glm::radians(89.0f)
         );
+        handled = true;
     }
     else
     {
         rotation_started = false;
     }
-
+    
+    
     auto qrot = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
     
     t.rotation = qrot;
     
     float speed = move_speed * (float)dt;
+    
     
     if (input->is_key_down(Key::P))
     {
@@ -82,6 +105,7 @@ void WorldScript_RotateAroundObject::tick(double dt)
         prof::set_is_profiling(false);
     }
     
+    
     if (input->is_key_down(Key::L))
     {
         prof::dump();
@@ -89,20 +113,48 @@ void WorldScript_RotateAroundObject::tick(double dt)
 
 
     if (input->is_key_down(Key::W))
+    {
         t.position = t.position.glm() + t.forward() * speed;
+        handled = true;
+    }
     if (input->is_key_down(Key::S))
+    {
         t.position = t.position.glm() - t.forward() * speed;
+        handled = true;
+    }
     if (input->is_key_down(Key::A))
+    {
         t.position = t.position.glm() - t.right() * speed;
+        handled = true;
+    }
     if (input->is_key_down(Key::D))
+    {
         t.position = t.position.glm() + t.right() * speed;
+        handled = true;
+    }
     if (input->is_key_down(Key::E))
+    {
         t.position = t.position.glm() + t.up() * speed;
+        handled = true;
+    }
     if (input->is_key_down(Key::Q))
+    {
         t.position = t.position.glm() - t.up() * speed;
-
+        handled = true;
+    }
     
-    // std::cout << t.position.x << " " << t.position.y << " " << t.position.z << std::endl;
-    camera_actor->set_transform(t);
+    
+    if (input->is_key_down(Key::H))
+    {
+        RhGlobals::engine->renderer->toggle_flag("debug_shadow");
+        handled = true;
+    }
+    
+    if (handled)
+    {
+        camera_actor->set_transform(t);
         // dir_light_actor->set_transform(t);
+    }
+    
+    
 }

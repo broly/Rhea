@@ -41,3 +41,8 @@ void RhComp_Light::update_scene_proxy()
     scene_proxy.falloff = falloff;
     scene_proxy.light_type = type;
 }
+
+void RhComp_Light::on_serialize(DependencyCollector* dc)
+{
+    RhComp_Renderable::on_serialize(dc);
+}

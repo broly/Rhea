@@ -41,6 +41,30 @@ export enum class CullMode
 REFLECT_ENUM(CullMode,
     none, front, back, both);
 
+struct DepthBiasInfo
+{
+    bool enable = false;
+    float constant_factor = 0.0;
+    float clamp = 0.0;
+    float slope_factor = 0.0;
+};
+REFLECT_STRUCT(DepthBiasInfo,
+    enable, constant_factor, clamp, slope_factor);
+
+export enum class CompareOp 
+{
+    never = 0,
+    less = 1,
+    equal = 2,
+    less_or_equal = 3,
+    greater = 4,
+    not_equal = 5,
+    greater_or_equal = 6,
+    always = 7,
+};
+REFLECT_ENUM(CompareOp,
+    never, less, equal, less_or_equal, greater, not_equal, greater_or_equal, always);
+
 
 export enum class FrontFace
 {
@@ -189,6 +213,8 @@ export
         bool is_translucent;
         CullMode cull_mode;
         FrontFace front_face;
+        CompareOp compare_op;
+        DepthBiasInfo depth_bias;
         
 
         PipelineRenderTargetDesc rt_compat;

@@ -8,11 +8,13 @@ import <map>;
 import name;
 import :pipeline_family;
 
+
+
 export struct RenderGraphPass
 {
     Name name;
     
-    
+    std::function<bool()> condition = nullptr;
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
 

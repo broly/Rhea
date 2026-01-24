@@ -29,6 +29,8 @@ public:
     void finish() override;
     void on_serialize(DependencyCollector* dc) override;
     
+    AABB get_aabb() const override;
+    
     void update_scene_proxy();
     
     SceneViewProxy_Mesh scene_proxy;

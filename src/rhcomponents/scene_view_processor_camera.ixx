@@ -12,6 +12,7 @@ import :rhcomp_camera;
 export struct RenderObject_Camera
 {
     glm::vec3 position;
+    glm::vec3 forward;
     glm::mat4 view;
     
     

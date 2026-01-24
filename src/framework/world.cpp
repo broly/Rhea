@@ -6,6 +6,7 @@ import :engine_clock;
 import :world_script;
 import :actor;
 import dependency_collector;
+import glm;
 
 import rhobject;
 import <json/value.h>;
@@ -158,6 +159,16 @@ std::shared_ptr<RhActor> World::spawn(const std::string& name)
     actors.push_back(actor);
     actor->internal_start(shared_from_this());
     return actor;
+}
+
+AABB World::get_world_aabb() const
+{
+    AABB result = {glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f)};
+    for (auto& actor : actors)
+    {
+        result += actor->get_aabb();
+    }
+    return result;
 }
 
 double World::get_time_seconds() const

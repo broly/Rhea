@@ -36,10 +36,12 @@ public:
     virtual void finish() {}
     
     void set_transform(const Transform& transform);
-    Transform get_transform();
+    Transform get_transform() const;
+    
+    AABB get_aabb() const;
     
     template<typename T>
-    std::shared_ptr<T> find_component()
+    std::shared_ptr<T> find_component() const
     {
         auto requested_object_type_id = reflect::get_object_type_name<T>();
         for (auto component : instanced_components)

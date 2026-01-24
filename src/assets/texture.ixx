@@ -52,7 +52,8 @@ export enum class TextureFormat
     RGBA32F,
 
     Depth24Stencil8,
-    Depth32F
+    Depth32F,
+    Depth16UNorm,
 };
 
 export struct Texture

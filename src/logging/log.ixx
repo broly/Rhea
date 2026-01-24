@@ -62,6 +62,8 @@ DEFINE_VERBOSITY(Error, 1, file | line | function, print_error);
 DEFINE_VERBOSITY(Warning, 2, no_detail, print_error);
 DEFINE_VERBOSITY(DisplayFn, 3, function, print_text);
 DEFINE_VERBOSITY(Log, 4, no_detail, print_text);
+DEFINE_VERBOSITY(Verbose, 5, no_detail, print_text);
+DEFINE_VERBOSITY(VeryVerbose, 6, no_detail, print_text);
 
 
 export template<size_t LogNameSize>
