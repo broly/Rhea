@@ -37,7 +37,8 @@
 				"fragment": "tonemap.frag"
 			},
 			"cull_mode": "none",
-			"front_face": "CW"
+			"front_face": "CW",
+			"compare_op": "greater"
 		}
 	]
 }

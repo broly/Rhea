@@ -12,13 +12,6 @@
 	"sampler": "surface",
 	
 	"parameters": {
-		"base_color": {
-			"type": "sampler",
-			"dynamic": true,
-			"shader_parameter": "u_base_color",
-			"ubo": null,
-			"binding": 1
-		},
 	},	
 	"permutations": {
 	},
@@ -37,7 +30,14 @@
 			"depth_test": true,
 			"translucent": false,
 			"cull_mode": "none",
-			"front_face": "CCW"
+			"front_face": "CCW",
+			"compare_op": "less",
+			"depth_bias" : {
+				"enable": true,
+				"constant_factor": 10.1,
+				"slope_factor": 1.0,
+				"clamp": 0
+			}
 		}
 	]
 }

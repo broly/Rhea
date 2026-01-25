@@ -20,9 +20,9 @@ struct PointLight
 
 struct DirectionalLight
 {
+    mat4 light_vp;  // view-projection for shadow
     vec4 direction; // xyz normalized (world)
     vec4 color;     // rgb * intensity
-    mat4 light_vp;  // view-projection for shadow
 };
 
 layout(set = 0, binding = 0) uniform LightUBO

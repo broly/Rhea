@@ -46,9 +46,9 @@ struct PointLight
 
 struct DirectionalLight
 {
+    mat4 light_vp;  // view-projection for shadow
     vec4 direction; // xyz normalized (world)
     vec4 color;     // rgb * intensity
-    mat4 light_vp;  // view-projection for shadow
 };
 
 layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
@@ -63,28 +63,35 @@ layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 
 
 
-layout(set = SET_SHADOW, binding = BINDING_UBO_SHADOW) uniform sampler2DShadow u_shadow_map;
+layout(set = SET_SHADOW, binding = BINDING_UBO_SHADOW) uniform sampler2D u_shadow_depth;
 
 
-
-float shadow_factor(vec3 world_pos)
+float shadow_factor(vec3 world_pos, vec3 normal)
 {
-    vec4 light_space =
-    light_ubo.dir_light.light_vp * vec4(world_pos, 1.0);
+    vec4 light_clip = light_ubo.dir_light.light_vp * vec4(world_pos, 1.0);
 
-    vec3 proj = light_space.xyz / light_space.w;
-    proj = proj * 0.5 + 0.5;
+    vec3 proj = light_clip.xyz / light_clip.w;
 
-    if (proj.z > 1.0)
-    return 1.0;
+    if (
+        proj.x < -1.0 || proj.x > 1.0 ||
+        proj.y < -1.0 || proj.y > 1.0 ||
+        proj.z <  0.0 || proj.z > 1.0
+    )
+    {
+        return 1.0;
+    }
 
-    float shadow = texture(
-        u_shadow_map,
-        vec3(proj.xy, proj.z - 0.005)
-    );
+    vec2 uv = proj.xy * 0.5 + 0.5;
 
-    return shadow;
+    float shadow_depth = texture(u_shadow_depth, uv).r;
+
+    float ndotl = max(dot(normal, -light_ubo.dir_light.direction.xyz), 0.0);
+    float bias  = max(0.001 * (1.0 - ndotl), 0.0005);
+
+    return (proj.z - bias > shadow_depth) ? 0.0 : 1.0;
 }
+
+
 
 
 // ================== MAIN ==================
@@ -92,6 +99,7 @@ void main()
 {
     // ----- Textures (linear space) -----
     vec4 base_color_tx = texture(u_base_color, v_uv);
+    float shadow = shadow_factor(v_world_pos, vec3(0.0, 0.0, 0.0));
     
     vec3 albedo =
         pow(base_color_tx.rgb, vec3(2.2))
@@ -164,14 +172,30 @@ void main()
         vec3 L = normalize(-light_ubo.dir_light.direction.xyz);
         vec3 H = normalize(V + L);
 
-        float shadow = shadow_factor(v_world_pos);
-
         float NdotL = max(dot(normal, L), 0.0);
+        float NdotV = max(dot(normal, V), 0.0);
 
-        vec3 radiance = light_ubo.dir_light.color.rgb * shadow;
+        if (NdotL > 0.0)
+        {
 
-        Lo += radiance * NdotL;
+            float shadow = shadow_factor(v_world_pos, normal);
+            
 
+            vec3 radiance = light_ubo.dir_light.color.rgb * shadow;
+
+            float NDF = DistributionGGX(normal, H, roughness);
+            float G   = GeometrySmith(normal, V, L, roughness);
+            vec3  F   = FresnelSchlick(max(dot(H, V), 0.0), F0);
+
+            vec3 specular =
+            (NDF * G * F) /
+            max(4.0 * NdotV * NdotL, 0.001);
+
+            vec3 kS = F;
+            vec3 kD = (1.0 - kS) * (1.0 - metallic);
+
+            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+        }
     }
 
     vec3 ambient = vec3(0.01) * albedo * ao;
