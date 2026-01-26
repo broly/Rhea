@@ -72,9 +72,7 @@ public:
     std::map<Name, std::shared_ptr<MaterialModel>> models;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
-    
-    RenderResource* create_material_resource(const RenderResourceDesc& desc);
-    
+
     std::map<std::pair<Name, std::shared_ptr<MaterialModel>>, RenderResource*> material_resources;
     
     std::map<Name, RBSampler> samplers;

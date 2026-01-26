@@ -66,10 +66,10 @@ layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 layout(set = SET_SHADOW, binding = BINDING_UBO_SHADOW) uniform sampler2D u_shadow_depth;
 
 
-float shadow_factor(vec3 world_pos, vec3 normal)
+// ================== SHADOW ==================
+float shadow_factor(vec3 world_pos, vec3 Ng)
 {
     vec4 light_clip = light_ubo.dir_light.light_vp * vec4(world_pos, 1.0);
-
     vec3 proj = light_clip.xyz / light_clip.w;
 
     if (
@@ -77,134 +77,154 @@ float shadow_factor(vec3 world_pos, vec3 normal)
         proj.y < -1.0 || proj.y > 1.0 ||
         proj.z <  0.0 || proj.z > 1.0
     )
-    {
-        return 1.0;
-    }
+    return 1.0;
 
     vec2 uv = proj.xy * 0.5 + 0.5;
+    float depth = texture(u_shadow_depth, uv).r;
 
-    float shadow_depth = texture(u_shadow_depth, uv).r;
+    float ndotl = max(dot(Ng, -light_ubo.dir_light.direction.xyz), 0.0);
+    float bias  = max(0.0005 * (1.0 - ndotl), 0.0001);
 
-    float ndotl = max(dot(normal, -light_ubo.dir_light.direction.xyz), 0.0);
-    float bias  = max(0.001 * (1.0 - ndotl), 0.0005);
-
-    return (proj.z - bias > shadow_depth) ? 0.0 : 1.0;
+    return (proj.z - bias > depth) ? 0.0 : 1.0;
 }
-
-
-
 
 // ================== MAIN ==================
 void main()
 {
-    // ----- Textures (linear space) -----
-    vec4 base_color_tx = texture(u_base_color, v_uv);
-    float shadow = shadow_factor(v_world_pos, vec3(0.0, 0.0, 0.0));
-    
-    vec3 albedo =
-        pow(base_color_tx.rgb, vec3(2.2))
-        * material.base_color_mult;
-    
-#if BLEND_MODE_TRANSLUCENT
-    float alpha = base_color_tx.a;
-#endif
-    
-    vec3 emissive = 
-        texture(u_emissive, v_uv).rgb
-        * material.emissive_mult;
+    vec4 base_tx = texture(u_base_color, v_uv);
 
-    vec3 orm = texture(u_orm, v_uv).rgb;
+#if BLEND_MODE_TRANSLUCENT
+    float alpha = base_tx.a;
     
+    if (alpha <= 0.001)
+        discard;
+#endif
+
+    // ----- Albedo (linear) -----
+    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * material.base_color_mult;
+
+    // ----- ORM -----
+    vec3 orm = texture(u_orm, v_uv).rgb;
     float ao        = orm.r * material.occlusion_mult;
     float roughness = orm.g * material.roughness_mult;
     float metallic  = orm.b * material.metallic_mult;
 
-    // ----- TBN -----
-    vec3 N = normalize(v_world_normal);
+#if BLEND_MODE_TRANSLUCENT
+    metallic  = 0.0;
+    roughness = 1.0;
+#endif
+
+    // ----- Normals -----
+    vec3 Ng = normalize(v_world_normal);
+    vec3 N  = Ng;
+
+#if !BLEND_MODE_TRANSLUCENT
     vec3 T = normalize(v_world_tangent);
     vec3 B = normalize(v_world_bitangent);
-    mat3 TBN = mat3(T, B, N);
-    
-    
-    vec3 normal_tx = texture(u_normal_map, v_uv).rgb;
-    normal_tx.y = 1 - normal_tx.y;
-    vec3 normal_ts = normal_tx * 2.0 - 1.0;
-    vec3 normal = normalize(TBN * normal_ts);
+    mat3 TBN = mat3(T, B, Ng);
+
+    vec3 n_tx = texture(u_normal_map, v_uv).rgb;
+    n_tx.y = 1.0 - n_tx.y;
+    vec3 n_ts = n_tx * 2.0 - 1.0;
+
+    N = normalize(TBN * n_ts);
+#endif
 
     // ----- View -----
     vec3 V = normalize(camera.camera_pos.xyz - v_world_pos);
 
-    // ----- Fresnel base -----
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
-
     vec3 Lo = vec3(0.0);
 
+    // ================== POINT LIGHTS ==================
     for (int i = 0; i < light_ubo.light_count; ++i)
     {
         vec3 Lpos = light_ubo.lights[i].position.xyz;
         vec3 Lcol = light_ubo.lights[i].color.rgb;
 
         vec3 L = normalize(Lpos - v_world_pos);
-        vec3 H = normalize(V + L);
+
+        float NdotL_geom = max(dot(Ng, L), 0.0);
+        float NdotL_nm   = max(dot(N,  L), 0.0);
+        float NdotL      = min(NdotL_geom, NdotL_nm);
+
+        if (NdotL <= 0.0)
+            continue;
 
         float dist = length(Lpos - v_world_pos);
         float attenuation = 1.0 / (dist * dist + 1.0);
         vec3 radiance = Lcol * attenuation;
 
-        float NDF = DistributionGGX(normal, H, roughness);
-        float G   = GeometrySmith(normal, V, L, roughness);
+#if BLEND_MODE_TRANSLUCENT
+        Lo += albedo / PI * radiance * NdotL;
+#else
+        vec3 H = normalize(V + L);
+        vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+        float NDF = DistributionGGX(N, H, roughness);
+        float G   = GeometrySmith(N, V, L, roughness);
         vec3  F   = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
-        vec3 specular =
+        vec3 spec =
             (NDF * G * F) /
-            max(4.0 * max(dot(normal, V), 0.0)
-                * max(dot(normal, L), 0.0), 0.001);
+            max(4.0 * max(dot(N, V), 0.0) * NdotL, 0.001);
 
         vec3 kS = F;
         vec3 kD = (1.0 - kS) * (1.0 - metallic);
 
-        float NdotL = max(dot(normal, L), 0.0);
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+        Lo += (kD * albedo / PI + spec) * radiance * NdotL;
+#endif
     }
+
+    // ================== DIRECTIONAL ==================
+    float shadow = 1.0;
 
     if (light_ubo.has_dir_light == 1)
     {
         vec3 L = normalize(-light_ubo.dir_light.direction.xyz);
-        vec3 H = normalize(V + L);
 
-        float NdotL = max(dot(normal, L), 0.0);
-        float NdotV = max(dot(normal, V), 0.0);
+        float NdotL_geom = max(dot(Ng, L), 0.0);
+        float NdotL_nm   = max(dot(N,  L), 0.0);
+        float NdotL      = min(NdotL_geom, NdotL_nm);
 
         if (NdotL > 0.0)
         {
-
-            float shadow = shadow_factor(v_world_pos, normal);
-            
-
+            shadow = shadow_factor(v_world_pos, Ng);
             vec3 radiance = light_ubo.dir_light.color.rgb * shadow;
 
-            float NDF = DistributionGGX(normal, H, roughness);
-            float G   = GeometrySmith(normal, V, L, roughness);
+#if BLEND_MODE_TRANSLUCENT
+            Lo += albedo / PI * radiance * NdotL;
+#else
+            vec3 H = normalize(V + L);
+            vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+            float NDF = DistributionGGX(N, H, roughness);
+            float G   = GeometrySmith(N, V, L, roughness);
             vec3  F   = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
-            vec3 specular =
-            (NDF * G * F) /
-            max(4.0 * NdotV * NdotL, 0.001);
+            vec3 spec =
+                (NDF * G * F) /
+                max(4.0 * max(dot(N, V), 0.0) * NdotL, 0.001);
 
             vec3 kS = F;
             vec3 kD = (1.0 - kS) * (1.0 - metallic);
 
-            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+            Lo += (kD * albedo / PI + spec) * radiance * NdotL;
+#endif
         }
     }
 
+    // ================== AMBIENT ==================
     vec3 ambient = vec3(0.01) * albedo * ao;
-    vec3 hdr_color = ambient + Lo + emissive;
 
 #if BLEND_MODE_TRANSLUCENT
-    out_color = vec4(hdr_color, alpha);
-#else
-    out_color = vec4(hdr_color, 1.0);
+    ambient *= shadow;
 #endif
-    
+
+    vec3 color = ambient + Lo;
+
+#if BLEND_MODE_TRANSLUCENT
+    out_color = vec4(color, alpha);
+#else
+    out_color = vec4(color, 1.0);
+#endif
 }

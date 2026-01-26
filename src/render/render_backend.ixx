@@ -17,6 +17,10 @@ import assets;
 struct RenderGraphPass;
 export class RenderBackend;
 
+export template<typename T>
+concept allowed_for_push_constant = 
+    std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> && sizeof(T) <= 128;
+
 template<typename T>
 concept RenderBackendType = 
     std::is_base_of_v<RenderBackend, T> && 
@@ -75,8 +79,16 @@ public:
 
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) = 0;
     
+    void push_constants(
+        const RBCommandList& cmd, 
+        const allowed_for_push_constant auto& value, 
+        PipelineObject* pipeline_object)
+    {
+        push_constants_impl(cmd, &value, sizeof(value), pipeline_object);
+    }
+    
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
-    virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, PipelineObject* pipeline_object) = 0;
+    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) = 0;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;

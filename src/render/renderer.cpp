@@ -122,8 +122,3 @@ RenderResource* Renderer::get_or_create_resource_from_model(std::shared_ptr<Mate
     
     return resource;
 }
-
-RenderResource* Renderer::create_material_resource(const RenderResourceDesc& desc)
-{
-    todo("not implemented yet");
-}

@@ -226,17 +226,16 @@ void GameRenderer::init(RBWindowHandle in_window)
         },
         .execute = [=](RenderGraphContext& ctx)
         {
-            // Bind your fullscreen debug pipeline
             ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
             
             auto shadow_debug_material_instance = get_or_create_material_instance(shadow_debug_material, ctx.pass_name);
-            
-            auto* shadow_debug_instance =
+
+            RenderResourceInstance* shadow_debug_instance =
                 shadow_debug_material_instance->get_or_create_resource_instance(
                     shadow_debug_pipeline,
                     ctx.frame
                 );
-            // Bind shadow map as sampler
+
             shadow_debug_instance->update_image(
                 shadow_debug_pipeline,
                 "u_shadow_depth",
@@ -250,7 +249,6 @@ void GameRenderer::init(RBWindowHandle in_window)
                 ctx.frame
             );
     
-            // Draw fullscreen quad
             ctx.backend.draw_fullscreen(ctx.cmd);
         }
     });
@@ -261,7 +259,6 @@ void GameRenderer::init(RBWindowHandle in_window)
             {  shadow_map, RBImageUsage::SampledFragment }
         },
         .writes = { 
-            // { hdr_color, RBImageUsage::ColorAttachment }, 
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
@@ -377,10 +374,8 @@ glm::mat4 GameRenderer::build_dir_light_vp() const
     if (!dir)
         return glm::mat4(1.0f);
 
-
     const AABB& aabb = scene_view->world_aabb;
     glm::vec3 center = aabb.center();
-
 
     glm::vec3 lightDir = glm::normalize(dir->direction);
 
@@ -389,13 +384,10 @@ glm::mat4 GameRenderer::build_dir_light_vp() const
             ? glm::vec3(0,0,1)
             : glm::vec3(0,1,0);
 
-
     float dist = aabb.scalar_radius();
     glm::vec3 lightPos = center - lightDir * dist;
 
-
     glm::mat4 lightView = glm::lookAt(lightPos, center, up);
-
 
     glm::vec3 corners[8];
     aabb.get_corners(corners);
@@ -410,8 +402,6 @@ glm::mat4 GameRenderer::build_dir_light_vp() const
         maxLS = glm::max(maxLS, p);
     }
 
-    // --- 6. Orthographic projection (Vulkan ZO)
-    
     
     glm::mat4 lightProj = glm::orthoZO(
         minLS.x, maxLS.x,
@@ -431,9 +421,6 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
     auto frame = ctx.frame;
 
     Name pass_name = ctx.pass_name;
-    // ============================================================
-    // 1. Pass-level resources (camera, light)
-    // ============================================================
 
     PipelineObject* current_pipeline = nullptr;
 
@@ -500,9 +487,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         shadow->bind(pipeline, cmd, frame);
     };
 
-    // ============================================================
-    // 2. Collect draw items
-    // ============================================================
+
 
     struct DrawItem
     {
@@ -562,9 +547,6 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         }
     }
 
-    // ============================================================
-    // 3. Draw batches
-    // ============================================================
 
     for (auto& [key, batch] : batches)
     {
@@ -595,6 +577,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
             ctx.backend.bind_mesh(cmd, item.mesh, frame);
 
             // ---------- Push constants ----------
+            using T = decltype(item.world);
             ctx.backend.push_constants(cmd, item.world, pipeline);
 
             ctx.backend.draw_indexed(

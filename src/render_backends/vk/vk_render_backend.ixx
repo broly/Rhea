@@ -117,7 +117,7 @@ public:   /// API Section
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
-    virtual void push_constants(const RBCommandList& cmd, glm::mat4 matrix, PipelineObject* pipeline_object) override;
+    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) override;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) override;
     virtual TextureFormat get_swapchain_format() const override;
