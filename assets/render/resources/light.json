@@ -1,0 +1,14 @@
+{
+	"name": "light",
+	"stages": ["fragment"],
+	"usage": "frame",
+	"variables": [
+		{
+			"variable": "light_ubo",
+			"type": "uniform",
+			"ubo": "LightUBO",
+			"binding": "BINDING_UBO_LIGHT"
+		}
+	],
+	"set": "SET_LIGHT"
+}

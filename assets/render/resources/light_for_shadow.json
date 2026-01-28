@@ -1,0 +1,14 @@
+{
+	"name": "shadow_light",
+	"stages": ["vertex", "fragment"],
+	"usage": "persistent",
+	"variables": [
+		{
+			"variable": "shadow_light_ubo",
+			"type": "uniform",
+			"ubo": "LightUBO",
+			"binding": "BINDING_UBO_SHADOW_LIGHT"
+		}
+	],
+	"set": "SET_SHADOW_LIGHT"
+}

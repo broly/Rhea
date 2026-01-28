@@ -1,0 +1,13 @@
+{
+	"name": "shadow",
+	"stages": ["vertex", "fragment"],
+	"usage": "frame",
+	"variables": [
+		{
+			"variable": "u_shadow_depth",
+			"type": "sampler",
+			"binding": "BINDING_UBO_SHADOW"
+		}
+	],
+	"set": "SET_SHADOW_RESOURCE"
+}
