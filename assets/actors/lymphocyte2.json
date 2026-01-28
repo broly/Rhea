@@ -8,7 +8,7 @@
 			"fields": {
 				"transform": {
 					"position": { "x": 0, "y": 0, "z": 0 },
-					"rotation": { "x": 0, "y": 0, "z": 0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 					"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
 				},
 				"mesh": "meshes/lymphocyte/lymphocyte.glb",

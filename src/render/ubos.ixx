@@ -1,6 +1,8 @@
 ﻿export module render:ubos;
 
 import glm;
+import rhmath;
+#include "common/reflect_macros.h"
 
 export struct CameraUBO
 {
@@ -8,6 +10,7 @@ export struct CameraUBO
     glm::vec3 camera_pos;
     float pad;
 };
+REFLECT_STRUCT_RUNTIME_OPAQUE(CameraUBO);
 
 export struct ModelUBO_Temp
 {

@@ -136,3 +136,24 @@ export struct quat
 };
 REFLECT_STRUCT(quat,
     x, y, z, w);
+
+
+export struct mat4 
+{
+    float m00, m01, m02, m03;
+    float m10, m11, m12, m13;
+    float m20, m21, m22, m23;
+    float m30, m31, m32, m33;
+    
+    mat4() = default;
+    
+    mat4(const glm::mat4& mat)
+    {
+        std::memcpy(this, glm::value_ptr(mat), sizeof(mat4));
+    }
+};
+REFLECT_STRUCT_RUNTIME(mat4,
+    m00, m01, m02, m03,
+    m10, m11, m12, m13,
+    m20, m21, m22, m23,
+    m30, m31, m32, m33);

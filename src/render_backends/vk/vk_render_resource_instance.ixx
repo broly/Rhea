@@ -2,7 +2,6 @@
 
 import render;
 import :buffer_mgr;
-import :pipeline;
 import name;
 
 
@@ -30,5 +29,5 @@ public:
     const VkRenderResource& resource;
     ResourceUsageType usage;
 
-    std::map<VkPipelineObject*, PerPipelineData> per_pipeline;
+    // std::map<VkPipelineObject*, PerPipelineData> per_pipeline;
 };

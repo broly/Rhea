@@ -11,102 +11,102 @@
 		]
 	},
 	
-	"uniform_buffers": {
-		"material": {
-			"type_name": "MaterialUBO",
-			"binding": 0
-		}
-	},
-	
 	"sampler": "surface",
 	
 	"parameters": {
 		"blend_mode": {
-			"type": "blend_mode",
-			"dynamic": false,
-			"shader_parameter": null,
-			"ubo": null,
-			"binding": null
+			"type": "definition",
+			"definition": "blend_mode"
 		},
 		"base_color": {
 			"type": "sampler",
-			"dynamic": true,
-			"shader_parameter": "u_base_color",
-			"ubo": null,
-			"binding": 1
+			"variable": "u_base_color",
+			"binding": "BINDING_SAMPLER_ALBEDO"
 		},
 		"emissive": {
 			"type": "sampler",
-			"dynamic": true,
-			"shader_parameter": "u_emissive",
-			"ubo": null,
-			"binding": 2
+			"variable": "u_emissive",
+			"binding": "BINDING_SAMPLER_EMISSIVE"
 		},
 		"normal": {
 			"type": "sampler",
-			"dynamic": true,
-			"shader_parameter": "u_normal_map",
-			"ubo": null,
-			"binding": 3
+			"variable": "u_normal_map",
+			"binding": "BINDING_SAMPLER_NORMAL"
 		},
 		"orm": {
 			"type": "sampler",
-			"dynamic": true,
-			"shader_parameter": "u_orm",
-			"ubo": null,
-			"binding": 4
+			"variable": "u_orm",
+			"binding": "BINDING_SAMPLER_ORM"
 		},
-		"base_color_factor": {
-			"type": "vec4",
-			"dynamic": true,
-			"shader_parameter": null,
-			"ubo": "material",
-			"binding": null
-		},
-		"emissive_factor": {
-			"type": "vec4",
-			"dynamic": true,
-			"shader_parameter": null,
-			"ubo": "material",
-			"binding": null
-		},
-		"occlusion_factor": {
-			"type": "vec4",
-			"dynamic": true,
-			"shader_parameter": null,
-			"ubo": "material",
-			"binding": null
-		},
-		"metallic_factor": {
-			"type": "vec4",
-			"dynamic": true,
-			"shader_parameter": null,
-			"ubo": "material",
-			"binding": null
-		},
-		"roughness_factor": {
-			"type": "vec4",
-			"dynamic": true,
-			"shader_parameter": null,
-			"ubo": "material",
-			"binding": null
+		"material": {
+			"type": "uniform",
+			"ubo": "MaterialUBO",
+			"binding": "BINDING_MATERIAL",
+			"variable": "material_ubo",
+			"fields": {
+				"base_color_factor": {
+					"type": "vec4"
+				},
+				"emissive_factor": {
+					"type": "vec4"
+				},
+				"occlusion_factor": {
+					"type": "vec4"
+				},
+				"metallic_factor": {
+					"type": "vec4"
+				},
+				"roughness_factor": {
+					"type": "vec4"
+				}
+			}
 		}
 	},	
 	"permutations": {
 		"flags": {
-			"USE_BASE_COLOR": "base_color || base_color_factor",
+			"USE_BASE_COLOR": "base_color",
 			"USE_NORMAL_MAP": "normal",
-			"USE_ORM": "orm || metallic_factor || roughness_factor"
+			"USE_ORM": "orm"
 		},
 		"enums": {
 			"blend_mode": {
 				"opaque": "BLEND_MODE_OPAQUE",
 				"masked": "BLEND_MODE_MASKED",
-				"translucent": "BLEND_MODE_TRANSLUCENT",
+				"translucent": "BLEND_MODE_TRANSLUCENT"
 			}
 		}
 	},
-	"set": 3,
+	
+	"set": "SET_PBR",
+	
+	"vertex_layouts": [
+		{
+			"vertex_type": "Vertex",
+			"attributes": [ 
+				{ 
+					"name": "position",
+					"definition": "LOCATION_ATTR_POSITION",
+					"variable": "in_position"
+				},
+				{
+					"name": "normal",
+					"definition": "LOCATION_ATTR_NORMAL",
+					"variable": "in_normal"
+				},
+				{
+					"name": "tex_coord",
+					"definition": "LOCATION_ATTR_UV",
+					"variable": "in_uv"
+				},
+				{
+					"name": "tangent",
+					"definition": "LOCATION_ATTR_TANGENT",
+					"variable": "in_tangent"
+				}
+			]
+		}
+	],
+	
 	"passes": [	
 		{
 			"name": "GeometryBase",
@@ -120,21 +120,28 @@
 			},
 			"depth_write": true,
 			"depth_test": true,
+	
+			"resources": ["camera", "light", "shadow"],
 			"translucent": false,
 			"cull_mode": "back",
 			"front_face": "CW",
-			"compare_op": "less"
+			"compare_op": "less",
+			"push_constants": [
+				{
+					"type": "mat4",
+					"name": "camera",
+					"stages": ["vertex"]
+				}
+			]
 		},
 		{
 			"name": "GeometryTranslucent",
 			"requirements": "blend_mode == translucent",
-			"enum_white_list": {
-				"blend_mode": ["translucent"]
-			},
 			"shaders": {
 				"vertex": "geometry.vert",
 				"fragment": "geometry.frag"
 			},
+			"resources": ["camera", "light", "shadow"],
 			"depth_write": false,
 			"depth_test": true,
 			"translucent": true,

@@ -13,9 +13,7 @@ import render;
 export struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
 {
     MeshHandle mesh;
-    std::vector<PBRMaterial> materials;
     std::vector<std::shared_ptr<Material>> mats;
-    // PBRMaterial material;
     Name debug_name;
 };
 
@@ -35,14 +33,12 @@ public:
     
     SceneViewProxy_Mesh scene_proxy;
     
-    std::vector<PBRMaterial> materials;
-    
     MeshHandle mesh;
 
     std::vector<std::shared_ptr<Material>> mats;
 };
 
 REFLECT_OBJECT_FIELDS(RhComp_StaticMesh, RhComp_Renderable, 
-    transform, materials, mesh, mats);
+    transform, mesh, mats);
 
 

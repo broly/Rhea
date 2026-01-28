@@ -1,21 +1,29 @@
 {
 	"model_name": "shadow",
-	
 	"usage_type": "frame",
-	
-	"enums": {
-	},
-	
-	"uniform_buffers": {
-	},
-	
 	"sampler": "surface",
 	
-	"parameters": {
-	},	
+	"enums": {},
+	
+	"vertex_layouts": [
+		{
+			"vertex_type": "Vertex",
+			"attributes": [ 
+				{ 
+					"name": "position",
+					"definition": "LOCATION_ATTR_POSITION",
+					"variable": "in_position"
+				},
+			]
+		}
+	],
+	
+	"parameters": {},	
 	"permutations": {
+		"enums": {},
+		"flags": {}
 	},
-	"set": 0,
+	"set": "SET_SHADOW",
 	"passes": [	
 		{
 			"name": "shadowmap",
@@ -26,15 +34,23 @@
 				"vertex": "shadow.vert",
 				"fragment": "shadow.frag"
 			},
+			"resources": ["shadow_light"],
 			"depth_write": true,
 			"depth_test": true,
 			"translucent": false,
 			"cull_mode": "none",
 			"front_face": "CCW",
 			"compare_op": "less",
-			"depth_bias" : {
+			"push_constants": [
+				{
+					"type": "mat4",
+					"name": "camera",
+					"stages": ["vertex"]
+				}
+			],
+			"depth_bias": {
 				"enable": true,
-				"constant_factor": 10.1,
+				"constant_factor": 0.1,
 				"slope_factor": 1.0,
 				"clamp": 0
 			}

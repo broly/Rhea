@@ -16,26 +16,26 @@ layout(location = 4) in vec3 v_world_bitangent;
 layout(location = 0) out vec4 out_color;
 
 // ================== MATERIAL ==================
-layout(set = SET_MATERIAL, binding = 0) uniform MaterialUBO
+layout(set = SET_PBR, binding = BINDING_MATERIAL) uniform MaterialUBO
 {
     float base_color_mult;
     float emissive_mult;
     float occlusion_mult;
     float roughness_mult;
     float metallic_mult;
-} material;
+} material_ubo;
 
-layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_ALBEDO) uniform sampler2D u_base_color;
-layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_EMISSIVE) uniform sampler2D u_emissive;
-layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_NORMAL) uniform sampler2D u_normal_map;
-layout(set = SET_MATERIAL, binding = BINDING_SAMPLER_ORM) uniform sampler2D u_orm;
+layout(set = SET_PBR, binding = BINDING_SAMPLER_ALBEDO) uniform sampler2D u_base_color;
+layout(set = SET_PBR, binding = BINDING_SAMPLER_EMISSIVE) uniform sampler2D u_emissive;
+layout(set = SET_PBR, binding = BINDING_SAMPLER_NORMAL) uniform sampler2D u_normal_map;
+layout(set = SET_PBR, binding = BINDING_SAMPLER_ORM) uniform sampler2D u_orm;
 
 // ================== CAMERA ==================
 layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
 {
     mat4 view_proj;
     vec4 camera_pos;
-} camera;
+} camera_ubo;
 
 // ================== LIGHT ==================
 struct PointLight
@@ -63,7 +63,7 @@ layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 
 
 
-layout(set = SET_SHADOW, binding = BINDING_UBO_SHADOW) uniform sampler2D u_shadow_depth;
+layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW) uniform sampler2D u_shadow_depth;
 
 
 // ================== SHADOW ==================
@@ -101,13 +101,13 @@ void main()
 #endif
 
     // ----- Albedo (linear) -----
-    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * material.base_color_mult;
+    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * material_ubo.base_color_mult;
 
     // ----- ORM -----
     vec3 orm = texture(u_orm, v_uv).rgb;
-    float ao        = orm.r * material.occlusion_mult;
-    float roughness = orm.g * material.roughness_mult;
-    float metallic  = orm.b * material.metallic_mult;
+    float ao        = orm.r * material_ubo.occlusion_mult;
+    float roughness = orm.g * material_ubo.roughness_mult;
+    float metallic  = orm.b * material_ubo.metallic_mult;
 
 #if BLEND_MODE_TRANSLUCENT
     metallic  = 0.0;
@@ -131,7 +131,7 @@ void main()
 #endif
 
     // ----- View -----
-    vec3 V = normalize(camera.camera_pos.xyz - v_world_pos);
+    vec3 V = normalize(camera_ubo.camera_pos.xyz - v_world_pos);
 
     vec3 Lo = vec3(0.0);
 

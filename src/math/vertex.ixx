@@ -1,11 +1,14 @@
 ﻿export module rhmath:vertex;
 
-import glm;
+import :vec;
+#include "common/reflect_macros.h"
 
 export struct Vertex 
 {
-    glm::vec3 position;
-    glm::vec3 normal;
-    glm::vec2 tex_coord;
-    glm::vec4 tangent;
+    vec3 position;
+    vec3 normal;
+    vec2 tex_coord;
+    vec4 tangent;
 };
+REFLECT_STRUCT_RUNTIME(Vertex,
+    position, normal, tex_coord, tangent);

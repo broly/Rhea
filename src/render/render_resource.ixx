@@ -5,11 +5,12 @@ import :graphics_pipeline_desc;
 import :render_resource_instance;
 import name;
 
-struct RenderResourceVariable
+struct RenderResourceVariableDesc
 {
     Name name;
-    uint16_t set;
-    uint16_t binding;
+    
+    Name set;
+    Name binding;
     
     size_t size;
 };
@@ -22,7 +23,8 @@ export struct RenderResourceDesc
     ResourceUsageType usage_type = ResourceUsageType::persistent;
     std::optional<RBSampler> sampler;
     
-    std::vector<RenderResourceVariable> variables;
+    std::vector<RenderResourceVariableDesc> variables;
+    Name set;
 };
 
 export class RenderResource
@@ -33,11 +35,9 @@ public:
     RenderResource(const RenderResourceDesc& in_desc)
         : desc(in_desc)
     {}
-    
-    virtual void provide(class PipelineObject* pipeline_object) = 0;
-    virtual RenderResourceInstance* create_instance() = 0;
-    virtual RenderResourceInstance* query_single(PipelineObject* pipeline_object) = 0;
-    virtual RBDescriptorSetLayout get_descriptor_set_layout(class PipelineObject* pipeline_object) = 0;
-    
+
+    virtual RenderResourceInstance* query_single(PipelineObject* pipeline_object);
+
     const RenderResourceDesc desc;
 };
+

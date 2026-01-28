@@ -23,6 +23,8 @@
     #define BINDING_SAMPLER_NORMAL 3
     #define BINDING_SAMPLER_ORM 4
 
+#define SET_PBR SET_MATERIAL
+
 // Tonemapping
 
 

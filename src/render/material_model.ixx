@@ -19,6 +19,14 @@ REFLECT_STRUCT(MatModel_Permutations,
     flags, enums);
 
 
+export struct MatModel_PushConstant
+{
+    Name name;
+    Name type;
+    std::vector<ShaderStage> stages;
+};
+REFLECT_STRUCT(MatModel_PushConstant,
+    name, type, stages);
 
 export struct MatModel_Pass
 {
@@ -29,48 +37,66 @@ export struct MatModel_Pass
     bool depth_test;
     bool depth_write;
     bool translucent;
+    std::vector<Name> resources;
+    std::vector<MatModel_PushConstant> push_constants;
     CullMode cull_mode;
     FrontFace front_face;
     CompareOp compare_op;
-    DepthBiasInfo depth_bias;
+    std::optional<DepthBiasInfo> depth_bias;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, shaders, depth_test, depth_write, translucent, cull_mode, front_face, compare_op, depth_bias);
+    name, requirements, shaders, depth_test, push_constants, depth_write, resources, translucent, cull_mode, front_face, compare_op, depth_bias);
+
+export enum class MaterialParamType
+{
+    definition,
+    uniform,
+    sampler,
+};
+REFLECT_ENUM(MaterialParamType,
+    definition, uniform, sampler);
 
 export struct MatModel_Parameter
 {
-    Name type;
-    bool dynamic;
-    std::optional<Name> shader_parameter;
+    MaterialParamType type;
+    std::optional<Name> definition;
+    std::optional<Name> variable;
     std::optional<Name> ubo;
-    std::optional<uint16_t> binding;
+    std::optional<Name> binding;
 };
 REFLECT_STRUCT(MatModel_Parameter,
-    type, dynamic, shader_parameter, ubo, binding);
+    type, variable, ubo, binding);
 
-export struct MatModel_UniformBuffer
+export struct MatModel_LayoutAttributeInfo
 {
-    Name type_name;
-    uint16_t binding;
+    Name name;
+    Name definition;
+    Name variable;
 };
-REFLECT_STRUCT(MatModel_UniformBuffer,
-    type_name, binding);
+REFLECT_STRUCT(MatModel_LayoutAttributeInfo,
+    name, definition, variable);
 
-
+export struct MatModel_AttributesLayout
+{
+    Name vertex_type;
+    std::vector<MatModel_LayoutAttributeInfo> attributes;
+};
+REFLECT_STRUCT(MatModel_AttributesLayout,
+    vertex_type, attributes);
 
 export class MaterialModel : public RhObject
 {
 public:
     Name model_name;
+    std::vector<MatModel_AttributesLayout> vertex_layouts;
     std::map<Name, std::vector<Name>> enums;
-    std::map<Name, MatModel_UniformBuffer> uniform_buffers;
     std::map<Name, MatModel_Parameter> parameters;
     MatModel_Permutations permutations;
     std::vector<MatModel_Pass> passes;
     
     Name sampler;
     
-    uint16_t set;
+    Name set;
     
     std::map<Name, TypeId> ubo_types;
     
@@ -80,5 +106,19 @@ public:
     
     void on_serialize(DependencyCollector* dc) override;
 };
+
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, uniform_buffers, set, parameters, sampler, permutations, passes, usage_type);
+                      model_name, vertex_layouts, set, enums, parameters, sampler, permutations, passes, usage_type);
+
+export class RenderResourceInfo : public RhObject
+{
+public:
+    Name name;
+    std::optional<Name> sampler;
+    std::vector<ShaderStage> stages;
+    ResourceUsageType usage;
+    std::vector<MatModel_Parameter> variables;
+    Name set;
+};
+REFLECT_OBJECT_FIELDS(RenderResourceInfo, RhObject,
+    name, stages, usage, sampler, variables, set);

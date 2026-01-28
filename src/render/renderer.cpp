@@ -10,6 +10,8 @@ import reflect;
 void Renderer::init(RBWindowHandle in_window)
 {
     load_schemas();
+    
+    load_resources();
 }
 
 void Renderer::load_schemas()
@@ -30,6 +32,66 @@ void Renderer::load_schemas()
     {
         if (auto obj = json_object::load_object<MaterialModel>(file))
             models.insert({obj->model_name, obj});
+    }
+}
+
+void Renderer::load_resources()
+{
+    auto dir = paths::get_assets_path() / "render" / "resources";
+    
+    std::vector<std::filesystem::path> files;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        if (entry.is_regular_file()) {
+            if (entry.path().extension() == ".json")
+            {
+                files.emplace_back(entry.path().string());
+            }
+        }
+    }
+    
+    for (auto& file : files)
+    {
+        if (auto obj = json_object::load_object<RenderResourceInfo>(file))
+            resources_info.insert({obj->name, obj});
+    }
+    
+    for (const auto& [_, resource_info] : resources_info)
+    {
+        RenderResourceDesc desc;
+        desc.name = resource_info->name;
+        desc.set = resource_info->set;
+        if (resource_info->sampler.has_value())
+        {
+            auto found_sampler = samplers.find(*resource_info->sampler);
+            checkf(found_sampler != samplers.end(), "Could not find sampler named %s", 
+                resource_info->sampler->to_string().c_str());
+            desc.sampler = found_sampler->second;
+        }
+        desc.stages = ShaderStage::none;
+        for (ShaderStage stage : resource_info->stages)
+            desc.stages |= stage;
+        
+        desc.usage_type = resource_info->usage;
+        for (const MatModel_Parameter& variable : resource_info->variables)
+        {
+            checkf(variable.type != MaterialParamType::definition, "Resource variable type could not be definition");
+            RenderResourceVariableDesc var_desc;
+            var_desc.name = *variable.variable;
+            var_desc.binding = *variable.binding;
+            var_desc.set = resource_info->set;
+            if (variable.type == MaterialParamType::uniform)
+            {
+                const reflect::RuntimeReflectionInfo* ubo_info = reflect::find_runtime_info(*variable.ubo);
+                checkf(ubo_info, "could not find runtime type %s, please add runtime reflection", variable.ubo->to_string().c_str());
+                var_desc.size = ubo_info->size;
+            }
+            else
+            {
+                var_desc.size = -1;
+            }
+            desc.variables.push_back(var_desc);
+        }
+        resources[desc.name] = render_backend->create_resource(desc);
     }
 }
 
@@ -89,29 +151,24 @@ RenderResource* Renderer::get_or_create_resource_from_model(std::shared_ptr<Mate
     desc.name = model->model_name;
     desc.usage_type = model->usage_type;
     desc.sampler = samplers[model->sampler];
+    desc.set = model->set;
 
     // UBOs
-    for (const auto& [ubo_name, ubo] : model->uniform_buffers)
+    for (const auto& [name, param] : model->parameters)
     {
-        auto info = reflect::find_runtime_info(ubo.type_name);
-        checkf(info, "Could not find type");
-        desc.variables.push_back(RenderResourceVariable{
-            .name = ubo_name,
-            .set = model->set,
-            .binding = ubo.binding,
-            .size = info->size,
-        });
-    }
-
-    // Parameters
-    for (const auto& [param_name, param] : model->parameters)
-    {
-        if (param.shader_parameter)
+        if (param.type == MaterialParamType::uniform)
         {
-            desc.variables.push_back(RenderResourceVariable{
-                .name = *param.shader_parameter,
-                .set = model->set,
-                .binding = *param.binding,
+            const Name cpp_ubo_name = *param.ubo;
+            auto info = reflect::find_runtime_info(cpp_ubo_name);
+            checkf(info, "Could not find type");
+            desc.variables.push_back(RenderResourceVariableDesc{
+                .name = *param.variable,
+                .size = info->size,
+            });
+        } else if (param.type == MaterialParamType::sampler)
+        {
+            desc.variables.push_back(RenderResourceVariableDesc{
+                .name = *param.variable
             });
         }
     }
@@ -121,4 +178,14 @@ RenderResource* Renderer::get_or_create_resource_from_model(std::shared_ptr<Mate
     material_resources.insert({std::pair{pass_name, model}, resource});
     
     return resource;
+}
+
+
+RenderResource* Renderer::find_resource(Name resource_name) const
+{
+    auto resource_it = resources.find(resource_name);
+    if (resource_it == resources.end())
+        return nullptr;
+    
+    return resource_it->second;
 }

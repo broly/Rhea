@@ -138,13 +138,13 @@ foreach(shader ${SHADERS})
     get_filename_component(shader_name ${shader} NAME)
     set(output ${SHADER_BINARY_DIR}/${shader_name}.spv)
 
-    add_custom_command(
-        OUTPUT ${output}
-        COMMAND ${GLSLC} ${shader} -o ${output}
-        DEPENDS ${shader}
-        COMMENT "Compiling shader ${shader_name}"
-        VERBATIM
-    )
+    # add_custom_command(
+    #     OUTPUT ${output}
+    #     COMMAND ${GLSLC} ${shader} -o ${output}
+    #     DEPENDS ${shader}
+    #     COMMENT "Compiling shader ${shader_name}"
+    #     VERBATIM
+    # )
 
     list(APPEND SPIRV_SHADERS ${output})
 endforeach()

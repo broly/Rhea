@@ -31,7 +31,7 @@ public:
 
     PipelineLayoutDesc geom_pipeline_layout;
     PipelineLayoutDesc shadow_pipeline_layout;
-
+    
     RenderResource* camera_resource;
     RenderResource* light_resource;
     RenderResource* light_resource_shadow;

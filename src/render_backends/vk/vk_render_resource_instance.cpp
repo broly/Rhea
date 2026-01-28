@@ -15,8 +15,9 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeli
                                                           Name buffer_name, size_t size, void* data, RBFrameHandle frame)
 {
     auto* vk_pipeline    = static_cast<VkPipelineObject*>(pipeline_object);
-    auto& pipe_info = resource.info_by_pipeline.at(vk_pipeline);
-    auto& inst_info = per_pipeline.at(vk_pipeline);
+    
+    auto inst_info = vk_pipeline->instance_pipeline_data.at(this);
+    auto& pipe_info = vk_pipeline->resources_pipeline_info.at((VkRenderResource*)&resource);
 
     auto [binding_index, binding] =
         pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
@@ -35,8 +36,9 @@ void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_objec
                                             RBImageHandle image_handle, RBFrameHandle frame)
 {
     auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
-    auto& pipe_info = resource.info_by_pipeline.at(vk_pipeline);
-    auto& inst_info = per_pipeline.at(vk_pipeline);
+    
+    auto inst_info = vk_pipeline->instance_pipeline_data.at(this);
+    auto& pipe_info = vk_pipeline->resources_pipeline_info.at((VkRenderResource*)&resource);
 
     auto [binding_index, binding] =
         pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
@@ -59,8 +61,9 @@ void VkRenderResourceInstance::bind(class PipelineObject* pipeline_object, RBCom
 {
     PROFILE("VkRenderResourceInstance::bind");
     auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
-    auto& pipe_info = resource.info_by_pipeline.at(vk_pipeline);
-    auto& inst_info = per_pipeline.at(vk_pipeline);
+    
+    auto inst_info = vk_pipeline->instance_pipeline_data.at(this);
+    auto& pipe_info = vk_pipeline->resources_pipeline_info.at((VkRenderResource*)&resource);
 
     uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
 

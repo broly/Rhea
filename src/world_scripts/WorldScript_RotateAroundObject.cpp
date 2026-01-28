@@ -1,7 +1,6 @@
 module WorldScript_RotateAroundObject;
 
 import <iostream>;
-#include <math.h>
 import glm;
 import rhmath;
 import globals;

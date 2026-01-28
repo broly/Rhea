@@ -312,10 +312,10 @@ PipelineObject* RenderGraph::create_pipeline(const GraphicsPipelineDesc& desc)
 }
 
 PipelineObject* RenderGraph::request_pipeline(
-    PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout)
+    PipelineFamily& pipeline_family, ShaderKey shader_key)
 {
     assert(!graph_compiled);
-    PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key, layout);
+    PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key);
     pipelines.push_back(pipeline);
     return pipeline;
 }

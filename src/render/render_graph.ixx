@@ -76,7 +76,7 @@ public:
     
     PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
     PipelineObject* request_pipeline(
-        PipelineFamily& pipeline_family, ShaderKey shader_key, const PipelineLayoutDesc& layout);
+        PipelineFamily& pipeline_family, ShaderKey shader_key);
 
     RenderResource* create_resource(const RenderResourceDesc& desc);
     

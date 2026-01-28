@@ -1,7 +1,6 @@
 ﻿export module vk:render_resource;
 import render;
 
-import :pipeline;
 import :render_resource_instance;
 import <memory>;
 
@@ -24,19 +23,10 @@ public:
 
     vk::BufferManager& buffer_manager;
     VkRenderBackend& backend;
-    
-    RenderResourceInstance* create_instance() override;
-    RenderResourceInstance* query_single(PipelineObject* pipeline_object) override;
-    
-    void update_buffers_per_pipeline();
 
-    virtual void provide(class PipelineObject* pipeline_object) override;
+    // std::map<VkPipelineObject*, VkRenderResourcePipelineInfo> info_by_pipeline;
     
-    virtual RBDescriptorSetLayout get_descriptor_set_layout(class PipelineObject* pipeline_object) override;
+    // RenderResourceInstance* single_resource = nullptr;
     
-    std::map<VkPipelineObject*, VkRenderResourcePipelineInfo> info_by_pipeline;
-    
-    RenderResourceInstance* single_resource = nullptr;
-    
-    std::vector<std::unique_ptr<VkRenderResourceInstance>> instances;
+    // std::vector<std::unique_ptr<VkRenderResourceInstance>> instances;
 };

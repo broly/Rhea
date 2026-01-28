@@ -10,6 +10,9 @@ import <filesystem>;
 
 export class Renderer;
 
+using DefinitionValue = std::variant<bool, int>;
+using DefinitionMap = std::map<Name, DefinitionValue>;
+
 export class PipelineFamily
 {
 public:
@@ -22,12 +25,14 @@ public:
 
     ShaderKey make_shader_key(std::shared_ptr<Material> material, Name pass_name) const;
 
-    PipelineObject* request_pipeline(ShaderKey key, const PipelineLayoutDesc& layout);
+    PipelineObject* request_pipeline(ShaderKey key);
 
 private:
 
-    void decode_key_to_defines(ShaderKey key, std::map<Name, bool>& out_defines) const;
-    std::filesystem::path request_permutation(const std::string& shader_name, ShaderKey key, const std::map<Name, bool>& defines);
+    void decode_key_to_defines(ShaderKey key, DefinitionMap& out_defines) const;
+    std::filesystem::path request_permutation(const std::string& shader_name, ShaderKey key, const DefinitionMap& defines);
+    
+    PipelineLayoutDesc layout;
 private:
     std::shared_ptr<RenderBackend> backend;
     std::shared_ptr<Renderer> renderer;

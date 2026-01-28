@@ -16,9 +16,13 @@ void MaterialModel::on_serialize(DependencyCollector* dc)
 {
     RhObject::on_serialize(dc);
     
-    for (const auto& [_, ubo_type] : uniform_buffers)
+    for (const auto& [_, param] : parameters)
     {
-        const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(ubo_type.type_name);
-        checkf(info != nullptr, "Can't find structure '%s'", ubo_type.type_name.to_string().c_str());
+        if (param.type == MaterialParamType::uniform)
+        {
+            const Name ubo = *param.ubo;
+            const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(ubo);
+            checkf(info != nullptr, "Can't find structure '%s'", ubo.to_string().c_str());
+        }
     }
 }

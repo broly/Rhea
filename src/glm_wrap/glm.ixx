@@ -79,4 +79,5 @@ export namespace glm
     using glm::ortho;
     using glm::dot;
     using glm::abs;
+    using glm::value_ptr;
 }

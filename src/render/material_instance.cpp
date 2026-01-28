@@ -39,18 +39,20 @@ void MaterialInstance::apply_material_parameters(
         const MatModel_Parameter& param = it->second;
 
         // -------- UBO --------
-        if (param.ubo)  // todo: hack
+        if (param.type == MaterialParamType::uniform)
         {
-            auto uniform_buffer_it = model->uniform_buffers.find(*param.ubo);
-            volatile auto uniform_buffer_info = reflect::find_runtime_info(uniform_buffer_it->second.type_name);
+            checkf(param.ubo.has_value(), "Uniform buffer parameter has no value");
+            const Name ubo_name = *param.ubo;
+
+            const reflect::RuntimeReflectionInfo* uniform_buffer_info = reflect::find_runtime_info(ubo_name);
             
-            if (!cached_ubos.contains(*param.ubo))
+            if (!cached_ubos.contains(ubo_name))
             {
                 std::vector<std::byte> data;
                 data.resize(uniform_buffer_info->size, std::byte{});
-                cached_ubos.insert({*param.ubo, data});
+                cached_ubos.insert({ubo_name, data});
             }
-            auto& buf = cached_ubos.at(*param.ubo);
+            auto& buf = cached_ubos.at(ubo_name);
             float* qwe = reinterpret_cast<float*>(buf.data());
             
             for (auto& field : uniform_buffer_info->fields)
@@ -68,20 +70,18 @@ void MaterialInstance::apply_material_parameters(
                 buf.data(),
                 frame
             );
-            continue;
         }
 
         // -------- Texture --------
-        if (param.binding)  // todo: hack
+        else if (param.type == MaterialParamType::sampler)
         {
             auto tex = std::get<TextureHandle>(param_value.data);
             instance->update_image(
                 pipeline,
-                *param.shader_parameter,
+                *param.variable,
                 renderer->get_texture(tex),
                 frame
             );
-            continue;
         }
     }
 }
@@ -92,8 +92,7 @@ RenderResourceInstance* MaterialInstance::get_or_create_resource_instance(Pipeli
     if (it != instances.end())
         return it->second.get();
 
-    render_resource->provide(pipeline);
-    auto instance = render_resource->create_instance();
+    auto instance = pipeline->create_resource_instance(render_resource);
     apply_material_parameters(instance, pipeline, frame);
 
     instances.emplace(pipeline, std::move(instance));

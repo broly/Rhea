@@ -9,6 +9,8 @@ import type_id;
 
 #define __PRIVATE_NAMED_FIELD(x) detail::NamedField<&Type::x, #x>
 
+#define __PRIVATE_IS_REFLECTED(x) static_assert(reflect::is_reflected_v<decltype(Type{}.x)>, #x" is not reflected")
+
 #define REFLECT_STRUCT(T, ...) \
     export template<> \
     struct reflect::ReflectionInfo<T> \
@@ -42,6 +44,7 @@ import type_id;
             RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_FIELD,__VA_ARGS__) \
         >;\
         static constexpr bool reflected = true; \
+        static constexpr std::string_view name = #T; \
         static constexpr void iter(auto Func) \
         {\
             Fields::iter(Func); \
@@ -52,6 +55,26 @@ import type_id;
             [] (void* ptr) { new (ptr) T(); },\
             {\
                 RHEA_FOR_EACH_COLON(__PRIVATE_RUNTIME_FIELD,__VA_ARGS__) \
+            });\
+    }
+
+#define REFLECT_STRUCT_RUNTIME_OPAQUE(T) \
+    export template<> \
+    struct reflect::ReflectionInfo<T> \
+    { \
+        using Type = T; \
+        using Fields = detail::NamedFieldList<>;\
+        static constexpr bool reflected = true; \
+        static constexpr std::string_view name = #T; \
+        static constexpr void iter(auto Func) \
+        {\
+        }\
+        static inline auto __dummy = reflect::register_type(\
+            get_type_id<T>(), \
+            sizeof(T), \
+            [] (void* ptr) { new (ptr) T(); },\
+            {\
+                 \
             });\
     }
 
@@ -70,11 +93,16 @@ import type_id;
         inline static std::map<Name, underlying> values = {\
             RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_ENUM_MEMBER_NAME_TO_VALUE,__VA_ARGS__)\
         }; \
+        static constexpr std::string_view name = #T; \
         static T enum_name_to_value(Name s)\
         {\
             if (values.contains(s))\
                 return (T)values[s];\
             return T{};\
+        }\
+        static bool is_valid_enum_name(Name s)\
+        {\
+            return values.contains(s);\
         }\
         static Name enum_value_to_name(T value) \
         {\

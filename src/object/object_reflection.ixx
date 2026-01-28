@@ -17,6 +17,7 @@ import static_name;
 
 #include <iostream>
 
+#include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 
 
@@ -207,6 +208,10 @@ export namespace reflect::json
     {
         if constexpr (std::is_enum_v<T> && reflect::is_reflected_v<T>)
         {
+            std::string value_str = value.asString();
+            checkf(reflect::is_valid_enum_name<T>(value_str), "Wrong member name '%s' for enum '%s'",
+                            value_str.c_str(), reflect::get_name<T>().to_string().c_str());
+            
             target = reflect::ReflectionInfo<T>::template enum_name_to_value(value.asString());
         } else if constexpr (is_shared_ptr_v<T>)
         {
@@ -262,9 +267,15 @@ export namespace reflect::json
                 auto from_string = [] (const std::string& name) -> KEY
                 {
                     if constexpr (std::is_enum_v<KEY>)
+                    {
+                        checkf(reflect::is_valid_enum_name<KEY>(name), "Wrong member name '%s' for enum '%s'",
+                            name.c_str(), reflect::get_name<KEY>().to_string().c_str());
                         return reflect::name_to_enum<KEY>(name);
+                    }
                     else
+                    {
                         return std::string(name);
+                    }
                 };
             
                 KEY key = from_string(member_name);
@@ -293,11 +304,17 @@ export namespace reflect::json
         reflect::visit<T>([&] <auto PtrToField, FixedString Name> ()
         {
             const std::string name = std::string(Name); // todo: inefficient
-            if (Json::Value const* json_value = json_object.find(std::string(name)))
-            {
-                auto& field_ref = struct_ref.*PtrToField;
-                do_serialize_json_value(field_ref, *json_value, is_loading, dc);
-            }
+            Json::Value const* json_value = json_object.find(std::string(name));
+            
+            // if (is_optional_v<std::decay_t<decltype(struct_ref.*PtrToField)>> && !json_value)
+            //     return;
+            
+            // checkf(json_value, "Required field %s is missing", name.c_str());
+            if (!json_value)
+                return;
+            auto& field_ref = struct_ref.*PtrToField;
+            do_serialize_json_value(field_ref, *json_value, is_loading, dc);
+            
         });
     }
 }

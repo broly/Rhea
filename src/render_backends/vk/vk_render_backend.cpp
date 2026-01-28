@@ -435,14 +435,6 @@ VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
     return image_manager.get_image_format(handle);
 }
 
-RBPipelineHandle VkRenderBackend::get_or_create_pipeline(RBPipelineHandle handle, VkRenderPass render_pass)
-{
-    auto& obj = *pipelines[handle];
-
-    return obj.get_or_create_pipeline(render_pass);
-    
-}
-
 
 RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
 {

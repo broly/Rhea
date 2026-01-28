@@ -3,42 +3,38 @@
 	
 	"usage_type": "frame",
 	
-	"enums": {
-	},
-	
-	"uniform_buffers": {
-	},
+	"enums": {},
+	"vertex_layouts": [],
+	"uniform_buffers": {},
 	"sampler": "default",
 	
 	"parameters": {
 		"hdr_color": {
 			"type": "sampler",
-			"dynamic": true,
-			"shader_parameter": "u_hdr_color",
-			"ubo": null,
-			"binding": 0
+			"variable": "u_hdr_color",
+			"binding": "BINDING_SAMPLER_HDR_COLOR"
 		}
 	},	
 	"permutations": {
-		"flags": {
-		},
-		"enums": {
-		}
+		"flags": {},
+		"enums": {}
 	},
-	"set": 0,
+	"set": "SET_TONEMAP",
 	"passes": [
 		{
 			"name": "ToneMapping",
 			"requirements": "",
-			"enum_white_list": {
-			},
 			"shaders": {
 				"vertex": "fullscreen.vert",
 				"fragment": "tonemap.frag"
 			},
 			"cull_mode": "none",
 			"front_face": "CW",
-			"compare_op": "greater"
+			"compare_op": "greater",
+			"resources": [],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false
 		}
 	]
 }

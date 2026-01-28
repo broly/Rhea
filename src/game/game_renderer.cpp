@@ -36,55 +36,61 @@ constexpr bool debug_shadow_pass = false;
 
 void GameRenderer::init(RBWindowHandle in_window)
 {
-    Renderer::init(in_window);
-    
     set_flag(Names::debug_shadow, false);
     
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     render_graph = std::make_shared<RenderGraph>(render_backend);
+    
+    Renderer::init(in_window);
+    
 
     samplers["default"] = render_backend->create_sampler(samplers::default_surface());
     samplers["surface"] = render_backend->create_sampler(samplers::default_surface());
     samplers["shadow"] = render_backend->create_sampler(samplers::default_shadow());
     
-    camera_resource = render_graph->create_resource({
-        .name = "camera",
-        .stages = ShaderStage::all,
-        .usage_type = ResourceUsageType::frame,
-        .variables = {
-            { "camera", SET_CAMERA, BINDING_UBO_CAMERA, sizeof(CameraUBO) }
-        }
-    });
+    camera_resource = find_resource("camera");
+    light_resource = find_resource("light");
+    light_resource_shadow = find_resource("shadow_light");
+    shadow_resource = find_resource("shadow");
+    
+    // camera_resource = render_graph->create_resource({
+    //     .name = "camera",
+    //     .stages = ShaderStage::all,
+    //     .usage_type = ResourceUsageType::frame,
+    //     .variables = {
+    //         { "camera", SET_CAMERA, BINDING_UBO_CAMERA, sizeof(CameraUBO) }
+    //     }
+    // });
     
     
-    light_resource = render_graph->create_resource({
-        .name = "light",
-        .stages = ShaderStage::fragment,
-        .usage_type = ResourceUsageType::frame,
-        .variables = {
-            { "light_ubo", SET_LIGHT, BINDING_UBO_LIGHT, sizeof(LightUBO) }
-        }
-    });
+    // light_resource = render_graph->create_resource({
+    //     .name = "light",
+    //     .stages = ShaderStage::fragment,
+    //     .usage_type = ResourceUsageType::frame,
+    //     .variables = {
+    //         { "light_ubo", SET_LIGHT, BINDING_UBO_LIGHT, sizeof(LightUBO) }
+    //     }
+    // });
     
-    light_resource_shadow = render_graph->create_resource({
-        .name = "shadow_light",
-        .stages = ShaderStage::all,
-        .usage_type = ResourceUsageType::persistent,
-        .variables = {
-            { "shadow_light_ubo", 0, 0, sizeof(LightUBO) },
-            { "u_shadow_depth", 0, 1 }
-        }
-    });
+    // light_resource_shadow = render_graph->create_resource({
+    //     .name = "shadow_light",
+    //     .stages = ShaderStage::all,
+    //     .usage_type = ResourceUsageType::persistent,
+    //     .variables = {
+    //         { "shadow_light_ubo", 0, 0, sizeof(LightUBO) },
+    //         { "u_shadow_depth", 0, 1 }
+    //     }
+    // });
     
-    shadow_resource = render_graph->create_resource({
-        .name = "shadow",
-        .stages = ShaderStage::all,
-        .usage_type = ResourceUsageType::frame,
-        .sampler = samplers["shadow"],
-        .variables = {
-            { "u_shadow_depth", SET_SHADOW, BINDING_UBO_SHADOW }
-        }
-    });
+    // shadow_resource = render_graph->create_resource({
+    //     .name = "shadow",
+    //     .stages = ShaderStage::all,
+    //     .usage_type = ResourceUsageType::frame,
+    //     .sampler = samplers["shadow"],
+    //     .variables = {
+    //         { "u_shadow_depth", SET_SHADOW, BINDING_UBO_SHADOW }
+    //     }
+    // });
     
     auto& tonemap_model = models.find("tonemap")->second;
     auto& shadow_debug_model = models.find("shadow_debug")->second;
@@ -100,80 +106,80 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     auto hdr_color = render_graph->create_texture(hdr_color_desc);
     
-    VertexLayout geom_vertex_layout = {
-        VertexLayout {
-            .layouts = {
-                VertexLayoutData{
-                    .binding_index = 0,
-                    .stride = sizeof(Vertex),
-                    .attributes = {
-                          { "in_position",LOCATION_ATTR_POSITION, offsetof(Vertex, position) },
-                          { "in_normal",  LOCATION_ATTR_NORMAL,   offsetof(Vertex, normal) },
-                          { "in_uv",      LOCATION_ATTR_UV,       offsetof(Vertex, tex_coord) },
-                          { "in_tangent", LOCATION_ATTR_TANGENT,  offsetof(Vertex, tangent) }
-                    }
-                }
-            }
-        }
-    };
-    
-    VertexLayout shadow_vertex_layout = {
-        VertexLayout {
-            .layouts = {
-                VertexLayoutData{
-                    .binding_index = 0,
-                    .stride = sizeof(Vertex),
-                    .attributes = {
-                        { "in_position", LOCATION_ATTR_POSITION, offsetof(Vertex, position) }
-                    }
-                }
-            }
-        }
-    };
+    // VertexLayout geom_vertex_layout = {
+    //     VertexLayout {
+    //         .layouts = {
+    //             VertexLayoutData{
+    //                 .binding_index = 0,
+    //                 .stride = sizeof(Vertex),
+    //                 .attributes = {
+    //                       { "in_position",LOCATION_ATTR_POSITION, offsetof(Vertex, position) },
+    //                       { "in_normal",  LOCATION_ATTR_NORMAL,   offsetof(Vertex, normal) },
+    //                       { "in_uv",      LOCATION_ATTR_UV,       offsetof(Vertex, tex_coord) },
+    //                       { "in_tangent", LOCATION_ATTR_TANGENT,  offsetof(Vertex, tangent) }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // };
+    //
+    // VertexLayout shadow_vertex_layout = {
+    //     VertexLayout {
+    //         .layouts = {
+    //             VertexLayoutData{
+    //                 .binding_index = 0,
+    //                 .stride = sizeof(Vertex),
+    //                 .attributes = {
+    //                     { "in_position", LOCATION_ATTR_POSITION, offsetof(Vertex, position) }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // };
 
     
-    geom_pipeline_layout = {
-        .vertex_layout = geom_vertex_layout,
-        .resources = {camera_resource, light_resource, shadow_resource }, 
-        .push_constants = {{
-            .stages = ShaderStage::vertex,
-            .offset = 0,
-            .size = sizeof(glm::mat4),
-        }}
-    };
+    // geom_pipeline_layout = {
+    //     .vertex_layout = geom_vertex_layout,
+    //     .resources = {camera_resource, light_resource, shadow_resource }, 
+    //     .push_constants = {{
+    //         .stages = ShaderStage::vertex,
+    //         .offset = 0,
+    //         .size = sizeof(glm::mat4),
+    //     }}
+    // };
     
-   shadow_pipeline_layout = {
-        .vertex_layout = shadow_vertex_layout,
-        .resources = { light_resource_shadow },
-        .push_constants = {{
-            .stages = ShaderStage::vertex,
-            .offset = 0,
-            .size = sizeof(glm::mat4),
-        }}
-    };
-    
-    
-    PipelineLayoutDesc tonemap_pipeline_layout = {
-        .vertex_layout = {},
-        .resources = {  }, 
-        .push_constants = {}
-    };
+   // shadow_pipeline_layout = {
+   //      .vertex_layout = shadow_vertex_layout,
+   //      .resources = { light_resource_shadow },
+   //      .push_constants = {{
+   //          .stages = ShaderStage::vertex,
+   //          .offset = 0,
+   //          .size = sizeof(glm::mat4),
+   //      }}
+   //  };
     
     
-    PipelineLayoutDesc shadow_debug_pipeline_layout = {
-        .vertex_layout = {},
-        .resources = { light_resource_shadow }, 
-        .push_constants = {}
-    };
+    // PipelineLayoutDesc tonemap_pipeline_layout = {
+    //     .vertex_layout = {},
+    //     .resources = {  }, 
+    //     .push_constants = {}
+    // };
+    //
+    //
+    // PipelineLayoutDesc shadow_debug_pipeline_layout = {
+    //     .vertex_layout = {},
+    //     .resources = { light_resource_shadow }, 
+    //     .push_constants = {}
+    // };
     
     PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, render_backend, shared_from_this());
     
     PipelineObject* tonemap_pipeline = render_graph->request_pipeline(
-        tonemap_pipeline_family, {}, tonemap_pipeline_layout);
+        tonemap_pipeline_family, {});
     
     PipelineFamily shadow_debug_pipeline_family("ShadowDebug", shadow_debug_model, render_backend, shared_from_this());
     PipelineObject* shadow_debug_pipeline =
-        shadow_debug_pipeline_family.request_pipeline({}, shadow_debug_pipeline_layout);
+        shadow_debug_pipeline_family.request_pipeline({});
     auto shadow_debug_material = std::make_shared<Material>();
     shadow_debug_material->model = "shadow_debug";
     
@@ -441,13 +447,13 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         auto [width, height] = ctx.backend.get_viewport_extent();
 
         CameraUBO camera_ubo;
-        camera_ubo.view_proj =
+        camera_ubo.view_proj  = 
             cam_ro->get_projection(float(width) / float(height)) *
             cam_ro->view;
         camera_ubo.camera_pos = cam_ro->position;
 
         auto cam = camera_resource->query_single(pipeline);
-        cam->update_uniform_buffer(pipeline, "camera", camera_ubo, frame);
+        cam->update_uniform_buffer(pipeline, "camera_ubo", camera_ubo, frame);
         cam->bind(pipeline, cmd, frame);
 
         // ---------- Lights ----------
@@ -559,7 +565,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
                 pass_name, model);
 
         PipelineObject* pipeline =
-            pipeline_family->request_pipeline(key, geom_pipeline_layout);
+            pipeline_family->request_pipeline(key);
 
         ctx.backend.bind_pipeline(cmd, pipeline);
         bind_pass_resources(pipeline);
@@ -694,7 +700,7 @@ void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
             );
 
         PipelineObject* pipeline =
-            pipeline_family->request_pipeline({}, shadow_pipeline_layout);
+            pipeline_family->request_pipeline({});
 
         ctx.backend.bind_pipeline(cmd, pipeline);
         bind_light(pipeline);
@@ -731,3 +737,4 @@ std::shared_ptr<MaterialInstance> GameRenderer::get_or_create_material_instance(
     material_instances.emplace(std::pair{material, pass_name}, instance);
     return instance;
 }
+

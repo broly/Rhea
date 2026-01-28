@@ -13,7 +13,7 @@
 					"fields": {
 						"transform": {
 							"position": { "x": 0, "y": 0, "z": 0 },
-							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
 						},
 						"fov": 1.04,
@@ -36,10 +36,10 @@
 					"fields": {
 						"transform": {
 							"position": { "x": -5, "y": 1, "z": 0 },
-							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
-						"color": { "x": 10, "y": 0, "z": 0 },
+						"color": { "x": 10, "y": 0, "z": 0, "w": 0 },
 						"intensity": 10,
 						"falloff": 100,
 						"type": "point"
@@ -61,7 +61,7 @@
 							"rotation": {"x": -0.500154674, "y": -0.28043431, "z": -0.175259128, "w": 0.800303757 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
-						"color": { "x": 8, "y": 8, "z": 4 },
+						"color": { "x": 8, "y": 8, "z": 4, "w": 0 },
 						"intensity": 100,
 						"falloff": 100,
 						"type": "directional"
@@ -80,7 +80,7 @@
 					"fields": {
 						"transform": {
 							"position": { "x": -5, "y": -5, "z": 0 },
-							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
 						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
@@ -115,10 +115,10 @@
 					"fields": {
 						"transform": {
 							"position": { "x": 5.11173, "y": 1.51831, "z": 5.89107 },
-							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
-						"color": { "x": 10, "y": 10, "z": 10 },
+						"color": { "x": 10, "y": 10, "z": 10, "w": 0 },
 						"intensity": 100,
 						"falloff": 100,
 						"type": "point"
@@ -137,10 +137,10 @@
 					"fields": {
 						"transform": {
 							"position": { "x": 0.3, "y": 8.9, "z": -1.38 },
-							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
-						"color": { "x": 8, "y": 8, "z": 4 },
+						"color": { "x": 8, "y": 8, "z": 4, "w": 0 },
 						"intensity": 100,
 						"falloff": 100,
 						"type": "point"
@@ -161,7 +161,7 @@
 					"fields": {
 						"transform": {
 							"position": { "x": 5.11173, "y": 1.51831, "z": 5.89107 },
-							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
 						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
@@ -195,7 +195,7 @@
 		//			"fields": {
 		//				"transform": {
 		//					"position": { "x": 0.100292, "y": 10, "z": -0.416527 },
-		//					"rotation": { "x": 0, "y": 0, "z": 0 },
+		//					"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 		//					"scale": { "x": 1, "y": 1, "z": 1}
 		//				}
 		//			}
@@ -213,7 +213,7 @@
 					"fields": {
 						"transform": {
 							"position": { "x": 0.100292, "y": -3.0493614, "z": -0.416527 },
-							"rotation": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 20, "y": 1, "z": 20}
 						},
 						"mesh_path": "meshes/lymphocyte/cube.glb"

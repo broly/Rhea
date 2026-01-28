@@ -6,7 +6,7 @@ import <memory>;
 import <bit>;
 import :handle_types;
 import :rg_types;
-#include <variant>
+import <variant>;
 
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
@@ -33,6 +33,14 @@ export enum class ShaderStage : uint16_t
 REFLECT_ENUM(ShaderStage,
     none, vertex, fragment, reserved2, reserved3, reserved4, reserved5, reserved6, reserved7);
 ENUM_MASK_OPS(ShaderStage, export);
+
+export ShaderStage make_shader_stages_mask(const std::vector<ShaderStage>& stages)
+{
+    ShaderStage result = ShaderStage::none;
+    for (auto& stage : stages)
+        result |= stage;
+    return result;
+}
 
 export enum class CullMode
 {
@@ -75,7 +83,7 @@ REFLECT_ENUM(FrontFace,
 
 struct VertexAttributeInfo
 {
-    const char* variable_name;
+    Name variable_name;
     uint16_t location;
     uint32_t offset;
 };
@@ -172,12 +180,27 @@ export
     {
         std::vector<VertexLayoutData> layouts;
     };
+    
+    struct GraphicsPipelineResourceInfo
+    {
+        RenderResource* resource;
+        uint16_t set;
+        std::vector<uint32_t> resource_variable_bindings;
+    };
 
     struct PipelineLayoutDesc
     {
         VertexLayout vertex_layout;
-        std::vector<RenderResource*> resources;
+        std::vector<GraphicsPipelineResourceInfo> resources;
         std::vector<PushConstantRange> push_constants;
+        
+        const GraphicsPipelineResourceInfo* get_graphics_pipeline_resource_info(RenderResource* rr) const
+        {
+            for (const auto& info : resources)
+                if (info.resource == rr)
+                    return &info;
+            return nullptr;
+        }
     };
     
 
@@ -218,6 +241,8 @@ export
         
 
         PipelineRenderTargetDesc rt_compat;
+        
+        
     };
 
 

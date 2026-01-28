@@ -151,10 +151,6 @@ private: // internal section
     vk::DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
 
     VkFormat get_image_format(RBImageHandle handle) const;
-    
-    RBPipelineHandle get_or_create_pipeline(
-        RBPipelineHandle handle,
-        VkRenderPass render_pass);
 
 public:   /// Aggregate section. These objects have same lifetime with render backend. use refs
     vk::Instance instance {};

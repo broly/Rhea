@@ -341,6 +341,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
     
     vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
     
+    LogVkImageManager.Log("Allocated GPU texture: %s", tex.name.c_str());
+    
     return image;
 }
 

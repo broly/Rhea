@@ -68,6 +68,14 @@ export namespace reflect
         type_initializer initializer;
         bool is_basic;
         std::vector<FieldRuntimeReflectionInfo> fields;
+        
+        const FieldRuntimeReflectionInfo* find_field(Name field_name) const
+        {
+            for (const auto& field : fields)
+                if (field.name == field_name)
+                    return &field;
+            return nullptr;
+        }
     };
     
     bool register_type(TypeId type_id, size_t size, type_initializer initializer, 
@@ -95,6 +103,21 @@ export namespace reflect
         static_assert(requires {reflect::ReflectionInfo<E>::reflected; }, "enum not reflected");
         return reflect::ReflectionInfo<E>::enum_name_to_value(name);
     }
+    
+    template<typename E>
+    bool is_valid_enum_name(Name name)
+    {
+        static_assert(requires {reflect::ReflectionInfo<E>::reflected; }, "enum not reflected");
+        return reflect::ReflectionInfo<E>::is_valid_enum_name(name);
+    }
+    
+    template<typename T>
+    Name get_name()
+    {
+        static_assert(requires {reflect::ReflectionInfo<T>::reflected; }, "enum not reflected");
+        return reflect::ReflectionInfo<T>::name;
+    }
+    
 }
 
 

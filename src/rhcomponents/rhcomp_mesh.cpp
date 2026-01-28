@@ -98,7 +98,6 @@ AABB RhComp_StaticMesh::get_aabb() const
 
 void RhComp_StaticMesh::update_scene_proxy()
 {
-    scene_proxy.materials = materials;
     scene_proxy.mats = mats;
     scene_proxy.mesh = mesh;
     scene_proxy.transform = transform;

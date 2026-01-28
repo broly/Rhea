@@ -25,7 +25,7 @@ struct DirectionalLight
     vec4 color;     // rgb * intensity
 };
 
-layout(set = 0, binding = 0) uniform LightUBO
+layout(set = SET_SHADOW_LIGHT, binding = BINDING_UBO_SHADOW_LIGHT) uniform LightUBO
 {
     PointLight lights[8];
     int light_count;

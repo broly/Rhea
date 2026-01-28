@@ -1,6 +1,6 @@
 #version 450
 layout(location = 0) out vec4 out_color;
-layout(set = 0, binding = 1) uniform sampler2D u_shadow_depth;
+layout(set = SET_SHADOWDEBUG, binding = BINDING_SHADOW_DEPTH) uniform sampler2D u_shadow_depth;
 
 void main()
 {

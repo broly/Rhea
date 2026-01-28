@@ -11,6 +11,8 @@ import render;
 import <unordered_map>;
 import <optional>;
 import <cassert>;
+import :render_resource;
+import :render_resource_instance;
 import :reflection;
 
 class VkPipelineObject : public PipelineObject
@@ -39,6 +41,12 @@ public:
     }
     VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
     
+    RenderResourceInstance* query_unique_resource_instance(RenderResource* resource) override;
+    RenderResourceInstance* create_resource_instance(RenderResource* resource) override;
+    
+    void update_buffers();
+
+    
     std::optional<GraphicsPipelineDesc> pipeline_desc;
     
     void reflect_shader(const VkShader& shader, ShaderStage stage);
@@ -48,7 +56,7 @@ public:
         return pipeline_reflection;
     }
 
-private:
+public:
     vk::Instance& instance;
     vk::SwapchainControl& swapchain;
     vk::BufferManager& buffer_manager;
@@ -60,5 +68,18 @@ private:
     std::vector<VkShader> shaders;
     
     std::map<ShaderStage, PipelineReflection> pipeline_reflection;
+    
+    std::map<VkRenderResource*, VkRenderResourceInstance*> unique_resource_instances; 
+    std::vector<std::unique_ptr<VkRenderResourceInstance>> instances;
+    
+    std::map<VkRenderResource*, VkRenderResourcePipelineInfo> resources_pipeline_info;
+    
+    struct ResorceInstancePipelineData
+    {
+        std::vector<RBDescriptorSet> sets_per_frame = {};
+        std::vector<std::vector<RBBufferHandle>> buffers = {}; // [binding][frame]
+    };
+    
+    std::map<VkRenderResourceInstance*, ResorceInstancePipelineData> instance_pipeline_data;
     
 };

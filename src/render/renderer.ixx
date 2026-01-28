@@ -44,7 +44,7 @@ export struct LightUBO
     int has_dir_light;
     glm::vec3 _pad1;
 };
-
+REFLECT_STRUCT_RUNTIME_OPAQUE(LightUBO);
 
 export class Renderer : public std::enable_shared_from_this<Renderer>
 {
@@ -53,6 +53,7 @@ public:
     virtual void init(RBWindowHandle in_window);
     
     void load_schemas();
+    void load_resources();
 
     virtual void execute() {}
     
@@ -70,6 +71,8 @@ public:
 
     std::shared_ptr<RenderBackend> render_backend;
     std::map<Name, std::shared_ptr<MaterialModel>> models;
+    std::map<Name, std::shared_ptr<RenderResourceInfo>> resources_info;
+    std::map<Name, RenderResource*> resources;
     
     std::map<TextureHandle, RBImageHandle> texture_cache;
 
@@ -78,4 +81,8 @@ public:
     std::map<Name, RBSampler> samplers;
     
     std::map<Name, bool> render_flags;
+    
+    
+    RenderResource* find_resource(Name resource_name) const;
+
 };
