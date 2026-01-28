@@ -221,43 +221,43 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
-    render_graph->add_pass({
-        .name = "ShadowDebug",
-        .condition = [this] () { return render_flags[Names::debug_shadow]; },
-        .reads = {
-            { shadow_map, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
-            
-            auto shadow_debug_material_instance = get_or_create_material_instance(shadow_debug_material, ctx.pass_name);
-
-            RenderResourceInstance* shadow_debug_instance =
-                shadow_debug_material_instance->get_or_create_resource_instance(
-                    shadow_debug_pipeline,
-                    ctx.frame
-                );
-
-            shadow_debug_instance->update_image(
-                shadow_debug_pipeline,
-                "u_shadow_depth",
-                render_graph->get_image(shadow_map),
-                ctx.frame
-            );
-    
-            shadow_debug_instance->bind(
-                shadow_debug_pipeline,
-                ctx.cmd,
-                ctx.frame
-            );
-    
-            ctx.backend.draw_fullscreen(ctx.cmd);
-        }
-    });
+    // render_graph->add_pass({
+    //     .name = "ShadowDebug",
+    //     //.condition = [this] () { return render_flags[Names::debug_shadow]; },
+    //     .reads = {
+    //         { shadow_map, RBImageUsage::SampledFragment }
+    //     },
+    //     .writes = {
+    //         { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+    //     },
+    //     .execute = [=](RenderGraphContext& ctx)
+    //     {
+    //         ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
+    //         
+    //         auto shadow_debug_material_instance = get_or_create_material_instance(shadow_debug_material, ctx.pass_name);
+    //
+    //         RenderResourceInstance* shadow_debug_instance =
+    //             shadow_debug_material_instance->get_or_create_resource_instance(
+    //                 shadow_debug_pipeline,
+    //                 ctx.frame
+    //             );
+    //
+    //         shadow_debug_instance->update_image(
+    //             shadow_debug_pipeline,
+    //             "u_shadow_depth",
+    //             render_graph->get_image(shadow_map),
+    //             ctx.frame
+    //         );
+    //
+    //         shadow_debug_instance->bind(
+    //             shadow_debug_pipeline,
+    //             ctx.cmd,
+    //             ctx.frame
+    //         );
+    //
+    //         ctx.backend.draw_fullscreen(ctx.cmd);
+    //     }
+    // });
     
     render_graph->add_pass({
         .name = Names::pass_geometry_base,
@@ -297,7 +297,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_graph->add_pass({
         .name = "ToneMapping",
-        .condition = [this] () { return !is_debugging(); },
+        //.condition = [this] () { return !is_debugging(); },
         .reads = {
             { hdr_color, RBImageUsage::SampledFragment }
         },
@@ -583,7 +583,6 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
             ctx.backend.bind_mesh(cmd, item.mesh, frame);
 
             // ---------- Push constants ----------
-            using T = decltype(item.world);
             ctx.backend.push_constants(cmd, item.world, pipeline);
 
             ctx.backend.draw_indexed(

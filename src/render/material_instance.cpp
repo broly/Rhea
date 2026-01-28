@@ -29,9 +29,9 @@ void MaterialInstance::apply_material_parameters(
     PipelineObject* pipeline,
     RBFrameHandle frame)
 {
-
     for (const auto& [param_name, param_value] : material->parameters)
     {
+        
         auto it = model->parameters.find(param_name);
         if (it == model->parameters.end())
             continue;
@@ -41,11 +41,53 @@ void MaterialInstance::apply_material_parameters(
         // -------- UBO --------
         if (param.type == MaterialParamType::uniform)
         {
-            checkf(param.ubo.has_value(), "Uniform buffer parameter has no value");
-            const Name ubo_name = *param.ubo;
-
-            const reflect::RuntimeReflectionInfo* uniform_buffer_info = reflect::find_runtime_info(ubo_name);
+            // checkf(param.ubo.has_value(), "Uniform buffer parameter has no value");
+            // const Name ubo_name = *param.ubo;
+            //
+            // const reflect::RuntimeReflectionInfo* uniform_buffer_info = reflect::find_runtime_info(ubo_name);
+            //
+            // if (!cached_ubos.contains(ubo_name))
+            // {
+            //     std::vector<std::byte> data;
+            //     data.resize(uniform_buffer_info->size, std::byte{});
+            //     cached_ubos.insert({ubo_name, data});
+            // }
+            // auto& buf = cached_ubos.at(ubo_name);
+            //
+            // for (auto& field : uniform_buffer_info->fields)
+            // {
+            //     if (field.name == param_name)
+            //     {
+            //         memcpy(field.get_value_ptr(buf.data()), param_value.get_raw(), 4);
+            //     }
+            // }
+            //
+            // instance->update_uniform_buffer_impl(
+            //     pipeline,
+            //     *param.ubo,
+            //     uniform_buffer_info->size,
+            //     buf.data(),
+            //     frame
+            // );
+        } 
+        
+        else if (param.type == MaterialParamType::vec4)
+        {
+            checkf(param.storage.has_value(), "vec4 parameter must have storage");
             
+            auto storage_it = model->parameters.find(*param.storage);
+            
+            checkf(storage_it != model->parameters.end(), "unknown storage %s", param.storage->to_string().c_str());
+            
+            auto ubo = storage_it->second.ubo;
+            
+            checkf(ubo.has_value(), "ubo not set");
+            
+            const Name ubo_name = *ubo;
+            
+            const Name ubo_var_name = *storage_it->second.variable;
+            
+            const reflect::RuntimeReflectionInfo* uniform_buffer_info = reflect::find_runtime_info(ubo_name);
             if (!cached_ubos.contains(ubo_name))
             {
                 std::vector<std::byte> data;
@@ -53,8 +95,6 @@ void MaterialInstance::apply_material_parameters(
                 cached_ubos.insert({ubo_name, data});
             }
             auto& buf = cached_ubos.at(ubo_name);
-            float* qwe = reinterpret_cast<float*>(buf.data());
-            
             for (auto& field : uniform_buffer_info->fields)
             {
                 if (field.name == param_name)
@@ -62,10 +102,9 @@ void MaterialInstance::apply_material_parameters(
                     memcpy(field.get_value_ptr(buf.data()), param_value.get_raw(), 4);
                 }
             }
-            
             instance->update_uniform_buffer_impl(
                 pipeline,
-                *param.ubo,
+                ubo_var_name,
                 uniform_buffer_info->size,
                 buf.data(),
                 frame

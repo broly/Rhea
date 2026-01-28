@@ -85,9 +85,13 @@ void Renderer::load_resources()
                 checkf(ubo_info, "could not find runtime type %s, please add runtime reflection", variable.ubo->to_string().c_str());
                 var_desc.size = ubo_info->size;
             }
-            else
+            else if (variable.type == MaterialParamType::sampler)
             {
                 var_desc.size = -1;
+            }
+            else
+            {
+                continue;
             }
             desc.variables.push_back(var_desc);
         }

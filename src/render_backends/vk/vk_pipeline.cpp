@@ -173,6 +173,7 @@ void VkPipelineObject::prepare()
     plci.pPushConstantRanges = push_constants.data();
 
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
+    LogVkPipeline.Log("Created pipeline %s (%p)", desc.pass_name.to_string().c_str(), pipeline_layout);
 }
 
 

@@ -183,7 +183,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         material_resource_info.set = set_index;
         for (const auto& [name, param] : model->parameters)
         {
-            if (param.type != MaterialParamType::definition)
+            if (param.type == MaterialParamType::sampler || param.type == MaterialParamType::uniform)
             {
                 checkf(param.binding, "Binding definition must be set");
                 defines.insert({*param.binding, binding_index});

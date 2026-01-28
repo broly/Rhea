@@ -13,6 +13,8 @@
 	
 	"sampler": "surface",
 	
+	"ubo_access": "material",
+	
 	"parameters": {
 		"blend_mode": {
 			"type": "definition",
@@ -42,24 +44,27 @@
 			"type": "uniform",
 			"ubo": "MaterialUBO",
 			"binding": "BINDING_MATERIAL",
-			"variable": "material_ubo",
-			"fields": {
-				"base_color_factor": {
-					"type": "vec4"
-				},
-				"emissive_factor": {
-					"type": "vec4"
-				},
-				"occlusion_factor": {
-					"type": "vec4"
-				},
-				"metallic_factor": {
-					"type": "vec4"
-				},
-				"roughness_factor": {
-					"type": "vec4"
-				}
-			}
+			"variable": "material_ubo"
+		},
+		"base_color_factor": {
+			"type": "vec4",
+			"storage": "material"
+		},
+		"emissive_factor": {
+			"type": "vec4",
+			"storage": "material"
+		},
+		"occlusion_factor": {
+			"type": "vec4",
+			"storage": "material"
+		},
+		"metallic_factor": {
+			"type": "vec4",
+			"storage": "material"
+		},
+		"roughness_factor": {
+			"type": "vec4",
+			"storage": "material"
 		}
 	},	
 	"permutations": {
@@ -147,7 +152,14 @@
 			"translucent": true,
 			"cull_mode": "back",
 			"front_face": "CW",
-			"compare_op": "less"
+			"compare_op": "less",
+			"push_constants": [
+				{
+					"type": "mat4",
+					"name": "camera",
+					"stages": ["vertex"]
+				}
+			]
 		}
 	]
 }

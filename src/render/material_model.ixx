@@ -52,9 +52,13 @@ export enum class MaterialParamType
     definition,
     uniform,
     sampler,
+    Float,
+    vec2,
+    vec3,
+    vec4,
 };
 REFLECT_ENUM(MaterialParamType,
-    definition, uniform, sampler);
+    definition, uniform, sampler, Float, vec2, vec4, vec4);
 
 export struct MatModel_Parameter
 {
@@ -63,9 +67,10 @@ export struct MatModel_Parameter
     std::optional<Name> variable;
     std::optional<Name> ubo;
     std::optional<Name> binding;
+    std::optional<Name> storage;
 };
 REFLECT_STRUCT(MatModel_Parameter,
-    type, variable, ubo, binding);
+    type, variable, ubo, binding, storage);
 
 export struct MatModel_LayoutAttributeInfo
 {
@@ -94,6 +99,8 @@ public:
     MatModel_Permutations permutations;
     std::vector<MatModel_Pass> passes;
     
+    Name ubo_access;
+    
     Name sampler;
     
     Name set;
@@ -108,7 +115,7 @@ public:
 };
 
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, vertex_layouts, set, enums, parameters, sampler, permutations, passes, usage_type);
+                      model_name, vertex_layouts, set, enums, parameters, ubo_access, sampler, permutations, passes, usage_type);
 
 export class RenderResourceInfo : public RhObject
 {
