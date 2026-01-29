@@ -1,6 +1,5 @@
 #version 450
 #include "definitions.glsl"
-#include "layout.glsl"
 
 
 // ---------- Vertex inputs ----------

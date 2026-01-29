@@ -15,8 +15,6 @@ import dependency_collector;
 import name;
 import static_name;
 
-#include <iostream>
-
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 

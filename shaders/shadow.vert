@@ -1,7 +1,6 @@
 #version 450
 
 #include "definitions.glsl"
-#include "layout.glsl"
 
 layout(location = 0) in vec3 in_position;
 

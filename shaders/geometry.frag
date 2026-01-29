@@ -3,7 +3,6 @@
 #include "definitions.glsl"
 #include "pbr_helpers.glsl"
 #include "math.glsl"
-#include "layout.glsl"
 
 // ================== INPUTS ==================
 layout(location = 0) in vec3 v_world_pos;
@@ -67,26 +66,78 @@ layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW) uniform sampler2
 
 
 // ================== SHADOW ==================
+
+
+#define WITH_POISSON 1
+const int POISSON_STEPS = 8;
+
+const vec2 POISSON[8] = vec2[](
+    vec2(-0.326, -0.406),
+    vec2(-0.840, -0.074),
+    vec2(-0.696,  0.457),
+    vec2(-0.203,  0.621),
+    vec2( 0.962, -0.195),
+    vec2( 0.473, -0.480),
+    vec2( 0.519,  0.767),
+    vec2( 0.185, -0.893)
+);
+
+float hash12(vec2 p)
+{
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+mat2 rot2(float a)
+{
+    float s = sin(a), c = cos(a);
+    return mat2(c, -s, s, c);
+}
+
 float shadow_factor(vec3 world_pos, vec3 Ng)
 {
-    vec4 light_clip = light_ubo.dir_light.light_vp * vec4(world_pos, 1.0);
+    vec3 shadow_pos = world_pos + Ng * 0.003;
+
+    vec4 light_clip = light_ubo.dir_light.light_vp * vec4(shadow_pos, 1.0);
     vec3 proj = light_clip.xyz / light_clip.w;
 
-    if (
-        proj.x < -1.0 || proj.x > 1.0 ||
-        proj.y < -1.0 || proj.y > 1.0 ||
-        proj.z <  0.0 || proj.z > 1.0
-    )
+    if (proj.x < -1.0 || proj.x > 1.0 ||
+    proj.y < -1.0 || proj.y > 1.0 ||
+    proj.z <  0.0 || proj.z > 1.0)
     return 1.0;
 
     vec2 uv = proj.xy * 0.5 + 0.5;
-    float depth = texture(u_shadow_depth, uv).r;
 
     float ndotl = max(dot(Ng, -light_ubo.dir_light.direction.xyz), 0.0);
-    float bias  = max(0.0005 * (1.0 - ndotl), 0.0001);
+    float bias = mix(0.0005, 0.0025, 1.0 - ndotl);
 
+    vec2 texelSize = 1.0 / vec2(textureSize(u_shadow_depth, 0));
+
+    
+#if WITH_POISSON
+    float radius = mix(1.25, 2.5, 1.0 - ndotl);
+    
+    // --- rotate kernel per-pixel
+    float angle = hash12(gl_FragCoord.xy) * 6.2831853;
+    mat2 R = rot2(angle);
+    float shadow = 0.0;
+
+    for (int i = 0; i < POISSON_STEPS; ++i)
+    {
+        vec2 offset = R * POISSON[i] * texelSize * radius;
+        float depth = texture(u_shadow_depth, uv + offset).r;
+        shadow += (proj.z - bias <= depth) ? 1.0 : 0.0;
+    }
+
+    return shadow * 0.125;
+#else
+    float depth = texture(u_shadow_depth, uv).r;
     return (proj.z - bias > depth) ? 0.0 : 1.0;
+#endif    
 }
+
+
 
 // ================== MAIN ==================
 void main()
