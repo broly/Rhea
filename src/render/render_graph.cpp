@@ -137,12 +137,12 @@ bool is_attachment(RBImageUsage usage)
     }
 }
 
-void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
+void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params)
 {
     PROFILE();
     assert(graph_compiled);
 
-    RenderGraphContext ctx(*backend, cmd, {}, *this);
+    RenderGraphContext ctx(*backend, cmd, {}, *this, params);
     ctx.frame = frame;
 
     // Initialize external images (swapchain)
@@ -269,14 +269,6 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame)
 }
 
 
-RBImageHandle RenderGraph::resolve_image(const RGTexture& tex, std::optional<RBFrameHandle> frame)
-{
-    if (tex.desc.external)
-        return backend->get_swapchain_image(frame);
-    else 
-        return tex.image.value();
-}
-
 void RenderGraph::rebuild_resources()
 {
     auto extent = backend->get_swapchain_extent();
@@ -303,44 +295,10 @@ void RenderGraph::rebuild_resources()
     }
 }
 
-PipelineObject* RenderGraph::create_pipeline(const GraphicsPipelineDesc& desc)
-{
-    assert(!graph_compiled);
-    PipelineObject* pipeline = backend->create_pipeline(desc);
-    pipelines.push_back(pipeline);
-    return pipeline;
-}
-
 PipelineObject* RenderGraph::request_pipeline(
     PipelineFamily& pipeline_family, ShaderKey shader_key)
 {
     assert(!graph_compiled);
     PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key);
-    pipelines.push_back(pipeline);
     return pipeline;
-}
-
-RenderResource* RenderGraph::create_resource(const RenderResourceDesc& desc)
-{
-    assert(!graph_compiled);
-    RenderResource* resource = backend->create_resource(desc);
-    resources.push_back(resource);
-    return resource;
-}
-
-void RenderGraph::transition_if_needed(RBCommandList cmd, RGTexture& tex, RBImageUsage next_usage) const
-{
-    RBImageLayout new_layout = layout_for(next_usage);
-
-    if (tex.current_layout == new_layout)
-        return;
-
-    backend->transition_image(
-        cmd,
-        tex.image.value(),
-        tex.current_layout,
-        new_layout
-    );
-
-    tex.current_layout = new_layout;
 }

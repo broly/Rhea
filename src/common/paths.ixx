@@ -60,5 +60,9 @@ export namespace paths
     {
         return get_project_path() / "assets";
     }
+    std::filesystem::path get_cache_path()
+    {
+        return get_project_path() / "cache";
+    }
 
 }

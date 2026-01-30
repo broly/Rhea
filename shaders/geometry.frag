@@ -130,7 +130,7 @@ float shadow_factor(vec3 world_pos, vec3 Ng)
         shadow += (proj.z - bias <= depth) ? 1.0 : 0.0;
     }
 
-    return shadow * 0.125;
+    return shadow / POISSON_STEPS;
 #else
     float depth = texture(u_shadow_depth, uv).r;
     return (proj.z - bias > depth) ? 0.0 : 1.0;

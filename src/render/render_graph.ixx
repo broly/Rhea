@@ -21,6 +21,19 @@ export struct RenderGraphPass
     std::function<void(class RenderGraphContext&)> execute;
 };
 
+export enum class RenderGraphMode
+{
+    Camera,
+    ReflectionCapture,
+};
+
+export struct RenderGraphParameters
+{
+    RenderGraphMode mode;
+    
+    std::map<Name, float> extra;
+};
+
 export class RenderGraphContext
 {
 public:
@@ -28,22 +41,23 @@ public:
         RenderBackend& in_backend,
         RBCommandList in_cmd,
         RBFramebufferId in_fb, 
-        class RenderGraph& render_graph)
+        class RenderGraph& render_graph,
+        const RenderGraphParameters& in_params = {})
         : backend(in_backend)
         , cmd(in_cmd)
         , framebuffer(in_fb)
         , render_graph(render_graph)
+        , params(in_params)
     {}
-
+    
     Name pass_name;
     RenderBackend& backend;
-    RBCommandList  cmd;
+    RBCommandList cmd;
     RBFramebufferId framebuffer;
     RenderGraph& render_graph;
     RBFrameHandle frame;
-    
+    RenderGraphParameters params;
 };
-
 
 
 export class RenderGraph
@@ -58,11 +72,9 @@ public:
     RGPassId add_pass(RenderGraphPass&& pass);
 
     void compile();
-    void execute(RBCommandList cmd, RBFrameHandle frame);
-    
-    RBImageHandle resolve_image(const RGTexture& tex, std::optional<RBFrameHandle> frame = std::nullopt);
-    
-    
+    void execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params);
+
+
     RBImageHandle get_image(RGTextureHandle tex) const
     {
         assert(tex.id < textures.size());
@@ -73,48 +85,11 @@ public:
     }
     
     void rebuild_resources();
-    
-    PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
+
     PipelineObject* request_pipeline(
         PipelineFamily& pipeline_family, ShaderKey shader_key);
 
-    RenderResource* create_resource(const RenderResourceDesc& desc);
-    
-    static RBImageLayout layout_for(RBImageUsage usage)
-    {
-        switch (usage)
-        {
-        case RBImageUsage::ColorAttachment:
-            return RBImageLayout::color_attachment_optimal;
-        case RBImageUsage::DepthStencilAttachment:
-            return RBImageLayout::depth_stencil_attachment_optimal;
-        case RBImageUsage::DepthStencilReadOnly:
-            return RBImageLayout::depth_stencil_read_only_optimal;
-        case RBImageUsage::SampledFragment:
-            return RBImageLayout::shader_read_only_optimal;
-        case RBImageUsage::TransferDst:
-            return RBImageLayout::transfer_dst_optimal;
-        case RBImageUsage::TransferSrc:
-            return RBImageLayout::transfer_src_optimal;
-        case RBImageUsage::Present:
-            return RBImageLayout::transfer_present;
-        default:
-            return RBImageLayout::undefined;
-        }
-    }
-    
-    void transition_if_needed(
-        RBCommandList cmd,
-        RGTexture& tex,
-        RBImageUsage next_usage) const;
-
 private:
-    struct Resource
-    {
-        RGResourceType type;
-    };
-
-    std::vector<RGResource> rg_resources;
     std::vector<RenderGraphPass> passes;
 
     std::vector<uint32_t> execution_order;
@@ -122,11 +97,7 @@ private:
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
     std::vector<std::vector<RGImageBarrier>> pass_barriers;
-    
-    
-    
-    std::vector<PipelineObject*> pipelines; 
-    std::vector<RenderResource*> resources;
-    
+
+
     bool graph_compiled = false;
 };

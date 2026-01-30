@@ -43,7 +43,6 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     Renderer::init(in_window);
     
-
     samplers["default"] = render_backend->create_sampler(samplers::default_surface());
     samplers["surface"] = render_backend->create_sampler(samplers::default_surface());
     samplers["shadow"] = render_backend->create_sampler(samplers::default_shadow());
@@ -52,45 +51,6 @@ void GameRenderer::init(RBWindowHandle in_window)
     light_resource = find_resource("light");
     light_resource_shadow = find_resource("shadow_light");
     shadow_resource = find_resource("shadow");
-    
-    // camera_resource = render_graph->create_resource({
-    //     .name = "camera",
-    //     .stages = ShaderStage::all,
-    //     .usage_type = ResourceUsageType::frame,
-    //     .variables = {
-    //         { "camera", SET_CAMERA, BINDING_UBO_CAMERA, sizeof(CameraUBO) }
-    //     }
-    // });
-    
-    
-    // light_resource = render_graph->create_resource({
-    //     .name = "light",
-    //     .stages = ShaderStage::fragment,
-    //     .usage_type = ResourceUsageType::frame,
-    //     .variables = {
-    //         { "light_ubo", SET_LIGHT, BINDING_UBO_LIGHT, sizeof(LightUBO) }
-    //     }
-    // });
-    
-    // light_resource_shadow = render_graph->create_resource({
-    //     .name = "shadow_light",
-    //     .stages = ShaderStage::all,
-    //     .usage_type = ResourceUsageType::persistent,
-    //     .variables = {
-    //         { "shadow_light_ubo", 0, 0, sizeof(LightUBO) },
-    //         { "u_shadow_depth", 0, 1 }
-    //     }
-    // });
-    
-    // shadow_resource = render_graph->create_resource({
-    //     .name = "shadow",
-    //     .stages = ShaderStage::all,
-    //     .usage_type = ResourceUsageType::frame,
-    //     .sampler = samplers["shadow"],
-    //     .variables = {
-    //         { "u_shadow_depth", SET_SHADOW, BINDING_UBO_SHADOW }
-    //     }
-    // });
     
     auto& tonemap_model = models.find("tonemap")->second;
     auto& shadow_debug_model = models.find("shadow_debug")->second;
@@ -105,72 +65,6 @@ void GameRenderer::init(RBWindowHandle in_window)
     };
 
     auto hdr_color = render_graph->create_texture(hdr_color_desc);
-    
-    // VertexLayout geom_vertex_layout = {
-    //     VertexLayout {
-    //         .layouts = {
-    //             VertexLayoutData{
-    //                 .binding_index = 0,
-    //                 .stride = sizeof(Vertex),
-    //                 .attributes = {
-    //                       { "in_position",LOCATION_ATTR_POSITION, offsetof(Vertex, position) },
-    //                       { "in_normal",  LOCATION_ATTR_NORMAL,   offsetof(Vertex, normal) },
-    //                       { "in_uv",      LOCATION_ATTR_UV,       offsetof(Vertex, tex_coord) },
-    //                       { "in_tangent", LOCATION_ATTR_TANGENT,  offsetof(Vertex, tangent) }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // };
-    //
-    // VertexLayout shadow_vertex_layout = {
-    //     VertexLayout {
-    //         .layouts = {
-    //             VertexLayoutData{
-    //                 .binding_index = 0,
-    //                 .stride = sizeof(Vertex),
-    //                 .attributes = {
-    //                     { "in_position", LOCATION_ATTR_POSITION, offsetof(Vertex, position) }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // };
-
-    
-    // geom_pipeline_layout = {
-    //     .vertex_layout = geom_vertex_layout,
-    //     .resources = {camera_resource, light_resource, shadow_resource }, 
-    //     .push_constants = {{
-    //         .stages = ShaderStage::vertex,
-    //         .offset = 0,
-    //         .size = sizeof(glm::mat4),
-    //     }}
-    // };
-    
-   // shadow_pipeline_layout = {
-   //      .vertex_layout = shadow_vertex_layout,
-   //      .resources = { light_resource_shadow },
-   //      .push_constants = {{
-   //          .stages = ShaderStage::vertex,
-   //          .offset = 0,
-   //          .size = sizeof(glm::mat4),
-   //      }}
-   //  };
-    
-    
-    // PipelineLayoutDesc tonemap_pipeline_layout = {
-    //     .vertex_layout = {},
-    //     .resources = {  }, 
-    //     .push_constants = {}
-    // };
-    //
-    //
-    // PipelineLayoutDesc shadow_debug_pipeline_layout = {
-    //     .vertex_layout = {},
-    //     .resources = { light_resource_shadow }, 
-    //     .push_constants = {}
-    // };
     
     PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, render_backend, shared_from_this());
     
@@ -221,43 +115,43 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
-    // render_graph->add_pass({
-    //     .name = "ShadowDebug",
-    //     //.condition = [this] () { return render_flags[Names::debug_shadow]; },
-    //     .reads = {
-    //         { shadow_map, RBImageUsage::SampledFragment }
-    //     },
-    //     .writes = {
-    //         { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-    //     },
-    //     .execute = [=](RenderGraphContext& ctx)
-    //     {
-    //         ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
-    //         
-    //         auto shadow_debug_material_instance = get_or_create_material_instance(shadow_debug_material, ctx.pass_name);
-    //
-    //         RenderResourceInstance* shadow_debug_instance =
-    //             shadow_debug_material_instance->get_or_create_resource_instance(
-    //                 shadow_debug_pipeline,
-    //                 ctx.frame
-    //             );
-    //
-    //         shadow_debug_instance->update_image(
-    //             shadow_debug_pipeline,
-    //             "u_shadow_depth",
-    //             render_graph->get_image(shadow_map),
-    //             ctx.frame
-    //         );
-    //
-    //         shadow_debug_instance->bind(
-    //             shadow_debug_pipeline,
-    //             ctx.cmd,
-    //             ctx.frame
-    //         );
-    //
-    //         ctx.backend.draw_fullscreen(ctx.cmd);
-    //     }
-    // });
+    render_graph->add_pass({
+        .name = "ShadowDebug",
+        .condition = [this] () { return render_flags[Names::debug_shadow]; },
+        .reads = {
+            { shadow_map, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [=](RenderGraphContext& ctx)
+        {
+            ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
+            
+            auto shadow_debug_material_instance = get_or_create_material_instance(shadow_debug_material, ctx.pass_name);
+    
+            RenderResourceInstance* shadow_debug_instance =
+                shadow_debug_material_instance->get_or_create_resource_instance(
+                    shadow_debug_pipeline,
+                    ctx.frame
+                );
+    
+            shadow_debug_instance->update_image(
+                shadow_debug_pipeline,
+                "u_shadow_depth",
+                render_graph->get_image(shadow_map),
+                ctx.frame
+            );
+    
+            shadow_debug_instance->bind(
+                shadow_debug_pipeline,
+                ctx.cmd,
+                ctx.frame
+            );
+    
+            ctx.backend.draw_fullscreen(ctx.cmd);
+        }
+    });
     
     render_graph->add_pass({
         .name = Names::pass_geometry_base,
@@ -297,7 +191,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_graph->add_pass({
         .name = "ToneMapping",
-        //.condition = [this] () { return !is_debugging(); },
+        .condition = [this] () { return !is_debugging(); },
         .reads = {
             { hdr_color, RBImageUsage::SampledFragment }
         },
@@ -356,7 +250,9 @@ void GameRenderer::execute()
     }
 
     RBCommandList cmd = backend.begin_commands(frame);
-    render_graph->execute(cmd, frame);
+    RenderGraphParameters params;
+    params.mode = RenderGraphMode::Camera;
+    render_graph->execute(cmd, frame, params);
     backend.end_commands(cmd);
 
     backend.submit_frame(frame, cmd);
@@ -412,7 +308,7 @@ glm::mat4 GameRenderer::build_dir_light_vp() const
     glm::mat4 lightProj = glm::orthoZO(
         minLS.x, maxLS.x,
         minLS.y, maxLS.y,
-        -maxLS.z, -minLS.z * 10
+        0.f, -minLS.z * 10
     );
 
     return lightProj * lightView;
