@@ -297,6 +297,11 @@ RBImageHandle VkRenderBackend::create_image(const RBImageDesc& desc)
     return image_manager.create_image(desc);
 }
 
+void VkRenderBackend::destroy_image(RBImageHandle handle, bool wait_fences)
+{
+    return image_manager.destroy_image(handle, wait_fences);
+}
+
 RBImageView VkRenderBackend::get_image_view(RBImageHandle handle)
 {
     return image_manager.get_image_view(handle);

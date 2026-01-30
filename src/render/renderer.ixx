@@ -57,8 +57,8 @@ public:
 
     virtual void execute() {}
     
-    void set_flag(Name name, bool value);
-    void toggle_flag(Name name);
+    void set_flag(Name name, bool value, bool needs_rebuild = false);
+    void toggle_flag(Name name, bool needs_rebuild = false);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
@@ -81,6 +81,8 @@ public:
     std::map<Name, RBSampler> samplers;
     
     std::map<Name, bool> render_flags;
+    
+    bool render_graph_needs_rebuild = false;
     
     
     RenderResource* find_resource(Name resource_name) const;

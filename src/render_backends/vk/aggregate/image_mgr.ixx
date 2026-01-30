@@ -29,6 +29,9 @@ namespace vk
         
         RBImageHandle create_image(const RBImageDesc& desc);
         
+        void destroy_image(RBImageHandle handle, bool wait_fences);
+
+
         vk::Instance& instance;
         vk::ImmediateCommandPool& immediate_command_pool;
         

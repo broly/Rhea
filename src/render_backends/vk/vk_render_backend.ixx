@@ -122,6 +122,7 @@ public:   /// API Section
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) override;
     virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
+    virtual void destroy_image(RBImageHandle handle, bool wait_fences) override;
     virtual RBImageView get_image_view(RBImageHandle handle) override;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;

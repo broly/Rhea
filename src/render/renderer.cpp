@@ -99,14 +99,15 @@ void Renderer::load_resources()
     }
 }
 
-void Renderer::set_flag(Name name, bool value)
+void Renderer::set_flag(Name name, bool value, bool needs_rebuild)
 {
     render_flags[name] = value;
 }
 
-void Renderer::toggle_flag(Name name)
+void Renderer::toggle_flag(Name name, bool needs_rebuild)
 {
     render_flags[name] = !render_flags[name];
+    render_graph_needs_rebuild = true;
 }
 
 RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)

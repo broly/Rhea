@@ -91,6 +91,9 @@ void RenderGraph::compile()
     for (uint32_t pass_index = 0; pass_index < passes.size(); ++pass_index)
     {
         auto& pass = passes[pass_index];
+     
+        if (pass.condition && !pass.condition())
+            continue;
         
         auto& barriers = pass_barriers[pass_index];
 
@@ -293,6 +296,20 @@ void RenderGraph::rebuild_resources()
         };
         tex.image = backend->create_image(desc);
     }
+}
+
+void RenderGraph::recompile()
+{
+    assert(graph_compiled);
+    
+    graph_compiled = false;
+    
+    for (auto& tex : textures)
+    {
+        if (tex.image)
+            backend->destroy_image(*tex.image, true);
+    }
+    compile();
 }
 
 PipelineObject* RenderGraph::request_pipeline(

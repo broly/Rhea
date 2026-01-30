@@ -59,7 +59,6 @@ public:
     RenderGraphParameters params;
 };
 
-
 export class RenderGraph
 {
 public:
@@ -85,6 +84,8 @@ public:
     }
     
     void rebuild_resources();
+    
+    void recompile();
 
     PipelineObject* request_pipeline(
         PipelineFamily& pipeline_family, ShaderKey shader_key);

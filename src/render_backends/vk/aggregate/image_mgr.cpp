@@ -109,7 +109,6 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
 
     VK_CHECK(vkCreateImage(instance.device, &image_info, nullptr, &res.image));
     
-
     VkMemoryRequirements mem_req;
     vkGetImageMemoryRequirements(instance.device, res.image, &mem_req);
 
@@ -146,6 +145,38 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     image_resources.push_back(res);
 
     return RBImageHandle{ id };
+}
+
+void vk::ImageManager::destroy_image(RBImageHandle handle, bool wait_fences)
+{
+    assert(handle.id < image_resources.size());
+    
+    if (wait_fences)
+        vkDeviceWaitIdle(instance.device);
+
+    vk::ImageResource& res = image_resources[handle.id];
+
+    if (res.view != VK_NULL_HANDLE)
+    {
+        vkDestroyImageView(instance.device, res.view, nullptr);
+        res.view = VK_NULL_HANDLE;
+    }
+
+    if (res.image != VK_NULL_HANDLE)
+    {
+        vkDestroyImage(instance.device, res.image, nullptr);
+        res.image = VK_NULL_HANDLE;
+    }
+
+    if (res.memory != VK_NULL_HANDLE)
+    {
+        vkFreeMemory(instance.device, res.memory, nullptr);
+        res.memory = VK_NULL_HANDLE;
+    }
+
+    LogVkImageManager.Log(
+        "Destroyed image %u", handle.id
+    );
 }
 
 void vk::ImageManager::set_default_extent(uint32_t width, uint32_t height)

@@ -19,5 +19,5 @@ public:
     float move_speed = 10.0f;
     std::shared_ptr<RhActor> camera_actor = nullptr;
     std::shared_ptr<RhActor> dir_light_actor = nullptr;
-
+    double last_rg_switch_time = 0.f;
 };

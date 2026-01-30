@@ -237,6 +237,12 @@ void GameRenderer::execute()
 {
     auto& backend = *render_backend;
     
+    if (render_graph_needs_rebuild)
+    {
+        render_graph->recompile();
+        render_graph_needs_rebuild = false;
+    }
+    
     RBFrameHandle frame = backend.get_current_frame();
 
     backend.wait_for_frame(frame);

@@ -18,6 +18,8 @@
 #include <glm/gtx/norm.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
+#include <glm/common.hpp>
+#include <glm/gtx/compatibility.hpp>
 
 export namespace glm
 {
@@ -80,4 +82,6 @@ export namespace glm
     using glm::dot;
     using glm::abs;
     using glm::value_ptr;
+    using glm::lerp;
+    using glm::slerp;
 }

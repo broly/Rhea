@@ -7,6 +7,7 @@ import globals;
 import input;
 import profile;
 import rhmath;
+import rhcomponents;
 
 void WorldScript_RotateAroundObject::tick(double dt)
 {
@@ -24,6 +25,7 @@ void WorldScript_RotateAroundObject::tick(double dt)
 
     auto input = RhGlobals::engine->input;
     Transform t = camera_actor->get_transform();
+    
     
     static bool do_once = false;
     
@@ -48,6 +50,35 @@ void WorldScript_RotateAroundObject::tick(double dt)
         camera_actor->set_transform(t);
         // dir_light_actor->set_transform(t);
     }
+    
+    
+    const double world_seconds = world->get_time_seconds();
+    
+    glm::quat dir_light_a = {-0.500154674, -0.28043431, -0.175259128, 0.800303757 };
+    glm::quat a = {0.873911619, -0.195810378,0.434136629,0.0972735211 };
+    glm::quat b = {0.710990787, -0.554269791, 0.342177004, 0.264937967};
+
+    glm::vec4 color_a = {8, 8, 4, 1};
+    glm::vec4 color_b = {10, 2, 0, 1};
+    
+    auto light = dir_light_actor->find_component<RhComp_Light>();
+    auto light_transform = light->get_transform();
+    
+    
+    
+    float alpha = fmod(  world_seconds / 50, 1.0);
+    
+    glm::vec4 color_interp = glm::lerp(color_a, color_b, alpha);
+    light->color = color_interp;
+    light->update_scene_proxy();
+    
+    auto rot_interp =  glm::normalize(glm::lerp(b, a, alpha));
+    light_transform.set_rotation(rot_interp);
+    light->set_transform(light_transform);
+    
+    
+    
+    
     
     // =========================
     // MOUSE
@@ -142,10 +173,13 @@ void WorldScript_RotateAroundObject::tick(double dt)
         handled = true;
     }
     
-    
     if (input->is_key_down(Key::H))
     {
-        RhGlobals::engine->renderer->toggle_flag("debug_shadow");
+        const double time = world->get_time_seconds();
+        if (time - last_rg_switch_time < 1.0)
+            return;
+        last_rg_switch_time = time;
+        RhGlobals::engine->renderer->toggle_flag("debug_shadow", true);
         handled = true;
     }
     

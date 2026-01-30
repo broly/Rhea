@@ -93,6 +93,7 @@ public:
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
+    virtual void destroy_image(RBImageHandle handle, bool wait_fences) = 0;
     virtual RBImageView get_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
