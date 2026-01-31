@@ -10,81 +10,61 @@ import :pipeline_family;
 
 #include "common/reflect_macros.h"
 
-export struct MaterialUBO
-{
-    float base_color_factor;
-    float emissive_factor;
-    float occlusion_factor;
-    float roughness_factor;
-    float metallic_factor;
-};
-REFLECT_STRUCT_RUNTIME(MaterialUBO,
-    base_color_factor, emissive_factor, occlusion_factor, roughness_factor, metallic_factor);
-
-export struct PointLight
-{
-    glm::vec4 position;
-    glm::vec4 color;
-};
-
-export struct DirectionalLight
-{
-    glm::mat4 light_vp;  // view-projection for shadow
-    glm::vec4 direction; // xyz normalized (world)
-    glm::vec4 color;     // rgb * intensity
-};
-
-export struct LightUBO
-{
-    PointLight lights[8];
-    int light_count;
-    glm::vec3 _pad0;
-    
-    DirectionalLight dir_light;
-    int has_dir_light;
-    glm::vec3 _pad1;
-};
-REFLECT_STRUCT_RUNTIME_OPAQUE(LightUBO);
+export class MaterialInstance;
+export class RenderGraph;
 
 export class Renderer : public std::enable_shared_from_this<Renderer>
 {
 public:
     virtual ~Renderer() = default;
+    
+    
     virtual void init(RBWindowHandle in_window);
-    
-    void load_schemas();
-    void load_resources();
+    virtual void execute();
 
-    virtual void execute() {}
-    
+public:  // public API
     void set_flag(Name name, bool value, bool needs_rebuild = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
+    RenderResource* find_resource(Name resource_name) const;
+    std::shared_ptr<PipelineFamily> query_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model_name);
+    RenderResource* query_resource(std::shared_ptr<MaterialModel> model, Name pass_name);
+    std::shared_ptr<MaterialInstance> query_material_instance(std::shared_ptr<Material> material, Name pass_name);
+    std::shared_ptr<MaterialModel> find_model(Name model_name) const;
     
-    std::shared_ptr<PipelineFamily> get_or_create_material_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model_name);
+protected:  // internal functions
     
-    RenderResource* get_or_create_resource_from_model(std::shared_ptr<MaterialModel> model, Name pass_name);
+    void load_schemas();
+    void load_resources();
+   
     
-    mutable std::map<std::pair<Name, std::shared_ptr<MaterialModel>>, std::shared_ptr<PipelineFamily>> material_pipeline_families;
-
+protected:  // internal system accessors
     std::shared_ptr<RenderBackend> render_backend;
+    std::shared_ptr<RenderGraph> render_graph;
+    
+protected: // (semi-)immutable info
     std::map<Name, std::shared_ptr<MaterialModel>> models;
     std::map<Name, std::shared_ptr<RenderResourceInfo>> resources_info;
+    std::map<Name, RBSampler> samplers;
     std::map<Name, RenderResource*> resources;
-    
-    std::map<TextureHandle, RBImageHandle> texture_cache;
-
     std::map<std::pair<Name, std::shared_ptr<MaterialModel>>, RenderResource*> material_resources;
     
-    std::map<Name, RBSampler> samplers;
+protected: // materials and resources
+    std::map<std::pair<std::shared_ptr<Material>, Name>, std::shared_ptr<MaterialInstance>> material_instances;
+    mutable std::map<
+        std::pair<Name, std::shared_ptr<MaterialModel>>, 
+        std::shared_ptr<PipelineFamily>> material_pipeline_families;
+
+protected:  // textures
+    std::map<TextureHandle, RBImageHandle> texture_cache;
     
+protected: // dynamic info
     std::map<Name, bool> render_flags;
     
-    bool render_graph_needs_rebuild = false;
+    bool main_render_graph_needs_rebuild = false;
     
-    
-    RenderResource* find_resource(Name resource_name) const;
 
+    
 };

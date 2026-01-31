@@ -2,8 +2,10 @@
 
 import :render_backend;
 import paths;
+import :material_instance;
 import <filesystem>;
 import reflect;
+import :render_graph;
 #include "common/assertion_macros.h"
 
 
@@ -12,6 +14,40 @@ void Renderer::init(RBWindowHandle in_window)
     load_schemas();
     
     load_resources();
+}
+
+void Renderer::execute()
+{
+    checkf(render_graph != nullptr, "RenderGraph not initialized. Please create and initialize RenderGraph in your GameRenderer::init");
+    auto& backend = *render_backend;
+    
+    if (main_render_graph_needs_rebuild)
+    {
+        render_graph->recompile();
+        main_render_graph_needs_rebuild = false;
+    }
+    
+    RBFrameHandle frame = backend.get_current_frame();
+
+    backend.wait_for_frame(frame);
+
+    backend.reset_frame_fence(frame);
+
+    if (!backend.acquire_next_image(frame))
+    {
+        render_graph->rebuild_resources();
+        return;
+    }
+
+    RBCommandList cmd = backend.begin_commands(frame);
+    RenderGraphParameters params;
+    params.mode = RenderGraphMode::Camera;
+    render_graph->execute(cmd, frame, params);
+    backend.end_commands(cmd);
+
+    backend.submit_frame(frame, cmd);
+
+    backend.advance_frame();
 }
 
 void Renderer::load_schemas()
@@ -107,7 +143,7 @@ void Renderer::set_flag(Name name, bool value, bool needs_rebuild)
 void Renderer::toggle_flag(Name name, bool needs_rebuild)
 {
     render_flags[name] = !render_flags[name];
-    render_graph_needs_rebuild = true;
+    main_render_graph_needs_rebuild = true;
 }
 
 RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
@@ -132,7 +168,7 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
     return create_texture_from_asset(handle);
 }
 
-std::shared_ptr<PipelineFamily> Renderer::get_or_create_material_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model)
+std::shared_ptr<PipelineFamily> Renderer::query_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model)
 {
     if (material_pipeline_families.contains({pass_name, model}))
         return material_pipeline_families.at({pass_name, model});
@@ -144,7 +180,7 @@ std::shared_ptr<PipelineFamily> Renderer::get_or_create_material_pipeline_family
     return family;
 }
 
-RenderResource* Renderer::get_or_create_resource_from_model(std::shared_ptr<MaterialModel> model, Name pass_name)
+RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, Name pass_name)
 {
     if (material_resources.contains({pass_name, model}))
         return material_resources.at({pass_name, model});
@@ -193,4 +229,27 @@ RenderResource* Renderer::find_resource(Name resource_name) const
         return nullptr;
     
     return resource_it->second;
+}
+
+std::shared_ptr<MaterialInstance> Renderer::query_material_instance(std::shared_ptr<Material> material,
+    Name pass_name)
+{
+    auto it = material_instances.find({material, pass_name});
+    if (it != material_instances.end())
+        return it->second;
+
+    auto ptr = std::static_pointer_cast<Renderer>(shared_from_this());
+    
+    auto instance = std::make_shared<MaterialInstance>(material, shared_from_this(), pass_name);
+
+    material_instances.emplace(std::pair{material, pass_name}, instance);
+    return instance;
+}
+
+std::shared_ptr<MaterialModel> Renderer::find_model(Name model_name) const
+{
+    auto model_it = models.find(model_name);
+    if (model_it == models.end())
+        return nullptr;
+    return model_it->second;
 }

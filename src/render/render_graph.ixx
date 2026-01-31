@@ -27,9 +27,17 @@ export enum class RenderGraphMode
     ReflectionCapture,
 };
 
+export struct CubemapInfo
+{
+    glm::vec3 position;
+    unsigned int face_index;
+};
+
 export struct RenderGraphParameters
 {
     RenderGraphMode mode;
+    
+    std::optional<CubemapInfo> cubemap;
     
     std::map<Name, float> extra;
 };

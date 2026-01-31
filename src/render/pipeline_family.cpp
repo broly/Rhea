@@ -192,7 +192,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
             }
         }
         
-        RenderResource* material_resource = renderer->get_or_create_resource_from_model(model, pass->name);
+        RenderResource* material_resource = renderer->query_resource(model, pass->name);
         material_resource_info.resource = material_resource;
     
         desc.layout.resources.push_back(material_resource_info);

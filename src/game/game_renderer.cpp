@@ -128,7 +128,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         {
             ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
             
-            auto shadow_debug_material_instance = get_or_create_material_instance(shadow_debug_material, ctx.pass_name);
+            auto shadow_debug_material_instance = query_material_instance(shadow_debug_material, ctx.pass_name);
     
             RenderResourceInstance* shadow_debug_instance =
                 shadow_debug_material_instance->get_or_create_resource_instance(
@@ -204,7 +204,7 @@ void GameRenderer::init(RBWindowHandle in_window)
             ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
             
             std::shared_ptr<MaterialInstance> material_instance =
-                get_or_create_material_instance(tonemap_material, ctx.pass_name);
+                query_material_instance(tonemap_material, ctx.pass_name);
     
             auto* tonemap_instance =
                 material_instance->get_or_create_resource_instance(
@@ -231,40 +231,6 @@ void GameRenderer::init(RBWindowHandle in_window)
 
     
     render_graph->compile();
-}
-
-void GameRenderer::execute()
-{
-    auto& backend = *render_backend;
-    
-    if (render_graph_needs_rebuild)
-    {
-        render_graph->recompile();
-        render_graph_needs_rebuild = false;
-    }
-    
-    RBFrameHandle frame = backend.get_current_frame();
-
-    backend.wait_for_frame(frame);
-
-    backend.reset_frame_fence(frame);
-
-    if (!backend.acquire_next_image(frame))
-    {
-        render_graph->rebuild_resources();
-        return;
-    }
-
-    RBCommandList cmd = backend.begin_commands(frame);
-    RenderGraphParameters params;
-    params.mode = RenderGraphMode::Camera;
-    render_graph->execute(cmd, frame, params);
-    backend.end_commands(cmd);
-
-    backend.submit_frame(frame, cmd);
-
-    backend.advance_frame();
-
 }
 
 bool GameRenderer::is_debugging() const
@@ -323,7 +289,8 @@ glm::mat4 GameRenderer::build_dir_light_vp() const
 
 void GameRenderer::draw_scene(RenderGraphContext& ctx)
 {    
-
+    PROFILE("draw_scene");
+    
     auto& scene_view = engine->scene_view;
     auto cmd = ctx.cmd;
     auto frame = ctx.frame;
@@ -339,20 +306,61 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
 
         current_pipeline = pipeline;
 
-        // ---------- Camera ----------
-        auto& camera_processor =
-            scene_view->get_processor<SceneViewProcessor_Camera>();
-
-        const RenderObject_Camera* cam_ro =
-            camera_processor.get_active_camera();
-
-        auto [width, height] = ctx.backend.get_viewport_extent();
-
+        vec3 camera_position;
         CameraUBO camera_ubo;
-        camera_ubo.view_proj  = 
-            cam_ro->get_projection(float(width) / float(height)) *
-            cam_ro->view;
-        camera_ubo.camera_pos = cam_ro->position;
+        if (ctx.params.mode == RenderGraphMode::Camera)
+        {
+            // ---------- Camera ----------
+            auto& camera_processor =
+                scene_view->get_processor<SceneViewProcessor_Camera>();
+
+            const RenderObject_Camera* cam_ro =
+                camera_processor.get_active_camera();
+
+            auto [width, height] = ctx.backend.get_viewport_extent();
+
+            camera_ubo.view_proj  = 
+                cam_ro->get_projection(float(width) / float(height)) *
+                cam_ro->view;
+            camera_ubo.camera_pos = cam_ro->position;
+            camera_position = cam_ro->position;
+        } else
+        {
+            static const glm::vec3 cube_dirs[6] = {
+                { 1,  0,  0}, {-1,  0,  0},
+                { 0,  1,  0}, { 0, -1,  0},
+                { 0,  0,  1}, { 0,  0, -1}
+            };
+
+            static const glm::vec3 cube_ups[6] = {
+                {0, -1,  0}, {0, -1,  0},
+                {0,  0,  1}, {0,  0, -1},
+                {0, -1,  0}, {0, -1,  0}
+            };
+            
+            checkf(ctx.params.cubemap.has_value(), "Cubemap not defined");
+            
+            const auto& cp = *ctx.params.cubemap;
+
+            glm::mat4 view = glm::lookAt(
+                cp.position,
+                cp.position + cube_dirs[cp.face_index],
+                cube_ups[cp.face_index]
+            );
+
+            glm::mat4 proj = glm::perspective(
+                glm::radians(90.f),
+                1.f,
+                0.1f,
+                1000.f
+            );
+
+            proj[1][1] *= -1; // vk ndc
+
+            camera_ubo.view_proj = proj * view;
+            camera_ubo.camera_pos = cp.position;
+            camera_position = cp.position;
+        }
 
         auto cam = camera_resource->query_single(pipeline);
         cam->update_uniform_buffer(pipeline, "camera_ubo", camera_ubo, frame);
@@ -363,7 +371,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
             scene_view->get_processor<SceneViewProcessor_Light>();
 
         const auto [lights, light_num] =
-            light_processor.query_nearest_lights_limited<8>(cam_ro->position);
+            light_processor.query_nearest_lights_limited<8>(camera_position);
 
         LightUBO light_ubo{};
         light_ubo.light_count = light_num;
@@ -439,12 +447,9 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
                 auto model = models.find(material->model)->second;
 
                 // --------- Pipeline key ---------
-                auto pipeline_family =
-                    get_or_create_material_pipeline_family(
-                        pass_name, model);
+                auto pipeline_family = query_pipeline_family(pass_name, model);
 
-                ShaderKey key =
-                    pipeline_family->make_shader_key(material, pass_name);
+                ShaderKey key = pipeline_family->make_shader_key(material, pass_name);
 
                 batches[key].push_back({
                     .mesh     = MeshPrimHandle{ro.mesh, geom_index, prim_index},
@@ -463,7 +468,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         auto model = models.find(first_material->model)->second;
 
         auto pipeline_family =
-            get_or_create_material_pipeline_family(
+            query_pipeline_family(
                 pass_name, model);
 
         PipelineObject* pipeline =
@@ -476,7 +481,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
         {
             // ---------- Material ----------
             std::shared_ptr<MaterialInstance> material_instance =
-                get_or_create_material_instance(item.material, pass_name);
+                query_material_instance(item.material, pass_name);
 
             material_instance->bind(pipeline, cmd, frame);
 
@@ -501,7 +506,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
 
 void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
 {
-    PROFILE("ShadowPass");
+    PROFILE("draw_scene_shadow");
 
     auto& scene_view = engine->scene_view;
     auto cmd = ctx.cmd;
@@ -595,7 +600,7 @@ void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
     for (auto& item : items)
     {
         auto pipeline_family =
-            get_or_create_material_pipeline_family(
+            query_pipeline_family(
                 "ShadowMap",
                 models.find("Shadow")->second
             );
@@ -623,19 +628,4 @@ void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
     }
 }
 
-
-std::shared_ptr<MaterialInstance> GameRenderer::get_or_create_material_instance(
-    std::shared_ptr<Material> material, Name pass_name)
-{
-    auto it = material_instances.find({material, pass_name});
-    if (it != material_instances.end())
-        return it->second;
-
-    auto ptr = std::static_pointer_cast<Renderer>(shared_from_this());
-    
-    auto instance = std::make_shared<MaterialInstance>(material, shared_from_this(), pass_name);
-
-    material_instances.emplace(std::pair{material, pass_name}, instance);
-    return instance;
-}
 

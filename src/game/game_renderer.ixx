@@ -14,11 +14,8 @@ public:
     void set_engine(const std::shared_ptr<Engine>& in_engine);
 
     void init(RBWindowHandle in_window) override;
-    void execute() override;
 
     std::shared_ptr<Engine> engine;
-    
-    std::shared_ptr<RenderGraph> render_graph;
     
     bool is_debugging() const;
     
@@ -26,11 +23,6 @@ public:
     
     void draw_scene(RenderGraphContext& ctx);
     void draw_scene_shadow(RenderGraphContext& ctx);
-    
-    std::shared_ptr<MaterialInstance> get_or_create_material_instance(std::shared_ptr<Material> material, Name pass_name);
-
-    PipelineLayoutDesc geom_pipeline_layout;
-    PipelineLayoutDesc shadow_pipeline_layout;
     
     RenderResource* camera_resource;
     RenderResource* light_resource;
@@ -40,7 +32,4 @@ public:
     RGTextureHandle shadow_map;
     RBSwapchainExtent shadowmap_extent;
     
-    PipelineObject* geom_pipeline;
-    
-    std::map<std::pair<std::shared_ptr<Material>, Name>, std::shared_ptr<MaterialInstance>> material_instances;
 };

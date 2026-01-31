@@ -14,3 +14,4 @@ export import :sampler_desc;
 export import :material_instance;
 export import :pipeline_family;
 export import :shader_key;
+export import :system_ubo;

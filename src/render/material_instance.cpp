@@ -7,12 +7,10 @@ MaterialInstance::MaterialInstance(const std::shared_ptr<const Material>& in_mat
     , renderer(in_renderer)
 {
     Name model_name = material->model;
-    auto model_it = renderer->models.find(model_name);
-    checkf(model_it != renderer->models.end(), "Could not find specified model");
+    model = renderer->find_model(model_name);
+    checkf(model, "Could not find specified model");
     
-    model = renderer->models.at(material->model);
-
-    render_resource = renderer->get_or_create_resource_from_model(model, pass_name);
+    render_resource = renderer->query_resource(model, pass_name);
 
 }
 
