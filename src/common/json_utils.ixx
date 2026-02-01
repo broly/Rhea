@@ -19,8 +19,8 @@ export namespace json_utils
     
         std::ifstream file(level_path);
         if (!file.is_open()) {
-            std::cerr << "Failed to open bootstrap_level.json" << std::endl;
-            return std::nullopt;
+            std::cerr << "Failed to open json object" << std::endl;
+            throw std::runtime_error("Failed to open json object");
         }
     
         Json::Value root;

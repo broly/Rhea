@@ -441,7 +441,7 @@ VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
 }
 
 
-RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
+RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override, bool generate_mips)
 {
     return image_manager.create_texture_2d(tex, format_override);
 }

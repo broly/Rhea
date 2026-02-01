@@ -23,6 +23,9 @@ public:
     
     void draw_scene(RenderGraphContext& ctx);
     void draw_scene_shadow(RenderGraphContext& ctx);
+    void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
+    
+    CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false) const;
     
     RenderResource* camera_resource;
     RenderResource* light_resource;

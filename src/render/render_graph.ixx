@@ -75,6 +75,7 @@ public:
     
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
+    RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
 
     RGPassId add_pass(RenderGraphPass&& pass);
 

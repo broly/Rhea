@@ -46,7 +46,7 @@ public:
 
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
 
-    virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt) = 0;
+    virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt, bool generate_mips = true) = 0;
     virtual void update_viewport(const RBCommandList& cmd, RBSwapchainExtent extent) = 0;
 
     template<RenderBackendType T>

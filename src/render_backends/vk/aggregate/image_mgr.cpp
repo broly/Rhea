@@ -186,7 +186,7 @@ void vk::ImageManager::set_default_extent(uint32_t width, uint32_t height)
 }
 
 
-RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override)
+RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override, bool generate_mips)
 {
     const TextureFormat format =
         format_override.value_or(tex.format);
@@ -278,7 +278,9 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
         return image;
     }
     
-    uint32_t mip_levels = static_cast<uint32_t>(std::floor(std::log2(std::max(tex.width, tex.height))) ) + 1;
+    uint32_t mip_levels = generate_mips ? 
+        static_cast<uint32_t>(std::floor(std::log2(std::max(tex.width, tex.height))) ) + 1 :
+        1;
     
     RBImageDesc desc;
     desc.name = std::string("TEX_") + tex.name;
@@ -354,13 +356,16 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
         );
         
         
-        generate_mipmaps(
-            cmd,
-            image,
-            tex.width,
-            tex.height,
-            mip_levels
-        );
+        if (generate_mips)
+        {
+            generate_mipmaps(
+                cmd,
+                image,
+                tex.width,
+                tex.height,
+                mip_levels
+            );
+        }
     
         // transition_image(
         //     cmd,

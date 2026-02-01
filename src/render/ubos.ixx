@@ -6,9 +6,10 @@ import rhmath;
 
 export struct CameraUBO
 {
-    glm::mat4 view_proj;
+    glm::mat4 view;
+    glm::mat4 proj;
     glm::vec3 camera_pos;
-    float pad;
+    float _pad = 0.f;
 };
 REFLECT_STRUCT_RUNTIME_OPAQUE(CameraUBO);
 

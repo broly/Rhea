@@ -39,7 +39,7 @@ namespace vk
         
         void set_default_extent(uint32_t width, uint32_t height);
         
-        RBImageHandle create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override);
+        RBImageHandle create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override, bool generate_mips = true);
         
         void transition_image(
             RBCommandList cmd,

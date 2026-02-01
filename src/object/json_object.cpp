@@ -15,8 +15,8 @@ std::shared_ptr<RhObject> json_object::load_object_impl(std::filesystem::path pa
         
     std::ifstream file(path.string());
     if (!file.is_open()) {
-        std::cerr << "Failed to open bootstrap_level.json" << std::endl;
-        return nullptr;
+        std::cerr << "Failed to open json object" << std::endl;
+        throw std::runtime_error("Failed to open json object");
     }
     
     Json::Value root;

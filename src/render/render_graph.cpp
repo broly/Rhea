@@ -25,6 +25,34 @@ RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
     return handle;
 }
 
+RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle, bool generate_mips)
+{
+    RGTextureHandle handle;
+    
+    const Texture& data = tex_handle.get();
+    
+    
+    handle.id = uint32_t(textures.size());
+    handle.name = data.name;
+    
+    RGTextureDesc desc;
+    desc.external = true;
+    desc.format = data.format;
+    desc.width = data.width;
+    desc.height = data.height;
+    desc.name = data.name;
+    desc.usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst;
+    
+    RBImageHandle image = backend->create_texture_2d(
+        data,
+        TextureFormat::RGBA8,
+        generate_mips
+    );
+
+    textures.push_back({ desc, image });
+    return handle;
+}
+
 RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
 {
     assert(!graph_compiled);

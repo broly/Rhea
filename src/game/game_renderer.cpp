@@ -52,6 +52,10 @@ void GameRenderer::init(RBWindowHandle in_window)
     light_resource_shadow = find_resource("shadow_light");
     shadow_resource = find_resource("shadow");
     
+    auto& asset_manager = AssetManager::get();
+    auto texh = asset_manager.load_texture("textures/noise/noise_512.png");
+    auto noise_texture = render_graph->create_texture_from_asset(texh, false);
+    
     auto& tonemap_model = models.find("tonemap")->second;
     auto& shadow_debug_model = models.find("shadow_debug")->second;
     
@@ -91,7 +95,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     auto depth_texture = render_graph->create_texture({
         .name = "depth",
         .format = TextureFormat::Depth24Stencil8,
-        .usage  = RenderTextureUsage::DepthStencil
+        .usage  = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
     
     shadowmap_extent = {2048, 2048};
@@ -153,6 +157,8 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
+    
+    
     render_graph->add_pass({
         .name = Names::pass_geometry_base,
         .reads = {
@@ -170,6 +176,7 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
+    
     render_graph->add_pass({
         .name = Names::pass_geometry_translucent,
         .reads = {
@@ -185,6 +192,25 @@ void GameRenderer::init(RBWindowHandle in_window)
             draw_scene(ctx);
         }
     });
+    
+    
+    
+    render_graph->add_pass({
+        .name = "Clouds",
+        .reads = {
+            { depth_texture, RBImageUsage::SampledFragment },
+            { noise_texture, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [=](RenderGraphContext& ctx)
+        {
+            draw_clouds(ctx, depth_texture, noise_texture);
+        }
+    });
+    
+    
     
     auto tonemap_material = std::make_shared<Material>();
     tonemap_material->model = "Tonemap";
@@ -306,62 +332,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
 
         current_pipeline = pipeline;
 
-        vec3 camera_position;
-        CameraUBO camera_ubo;
-        if (ctx.params.mode == RenderGraphMode::Camera)
-        {
-            // ---------- Camera ----------
-            auto& camera_processor =
-                scene_view->get_processor<SceneViewProcessor_Camera>();
-
-            const RenderObject_Camera* cam_ro =
-                camera_processor.get_active_camera();
-
-            auto [width, height] = ctx.backend.get_viewport_extent();
-
-            camera_ubo.view_proj  = 
-                cam_ro->get_projection(float(width) / float(height)) *
-                cam_ro->view;
-            camera_ubo.camera_pos = cam_ro->position;
-            camera_position = cam_ro->position;
-        } else
-        {
-            static const glm::vec3 cube_dirs[6] = {
-                { 1,  0,  0}, {-1,  0,  0},
-                { 0,  1,  0}, { 0, -1,  0},
-                { 0,  0,  1}, { 0,  0, -1}
-            };
-
-            static const glm::vec3 cube_ups[6] = {
-                {0, -1,  0}, {0, -1,  0},
-                {0,  0,  1}, {0,  0, -1},
-                {0, -1,  0}, {0, -1,  0}
-            };
-            
-            checkf(ctx.params.cubemap.has_value(), "Cubemap not defined");
-            
-            const auto& cp = *ctx.params.cubemap;
-
-            glm::mat4 view = glm::lookAt(
-                cp.position,
-                cp.position + cube_dirs[cp.face_index],
-                cube_ups[cp.face_index]
-            );
-
-            glm::mat4 proj = glm::perspective(
-                glm::radians(90.f),
-                1.f,
-                0.1f,
-                1000.f
-            );
-
-            proj[1][1] *= -1; // vk ndc
-
-            camera_ubo.view_proj = proj * view;
-            camera_ubo.camera_pos = cp.position;
-            camera_position = cp.position;
-        }
-
+        CameraUBO camera_ubo = make_camera_ubo(ctx);
         auto cam = camera_resource->query_single(pipeline);
         cam->update_uniform_buffer(pipeline, "camera_ubo", camera_ubo, frame);
         cam->bind(pipeline, cmd, frame);
@@ -371,7 +342,7 @@ void GameRenderer::draw_scene(RenderGraphContext& ctx)
             scene_view->get_processor<SceneViewProcessor_Light>();
 
         const auto [lights, light_num] =
-            light_processor.query_nearest_lights_limited<8>(camera_position);
+            light_processor.query_nearest_lights_limited<8>(camera_ubo.camera_pos);
 
         LightUBO light_ubo{};
         light_ubo.light_count = light_num;
@@ -628,4 +599,169 @@ void GameRenderer::draw_scene_shadow(RenderGraphContext& ctx)
     }
 }
 
+void GameRenderer::draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture)
+{
+    PROFILE("Clouds");
+
+    auto cmd   = ctx.cmd;
+    auto frame = ctx.frame;
+
+    static std::shared_ptr<Material> cloud_material;
+    static PipelineObject* cloud_pipeline = nullptr;
+
+    if (!cloud_material)
+    {
+        cloud_material = std::make_shared<Material>();
+        cloud_material->model = "clouds";
+    }
+
+    auto& cloud_model = models.find("clouds")->second;
+
+    PipelineFamily cloud_pipeline_family(
+        "clouds",
+        cloud_model,
+        render_backend,
+        shared_from_this()
+    );
+
+    if (!cloud_pipeline)
+        cloud_pipeline = cloud_pipeline_family.request_pipeline({});
+    
+    ctx.backend.bind_pipeline(ctx.cmd, cloud_pipeline);
+    
+    
+    
+    CameraUBO camera_ubo = make_camera_ubo(ctx);
+    
+    CloudsUBO clouds_ubo;
+    
+    clouds_ubo.planet_center = { 0, 0, 0, 0 };        // flat world
+    clouds_ubo.cloud_base    = { 150.0f, 400.0f, 0.3f, 1.0f };
+
+    clouds_ubo.sun_direction = { -0.4f, 0.8f, -0.3f, 0.0f };
+    clouds_ubo.sun_color     = { 1.0f, 0.98f, 0.95f, 15.0f };
+
+    clouds_ubo.cloud_color   = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+    clouds_ubo.scattering = { 1.0f, 0.4f, 0.25f, 0.0f };
+
+    clouds_ubo.wind          = { 0.02f, 0.0f, 0.01f, 0.0 };
+    
+    clouds_ubo.sky_ambient = { 0.45f, 0.55f, 0.7f, 0.0f };
+    clouds_ubo.horizon_color = { 0.8f, 0.9f, 1.0f, 0.0f };
+    
+    auto cam = camera_resource->query_single(cloud_pipeline);
+    cam->update_uniform_buffer(cloud_pipeline, "camera_ubo", camera_ubo, frame);
+    cam->bind(cloud_pipeline, cmd, frame);
+    
+
+    // ---------- Resources ----------
+    auto material_instance =
+        query_material_instance(cloud_material, ctx.pass_name);
+
+    auto* instance =
+        material_instance->get_or_create_resource_instance(
+            cloud_pipeline,
+            frame
+        );
+
+    instance->update_image(
+        cloud_pipeline,
+        "u_depth",
+        render_graph->get_image(depth_texture),
+        frame
+    );
+    
+    
+    instance->update_image(
+        cloud_pipeline,
+        "u_noise",
+        render_graph->get_image(noise_texture),
+        frame
+    );
+    
+    instance->update_uniform_buffer(
+        cloud_pipeline,
+        "clouds_ubo",
+        clouds_ubo,
+        frame);
+
+    instance->bind(cloud_pipeline, cmd, frame);
+
+    ctx.backend.draw_fullscreen(cmd);
+}
+
+CameraUBO GameRenderer::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos) const
+{
+    auto& scene_view = engine->scene_view;
+    CameraUBO camera_ubo;
+    vec3 camera_position;
+    if (ctx.params.mode == RenderGraphMode::Camera)
+    {
+        // ---------- Camera ----------
+        auto& camera_processor =
+            scene_view->get_processor<SceneViewProcessor_Camera>();
+
+        const RenderObject_Camera* cam_ro =
+            camera_processor.get_active_camera();
+
+        auto [width, height] = ctx.backend.get_viewport_extent();
+        
+        auto aspect = float(width) / float(height);
+        auto proj = cam_ro->get_projection(aspect);
+        auto view = cam_ro->view;
+        auto fov = cam_ro->fov;
+        
+        if (zero_pos)
+        {
+            view[3][0] = 0.0f;
+            view[3][1] = 0.0f;
+            view[3][2] = 0.0f;
+        }
+
+        camera_ubo.proj = proj;
+        camera_ubo.view = view;
+        camera_ubo.camera_pos = cam_ro->position;
+        camera_position = cam_ro->position;
+    } else
+    {
+        static const glm::vec3 cube_dirs[6] = {
+            { 1,  0,  0}, {-1,  0,  0},
+            { 0,  1,  0}, { 0, -1,  0},
+            { 0,  0,  1}, { 0,  0, -1}
+        };
+
+        static const glm::vec3 cube_ups[6] = {
+            {0, -1,  0}, {0, -1,  0},
+            {0,  0,  1}, {0,  0, -1},
+            {0, -1,  0}, {0, -1,  0}
+        };
+            
+        checkf(ctx.params.cubemap.has_value(), "Cubemap not defined");
+            
+        const auto& cp = *ctx.params.cubemap;
+
+        glm::mat4 view = glm::lookAt(
+            cp.position,
+            cp.position + cube_dirs[cp.face_index],
+            cube_ups[cp.face_index]
+        );
+
+        glm::mat4 proj = glm::perspective(
+            glm::radians(90.f),
+            1.f,
+            0.1f,
+            1000.f
+        );
+
+        proj[1][1] *= -1; // vk ndc
+
+        camera_ubo.proj = proj;
+        camera_ubo.view = view;
+        camera_ubo.camera_pos = cp.position;
+        camera_position = cp.position;
+    }
+    
+    return camera_ubo;
+}
 

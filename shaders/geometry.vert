@@ -18,7 +18,8 @@ layout(location = 4) out vec3 v_world_bitangent;
 // ---------- Camera ----------
 layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
 {
-    mat4 view_proj;
+    mat4 view;
+    mat4 proj;
     vec4 camera_pos;
 } camera;
 
@@ -50,6 +51,6 @@ void main()
     v_world_tangent  = T;
     v_world_bitangent = B;
 
-    gl_Position = camera.view_proj * world_pos;
+    gl_Position = camera.proj * camera.view * world_pos;
     // gl_Position.y = -gl_Position.y;
 }
