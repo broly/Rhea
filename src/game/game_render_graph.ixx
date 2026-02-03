@@ -6,6 +6,7 @@ import name;
 import <map>;
 import <memory>;
 import engine;
+import assets;
 
 class GameRenderGraph : public RenderGraph
 {
@@ -25,6 +26,13 @@ public:
     
     CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false) const;
     
+    void pass_shadow_map(RenderGraphContext& ctx);
+    void pass_shadow_debug(RenderGraphContext& ctx);
+    void pass_geometry_base(RenderGraphContext& ctx);
+    void pass_translucent(RenderGraphContext& ctx);
+    void pass_clouds(RenderGraphContext& ctx);
+    void pass_tonemapping(RenderGraphContext& ctx);
+    
     RGTextureHandle shadow_map;
     RBSwapchainExtent shadowmap_extent;
     
@@ -33,6 +41,16 @@ public:
     RenderResource* light_resource_shadow;
     RenderResource* shadow_resource;
     
+    RGTextureHandle swapchain_color;
+    RGTextureHandle depth_texture;
+    RGTextureHandle noise_texture;
+    RGTextureHandle hdr_color;
+    
+    std::shared_ptr<Material> tonemap_material;
+    std::shared_ptr<Material> shadow_debug_material;
+    
+    PipelineObject* shadow_debug_pipeline;
+    PipelineObject* tonemap_pipeline;
     Engine* engine;
     
 };

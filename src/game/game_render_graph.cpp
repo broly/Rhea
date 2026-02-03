@@ -11,6 +11,7 @@ import <unordered_map>;
 import rhcomponents;
 import globals;
 import assets;
+import <functional>;
 
 #include "render_layout.h"
 #include "common/assertion_macros.h"
@@ -46,7 +47,7 @@ GameRenderGraph::GameRenderGraph(
     
     auto& asset_manager = AssetManager::get();
     auto texh = asset_manager.load_texture("textures/noise/noise_512.png");
-    auto noise_texture = create_texture_from_asset(texh, false);
+    noise_texture = create_texture_from_asset(texh, false);
     
     auto tonemap_model = renderer->find_model("tonemap");
     auto shadow_debug_model = renderer->find_model("shadow_debug");
@@ -60,35 +61,35 @@ GameRenderGraph::GameRenderGraph(
         .external = false
     };
 
-    auto hdr_color = create_texture(hdr_color_desc);
+    hdr_color = create_texture(hdr_color_desc);
     
     PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, backend, renderer);
     
-    PipelineObject* tonemap_pipeline = request_pipeline(
+    tonemap_pipeline = request_pipeline(
         tonemap_pipeline_family, {});
     
     PipelineFamily shadow_debug_pipeline_family("ShadowDebug", shadow_debug_model, backend, renderer);
-    PipelineObject* shadow_debug_pipeline =
+    shadow_debug_pipeline =
         shadow_debug_pipeline_family.request_pipeline({});
-    auto shadow_debug_material = std::make_shared<Material>();
+    shadow_debug_material = std::make_shared<Material>();
     shadow_debug_material->model = "shadow_debug";
     
     auto swapchain_extent = backend->get_swapchain_extent();
 
-    auto swapchain_color = create_texture({
+    swapchain_color = create_texture({
         .name = "swapchain",
         .width = swapchain_extent.width,
         .height = swapchain_extent.height,
-        .format   = backend->get_swapchain_format(),
-        .usage    = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
+        .format = backend->get_swapchain_format(),
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
         .external = true,
         .swapchain_image = true,
     });
-    
-    auto depth_texture = create_texture({
+
+    depth_texture = create_texture({
         .name = "depth",
         .format = TextureFormat::Depth24Stencil8,
-        .usage  = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
+        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
     
     shadowmap_extent = {2048, 2048};
@@ -106,10 +107,7 @@ GameRenderGraph::GameRenderGraph(
         .writes = {
             { shadow_map, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear }
         },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            draw_scene_shadow(ctx);
-        }
+        .execute = std::bind(&GameRenderGraph::pass_shadow_map, this, std::placeholders::_1),
     });
     
     add_pass({
@@ -121,33 +119,7 @@ GameRenderGraph::GameRenderGraph(
         .writes = {
             { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
-            
-            auto shadow_debug_material_instance = renderer->query_material_instance(shadow_debug_material, ctx.pass_name);
-    
-            RenderResourceInstance* shadow_debug_instance =
-                shadow_debug_material_instance->get_or_create_resource_instance(
-                    shadow_debug_pipeline,
-                    ctx.frame
-                );
-    
-            shadow_debug_instance->update_image(
-                shadow_debug_pipeline,
-                "u_shadow_depth",
-                get_image(shadow_map),
-                ctx.frame
-            );
-    
-            shadow_debug_instance->bind(
-                shadow_debug_pipeline,
-                ctx.cmd,
-                ctx.frame
-            );
-    
-            ctx.backend.draw_fullscreen(ctx.cmd);
-        }
+        .execute = std::bind(&GameRenderGraph::pass_shadow_debug, this, std::placeholders::_1),
     });
     
     
@@ -161,12 +133,8 @@ GameRenderGraph::GameRenderGraph(
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            PROFILE("GeometryBase");
-            
-            draw_scene(ctx);
-        }
+        .execute = std::bind(&GameRenderGraph::pass_geometry_base, this, std::placeholders::_1),
+
     });
     
     
@@ -178,12 +146,7 @@ GameRenderGraph::GameRenderGraph(
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },   
         },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            PROFILE("Translucent");
-            
-            draw_scene(ctx);
-        }
+        .execute = std::bind(&GameRenderGraph::pass_translucent, this, std::placeholders::_1),
     });
     
     
@@ -197,15 +160,12 @@ GameRenderGraph::GameRenderGraph(
         .writes = {
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
         },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            draw_clouds(ctx, depth_texture, noise_texture);
-        }
+        .execute = std::bind(&GameRenderGraph::pass_clouds, this, std::placeholders::_1),
+        
     });
-    
-    
-    
-    auto tonemap_material = std::make_shared<Material>();
+
+
+    tonemap_material = std::make_shared<Material>();
     tonemap_material->model = "Tonemap";
     
     add_pass({
@@ -217,35 +177,7 @@ GameRenderGraph::GameRenderGraph(
         .writes = {
             { swapchain_color, RBImageUsage::ColorAttachment }
         },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            
-            ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
-            
-            std::shared_ptr<MaterialInstance> material_instance =
-                renderer->query_material_instance(tonemap_material, ctx.pass_name);
-    
-            auto* tonemap_instance =
-                material_instance->get_or_create_resource_instance(
-                    tonemap_pipeline,
-                    ctx.frame
-                );
-            
-            tonemap_instance->update_image(
-                tonemap_pipeline,
-                "u_hdr_color",
-                get_image(hdr_color),
-                ctx.frame
-            );
-            
-            tonemap_instance->bind(
-                tonemap_pipeline,
-                ctx.cmd,
-                ctx.frame
-            );
-            
-            ctx.backend.draw_fullscreen(ctx.cmd);
-        }
+        .execute = std::bind(&GameRenderGraph::pass_tonemapping, this, std::placeholders::_1),
     });
 
     
@@ -757,5 +689,88 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
     }
     
     return camera_ubo;
+}
+
+void GameRenderGraph::pass_shadow_map(RenderGraphContext& ctx)
+{
+    draw_scene_shadow(ctx);
+}
+
+void GameRenderGraph::pass_shadow_debug(RenderGraphContext& ctx)
+{
+    
+    ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
+            
+    auto shadow_debug_material_instance = renderer->query_material_instance(shadow_debug_material, ctx.pass_name);
+    
+    RenderResourceInstance* shadow_debug_instance =
+        shadow_debug_material_instance->get_or_create_resource_instance(
+            shadow_debug_pipeline,
+            ctx.frame
+        );
+    
+    shadow_debug_instance->update_image(
+        shadow_debug_pipeline,
+        "u_shadow_depth",
+        get_image(shadow_map),
+        ctx.frame
+    );
+    
+    shadow_debug_instance->bind(
+        shadow_debug_pipeline,
+        ctx.cmd,
+        ctx.frame
+    );
+    
+    ctx.backend.draw_fullscreen(ctx.cmd);
+}
+
+void GameRenderGraph::pass_geometry_base(RenderGraphContext& ctx)
+{
+    PROFILE("GeometryBase");
+            
+    draw_scene(ctx);
+}
+
+void GameRenderGraph::pass_translucent(RenderGraphContext& ctx)
+{
+    PROFILE("Translucent");
+            
+    draw_scene(ctx);
+}
+
+void GameRenderGraph::pass_clouds(RenderGraphContext& ctx)
+{
+    draw_clouds(ctx, depth_texture, noise_texture);
+}
+
+void GameRenderGraph::pass_tonemapping(RenderGraphContext& ctx)
+{
+            
+    ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
+            
+    std::shared_ptr<MaterialInstance> material_instance =
+        renderer->query_material_instance(tonemap_material, ctx.pass_name);
+    
+    auto* tonemap_instance =
+        material_instance->get_or_create_resource_instance(
+            tonemap_pipeline,
+            ctx.frame
+        );
+            
+    tonemap_instance->update_image(
+        tonemap_pipeline,
+        "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame
+    );
+            
+    tonemap_instance->bind(
+        tonemap_pipeline,
+        ctx.cmd,
+        ctx.frame
+    );
+            
+    ctx.backend.draw_fullscreen(ctx.cmd);
 }
 
