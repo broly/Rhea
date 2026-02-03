@@ -30,8 +30,11 @@ void RGTexture::reset_layout()
     current_layout = RBImageLayout::undefined;
 }
 
-RenderGraph::RenderGraph(const std::shared_ptr<RenderBackend>& in_backend)
+RenderGraph::RenderGraph(
+        const std::shared_ptr<RenderBackend>& in_backend,
+        const std::shared_ptr<Renderer>& in_renderer)
     : backend(in_backend)
+    , renderer(in_renderer)
 {
 }
 
@@ -407,4 +410,22 @@ RGTexture& RenderGraph::get_swapchain_texture()
         if (tex.is_swapchain())
             return tex;
     unreachable("Could not find swapchain texture!");
+}
+
+void RenderGraph::set_flag(Name name, bool value, bool needs_rebuild)
+{
+    render_flags[name] = value;
+}
+
+void RenderGraph::toggle_flag(Name name, bool needs_rebuild)
+{
+    render_flags[name] = !render_flags[name];
+}
+
+bool RenderGraph::get_render_flag(Name name) const
+{
+    auto render_flag_it = render_flags.find(name);
+    if (render_flag_it != render_flags.end())
+        return render_flag_it->second;
+    return false;
 }

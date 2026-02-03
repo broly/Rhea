@@ -110,7 +110,9 @@ public:
 export class RenderGraph
 {
 public:
-    RenderGraph(const std::shared_ptr<RenderBackend>& in_backend);
+    RenderGraph(
+        const std::shared_ptr<RenderBackend>& in_backend,
+        const std::shared_ptr<Renderer>& in_renderer);
     
     
     
@@ -159,17 +161,24 @@ public:
     PipelineObject* request_pipeline(
         PipelineFamily& pipeline_family, ShaderKey shader_key);
 
-private:
     std::vector<RenderGraphPass> passes;
 
     std::vector<uint32_t> execution_order;
     
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
+    std::shared_ptr<Renderer> renderer;
     
     RGTexture& get_swapchain_texture();
     
 
+    void set_flag(Name name, bool value, bool needs_rebuild = false);
+    void toggle_flag(Name name, bool needs_rebuild = false);
+    bool get_render_flag(Name name) const;
+    
 
     bool graph_compiled = false;
+    
+protected: // dynamic info
+    std::map<Name, bool> render_flags;
 };

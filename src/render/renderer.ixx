@@ -34,6 +34,8 @@ public:  // public API
     std::shared_ptr<MaterialInstance> query_material_instance(std::shared_ptr<Material> material, Name pass_name);
     std::shared_ptr<MaterialModel> find_model(Name model_name) const;
     
+    bool get_render_flag(Name flag) const;
+
 protected:  // internal functions
     
     void load_schemas();
@@ -42,7 +44,7 @@ protected:  // internal functions
     
 protected:  // internal system accessors
     std::shared_ptr<RenderBackend> render_backend;
-    std::shared_ptr<RenderGraph> render_graph;
+    std::shared_ptr<RenderGraph> main_render_graph;
     
 protected: // (semi-)immutable info
     std::map<Name, std::shared_ptr<MaterialModel>> models;
@@ -50,6 +52,7 @@ protected: // (semi-)immutable info
     std::map<Name, RBSampler> samplers;
     std::map<Name, RenderResource*> resources;
     std::map<std::pair<Name, std::shared_ptr<MaterialModel>>, RenderResource*> material_resources;
+    
     
 protected: // materials and resources
     std::map<std::pair<std::shared_ptr<Material>, Name>, std::shared_ptr<MaterialInstance>> material_instances;
@@ -60,8 +63,6 @@ protected: // materials and resources
 protected:  // textures
     std::map<TextureHandle, RBImageHandle> texture_cache;
     
-protected: // dynamic info
-    std::map<Name, bool> render_flags;
     
     bool main_render_graph_needs_rebuild = false;
     

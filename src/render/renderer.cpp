@@ -18,12 +18,12 @@ void Renderer::init(RBWindowHandle in_window)
 
 void Renderer::execute()
 {
-    checkf(render_graph != nullptr, "RenderGraph not initialized. Please create and initialize RenderGraph in your GameRenderer::init");
+    checkf(main_render_graph != nullptr, "RenderGraph not initialized. Please create and initialize RenderGraph in your GameRenderer::init");
     auto& backend = *render_backend;
     
     if (main_render_graph_needs_rebuild)
     {
-        render_graph->recompile();
+        main_render_graph->recompile();
         main_render_graph_needs_rebuild = false;
     }
     
@@ -35,14 +35,14 @@ void Renderer::execute()
 
     if (!backend.acquire_next_image(frame))
     {
-        render_graph->rebuild_resources();
+        main_render_graph->rebuild_resources();
         return;
     }
 
     RBCommandList cmd = backend.begin_commands(frame);
     RenderGraphParameters params;
     params.mode = RenderGraphMode::Camera;
-    render_graph->execute(cmd, frame, params);
+    main_render_graph->execute(cmd, frame, params);
     backend.end_commands(cmd);
 
     backend.submit_frame(frame, cmd);
@@ -137,12 +137,12 @@ void Renderer::load_resources()
 
 void Renderer::set_flag(Name name, bool value, bool needs_rebuild)
 {
-    render_flags[name] = value;
+    main_render_graph->set_flag(name, value);
 }
 
 void Renderer::toggle_flag(Name name, bool needs_rebuild)
 {
-    render_flags[name] = !render_flags[name];
+    main_render_graph->toggle_flag(name, needs_rebuild);
     main_render_graph_needs_rebuild = true;
 }
 
@@ -255,4 +255,11 @@ std::shared_ptr<MaterialModel> Renderer::find_model(Name model_name) const
     if (model_it == models.end())
         return nullptr;
     return model_it->second;
+}
+
+bool Renderer::get_render_flag(Name flag) const
+{
+    checkf(main_render_graph != nullptr, "Graph is null");
+    
+    return main_render_graph->get_render_flag(flag);
 }
