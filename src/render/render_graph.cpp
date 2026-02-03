@@ -27,10 +27,7 @@ void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImag
 
 void RGTexture::reset_layout()
 {
-    if (is_swapchain())
-        current_layout = RBImageLayout::transfer_present;
-    else 
-        current_layout = RBImageLayout::undefined;
+    current_layout = RBImageLayout::undefined;
 }
 
 RenderGraph::RenderGraph(const std::shared_ptr<RenderBackend>& in_backend)
@@ -279,7 +276,6 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         if (pass.condition && !pass.condition())
             continue;
 
-
         // Build framebuffer
         FramebufferDesc fb_desc{};
         fb_desc.pass = pass.name;
@@ -313,27 +309,17 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
             if (tex.desc.usage & RenderTextureUsage::DepthStencil)
             {
-                fb_desc.depth_attachment = {
-                    image,
-                    write.load_op,
-                    write.store_op,
-                    write.usage
-                };
+                fb_desc.depth_attachment = { image, write.load_op, write.store_op, write.usage };
             }
             else
             {
-                fb_desc.color_attachments.push_back({
-                    image,
-                    write.load_op,
-                    RBStoreOp::Store,
-                    write.usage
-                });
+                fb_desc.color_attachments.push_back({ image, write.load_op, RBStoreOp::Store, write.usage });
             }
         }
 
         ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
         
-        for (auto& [tex, barrier] : pass.pass_barriers)
+        for (const auto& [tex, barrier] : pass.pass_barriers)
         {
             auto& texture = textures[tex.id];
             if (barrier.before_pass && texture.allows_barrier())
@@ -357,13 +343,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         }
     }
 
-    for (auto& tex : textures)
-    {
-        if (tex.is_swapchain())
-        {
-            tex.memory_barrier(cmd, *backend, RBImageLayout::transfer_present, frame);
-        }
-    }
+    auto& tex = get_swapchain_texture();
+    tex.memory_barrier(cmd, *backend, RBImageLayout::transfer_present, frame);
 }
 
 
@@ -391,11 +372,18 @@ void RenderGraph::rebuild_resources()
     }
 }
 
+
+
 void RenderGraph::recompile()
 {
     assert(graph_compiled);
     
     graph_compiled = false;
+    
+    for (auto& pass : passes)
+    {
+        pass.pass_barriers.clear();
+    }
     
     for (auto& tex : textures)
     {
@@ -411,4 +399,12 @@ PipelineObject* RenderGraph::request_pipeline(
     assert(!graph_compiled);
     PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key);
     return pipeline;
+}
+
+RGTexture& RenderGraph::get_swapchain_texture()
+{
+    for (RGTexture& tex : textures)
+        if (tex.is_swapchain())
+            return tex;
+    unreachable("Could not find swapchain texture!");
 }

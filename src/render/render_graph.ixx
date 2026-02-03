@@ -62,8 +62,8 @@ struct RGTexture
     
     bool allows_barrier() const
     {
-        if (is_imported() || is_swapchain())
-            return !current_layout.has_value();
+        if (is_imported())
+            return current_layout.has_value();
         return true;
     }
     
@@ -166,6 +166,8 @@ private:
     
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
+    
+    RGTexture& get_swapchain_texture();
     
 
 
