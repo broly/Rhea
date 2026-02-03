@@ -7,13 +7,13 @@ import <map>;
 import <memory>;
 import engine;
 import assets;
+#include "object/object_reflection_macro.h"
+
 
 class GameRenderGraph : public RenderGraph
 {
 public:
-    GameRenderGraph(
-        const std::shared_ptr<RenderBackend>& in_backend,
-        const std::shared_ptr<Renderer>& in_renderer);
+    void init_render_graph(const std::map<Name, bool>& parameters) override;
     
     
     bool is_debugging() const;
@@ -54,3 +54,4 @@ public:
     Engine* engine;
     
 };
+REFLECT_OBJECT(GameRenderGraph, RenderGraph);

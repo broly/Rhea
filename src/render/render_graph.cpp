@@ -30,12 +30,11 @@ void RGTexture::reset_layout()
     current_layout = RBImageLayout::undefined;
 }
 
-RenderGraph::RenderGraph(
-        const std::shared_ptr<RenderBackend>& in_backend,
-        const std::shared_ptr<Renderer>& in_renderer)
-    : backend(in_backend)
-    , renderer(in_renderer)
+
+void RenderGraph::setup(const std::shared_ptr<RenderBackend>& in_backend, const std::shared_ptr<Renderer>& in_renderer)
 {
+    backend = in_backend;
+    renderer = in_renderer;
 }
 
 RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)

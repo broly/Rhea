@@ -107,6 +107,7 @@ export namespace reflect
         ObjectFactoryType factory;
         UniqueObjectFactoryType unique_factory;
         std::optional<JsonSerializer> serializer;
+        bool is_abstract;
         
         template<typename T>
         std::shared_ptr<T> instantiate() const;
@@ -352,25 +353,40 @@ export namespace reflect
         ObjectFactoryType&& factory, 
         UniqueObjectFactoryType&& unique_factory, 
         std::set<std::string_view>&& bases,
-        std::optional<JsonSerializer> serializer);
+        std::optional<JsonSerializer> serializer,
+        bool is_abstract);
         
     template <typename T>
     inline bool register_object_class(std::string_view name, std::optional<JsonSerializer>&& Serializer)
     {
-        ObjectFactoryType factory = [name](const ObjectInitData& init_data)
+        ObjectFactoryType factory = [name](const ObjectInitData& init_data) -> std::shared_ptr<T>
         {
-            auto object = std::make_shared<T>();
-            object->init(name, init_data);
-            return object;
+            if constexpr (!std::is_abstract_v<T>)
+            {
+                auto object = std::make_shared<T>();
+                object->init(name, init_data);
+                return object;
+            }
+            unreachable("Could not create object from abstract class");
         };
-        UniqueObjectFactoryType unique_factory = [name](const ObjectInitData& init_data)
+        UniqueObjectFactoryType unique_factory = [name](const ObjectInitData& init_data) -> std::unique_ptr<T>
         {
-            auto object = std::make_unique<T>();
-            object->init(name, init_data);
-            return object;
+            if constexpr (!std::is_abstract_v<T>)
+            {
+                auto object = std::make_unique<T>();
+                object->init(name, init_data);
+                return object;
+            }
+            unreachable("Could not create object from abstract class");
         };
         std::set<std::string_view> class_bases = reflect_inner::RhObjectTraits<T>::get_bases();
-        register_object_class_impl(name, std::move(factory), std::move(unique_factory), std::move(class_bases), std::move(Serializer));
+        register_object_class_impl(
+            name, 
+            std::move(factory), 
+            std::move(unique_factory), 
+            std::move(class_bases), 
+            std::move(Serializer), 
+            std::is_abstract_v<T>);
         return true;
     }
     

@@ -6,6 +6,7 @@ import :material_instance;
 import <filesystem>;
 import reflect;
 import :render_graph;
+import json_utils;
 #include "common/assertion_macros.h"
 
 
@@ -14,6 +15,24 @@ void Renderer::init(RBWindowHandle in_window)
     load_schemas();
     
     load_resources();
+    
+    
+    const char* engine_config_path = "render/renderer.json";
+    
+    auto value = json_utils::load_json_asset(engine_config_path);
+    checkf(value.has_value(), "could not load render/renderer.json");
+    
+    Json::Value const* render_graph_class_value = value->find("graph_class");
+    checkf(render_graph_class_value != nullptr, "graph_class section is empty");
+    
+    main_render_graph_name = render_graph_class_value->asString();
+    
+    auto reflection_info = reflect::find_object_reflection_info(main_render_graph_name);
+    checkf(reflection_info != nullptr, "Could not find render graph class");
+    
+    main_render_graph = reflection_info->instantiate<RenderGraph>();
+    main_render_graph->setup(render_backend, shared_from_this());
+    main_render_graph->init_render_graph({});
 }
 
 void Renderer::execute()

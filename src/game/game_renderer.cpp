@@ -28,13 +28,11 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     render_backend = RenderBackend::create<VkRenderBackend>(in_window);
     
-    Renderer::init(in_window);
     
     samplers["default"] = render_backend->create_sampler(samplers::default_surface());
     samplers["surface"] = render_backend->create_sampler(samplers::default_surface());
     samplers["shadow"] = render_backend->create_sampler(samplers::default_shadow());
     
-    main_render_graph = std::make_shared<GameRenderGraph>(render_backend, shared_from_this());
     
-    
+    Renderer::init(in_window);
 }

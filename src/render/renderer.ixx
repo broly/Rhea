@@ -45,6 +45,7 @@ protected:  // internal functions
 protected:  // internal system accessors
     std::shared_ptr<RenderBackend> render_backend;
     std::shared_ptr<RenderGraph> main_render_graph;
+    Name main_render_graph_name;
     
 protected: // (semi-)immutable info
     std::map<Name, std::shared_ptr<MaterialModel>> models;

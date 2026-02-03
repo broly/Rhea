@@ -1,0 +1,49 @@
+{
+    "model_name": "clouds",
+
+    "usage_type": "frame",
+
+    "sampler": "default",
+
+    "ubo_access": "none",
+
+    "parameters": {
+		"clouds": {
+		    "type": "sampler",
+		    "variable": "u_noise",
+		    "binding": "BINDING_SAMPLER_NOISE"
+		},
+		"depth": {
+		    "type": "sampler",
+		    "variable": "u_depth",
+		    "binding": "BINDING_SAMPLER_DEPTH"
+		},
+		"material": {
+		    "type": "uniform",
+		    "ubo": "CloudsUBO",
+		    "binding": "BINDING_UBO_CLOUDS",
+		    "variable": "clouds_ubo"
+		}
+    },
+
+    "set": "SET_CLOUDS",
+
+    "passes": [
+        {
+            "name": "Clouds",
+            "shaders": {
+                "vertex": "fullscreen.vert",
+                "fragment": "clouds.frag"
+            },
+			"resources": ["camera"],
+
+            "depth_test": true,
+            "depth_write": false,
+            "translucent": true,
+            "cull_mode": "none",
+            "front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": []
+        }
+    ]
+}

@@ -13,7 +13,8 @@ void reflect::register_object_class_impl(
     ObjectFactoryType&& factory, 
     UniqueObjectFactoryType&& unique_factory, 
     std::set<std::string_view>&& bases,
-    std::optional<JsonSerializer> serializer)
+    std::optional<JsonSerializer> serializer,
+    bool is_abstract)
 {
     auto data = 
         ObjectReflectionInfo{
@@ -21,7 +22,8 @@ void reflect::register_object_class_impl(
             std::move(bases),
             std::move(factory),
             std::move(unique_factory),
-            std::move(serializer)
+            std::move(serializer),
+            is_abstract
         };
     
     Name in_name = name;
@@ -48,7 +50,8 @@ std::vector<const reflect::ObjectReflectionInfo*> reflect::get_subtypes(std::str
 void reflect::create_defaults()
 {
     for (auto& [name, info] : get_registry())
-        info.instantiate_default();
+        if (!info.is_abstract)
+            info.instantiate_default();
 }
 
 void reflect::ObjectReflectionInfo::instantiate_default()

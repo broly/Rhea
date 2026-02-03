@@ -30,10 +30,8 @@ namespace Names
     static Name debug_shadow = "debug_shadow";
 }
 
-GameRenderGraph::GameRenderGraph(
-    const std::shared_ptr<RenderBackend>& in_backend,
-    const std::shared_ptr<Renderer>& in_renderer)
-    : RenderGraph(in_backend, in_renderer)
+
+void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
 {
     engine = RhGlobals::engine;
 
@@ -101,6 +99,17 @@ GameRenderGraph::GameRenderGraph(
         .format = TextureFormat::Depth32F,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
+    
+    // auto offscreen_color = create_texture({
+    //     .name   = "offscreen_color",
+    //     .width  = swapchain_extent.width,
+    //     .height = swapchain_extent.height,
+    //     .format = TextureFormat::RGBA8,
+    //     .usage  = RenderTextureUsage::ColorAttachment |
+    //               RenderTextureUsage::Sampled |
+    //               RenderTextureUsage::TransferSrc,
+    //     .external = false
+    // });
     
     add_pass({
         .name = "ShadowMap",
@@ -183,8 +192,6 @@ GameRenderGraph::GameRenderGraph(
     
     compile();
 }
-
-
 
 bool GameRenderGraph::is_debugging() const
 {

@@ -7,7 +7,7 @@ import <functional>;
 import <map>;
 import name;
 import :pipeline_family;
-
+#include "object/object_reflection_macro.h"
 
 
 export struct RenderGraphPass
@@ -107,14 +107,14 @@ public:
     RenderGraphParameters params;
 };
 
-export class RenderGraph
+export class RenderGraph : public RhObject
 {
 public:
-    RenderGraph(
+    void setup(
         const std::shared_ptr<RenderBackend>& in_backend,
         const std::shared_ptr<Renderer>& in_renderer);
     
-    
+    virtual void init_render_graph(const std::map<Name, bool>& parameters) = 0;
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
@@ -182,3 +182,4 @@ public:
 protected: // dynamic info
     std::map<Name, bool> render_flags;
 };
+REFLECT_OBJECT(RenderGraph, RhObject);
