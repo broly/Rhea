@@ -15,6 +15,7 @@ import :helpers;
 import :log;
 import :pipeline;
 import profile;
+import reflect;
 
 
 
@@ -361,6 +362,31 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     auto it = render_pass_cache.find(desc);
     if (it != render_pass_cache.end())
         return it->second;
+    
+    
+    LogRBRenderPass.Log("get_or_create_render_pass (CREATE)");
+    for (auto attachment : fb.color_attachments)
+    {
+        auto vk_img = image_manager.get_image_resource(attachment.image).image;
+        LogRBRenderPass.Log(" * color_attachment (image: %s [%p]). Usage: %s (initial & final layouts), load_op: %s, store_op: %s",
+            debug.get_vk_image_name(vk_img).to_string().c_str(),
+            vk_img,
+            reflect::enum_name(attachment.usage).to_string().c_str(),
+            reflect::enum_name(attachment.load).to_string().c_str(),
+            reflect::enum_name(attachment.store).to_string().c_str());
+    }
+    if (fb.depth_attachment)
+    {
+        auto& attachment = *fb.depth_attachment;
+        auto vk_img = image_manager.get_image_resource(attachment.image).image;
+        
+        LogRBRenderPass.Log(" * depth_attachment (image: %s [%p}). Usage: %s (initial & final layouts), load_op: %s, store_op: %s",
+            debug.get_vk_image_name(vk_img).to_string().c_str(),
+            vk_img,
+            reflect::enum_name(attachment.usage).to_string().c_str(),
+            reflect::enum_name(attachment.load).to_string().c_str(),
+            reflect::enum_name(attachment.store).to_string().c_str());
+    }
 
     std::vector<VkAttachmentDescription> attachments;
     std::vector<VkAttachmentReference> color_refs;
@@ -441,9 +467,9 @@ VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
 }
 
 
-RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override, bool generate_mips)
+RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info)
 {
-    return image_manager.create_texture_2d(tex, format_override);
+    return image_manager.create_texture_2d(tex, texture_creation_info);
 }
 
 std::pair<uint32_t, uint32_t> VkRenderBackend::get_viewport_extent() const

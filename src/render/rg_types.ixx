@@ -41,8 +41,15 @@ export
 
         TextureFormat format = TextureFormat::Undefined;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
+        
+        
 
         bool external  = false;  // swapchain / imported resource
+        bool imported  = false;
+        
+        bool imported_texture_layout_initialized = false;
+        
+        bool swapchain_image = false;
     };
 
 
@@ -70,25 +77,36 @@ export
         uint32_t id;
     };
 
-    struct RGTexture
-    {
-        RGTextureDesc desc;
-        std::optional<RBImageHandle> image;      // backend image
-        
-        RBImageLayout current_layout = RBImageLayout::undefined;
-    };
 
     struct RGTextureHandle
     {
         uint32_t id;
         Name name;
+        
+        auto operator<=>(const RGTextureHandle& rhs) const
+        {
+            return id <=> rhs.id;
+        };
+    };
+    
+    template<>
+    struct std::hash<RGTextureHandle>
+    {
+        size_t operator()(const RGTextureHandle& h) const noexcept
+        {
+            return h.id;
+        }
+    };
+    
+    struct BarrierInfo
+    {
+        RBImageLayout layout;
     };
 
-    struct RGImageBarrier
+    struct RGImageBarriers
     {
-        RGTextureHandle texture;
-        RBImageLayout before;
-        RBImageLayout after;
+        std::optional<BarrierInfo> before_pass;  // not needed for ColorAttachment / DepthAttachment
+        std::optional<BarrierInfo> after_pass;  // will be read as: attachment -> (Sampled, Present, Storage)
     };
 
     struct RGImageUse

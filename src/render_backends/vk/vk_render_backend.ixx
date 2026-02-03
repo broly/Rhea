@@ -19,6 +19,7 @@ import render;
 import :immediate_commands;
 import :framebuffer_mgr;
 import :render_resource;
+import :debug;
 
 
 struct RenderPassAttachmentInfo
@@ -129,7 +130,7 @@ public:   /// API Section
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
-    virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt, bool generate_mips = true) override;
+    virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) override;
     std::pair<uint32_t, uint32_t> get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     
@@ -155,10 +156,11 @@ private: // internal section
 
 public:   /// Aggregate section. These objects have same lifetime with render backend. use refs
     vk::Instance instance {};
+    vk::Debug debug {};
     vk::ImmediateCommandPool immediate_command_pool{instance};
-    vk::ImageManager image_manager {instance, immediate_command_pool}; // holds refs
+    vk::ImageManager image_manager {instance, immediate_command_pool, debug}; // holds refs
     vk::SamplerManager sampler_manager {instance};
-    vk::SwapchainControl swapchain {instance, image_manager, sampler_manager};  // holds refs
+    vk::SwapchainControl swapchain {instance, image_manager, sampler_manager, debug};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
     vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
     vk::MeshManager mesh_manager{instance};

@@ -152,7 +152,10 @@ RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
     
     RBImageHandle image = render_backend->create_texture_2d(
         data,
-        TextureFormat::RGBA8
+        TextureCreationInfo{
+            TextureFormat::RGBA8,
+            true,
+        }
     );
     
     texture_cache.emplace(handle, image);

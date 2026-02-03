@@ -77,8 +77,13 @@ void vk::SwapchainControl::init()
         &sc_image_count, swapchain_images.data());
     
     LogVkSwapchain.Log("Swapchain images: ");
+    int image_index = 0;
     for (auto img : swapchain_images)
+    {
         LogVkSwapchain.Log(" * image %p", img);
+        debug.register_vk_image_name(img, std::string("swapchain_image_") + std::to_string(image_index));
+        image_index++;
+    }
     
     swapchain_image_handles.clear();
     swapchain_image_handles.resize(sc_image_count);

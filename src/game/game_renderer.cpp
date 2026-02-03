@@ -89,7 +89,8 @@ void GameRenderer::init(RBWindowHandle in_window)
         .height = swapchain_extent.height,
         .format   = render_backend->get_swapchain_format(),
         .usage    = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
-        .external = true
+        .external = true,
+        .swapchain_image = true,
     });
     
     auto depth_texture = render_graph->create_texture({
@@ -119,43 +120,43 @@ void GameRenderer::init(RBWindowHandle in_window)
         }
     });
     
-    render_graph->add_pass({
-        .name = "ShadowDebug",
-        .condition = [this] () { return render_flags[Names::debug_shadow]; },
-        .reads = {
-            { shadow_map, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [=](RenderGraphContext& ctx)
-        {
-            ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
-            
-            auto shadow_debug_material_instance = query_material_instance(shadow_debug_material, ctx.pass_name);
-    
-            RenderResourceInstance* shadow_debug_instance =
-                shadow_debug_material_instance->get_or_create_resource_instance(
-                    shadow_debug_pipeline,
-                    ctx.frame
-                );
-    
-            shadow_debug_instance->update_image(
-                shadow_debug_pipeline,
-                "u_shadow_depth",
-                render_graph->get_image(shadow_map),
-                ctx.frame
-            );
-    
-            shadow_debug_instance->bind(
-                shadow_debug_pipeline,
-                ctx.cmd,
-                ctx.frame
-            );
-    
-            ctx.backend.draw_fullscreen(ctx.cmd);
-        }
-    });
+    // render_graph->add_pass({
+    //     .name = "ShadowDebug",
+    //     .condition = [this] () { return render_flags[Names::debug_shadow]; },
+    //     .reads = {
+    //         { shadow_map, RBImageUsage::SampledFragment }
+    //     },
+    //     .writes = {
+    //         { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+    //     },
+    //     .execute = [=](RenderGraphContext& ctx)
+    //     {
+    //         ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
+    //         
+    //         auto shadow_debug_material_instance = query_material_instance(shadow_debug_material, ctx.pass_name);
+    //
+    //         RenderResourceInstance* shadow_debug_instance =
+    //             shadow_debug_material_instance->get_or_create_resource_instance(
+    //                 shadow_debug_pipeline,
+    //                 ctx.frame
+    //             );
+    //
+    //         shadow_debug_instance->update_image(
+    //             shadow_debug_pipeline,
+    //             "u_shadow_depth",
+    //             render_graph->get_image(shadow_map),
+    //             ctx.frame
+    //         );
+    //
+    //         shadow_debug_instance->bind(
+    //             shadow_debug_pipeline,
+    //             ctx.cmd,
+    //             ctx.frame
+    //         );
+    //
+    //         ctx.backend.draw_fullscreen(ctx.cmd);
+    //     }
+    // });
     
     
     

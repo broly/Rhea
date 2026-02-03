@@ -4,6 +4,7 @@ import <vulkan/vulkan_core.h>;
 
 #include "render_backends/vk/vk_macro.h"
 
+import reflect;
 import <cassert>;
 import :helpers;
 import :log;
@@ -136,13 +137,18 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     view_info.subresourceRange = {
         aspect, 0, desc.mip_levels, 0, 1
     };
+    
 
     VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &res.view));
     
     LogVkImageManager.Log("Created image %p (view %p) '%s'", res.image, res.view, desc.name.to_string().c_str());
+    
+    
 
     uint32_t id = static_cast<uint32_t>(image_resources.size());
     image_resources.push_back(res);
+    
+    debug.register_vk_image_name(res.image, desc.name);
 
     return RBImageHandle{ id };
 }
@@ -186,10 +192,10 @@ void vk::ImageManager::set_default_extent(uint32_t width, uint32_t height)
 }
 
 
-RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optional<TextureFormat> format_override, bool generate_mips)
+RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info)
 {
     const TextureFormat format =
-        format_override.value_or(tex.format);
+        texture_creation_info.format_override.value_or(tex.format);
     
 
     // =========================
@@ -212,6 +218,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
         desc.usage =
             RenderTextureUsage::Sampled |
             RenderTextureUsage::TransferDst;
+        desc.is_imported = texture_creation_info.imported;
 
         RBImageHandle image = create_image(desc);
         auto& res = get_image_resource(image);
@@ -278,7 +285,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
         return image;
     }
     
-    uint32_t mip_levels = generate_mips ? 
+    uint32_t mip_levels = texture_creation_info.generate_mips ? 
         static_cast<uint32_t>(std::floor(std::log2(std::max(tex.width, tex.height))) ) + 1 :
         1;
     
@@ -287,7 +294,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
     desc.mip_levels = mip_levels;  // here
     desc.width  = tex.width;
     desc.height = tex.height;
-    desc.format = format_override.value_or(tex.format);
+    desc.format = texture_creation_info.format_override.value_or(tex.format);
     desc.usage  =
         RenderTextureUsage::Sampled |
         RenderTextureUsage::TransferDst |
@@ -356,7 +363,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
         );
         
         
-        if (generate_mips)
+        if (texture_creation_info.generate_mips)
         {
             generate_mipmaps(
                 cmd,
@@ -366,7 +373,15 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
                 mip_levels
             );
         }
-    
+        if (texture_creation_info.current_layout != RBImageLayout::undefined)
+        {
+            transition_image(
+                cmd,
+                image,
+                RBImageLayout::transfer_dst_optimal,
+                texture_creation_info.current_layout
+            );
+        }
         // transition_image(
         //     cmd,
         //     image,
@@ -377,13 +392,21 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, std::optio
     
     vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
     
-    LogVkImageManager.Log("Allocated GPU texture: %s", tex.name.c_str());
+    LogVkImageManager.Log<Verbose>("Allocated GPU texture: %s", tex.name.c_str());
     
     return image;
 }
 
 void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after)
 {
+    auto vk_img = get_image_resource(image).image;
+    LogVkImageManager.Log<VeryVerbose>("Transition for image '%s' (%p): %s -> %s",
+        debug.get_vk_image_name(vk_img).to_string().c_str(),
+        vk_img, 
+        reflect::enum_name(before).to_string().c_str(),
+        reflect::enum_name(after).to_string().c_str());
+    
+    
     auto src = vk::to_vk_state(before);
     auto dst = vk::to_vk_state(after);
 

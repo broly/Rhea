@@ -26,6 +26,15 @@ concept RenderBackendType =
     std::is_base_of_v<RenderBackend, T> && 
         requires(T t, RBWindowHandle window_handle) { t.init(window_handle); };
 
+export struct TextureCreationInfo
+{
+    std::optional<TextureFormat> format_override = std::nullopt;
+    bool generate_mips = true;
+    bool imported = false;
+    RBImageLayout initial_layout = RBImageLayout::undefined;
+    RBImageLayout current_layout = RBImageLayout::undefined;
+};
+
 export class RenderBackend 
 {
 public:
@@ -46,7 +55,7 @@ public:
 
     virtual RBSwapchainExtent get_swapchain_extent() const = 0;
 
-    virtual RBImageHandle create_texture_2d(const Texture& data, std::optional<TextureFormat> format_override = std::nullopt, bool generate_mips = true) = 0;
+    virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) = 0;
     virtual void update_viewport(const RBCommandList& cmd, RBSwapchainExtent extent) = 0;
 
     template<RenderBackendType T>

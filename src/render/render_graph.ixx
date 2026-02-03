@@ -19,6 +19,8 @@ export struct RenderGraphPass
     std::vector<RGImageUse> writes;
 
     std::function<void(class RenderGraphContext&)> execute;
+    
+    std::map<RGTextureHandle, RGImageBarriers> pass_barriers;
 };
 
 export enum class RenderGraphMode
@@ -40,6 +42,44 @@ export struct RenderGraphParameters
     std::optional<CubemapInfo> cubemap;
     
     std::map<Name, float> extra;
+};
+
+
+struct RGTexture
+{
+    RGTextureDesc desc;
+    std::optional<RBImageHandle> image;
+        
+    std::optional<RBImageLayout> current_layout;
+    
+    RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
+    
+    
+    bool should_create_image() const
+    {
+        return !desc.swapchain_image && !desc.imported;
+    }
+    
+    bool allows_barrier() const
+    {
+        if (is_imported() || is_swapchain())
+            return !current_layout.has_value();
+        return true;
+    }
+    
+    bool is_imported() const
+    {
+        return desc.imported;
+    }
+
+    void memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImageLayout next, RBFrameHandle frame);
+    
+    bool is_swapchain() const
+    {
+        return desc.swapchain_image;
+    }
+    
+    void reset_layout();
 };
 
 export class RenderGraphContext
@@ -81,6 +121,26 @@ public:
 
     void compile();
     void execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params);
+    
+    static std::optional<RBImageUsage> find_next_usage(
+        const std::vector<RenderGraphPass>& passes,
+        size_t current_pass_index,
+        RGTextureHandle tex)
+    {
+        for (size_t i = current_pass_index + 1; i < passes.size(); ++i)
+        {
+            const auto& pass = passes[i];
+
+            for (const auto& read : pass.reads)
+                if (read.texture.id == tex.id)
+                    return read.usage;
+
+            for (const auto& write : pass.writes)
+                if (write.texture.id == tex.id)
+                    return write.usage;
+        }
+        return std::nullopt;
+    }
 
 
     RBImageHandle get_image(RGTextureHandle tex) const
@@ -106,7 +166,7 @@ private:
     
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
-    std::vector<std::vector<RGImageBarrier>> pass_barriers;
+    
 
 
     bool graph_compiled = false;

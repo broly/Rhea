@@ -26,6 +26,80 @@ export enum class ResourceUsageType
 REFLECT_ENUM(ResourceUsageType,
     frame, persistent);
 
+
+export enum class RBImageLayout
+{
+    undefined,
+    general,
+    color_attachment_optimal,
+    depth_stencil_attachment_optimal,
+    depth_stencil_read_only_optimal,
+    shader_read_only_optimal,
+    transfer_src_optimal,
+    transfer_dst_optimal,
+    preinitialized,
+    transfer_present,
+};
+REFLECT_ENUM(RBImageLayout,
+    undefined,
+    general,
+    color_attachment_optimal,
+    depth_stencil_attachment_optimal,
+    depth_stencil_read_only_optimal,
+    shader_read_only_optimal,
+    transfer_src_optimal,
+    transfer_dst_optimal,
+    preinitialized,
+    transfer_present);
+
+
+export enum class RBImageUsage
+{
+    Undefined,
+
+    ColorAttachment,
+    DepthStencilAttachment,
+    DepthStencilReadOnly,
+
+    SampledFragment,
+    SampledVertex,
+
+    TransferSrc,
+    TransferDst,
+
+    Present
+};
+REFLECT_ENUM(RBImageUsage,
+    Undefined,
+    ColorAttachment,
+    DepthStencilAttachment,
+    DepthStencilReadOnly,
+    SampledFragment,
+    SampledVertex,
+    TransferSrc,
+    TransferDst,
+    Present
+    );
+
+
+export enum class RBLoadOp
+{
+    Load,
+    Clear,
+    DontCare
+};
+REFLECT_ENUM(RBLoadOp,
+    Load, Clear, DontCare);
+    
+    
+export enum class RBStoreOp
+{
+    Store,
+    DontCare,
+};
+REFLECT_ENUM(RBStoreOp,
+    Store, DontCare);
+
 export 
 {
     template<typename... Ts>
@@ -120,19 +194,6 @@ export
         }
     };
 
-    enum class RBLoadOp
-    {
-        Load,
-        Clear,
-        DontCare
-    };
-    
-    
-    enum class RBStoreOp
-    {
-        Store,
-        DontCare,
-    };
 
 
     // enum class TextureFormat
@@ -221,6 +282,7 @@ export
         TextureFormat format;
         Mask<RenderTextureUsage::Type> usage;
         uint32_t mip_levels = 1;
+        bool is_imported = false;
     };
 
     struct RBImageHandle
@@ -235,23 +297,6 @@ export
     using RBSampler = RBHandle<VkSampler>;
     
     
-    enum class RBImageUsage
-    {
-        Undefined,
-
-        ColorAttachment,
-        DepthStencilAttachment,
-        DepthStencilReadOnly,
-
-        SampledFragment,
-        SampledVertex,
-
-        TransferSrc,
-        TransferDst,
-
-        Present
-    };
-
     struct AttachmentDesc
     {
         RBImageHandle image;
@@ -260,19 +305,6 @@ export
         RBImageUsage usage;
     };
     
-    enum class RBImageLayout
-    {
-        undefined,
-        general,
-        color_attachment_optimal,
-        depth_stencil_attachment_optimal,
-        depth_stencil_read_only_optimal,
-        shader_read_only_optimal,
-        transfer_src_optimal,
-        transfer_dst_optimal,
-        preinitialized,
-        transfer_present,
-    };
 
 
     struct FramebufferDesc
