@@ -387,7 +387,7 @@ void RenderGraph::recompile()
     
     for (auto& tex : textures)
     {
-        if (tex.image)
+        if (tex.image && tex.should_create_image())
             backend->destroy_image(*tex.image, true);
     }
     compile();
