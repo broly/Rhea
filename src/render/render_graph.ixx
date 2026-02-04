@@ -7,6 +7,8 @@ import <functional>;
 import <map>;
 import name;
 import :pipeline_family;
+import :common;
+import :rg_params;
 #include "object/object_reflection_macro.h"
 
 
@@ -23,26 +25,6 @@ export struct RenderGraphPass
     std::map<RGTextureHandle, RGImageBarriers> pass_barriers;
 };
 
-export enum class RenderGraphMode
-{
-    Camera,
-    ReflectionCapture,
-};
-
-export struct CubemapInfo
-{
-    glm::vec3 position;
-    unsigned int face_index;
-};
-
-export struct RenderGraphParameters
-{
-    RenderGraphMode mode;
-    
-    std::optional<CubemapInfo> cubemap;
-    
-    std::map<Name, float> extra;
-};
 
 
 struct RGTexture
@@ -107,6 +89,7 @@ public:
     RenderGraphParameters params;
 };
 
+
 export class RenderGraph : public RhObject
 {
 public:
@@ -118,13 +101,11 @@ public:
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
-    
-    void set_post_render(std::function<void(RenderGraphContext&)> in_post_render);
 
     RGPassId add_pass(RenderGraphPass&& pass);
 
     void compile();
-    void execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params);
+    void execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback);
     
     static std::optional<RBImageUsage> find_next_usage(
         const std::vector<RenderGraphPass>& passes,
@@ -146,6 +127,13 @@ public:
         return std::nullopt;
     }
 
+    std::optional<RBImageHandle> get_image_by_name(Name name)
+    {
+        for (auto& texture : textures)
+            if (texture.desc.name == name)
+                return texture.image.value();
+        return std::nullopt;
+    }
 
     RBImageHandle get_image(RGTextureHandle tex) const
     {
@@ -170,8 +158,6 @@ public:
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
     std::shared_ptr<Renderer> renderer;
-    
-    std::function<void(RenderGraphContext& ctx)> post_render = nullptr;
     
     RGTexture* get_swapchain_texture();
     

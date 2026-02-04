@@ -13,6 +13,7 @@ import globals;
 import assets;
 import <functional>;
 import texture_format;
+import :constants;
 
 #include "render_layout.h"
 #include "common/assertion_macros.h"
@@ -31,19 +32,12 @@ namespace Names
     static Name debug_shadow = "debug_shadow";
 }
 
-namespace Constants
-{
-    static constexpr Extent shadowmap_extent = {2048, 2048};;
-    static constexpr Extent ibl_extent = {512, 512};
-    static constexpr Extent zero_extent = {0, 0};
-}
 
-
-void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
+void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
 {
     engine = RhGlobals::engine;
     
-    capture_ibl = parameters.contains("capture_ibl") ? parameters.at("capture_ibl") : false;
+    capture_ibl = init_params.contains("capture_ibl") ? init_params.at("capture_ibl") : false;
 
     set_flag(Names::debug_shadow, false);
     
@@ -207,10 +201,6 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
             .execute = std::bind(&GameRenderGraph::pass_readback, this, std::placeholders::_1),
         });
     }
-    
-    if (capture_ibl)
-        set_post_render(std::bind(&GameRenderGraph::post_render, this, std::placeholders::_1));
-
     
     compile();
 }
@@ -655,7 +645,7 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
     auto& scene_view = engine->scene_view;
     CameraUBO camera_ubo;
     vec3 camera_position;
-    if (ctx.params.mode == RenderGraphMode::Camera)
+    if (!capture_ibl)
     {
         // ---------- Camera ----------
         auto& camera_processor =
@@ -684,6 +674,15 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
         camera_position = cam_ro->position;
     } else
     {
+        auto pos_it = ctx.params.vec3_params.find("capture_pos");
+        checkf(pos_it != ctx.params.vec3_params.end(), "position not found");
+        
+        auto face_index_it = ctx.params.int_params.find("face_index");
+        checkf(face_index_it != ctx.params.int_params.end(), "face index not found");
+        
+        auto position = pos_it->second;
+        auto face_index = face_index_it->second;
+        
         static const glm::vec3 cube_dirs[6] = {
             { 1,  0,  0}, {-1,  0,  0},
             { 0,  1,  0}, { 0, -1,  0},
@@ -695,15 +694,12 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
             {0,  0,  1}, {0,  0, -1},
             {0, -1,  0}, {0, -1,  0}
         };
-            
-        checkf(ctx.params.cubemap.has_value(), "Cubemap not defined");
-            
-        const auto& cp = *ctx.params.cubemap;
+        
 
         glm::mat4 view = glm::lookAt(
-            cp.position,
-            cp.position + cube_dirs[cp.face_index],
-            cube_ups[cp.face_index]
+            position,
+            position + cube_dirs[face_index],
+            cube_ups[face_index]
         );
 
         glm::mat4 proj = glm::perspective(
@@ -717,8 +713,8 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
 
         camera_ubo.proj = proj;
         camera_ubo.view = view;
-        camera_ubo.camera_pos = cp.position;
-        camera_position = cp.position;
+        camera_ubo.camera_pos = position;
+        camera_position = position;
     }
     
     return camera_ubo;
@@ -814,19 +810,3 @@ void GameRenderGraph::pass_readback(RenderGraphContext& ctx)
 {
     
 }
-
-void GameRenderGraph::post_render(RenderGraphContext& ctx)
-{
-    std::vector<std::byte> buffer;
-    TextureFormat fmt;
-    ctx.backend.copy_image_to_buffer(
-            get_image(hdr_color),
-            buffer,
-            fmt,
-            Constants::ibl_extent
-        );
-    
-    
-    exr::save(buffer, fmt,  Constants::ibl_extent, "hdr/test.exr");
-}
-

@@ -34,7 +34,6 @@ void Renderer::execute()
 {
     checkf(main_render_graph != nullptr, "RenderGraph not initialized. Please create and initialize RenderGraph in your GameRenderer::init");
     
-    
     execute_graph(main_render_graph);
     
     if (main_render_graph_needs_rebuild)
@@ -43,19 +42,23 @@ void Renderer::execute()
         main_render_graph_needs_rebuild = false;
     }
     
-    if (!rg_once_names.empty())
+    if (!rg_once_jobs.empty())
     {
-        for (const auto& name : rg_once_names)
+        for (const auto& job : rg_once_jobs)
         {
-            execute_graph(aux_graphs[name]);
+            auto rg = aux_graphs[job.render_graph_name];
+            execute_graph(rg, job.params, job.callback);
         }
-        rg_once_names.clear();
+        rg_once_jobs.clear();
     }
     
     execute_graph(main_render_graph);
 }
 
-void Renderer::execute_graph(std::shared_ptr<RenderGraph>& rg)
+void Renderer::execute_graph(
+    std::shared_ptr<RenderGraph>& rg, 
+    const RenderGraphParameters& params, 
+    RGPostRenderCallback callback)
 {
     
     auto& backend = *render_backend;
@@ -73,9 +76,7 @@ void Renderer::execute_graph(std::shared_ptr<RenderGraph>& rg)
     }
 
     RBCommandList cmd = backend.begin_commands(frame);
-    RenderGraphParameters params;
-    params.mode = RenderGraphMode::Camera;
-    rg->execute(cmd, frame, params);
+    rg->execute(cmd, frame, params, callback);
     backend.end_commands(cmd);
 
     backend.submit_frame(frame, cmd);
@@ -100,9 +101,9 @@ std::shared_ptr<RenderGraph> Renderer::create_render_graph(Name render_graph_nam
     return result;
 }
 
-void Renderer::trigger_aux_rg_once(Name aux_rg_name)
+void Renderer::trigger_aux_rg_once(Name aux_rg_name, const RenderGraphParameters& params, RGPostRenderCallback callback)
 {
-    rg_once_names.push_back(aux_rg_name);
+    rg_once_jobs.push_back({aux_rg_name, params, callback});
 }
 
 void Renderer::load_schemas()

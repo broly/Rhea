@@ -37,8 +37,5 @@ void RhComp_ReflectionCapture::finish()
 
 void RhComp_ReflectionCapture::update_scene_proxy()
 {
-    scene_proxy.fov = fov;
     scene_proxy.active = active;
-    scene_proxy.far_plane = far_plane;
-    scene_proxy.near_plane = near_plane;
 }

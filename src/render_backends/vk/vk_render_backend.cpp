@@ -266,7 +266,7 @@ void VkRenderBackend::advance_frame()
     swapchain.advance_frame();
 }
 
-void VkRenderBackend::copy_image_to_buffer(RBImageHandle img, std::vector<std::byte>& buf,
+void VkRenderBackend::copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf,
     TextureFormat& format,Extent extent)
 {
     image_manager.copy_image_to_buffer(img, buf, format, extent);

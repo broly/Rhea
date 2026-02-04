@@ -10,9 +10,6 @@ import render_scene;
 
 export struct SceneViewProxy_ReflectionCapture : public SceneViewProxy_Transform
 {
-    float fov = 0.f;
-    float near_plane = 0.f;
-    float far_plane = 0.f;
     bool active = false;
 };
 
@@ -26,9 +23,6 @@ public:
     void start() override;
     void finish() override;
     
-    float fov;
-    float near_plane;
-    float far_plane;
     bool active;
     
     void update_scene_proxy();
@@ -37,4 +31,4 @@ public:
 };
 
 REFLECT_OBJECT_FIELDS(RhComp_ReflectionCapture, RhComp_Renderable, 
-    transform, fov, near_plane, far_plane, active);
+    transform, active);

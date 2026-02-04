@@ -13,7 +13,7 @@ import assets;
 class GameRenderGraph : public RenderGraph
 {
 public:
-    void init_render_graph(const std::map<Name, bool>& parameters) override;
+    void init_render_graph(const std::map<Name, bool>& init_params) override;
     
     
     bool is_debugging() const;
@@ -33,9 +33,7 @@ public:
     void pass_clouds(RenderGraphContext& ctx);
     void pass_tonemapping(RenderGraphContext& ctx);
     void pass_readback(RenderGraphContext& ctx);
-    
-    void post_render(RenderGraphContext& ctx);
-    
+
     RGTextureHandle shadow_map;
     
     RenderResource* camera_resource;

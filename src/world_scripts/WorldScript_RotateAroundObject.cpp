@@ -8,6 +8,7 @@ import input;
 import profile;
 import rhmath;
 import rhcomponents;
+import game;
 
 void WorldScript_RotateAroundObject::tick(double dt)
 {
@@ -175,7 +176,14 @@ void WorldScript_RotateAroundObject::tick(double dt)
     
     if (input->is_key_down(Key::G))
     {
-        RhGlobals::engine->renderer->trigger_aux_rg_once("ibl");
+        auto gr = dynamic_cast<GameRenderer*>(RhGlobals::engine->renderer.get());
+        for (auto actor : world->get_actors())
+        {
+            if (auto comp = actor->find_component<RhComp_ReflectionCapture>())
+            {
+                gr->capture_ibl(actor->get_transform().position, actor->name);
+            }
+        }
         handled = true;
     }
     

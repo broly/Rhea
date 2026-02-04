@@ -43,7 +43,7 @@ public:
     virtual void wait_for_frame(RBFrameHandle frame) = 0;
     virtual void reset_frame_fence(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
-    virtual void copy_image_to_buffer(RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& format, Extent extent) = 0;
+    virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
     
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) = 0;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) = 0;

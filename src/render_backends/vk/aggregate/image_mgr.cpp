@@ -2,6 +2,7 @@
 
 import <vulkan/vulkan_core.h>;
 
+#include "common/assertion_macros.h"
 #include "render_backends/vk/vk_macro.h"
 
 import reflect;
@@ -429,27 +430,16 @@ void vk::ImageManager::create_staging_buffer(
     VkBuffer& out_buffer,
     VkDeviceMemory& out_memory)
 {
-    // ---------- Buffer ----------
     VkBufferCreateInfo buffer_info{};
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_info.size  = size;
     buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VK_CHECK(vkCreateBuffer(
-        instance.device,
-        &buffer_info,
-        nullptr,
-        &out_buffer
-    ));
+    VK_CHECK(vkCreateBuffer(instance.device, &buffer_info, nullptr, &out_buffer));
 
-    // ---------- Memory ----------
     VkMemoryRequirements mem_req;
-    vkGetBufferMemoryRequirements(
-        instance.device,
-        out_buffer,
-        &mem_req
-    );
+    vkGetBufferMemoryRequirements(instance.device, out_buffer, &mem_req);
 
     VkMemoryAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -461,51 +451,72 @@ void vk::ImageManager::create_staging_buffer(
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
 
-    VK_CHECK(vkAllocateMemory(
-        instance.device,
-        &alloc_info,
-        nullptr,
-        &out_memory
-    ));
-
-    VK_CHECK(vkBindBufferMemory(
-        instance.device,
-        out_buffer,
-        out_memory,
-        0
-    ));
+    VK_CHECK(vkAllocateMemory(instance.device, &alloc_info, nullptr, &out_memory));
+    VK_CHECK(vkBindBufferMemory(instance.device, out_buffer, out_memory, 0));
 }
 
 
 void vk::ImageManager::copy_image_to_buffer(
     RBImageHandle img,
-    std::vector<std::byte>& buf,
+    std::vector<float>& out_buffer,
     TextureFormat& out_format,
     Extent extent)
 {
-    VkImage image = get_image_resource(img).image;
+    VkImage image  = get_image_resource(img).image;
     VkFormat format = get_image_format(img);
-    out_format = vk::from_vk_format(format);
 
-    const uint32_t bpp = bytes_per_pixel(format);
-    const VkDeviceSize image_size = extent.width * extent.height * bpp;
+    uint32_t channels = 4;
+    uint32_t bytes_per_channel = 0;
 
-    buf.resize(image_size);
+    switch (format)
+    {
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            out_format = TextureFormat::RGBA16F;
+            bytes_per_channel = 2;
+            break;
+
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            out_format = TextureFormat::RGBA32F;
+            bytes_per_channel = 4;
+            break;
+
+        default:
+            checkf(false, "Unsupported format for image readback");
+            return;
+    }
+
+    const size_t pixel_count = extent.width * extent.height;
+    const size_t gpu_byte_size =
+        pixel_count * channels * bytes_per_channel;
+
+    const size_t float_count =
+        pixel_count * channels;
+
+    out_buffer.resize(float_count);
 
     // ---------- Staging buffer ----------
     VkBuffer staging_buffer;
     VkDeviceMemory staging_memory;
+    create_staging_buffer(gpu_byte_size, staging_buffer, staging_memory);
 
-    create_staging_buffer(image_size, staging_buffer, staging_memory);
-
+    // ---------- Copy command ----------
     VkBufferImageCopy region{};
-    region.imageSubresource = {
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        0, 0, 1
-    };
-    region.imageExtent = { extent.width, extent.height, 1 };
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
 
-    // ---------- Record commands ----------
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageExtent = {
+        extent.width,
+        extent.height,
+        1
+    };
+
+    // submit + WAIT
     immediate_command_pool.submit([&](VkCommandBuffer cmd)
     {
         vkCmdCopyImageToBuffer(
@@ -518,15 +529,35 @@ void vk::ImageManager::copy_image_to_buffer(
         );
     });
 
-    // ---------- CPU read ----------
-    void* mapped;
-    vkMapMemory(instance.device, staging_memory, 0, image_size, 0, &mapped);
-    memcpy(buf.data(), mapped, image_size);
+    // ---------- Map & convert ----------
+    void* mapped = nullptr;
+    VK_CHECK(vkMapMemory(
+        instance.device,
+        staging_memory,
+        0,
+        gpu_byte_size,
+        0,
+        &mapped
+    ));
+
+    if (format == VK_FORMAT_R32G32B32A32_SFLOAT)
+    {
+        memcpy(out_buffer.data(), mapped, gpu_byte_size);
+    }
+    else // RGBA16F → float
+    {
+        const uint16_t* src = reinterpret_cast<const uint16_t*>(mapped);
+
+        for (size_t i = 0; i < float_count; ++i)
+            out_buffer[i] = math::half_to_float(src[i]);
+    }
+
     vkUnmapMemory(instance.device, staging_memory);
 
     vkDestroyBuffer(instance.device, staging_buffer, nullptr);
     vkFreeMemory(instance.device, staging_memory, nullptr);
 }
+
 
 
 void vk::ImageManager::generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image,

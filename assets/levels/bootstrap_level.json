@@ -261,6 +261,101 @@
 					}
 				}
 			]
+		},
+		{
+			"name": "reflection_capture_1",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "reflection_capture_1_comp",
+					"class": "RhComp_ReflectionCapture",
+					"fields": {
+						"transform": {
+							"position": { "x": -12.23067, "y": 1.87657523, "z": -0.0409484506 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"active": true
+					}
+				}
+			]
+		},
+		{
+			"name": "reflection_capture_2",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "reflection_capture_2_comp",
+					"class": "RhComp_ReflectionCapture",
+					"fields": {
+						"transform": {
+							"position": { "x": -6.72988892, "y": 1.97569275, "z": -0.520481467 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"active": true
+					}
+				}
+			]
+		},
+		{
+			"name": "reflection_capture_3",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "reflection_capture_3_comp",
+					"class": "RhComp_ReflectionCapture",
+					"fields": {
+						"transform": {
+							"position": { "x": 0.00776743097, "y": 2.0106051, "z": -0.325556099 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"active": true
+					}
+				}
+			]
+		},
+		{
+			"name": "reflection_capture_4",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "reflection_capture_4_comp",
+					"class": "RhComp_ReflectionCapture",
+					"fields": {
+						"transform": {
+							"position": { "x": 8.62343311, "y": 1.85720229, "z": -2.48782659 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"active": true
+					}
+				}
+			]
+		},
+		{
+			"name": "reflection_capture_5",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "reflection_capture_5_comp",
+					"class": "RhComp_ReflectionCapture",
+					"fields": {
+						"transform": {
+							"position": { "x": 15.9919872, "y": 1.72655356, "z": -1.37592232 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"active": true
+					}
+				}
+			]
 		}
     ]
 }

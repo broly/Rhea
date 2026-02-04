@@ -5,4 +5,5 @@ export import :math;
 export import :transform;
 export import :vertex;
 export import :vec;
+export import :math_utils;
 export import :extent;

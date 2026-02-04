@@ -7,11 +7,14 @@ import :handle_types;
 import :render_backend;
 import :material_model;
 import :pipeline_family;
+import :common;
+import :rg_params;
 
 #include "common/reflect_macros.h"
 
 export class MaterialInstance;
 export class RenderGraph;
+export class RenderGraphContext;
 
 export class Renderer : public std::enable_shared_from_this<Renderer>
 {
@@ -22,14 +25,14 @@ public:
     virtual void init(RBWindowHandle in_window);
     virtual void execute();
     
-    void execute_graph(std::shared_ptr<RenderGraph>& rg);
+    void execute_graph(std::shared_ptr<RenderGraph>& rg, const RenderGraphParameters& params = {}, RGPostRenderCallback callback = nullptr);
     
     std::shared_ptr<RenderGraph> create_render_graph(
         Name render_graph_name, 
         const std::map<Name, bool>& parameters, 
         std::optional<Name> aux_graph_name = std::nullopt);
     
-    void trigger_aux_rg_once(Name aux_rg_name);
+    void trigger_aux_rg_once(Name aux_rg_name, const RenderGraphParameters& params, RGPostRenderCallback callback);
 
 public:  // public API
     void set_flag(Name name, bool value, bool needs_rebuild = false);
@@ -74,7 +77,14 @@ protected: // materials and resources
 protected:  // textures
     std::map<TextureHandle, RBImageHandle> texture_cache;
     
-    std::vector<Name> rg_once_names;
+    struct RenderGraphJob
+    {
+        Name render_graph_name;
+        RenderGraphParameters params;
+        RGPostRenderCallback callback;
+    };
+    
+    std::vector<RenderGraphJob> rg_once_jobs;
     
     bool main_render_graph_needs_rebuild = false;
     

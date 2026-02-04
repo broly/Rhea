@@ -79,10 +79,6 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     return handle;
 }
 
-void RenderGraph::set_post_render(std::function<void(RenderGraphContext&)> in_post_render)
-{
-    post_render = in_post_render;
-}
 
 RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
 {
@@ -264,7 +260,7 @@ bool is_attachment(RBImageUsage usage)
     }
 }
 
-void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params)
+void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback)
 {
     PROFILE();
     assert(graph_compiled);
@@ -352,10 +348,10 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     if (auto tex = get_swapchain_texture())
         tex->memory_barrier(cmd, *backend, RBImageLayout::transfer_present, frame);
     
-    if (post_render)
+    if (callback)
     {
         ctx.pass_name = "";
-        post_render(ctx);
+        callback(ctx);
     }
 }
 
