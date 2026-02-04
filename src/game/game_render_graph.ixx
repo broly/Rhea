@@ -32,9 +32,9 @@ public:
     void pass_translucent(RenderGraphContext& ctx);
     void pass_clouds(RenderGraphContext& ctx);
     void pass_tonemapping(RenderGraphContext& ctx);
+    void pass_readback(RenderGraphContext& ctx);
     
     RGTextureHandle shadow_map;
-    RBSwapchainExtent shadowmap_extent;
     
     RenderResource* camera_resource;
     RenderResource* light_resource;
@@ -52,6 +52,8 @@ public:
     PipelineObject* shadow_debug_pipeline;
     PipelineObject* tonemap_pipeline;
     Engine* engine;
+    
+    bool capture_ibl;
     
 };
 REFLECT_OBJECT(GameRenderGraph, RenderGraph);

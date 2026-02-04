@@ -5,6 +5,8 @@ import <stdexcept>;
 import <vector>;
 import <vulkan/vulkan_core.h>;
 
+import texture_format;
+
 import :context;
 
 #include "vk_macro.h"
@@ -371,6 +373,30 @@ export namespace vk
         return VK_FORMAT_UNDEFINED;
     }
     
+    inline TextureFormat from_vk_format(VkFormat format)
+    {
+        switch (format)
+        {
+        case VK_FORMAT_R8G8B8_UNORM:
+            return TextureFormat::RGB8;
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            return TextureFormat::RGBA8_SRGB;
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            return TextureFormat::RGBA8_UNORM;
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            return TextureFormat::RGBA16F;
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            return TextureFormat::RGBA32F;
+        case VK_FORMAT_D24_UNORM_S8_UINT:
+            return TextureFormat::Depth24Stencil8;
+        case VK_FORMAT_D32_SFLOAT:
+            return TextureFormat::Depth32F;
+        case VK_FORMAT_D16_UNORM:
+            return TextureFormat::Depth16UNorm;
+        }
+        return TextureFormat::Undefined;
+    }
+    
     struct ImageState
     {
         VkImageLayout layout;
@@ -475,6 +501,25 @@ export namespace vk
         }
     }
     
-    
+    uint32_t bytes_per_pixel(VkFormat format)
+    {
+        switch (format)
+        {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_UNORM:
+            return 4;
+
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            return 8;
+
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            return 16;
+
+        default:
+            assert(false && "Unsupported format");
+            return 0;
+        }
+    }
+
 
 }

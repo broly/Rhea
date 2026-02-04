@@ -6,6 +6,7 @@ import :immediate_commands;
 import :debug;
 import render;
 import assets;
+import texture_format;
 import <optional>;
 
 
@@ -49,6 +50,8 @@ namespace vk
             RBImageHandle image,
             RBImageLayout before,
             RBImageLayout after);
+        
+        void copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& out_format, RBSwapchainExtent extent);
         
         void generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image, uint32_t width, uint32_t height, uint32_t mip_levels);
         

@@ -117,6 +117,7 @@ public:   /// API Section
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
+    virtual void copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& format, RBSwapchainExtent extent) override;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) override;

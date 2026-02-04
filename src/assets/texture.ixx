@@ -5,6 +5,7 @@ import <filesystem>;
 import <vector>;
 import <future>;
 import <json/value.h>;
+import texture_format;
 import dependency_collector;
 
 
@@ -39,22 +40,6 @@ private:
     }
 };
 
-
-export enum class TextureFormat
-{
-    Undefined, 
-    RGB8, 
-    RGBA8, 
-    RGBA8_UNORM,
-    RGBA8_SRGB,
-
-    RGBA16F,
-    RGBA32F,
-
-    Depth24Stencil8,
-    Depth32F,
-    Depth16UNorm,
-};
 
 export struct Texture
 {

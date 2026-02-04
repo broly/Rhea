@@ -21,6 +21,15 @@ public:
     
     virtual void init(RBWindowHandle in_window);
     virtual void execute();
+    
+    void execute_graph(std::shared_ptr<RenderGraph>& rg);
+    
+    std::shared_ptr<RenderGraph> create_render_graph(
+        Name render_graph_name, 
+        const std::map<Name, bool>& parameters, 
+        std::optional<Name> aux_graph_name = std::nullopt);
+    
+    void trigger_aux_rg_once(Name aux_rg_name);
 
 public:  // public API
     void set_flag(Name name, bool value, bool needs_rebuild = false);
@@ -45,6 +54,7 @@ protected:  // internal functions
 protected:  // internal system accessors
     std::shared_ptr<RenderBackend> render_backend;
     std::shared_ptr<RenderGraph> main_render_graph;
+    std::map<Name, std::shared_ptr<RenderGraph>> aux_graphs;
     Name main_render_graph_name;
     
 protected: // (semi-)immutable info
@@ -64,6 +74,7 @@ protected: // materials and resources
 protected:  // textures
     std::map<TextureHandle, RBImageHandle> texture_cache;
     
+    std::vector<Name> rg_once_names;
     
     bool main_render_graph_needs_rebuild = false;
     

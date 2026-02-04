@@ -173,6 +173,12 @@ void WorldScript_RotateAroundObject::tick(double dt)
         handled = true;
     }
     
+    if (input->is_key_down(Key::G))
+    {
+        RhGlobals::engine->renderer->trigger_aux_rg_once("ibl");
+        handled = true;
+    }
+    
     if (input->is_key_down(Key::H))
     {
         const double time = world->get_time_seconds();

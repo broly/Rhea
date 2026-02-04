@@ -15,6 +15,7 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(jsoncpp CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(tinyexr CONFIG REQUIRED)
 find_package(unofficial-spirv-reflect CONFIG REQUIRED)
 
 
@@ -34,6 +35,7 @@ add_executable(rhea ${RHEA_SOURCES})
 # )
 set(RHEA_MODULE_DIRS
     src/glm_wrap
+    src/tinyexr_wrap
     src/input
     src/expr
     src/spirv_reflect_wrap
@@ -93,6 +95,7 @@ target_link_libraries(rhea
 		JsonCpp::JsonCpp
 		unofficial::spirv-reflect
 		fastgltf::module
+		unofficial::tinyexr::tinyexr
 )
 
 target_compile_definitions(rhea

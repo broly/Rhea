@@ -27,24 +27,38 @@ void Renderer::init(RBWindowHandle in_window)
     
     main_render_graph_name = render_graph_class_value->asString();
     
-    auto reflection_info = reflect::find_object_reflection_info(main_render_graph_name);
-    checkf(reflection_info != nullptr, "Could not find render graph class");
-    
-    main_render_graph = reflection_info->instantiate<RenderGraph>();
-    main_render_graph->setup(render_backend, shared_from_this());
-    main_render_graph->init_render_graph({});
+    main_render_graph = create_render_graph(main_render_graph_name, {});
 }
 
 void Renderer::execute()
 {
     checkf(main_render_graph != nullptr, "RenderGraph not initialized. Please create and initialize RenderGraph in your GameRenderer::init");
-    auto& backend = *render_backend;
+    
+    
+    execute_graph(main_render_graph);
     
     if (main_render_graph_needs_rebuild)
     {
         main_render_graph->recompile();
         main_render_graph_needs_rebuild = false;
     }
+    
+    if (!rg_once_names.empty())
+    {
+        for (const auto& name : rg_once_names)
+        {
+            execute_graph(aux_graphs[name]);
+        }
+        rg_once_names.clear();
+    }
+    
+    execute_graph(main_render_graph);
+}
+
+void Renderer::execute_graph(std::shared_ptr<RenderGraph>& rg)
+{
+    
+    auto& backend = *render_backend;
     
     RBFrameHandle frame = backend.get_current_frame();
 
@@ -54,19 +68,41 @@ void Renderer::execute()
 
     if (!backend.acquire_next_image(frame))
     {
-        main_render_graph->rebuild_resources();
+        rg->rebuild_resources();
         return;
     }
 
     RBCommandList cmd = backend.begin_commands(frame);
     RenderGraphParameters params;
     params.mode = RenderGraphMode::Camera;
-    main_render_graph->execute(cmd, frame, params);
+    rg->execute(cmd, frame, params);
     backend.end_commands(cmd);
 
     backend.submit_frame(frame, cmd);
 
     backend.advance_frame();
+}
+
+std::shared_ptr<RenderGraph> Renderer::create_render_graph(Name render_graph_name,
+    const std::map<Name, bool>& parameters, std::optional<Name> aux_graph_name)
+{
+    
+    auto reflection_info = reflect::find_object_reflection_info(render_graph_name);
+    checkf(reflection_info != nullptr, "Could not find render graph class");
+    
+    auto result = reflection_info->instantiate<RenderGraph>();
+    result->setup(render_backend, shared_from_this());
+    result->init_render_graph(parameters);
+    
+    if (aux_graph_name.has_value())
+        aux_graphs.insert({*aux_graph_name, result});
+    
+    return result;
+}
+
+void Renderer::trigger_aux_rg_once(Name aux_rg_name)
+{
+    rg_once_names.push_back(aux_rg_name);
 }
 
 void Renderer::load_schemas()

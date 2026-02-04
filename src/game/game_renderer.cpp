@@ -35,4 +35,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     
     Renderer::init(in_window);
+    
+    create_render_graph(main_render_graph_name, {{"capture_ibl", true}}, "ibl");
+    // trigger_aux_rg_once("ibl");
 }

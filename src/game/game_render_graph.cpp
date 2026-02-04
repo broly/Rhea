@@ -12,6 +12,7 @@ import rhcomponents;
 import globals;
 import assets;
 import <functional>;
+import texture_format;
 
 #include "render_layout.h"
 #include "common/assertion_macros.h"
@@ -30,10 +31,18 @@ namespace Names
     static Name debug_shadow = "debug_shadow";
 }
 
+namespace Constants
+{
+    RBSwapchainExtent shadowmap_extent = {2048, 2048};;
+    RBSwapchainExtent ibl_extent = {512, 512};
+}
+
 
 void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
 {
     engine = RhGlobals::engine;
+    
+    capture_ibl = parameters.contains("capture_ibl") ? parameters.at("capture_ibl") : false;
 
     set_flag(Names::debug_shadow, false);
     
@@ -50,12 +59,16 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
     auto tonemap_model = renderer->find_model("tonemap");
     auto shadow_debug_model = renderer->find_model("shadow_debug");
     
+    
+    auto swapchain_extent = capture_ibl ? RBSwapchainExtent{512, 512} : backend->get_swapchain_extent();
+
+    
     RGTextureDesc hdr_color_desc{
         .name = "hdr_color",
-        .width  = 0,
-        .height = 0,
+        .width = capture_ibl ? 512 : swapchain_extent.width,
+        .height = capture_ibl ? 512 : swapchain_extent.height,
         .format = TextureFormat::RGBA16F,
-        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false
     };
 
@@ -72,44 +85,35 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
     shadow_debug_material = std::make_shared<Material>();
     shadow_debug_material->model = "shadow_debug";
     
-    auto swapchain_extent = backend->get_swapchain_extent();
-
-    swapchain_color = create_texture({
-        .name = "swapchain",
-        .width = swapchain_extent.width,
-        .height = swapchain_extent.height,
-        .format = backend->get_swapchain_format(),
-        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
-        .external = true,
-        .swapchain_image = true,
-    });
+    if (!capture_ibl)
+    {
+        swapchain_color = create_texture({
+           .name = "swapchain",
+           .width = swapchain_extent.width,
+           .height = swapchain_extent.height,
+           .format = backend->get_swapchain_format(),
+           .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
+           .external = true,
+           .swapchain_image = true,
+       });
+    }
 
     depth_texture = create_texture({
         .name = "depth",
+        .width = capture_ibl ? 512 : swapchain_extent.width,
+        .height = capture_ibl ? 512 : swapchain_extent.height,
         .format = TextureFormat::Depth24Stencil8,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
     
-    shadowmap_extent = {2048, 2048};
     
     shadow_map = create_texture({
         .name = "shadow_map",
-        .width = shadowmap_extent.width,
-        .height = shadowmap_extent.height,
+        .width = Constants::shadowmap_extent.width,
+        .height = Constants::shadowmap_extent.height,
         .format = TextureFormat::Depth32F,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
-    
-    // auto offscreen_color = create_texture({
-    //     .name   = "offscreen_color",
-    //     .width  = swapchain_extent.width,
-    //     .height = swapchain_extent.height,
-    //     .format = TextureFormat::RGBA8,
-    //     .usage  = RenderTextureUsage::ColorAttachment |
-    //               RenderTextureUsage::Sampled |
-    //               RenderTextureUsage::TransferSrc,
-    //     .external = false
-    // });
     
     add_pass({
         .name = "ShadowMap",
@@ -119,19 +123,20 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
         .execute = std::bind(&GameRenderGraph::pass_shadow_map, this, std::placeholders::_1),
     });
     
-    add_pass({
-        .name = "ShadowDebug",
-        .condition = [this] () { return renderer->get_render_flag(Names::debug_shadow); },
-        .reads = {
-            { shadow_map, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = std::bind(&GameRenderGraph::pass_shadow_debug, this, std::placeholders::_1),
-    });
-    
-    
+    if (!capture_ibl)
+    {
+        add_pass({
+           .name = "ShadowDebug",
+           .condition = [this] () { return renderer->get_render_flag(Names::debug_shadow); },
+           .reads = {
+               { shadow_map, RBImageUsage::SampledFragment }
+           },
+           .writes = {
+               { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+           },
+           .execute = std::bind(&GameRenderGraph::pass_shadow_debug, this, std::placeholders::_1),
+       });
+    }
     
     add_pass({
         .name = Names::pass_geometry_base,
@@ -177,17 +182,32 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
     tonemap_material = std::make_shared<Material>();
     tonemap_material->model = "Tonemap";
     
-    add_pass({
-        .name = "ToneMapping",
-        .condition = [this] () { return !is_debugging(); },
-        .reads = {
-            { hdr_color, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { swapchain_color, RBImageUsage::ColorAttachment }
-        },
-        .execute = std::bind(&GameRenderGraph::pass_tonemapping, this, std::placeholders::_1),
-    });
+    if (!capture_ibl)
+    {
+        add_pass({
+            .name = "ToneMapping",
+            .condition = [this] () { return !is_debugging(); },
+            .reads = {
+                { hdr_color, RBImageUsage::SampledFragment }
+            },
+            .writes = {
+                { swapchain_color, RBImageUsage::ColorAttachment }
+            },
+            .execute = std::bind(&GameRenderGraph::pass_tonemapping, this, std::placeholders::_1),
+        });
+    }
+    else
+    {
+    
+        add_pass({
+            .name = "readback",
+            .condition = [this] () { return !is_debugging(); },
+            .reads = {
+                { hdr_color,  RBImageUsage::TransferSrc }
+            },
+            .execute = std::bind(&GameRenderGraph::pass_readback, this, std::placeholders::_1),
+        });
+    }
 
     
     compile();
@@ -396,12 +416,16 @@ void GameRenderGraph::draw_scene(RenderGraphContext& ctx)
             // ---------- Push constants ----------
             ctx.backend.push_constants(cmd, item.world, pipeline);
 
+            const bool use_swapchain_extent = !capture_ibl;
+            RBSwapchainExtent extent = capture_ibl ? RBSwapchainExtent{512, 512} : RBSwapchainExtent{0, 0};
+            
             ctx.backend.draw_indexed(
                 cmd,
                 item.mesh.get().indices.size(),
                 RBDrawParams {
                     .update_viewport_extent = true,
-                    .use_swapchain_extent = true
+                    .use_swapchain_extent = use_swapchain_extent,
+                    .extent = extent
                 }
             );
         }
@@ -526,7 +550,7 @@ void GameRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
              RBDrawParams{
                  .update_viewport_extent = true,
                  .use_swapchain_extent = false,
-                 .extent = shadowmap_extent
+                 .extent = Constants::shadowmap_extent
              }
         );
     }
@@ -638,7 +662,7 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
         const RenderObject_Camera* cam_ro =
             camera_processor.get_active_camera();
 
-        auto [width, height] = ctx.backend.get_viewport_extent();
+        auto [width, height] = !capture_ibl ? ctx.backend.get_viewport_extent() : std::pair<uint32_t, uint32_t>{512, 512};
         
         auto aspect = float(width) / float(height);
         auto proj = cam_ro->get_projection(aspect);
@@ -779,5 +803,25 @@ void GameRenderGraph::pass_tonemapping(RenderGraphContext& ctx)
     );
             
     ctx.backend.draw_fullscreen(ctx.cmd);
+}
+
+
+
+
+void GameRenderGraph::pass_readback(RenderGraphContext& ctx)
+{
+    std::vector<std::byte> buffer;
+    TextureFormat fmt;
+    ctx.backend.copy_image_to_buffer(
+            ctx.cmd,
+            get_image(hdr_color),
+            buffer,
+            fmt,
+            Constants::ibl_extent
+        );
+    
+    Dim2d extent {Constants::ibl_extent.width, Constants::ibl_extent.height};
+    
+    exr::save(buffer, fmt,  extent, "hdr/test.exr");
 }
 

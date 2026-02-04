@@ -432,6 +432,94 @@ void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, 
     );
 }
 
+
+
+void vk::ImageManager::copy_image_to_buffer(RBCommandList cmd, RBImageHandle img,  std::vector<std::byte>& buf,
+    TextureFormat& out_format, RBSwapchainExtent extent)
+{
+    VkImage image = get_image_resource(img).image;
+    VkFormat format = get_image_format(img);
+    out_format = vk::from_vk_format(format);
+    const uint32_t bpp = bytes_per_pixel(format);
+    const VkDeviceSize image_size = extent.width * extent.height * bpp;
+
+    // 1. Resize output vector
+    buf.resize(image_size);
+
+    // 2. Create staging buffer
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+
+    VkBufferCreateInfo buffer_info{};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size  = image_size;
+    buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    vkCreateBuffer(instance.device, &buffer_info, nullptr, &staging_buffer);
+
+    VkMemoryRequirements mem_req;
+    vkGetBufferMemoryRequirements(instance.device, staging_buffer, &mem_req);
+
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_req.size;
+    alloc_info.memoryTypeIndex = find_memory_type(
+        instance.physical_device,
+        mem_req.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    vkAllocateMemory(instance.device, &alloc_info, nullptr, &staging_memory);
+    vkBindBufferMemory(instance.device, staging_buffer, staging_memory, 0);
+
+    // 3. Copy image → buffer (image MUST be in TRANSFER_SRC layout)
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;     // tightly packed
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageOffset = { 0, 0, 0 };
+    region.imageExtent = { extent.width, extent.height, 1 };
+
+    vkCmdCopyImageToBuffer(
+        cmd,
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        staging_buffer,
+        1,
+        &region
+    );
+
+    // 4. Submit & wait (stall!)
+    
+    VkCommandBuffer command_buffer = cmd.as<VkCommandBuffer>();
+    
+    VkSubmitInfo submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &command_buffer;
+
+    vkQueueSubmit(instance.graphics_queue, 1, &submit, VK_NULL_HANDLE);
+    vkQueueWaitIdle(instance.graphics_queue);
+
+    // 5. Map & copy to std::vector
+    void* mapped;
+    vkMapMemory(instance.device, staging_memory, 0, image_size, 0, &mapped);
+    memcpy(buf.data(), mapped, image_size);
+    vkUnmapMemory(instance.device, staging_memory);
+
+    // 6. Cleanup
+    vkDestroyBuffer(instance.device, staging_buffer, nullptr);
+    vkFreeMemory(instance.device, staging_memory, nullptr);
+}
+
 void vk::ImageManager::generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image,
                                         uint32_t width, uint32_t height, uint32_t mip_levels)
 {

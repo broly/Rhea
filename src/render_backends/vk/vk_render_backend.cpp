@@ -266,6 +266,12 @@ void VkRenderBackend::advance_frame()
     swapchain.advance_frame();
 }
 
+void VkRenderBackend::copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf,
+    TextureFormat& format,RBSwapchainExtent extent)
+{
+    image_manager.copy_image_to_buffer(cmd, img, buf, format, extent);
+}
+
 void VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle)
 {
     PROFILE(__FUNCTION__);

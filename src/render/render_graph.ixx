@@ -169,7 +169,7 @@ public:
     std::shared_ptr<RenderBackend> backend;
     std::shared_ptr<Renderer> renderer;
     
-    RGTexture& get_swapchain_texture();
+    RGTexture* get_swapchain_texture();
     
 
     void set_flag(Name name, bool value, bool needs_rebuild = false);

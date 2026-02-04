@@ -345,8 +345,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         }
     }
 
-    auto& tex = get_swapchain_texture();
-    tex.memory_barrier(cmd, *backend, RBImageLayout::transfer_present, frame);
+    if (auto tex = get_swapchain_texture())
+        tex->memory_barrier(cmd, *backend, RBImageLayout::transfer_present, frame);
 }
 
 
@@ -403,12 +403,12 @@ PipelineObject* RenderGraph::request_pipeline(
     return pipeline;
 }
 
-RGTexture& RenderGraph::get_swapchain_texture()
+RGTexture* RenderGraph::get_swapchain_texture()
 {
     for (RGTexture& tex : textures)
         if (tex.is_swapchain())
-            return tex;
-    unreachable("Could not find swapchain texture!");
+            return &tex;
+    return nullptr;
 }
 
 void RenderGraph::set_flag(Name name, bool value, bool needs_rebuild)

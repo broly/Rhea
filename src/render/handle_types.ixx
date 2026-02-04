@@ -8,6 +8,7 @@ import <vector>;
 import type_id;
 import assets;
 import name;
+import texture_format;
 
 #include "common/reflect_macros.h"
 #include "common/type_macros.h"
