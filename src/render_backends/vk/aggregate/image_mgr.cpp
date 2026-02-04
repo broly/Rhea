@@ -11,7 +11,7 @@ import :log;
 
 
 RBImageHandle vk::ImageManager::create_image_view(
-    VkExtent2D extent, 
+    VkExtent2D vk_extent, 
     const VkSurfaceFormatKHR& surface_format,
     VkImage image)
 {
@@ -39,8 +39,8 @@ RBImageHandle vk::ImageManager::create_image_view(
     res.image  = image;                 // VkImage
     res.view   = view;                  // VkImageView
     res.format = surface_format.format;
-    res.width  = extent.width;
-    res.height = extent.height;
+    res.extent.width  = vk_extent.width;
+    res.extent.height = vk_extent.height;
     
 
     uint32_t id = static_cast<uint32_t>(image_resources.size());
@@ -62,20 +62,14 @@ VkImageView vk::ImageManager::get_image_view(RBImageHandle image_handle)
 
 RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
 {
-    uint32_t width  = desc.width;
-    uint32_t height = desc.height;
-
-    if (width == 0 || height == 0)
-    {
-        width  = default_width;
-        height = default_height;
-    }
+    Extent extent = desc.extent;
+    if (extent.is_zero())
+        extent = default_extent;
     
-    assert(width != 0 && height != 0);
+    assert(extent.is_not_zero());
 
     vk::ImageResource res{};
-    res.width  = width;
-    res.height = height;
+    res.extent = extent;
     res.format = vk::to_vk_format(desc.format);
     res.mip_levels = desc.mip_levels;
 
@@ -98,7 +92,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
 
     VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent = { width, height, 1 };
+    image_info.extent = { extent.width, extent.height, 1 };
     image_info.mipLevels = desc.mip_levels;
     image_info.arrayLayers = 1;
     image_info.format = vk::to_vk_format(desc.format);
@@ -185,10 +179,9 @@ void vk::ImageManager::destroy_image(RBImageHandle handle, bool wait_fences)
     );
 }
 
-void vk::ImageManager::set_default_extent(uint32_t width, uint32_t height)
+void vk::ImageManager::set_default_extent(Extent extent)
 {
-    default_height = height;
-    default_width = width;
+    default_extent = extent;
 }
 
 
@@ -203,7 +196,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     // =========================
     static std::unordered_map<TextureFormat, RBImageHandle> black_textures;
 
-    if (tex.width == 0 || tex.height == 0)
+    if (tex.extent.is_zero())
     {
         auto it = black_textures.find(format);
         if (it != black_textures.end())
@@ -212,8 +205,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         // --- create 1x1 black texture ---
         RBImageDesc desc;
         desc.name = std::string("TEX_B_") + tex.name;
-        desc.width  = 1;
-        desc.height = 1;
+        desc.extent.width  = 1;
+        desc.extent.height = 1;
         desc.format = format;
         desc.usage =
             RenderTextureUsage::Sampled |
@@ -286,14 +279,13 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     }
     
     uint32_t mip_levels = texture_creation_info.generate_mips ? 
-        static_cast<uint32_t>(std::floor(std::log2(std::max(tex.width, tex.height))) ) + 1 :
+        static_cast<uint32_t>(std::floor(std::log2(std::max(tex.extent.width, tex.extent.height))) ) + 1 :
         1;
     
     RBImageDesc desc;
     desc.name = std::string("TEX_") + tex.name;
     desc.mip_levels = mip_levels;  // here
-    desc.width  = tex.width;
-    desc.height = tex.height;
+    desc.extent  = tex.extent;
     desc.format = texture_creation_info.format_override.value_or(tex.format);
     desc.usage  =
         RenderTextureUsage::Sampled |
@@ -309,7 +301,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         tex.format == TextureFormat::RGB8 ? 3 : 4;
     
     size_t upload_size =
-        tex.width * tex.height * pixel_size;
+        tex.extent.width * tex.extent.height * pixel_size;
     
     if (upload_size == 0)
     {
@@ -348,8 +340,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         copy.imageSubresource.layerCount = 1;
         copy.imageSubresource.mipLevel = 0;
         copy.imageExtent = {
-            tex.width,
-            tex.height,
+            tex.extent.width,
+            tex.extent.height,
             1
         };
     
@@ -368,8 +360,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
             generate_mipmaps(
                 cmd,
                 image,
-                tex.width,
-                tex.height,
+                tex.extent.width,
+                tex.extent.height,
                 mip_levels
             );
         }
@@ -435,7 +427,7 @@ void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, 
 
 
 void vk::ImageManager::copy_image_to_buffer(RBCommandList cmd, RBImageHandle img,  std::vector<std::byte>& buf,
-    TextureFormat& out_format, RBSwapchainExtent extent)
+    TextureFormat& out_format, Extent extent)
 {
     VkImage image = get_image_resource(img).image;
     VkFormat format = get_image_format(img);

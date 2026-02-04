@@ -4,6 +4,7 @@ import <array>;
 import <vector>;
 import <vulkan/vulkan_core.h>;
 import <map>;
+import rhmath;
 
 import render;
 
@@ -59,8 +60,7 @@ namespace vk
         // one view per image
         VkImageView view = VK_NULL_HANDLE;
 
-        uint32_t width = 0;
-        uint32_t height = 0;
+        Extent extent;
         VkFormat format = VK_FORMAT_UNDEFINED;
         
         uint32_t mip_levels   = 1; 

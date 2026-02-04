@@ -44,8 +44,8 @@ std::optional<Texture> Texture::create_from_file(const std::filesystem::path& pa
         // throw std::runtime_error("Failed to load texture: " + path.string());
     }
     
-    texture.width = static_cast<uint32_t>(width);
-    texture.height = static_cast<uint32_t>(height);
+    texture.extent.width = static_cast<uint32_t>(width);
+    texture.extent.height = static_cast<uint32_t>(height);
     texture.format = TextureFormat::RGBA8;
     
     size_t image_size = width * height * 4;

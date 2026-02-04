@@ -63,7 +63,7 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
     }
     
     Texture texture = std::move(*texture_opt);
-    assert(texture.height > 0);
+    assert(texture.extent.height > 0);
     
     std::scoped_lock<std::mutex> lock(mutex);
     

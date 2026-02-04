@@ -7,6 +7,7 @@ import :debug;
 import render;
 import assets;
 import texture_format;
+import rhmath;
 import <optional>;
 
 
@@ -23,7 +24,7 @@ namespace vk
         {}
         
         RBImageHandle create_image_view(
-            VkExtent2D extent, 
+            VkExtent2D vk_extent, 
             const VkSurfaceFormatKHR& surface_format,
             VkImage image);
         
@@ -41,7 +42,7 @@ namespace vk
         
         std::vector<vk::ImageResource> image_resources;
         
-        void set_default_extent(uint32_t width, uint32_t height);
+        void set_default_extent(Extent extent);
         
         RBImageHandle create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info);
         
@@ -51,7 +52,7 @@ namespace vk
             RBImageLayout before,
             RBImageLayout after);
         
-        void copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& out_format, RBSwapchainExtent extent);
+        void copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& out_format, Extent extent);
         
         void generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image, uint32_t width, uint32_t height, uint32_t mip_levels);
         
@@ -61,7 +62,6 @@ namespace vk
         
         VkFormat get_image_format(RBImageHandle handle) const;
 
-        uint32_t default_width = 0;
-        uint32_t default_height = 0;
+        Extent default_extent;
     };
 }

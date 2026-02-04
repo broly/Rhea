@@ -35,7 +35,7 @@ static float half_to_float(uint16_t h)
     return result;
 }
 
-bool exr::save(const std::vector<std::byte>& buffer, TextureFormat fmt, Dim2d dim, const std::string& path)
+bool exr::save(const std::vector<std::byte>& buffer, TextureFormat fmt, Extent dim, const std::string& path)
 {
     auto filename = paths::get_cache_path() / path;
     

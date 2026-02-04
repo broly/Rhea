@@ -33,8 +33,9 @@ namespace Names
 
 namespace Constants
 {
-    RBSwapchainExtent shadowmap_extent = {2048, 2048};;
-    RBSwapchainExtent ibl_extent = {512, 512};
+    static constexpr Extent shadowmap_extent = {2048, 2048};;
+    static constexpr Extent ibl_extent = {512, 512};
+    static constexpr Extent zero_extent = {0, 0};
 }
 
 
@@ -60,13 +61,14 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
     auto shadow_debug_model = renderer->find_model("shadow_debug");
     
     
-    auto swapchain_extent = capture_ibl ? RBSwapchainExtent{512, 512} : backend->get_swapchain_extent();
+    auto swapchain_extent = backend->get_swapchain_extent();
+    
+    auto resolution = capture_ibl ? Constants::ibl_extent : Constants::zero_extent;
 
     
     RGTextureDesc hdr_color_desc{
         .name = "hdr_color",
-        .width = capture_ibl ? 512 : swapchain_extent.width,
-        .height = capture_ibl ? 512 : swapchain_extent.height,
+        .extent = resolution,
         .format = TextureFormat::RGBA16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false
@@ -89,8 +91,7 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
     {
         swapchain_color = create_texture({
            .name = "swapchain",
-           .width = swapchain_extent.width,
-           .height = swapchain_extent.height,
+           .extent = swapchain_extent,
            .format = backend->get_swapchain_format(),
            .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
            .external = true,
@@ -100,8 +101,7 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
 
     depth_texture = create_texture({
         .name = "depth",
-        .width = capture_ibl ? 512 : swapchain_extent.width,
-        .height = capture_ibl ? 512 : swapchain_extent.height,
+        .extent = resolution,
         .format = TextureFormat::Depth24Stencil8,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
@@ -109,8 +109,7 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
     
     shadow_map = create_texture({
         .name = "shadow_map",
-        .width = Constants::shadowmap_extent.width,
-        .height = Constants::shadowmap_extent.height,
+        .extent = Constants::shadowmap_extent,
         .format = TextureFormat::Depth32F,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
@@ -417,7 +416,7 @@ void GameRenderGraph::draw_scene(RenderGraphContext& ctx)
             ctx.backend.push_constants(cmd, item.world, pipeline);
 
             const bool use_swapchain_extent = !capture_ibl;
-            RBSwapchainExtent extent = capture_ibl ? RBSwapchainExtent{512, 512} : RBSwapchainExtent{0, 0};
+            Extent extent = capture_ibl ? Constants::ibl_extent : Constants::zero_extent;
             
             ctx.backend.draw_indexed(
                 cmd,
@@ -662,7 +661,7 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
         const RenderObject_Camera* cam_ro =
             camera_processor.get_active_camera();
 
-        auto [width, height] = !capture_ibl ? ctx.backend.get_viewport_extent() : std::pair<uint32_t, uint32_t>{512, 512};
+        auto [width, height] = !capture_ibl ? ctx.backend.get_viewport_extent() : Constants::ibl_extent;
         
         auto aspect = float(width) / float(height);
         auto proj = cam_ro->get_projection(aspect);
@@ -820,7 +819,7 @@ void GameRenderGraph::pass_readback(RenderGraphContext& ctx)
             Constants::ibl_extent
         );
     
-    Dim2d extent {Constants::ibl_extent.width, Constants::ibl_extent.height};
+    Extent extent {Constants::ibl_extent.width, Constants::ibl_extent.height};
     
     exr::save(buffer, fmt,  extent, "hdr/test.exr");
 }

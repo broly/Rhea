@@ -25,7 +25,7 @@ namespace vk
         SwapchainControl(vk::Instance& in_instance, vk::ImageManager& in_texture_manager, vk::SamplerManager& in_sampler_manager, vk::Debug& in_debug)
             : swapchain(VK_NULL_HANDLE)
             , image_manager(in_texture_manager)
-            , extent()
+            , vk_extent()
             , surface_format()
             , instance(in_instance)
             , sampler_manager(in_sampler_manager)
@@ -35,7 +35,7 @@ namespace vk
 
         void init();
         void recreate_swapchain();
-        RBSwapchainExtent get_extent() const;
+        Extent get_extent() const;
 
         RBImageHandle get_image() const;
         bool acquire_next_image(RBFrameHandle frame_handle);
@@ -47,7 +47,7 @@ namespace vk
         void reset_frame_fence(uint32_t frame);
 
         VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-        VkExtent2D extent;
+        VkExtent2D vk_extent;
     
         VkImage depth_image = VK_NULL_HANDLE;
         VkDeviceMemory depth_memory = VK_NULL_HANDLE;

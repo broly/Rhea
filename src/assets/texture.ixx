@@ -7,7 +7,7 @@ import <future>;
 import <json/value.h>;
 import texture_format;
 import dependency_collector;
-
+import rhmath;
 
 import :asset;
 
@@ -45,8 +45,7 @@ export struct Texture
 {
     std::string name;
     
-    uint32_t width;
-    uint32_t height;
+    Extent extent;
     TextureFormat format;
     uint32_t id;
 

@@ -21,9 +21,11 @@ void vk::SwapchainControl::init()
 
     VkPresentModeKHR present_mode = vk::choose_present_mode(support.present_modes);
 
-    extent = vk::choose_extent(support.caps, instance.window);
+    vk_extent = vk::choose_extent(support.caps, instance.window);
     
-    image_manager.set_default_extent(extent.width, extent.height);
+    const Extent extent = {vk_extent.width, vk_extent.height};
+    
+    image_manager.set_default_extent(extent);
 
     // --- Image count ---
     uint32_t image_count = support.caps.minImageCount + 1;
@@ -41,7 +43,7 @@ void vk::SwapchainControl::init()
     sci.minImageCount = image_count;
     sci.imageFormat = surface_format.format;
     sci.imageColorSpace = surface_format.colorSpace;
-    sci.imageExtent = extent;
+    sci.imageExtent = vk_extent;
     sci.imageArrayLayers = 1;
     sci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
@@ -91,7 +93,7 @@ void vk::SwapchainControl::init()
 
     for (uint32_t i = 0; i < sc_image_count; ++i)
     {
-        auto handle = image_manager.create_image_view(extent, surface_format, swapchain_images[i]);
+        auto handle = image_manager.create_image_view(vk_extent, surface_format, swapchain_images[i]);
         swapchain_image_handles[i] = handle;
     }
 }
@@ -128,9 +130,9 @@ void vk::SwapchainControl::recreate_swapchain()
 
 
 
-RBSwapchainExtent vk::SwapchainControl::get_extent() const
+Extent vk::SwapchainControl::get_extent() const
 {
-    return RBSwapchainExtent{extent.width, extent.height};
+    return Extent{vk_extent.width, vk_extent.height};
 }
 
 RBImageHandle vk::SwapchainControl::get_image() const

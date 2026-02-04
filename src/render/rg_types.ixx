@@ -36,8 +36,7 @@ export
     struct RGTextureDesc
     {
         Name name;
-        uint32_t width  = 0;
-        uint32_t height = 0;    
+        Extent extent;
 
         TextureFormat format = TextureFormat::Undefined;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;

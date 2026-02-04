@@ -25,7 +25,7 @@ void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, s
 }
 
 
-RBSwapchainExtent VkRenderBackend::get_swapchain_extent() const
+Extent VkRenderBackend::get_swapchain_extent() const
 {
     return swapchain.get_extent();
 }
@@ -84,8 +84,8 @@ void VkRenderBackend::create_depth_resources()
     VkImageCreateInfo image_ci{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.extent = {
-        swapchain.extent.width,
-        swapchain.extent.height,
+        swapchain.vk_extent.width,
+        swapchain.vk_extent.height,
         1
     };
     image_ci.mipLevels = 1;
@@ -180,7 +180,7 @@ void VkRenderBackend::destroy_depth_resources()
 
 void VkRenderBackend::update_viewport_extent(const RBCommandList& cmd)
 {
-    RBSwapchainExtent extent = swapchain.get_extent();
+    Extent extent = swapchain.get_extent();
 
     VkViewport viewport;
     viewport.x = 0;
@@ -199,7 +199,7 @@ void VkRenderBackend::update_viewport_extent(const RBCommandList& cmd)
 }
 
 
-void VkRenderBackend::update_viewport(const RBCommandList& cmd, RBSwapchainExtent extent)
+void VkRenderBackend::update_viewport(const RBCommandList& cmd, Extent extent)
 {
     VkViewport viewport{};
     viewport.x = 0;
@@ -267,7 +267,7 @@ void VkRenderBackend::advance_frame()
 }
 
 void VkRenderBackend::copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf,
-    TextureFormat& format,RBSwapchainExtent extent)
+    TextureFormat& format,Extent extent)
 {
     image_manager.copy_image_to_buffer(cmd, img, buf, format, extent);
 }
@@ -478,9 +478,9 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, const Textu
     return image_manager.create_texture_2d(tex, texture_creation_info);
 }
 
-std::pair<uint32_t, uint32_t> VkRenderBackend::get_viewport_extent() const
+Extent VkRenderBackend::get_viewport_extent() const
 {
-    return {swapchain.extent.width, swapchain.extent.height};
+    return {swapchain.vk_extent.width, swapchain.vk_extent.height};
 }
 
 RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
@@ -635,7 +635,7 @@ void VkRenderBackend::end_commands(RBCommandList cmd_list)
 RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc& desc)
 {
     VkRenderPass rp = get_or_create_render_pass(desc);
-    RBSwapchainExtent extent = swapchain.get_extent();
+    Extent extent = swapchain.get_extent();
     return framebuffer_manager.get_or_create_framebuffer(desc, rp, extent);
 }
 
@@ -652,7 +652,7 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
     VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     rpbi.renderPass  = fb.render_pass;
     rpbi.framebuffer = fb.framebuffer;
-    rpbi.renderArea.extent = { fb.width, fb.height };
+    rpbi.renderArea.extent = { fb.extent.width, fb.extent.height };
     rpbi.clearValueCount = 2;
     rpbi.pClearValues = clears;
 

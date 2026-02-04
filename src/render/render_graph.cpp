@@ -61,8 +61,7 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     desc.external = false;
     desc.imported = true;
     desc.format = data.format;
-    desc.width = data.width;
-    desc.height = data.height;
+    desc.extent = data.extent;
     desc.name = data.name;
     desc.usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst;
     
@@ -140,8 +139,7 @@ void RenderGraph::compile()
         {
             RBImageDesc desc{
                 .name = std::string("RG_") + tex.desc.name.to_string(),
-                .width  = tex.desc.width,
-                .height = tex.desc.height,
+                .extent  = tex.desc.extent,
                 .format = tex.desc.format,
                 .usage  = tex.desc.usage
             };
@@ -284,17 +282,16 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
         bool size_set = false;
 
-        auto set_size = [&](uint32_t w, uint32_t h)
+        auto set_size = [&](Extent extent)
         {
             if (!size_set)
             {
-                fb_desc.width  = w;
-                fb_desc.height = h;
+                fb_desc.extent = extent;
                 size_set = true;
             }
             else
             {
-                assert(fb_desc.width == w && fb_desc.height == h);
+                assert(fb_desc.extent == extent);
             }
         };
 
@@ -307,7 +304,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
             RBImageHandle image = tex.get_image(*backend, frame);
 
-            set_size(tex.desc.width, tex.desc.height);
+            set_size(tex.desc.extent);
 
             if (tex.desc.usage & RenderTextureUsage::DepthStencil)
             {
@@ -358,15 +355,13 @@ void RenderGraph::rebuild_resources()
     {
         if (tex.is_swapchain())
         {
-            tex.desc.width  = extent.width;
-            tex.desc.height = extent.height;
+            tex.desc.extent = extent;
             continue;
         }
         
         RBImageDesc desc = {
             .name = std::string("RG_") + tex.desc.name.to_string(),
-            .width  = tex.desc.width,
-            .height = tex.desc.height,
+            .extent  = tex.desc.extent,
             .format = tex.desc.format,
             .usage  = tex.desc.usage
         };

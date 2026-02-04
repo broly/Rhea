@@ -13,15 +13,13 @@ namespace vk
         
         VkFramebuffer framebuffer;
         VkRenderPass  render_pass;
-        uint32_t      width;
-        uint32_t      height;
+        Extent extent;
         std::vector<VkImageView> attachments;
         
-        bool matches(const FramebufferDesc& in_desc, VkRenderPass in_render_pass, uint32_t in_width, uint32_t in_height)
+        bool matches(const FramebufferDesc& in_desc, VkRenderPass in_render_pass, Extent in_extent)
         {
             bool almost_identical = 
-                width == in_width && 
-                height == in_height && 
+                extent == in_extent && 
                 in_render_pass == render_pass &&
                 desc.color_attachments.size() == in_desc.color_attachments.size();
             
@@ -55,7 +53,7 @@ namespace vk
         
         void destroy_framebuffers();
         
-        RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc, VkRenderPass render_pass, RBSwapchainExtent extent);
+        RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc, VkRenderPass render_pass, Extent extent);
         const FramebufferResource& get_framebuffer_resource(RBFramebufferId framebuffer_id);
 
         std::unordered_map<size_t, VkFramebuffer> framebuffer_cache;

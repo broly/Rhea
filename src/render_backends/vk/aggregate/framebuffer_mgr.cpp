@@ -14,22 +14,18 @@ void vk::FramebufferManager::destroy_framebuffers()
 }
 
 RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const FramebufferDesc& desc, VkRenderPass render_pass,
-                                                                  RBSwapchainExtent extent)
+                                                                  Extent extent)
 {
-    
-    uint32_t height = (desc.height > 0) ? desc.height : extent.height;
-    uint32_t width = (desc.width > 0) ? desc.width : extent.width;
-    
+    Extent ext = !desc.extent.is_zero() ? desc.extent : extent;
     
     for (uint32_t i = 0; i < framebuffer_resources.size(); ++i)
     {
-        if (framebuffer_resources[i].matches(desc, render_pass, width, height))
+        if (framebuffer_resources[i].matches(desc, render_pass, ext))
             return RBFramebufferId{(uint64_t)i};
     }
     
     
-    assert(height > 0);
-    assert(width > 0);
+    assert(!ext.is_zero());
 
     std::vector<VkImageView> attachments;
 
@@ -45,8 +41,8 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
     info.renderPass = render_pass;
     info.attachmentCount = uint32_t(attachments.size());
     info.pAttachments = attachments.data();
-    info.width  = width;
-    info.height = height;
+    info.width  = ext.width;
+    info.height = ext.height;
     info.layers = 1;
 
     VkFramebuffer fb;
@@ -57,8 +53,7 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
         .desc = desc,
         .framebuffer = fb,
         .render_pass = render_pass,
-        .width = width,
-        .height = height,
+        .extent = ext,
         .attachments = attachments
     });
 

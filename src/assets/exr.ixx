@@ -7,5 +7,5 @@ import rhmath;
 export namespace exr
 {
     
-    bool save(const std::vector<std::byte>& buffer, TextureFormat fmt, Dim2d dim, const std::string& path);
+    bool save(const std::vector<std::byte>& buffer, TextureFormat fmt, Extent dim, const std::string& path);
 }

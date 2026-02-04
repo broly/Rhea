@@ -9,6 +9,7 @@ import type_id;
 import assets;
 import name;
 import texture_format;
+import rhmath;
 
 #include "common/reflect_macros.h"
 #include "common/type_macros.h"
@@ -278,8 +279,7 @@ export
     struct RBImageDesc
     {
         Name name;
-        uint32_t width;
-        uint32_t height;
+        Extent extent;
         TextureFormat format;
         Mask<RenderTextureUsage::Type> usage;
         uint32_t mip_levels = 1;
@@ -315,20 +315,14 @@ export
         std::optional<AttachmentDesc> depth_attachment;
         
 
-        uint32_t width  = 0;
-        uint32_t height = 0;
-    };
-
-    struct RBSwapchainExtent
-    {
-        uint32_t width, height;
+        Extent extent;
     };
     
     struct RBDrawParams
     {
         bool update_viewport_extent = false;
         bool use_swapchain_extent = false;
-        RBSwapchainExtent extent;
+        Extent extent;
     };
 
     using RBRenderPass = RBHandle<VkRenderPass>;

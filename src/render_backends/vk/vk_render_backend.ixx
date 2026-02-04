@@ -99,7 +99,7 @@ public:   /// API Section
     virtual PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc) override;
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) override;
-    virtual RBSwapchainExtent get_swapchain_extent() const override;
+    virtual Extent get_swapchain_extent() const override;
     virtual void transition_image(
         RBCommandList cmd,
         RBImageHandle image,
@@ -117,7 +117,7 @@ public:   /// API Section
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
-    virtual void copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& format, RBSwapchainExtent extent) override;
+    virtual void copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& format, Extent extent) override;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) override;
@@ -132,10 +132,10 @@ public:   /// API Section
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) override;
-    std::pair<uint32_t, uint32_t> get_viewport_extent() const override;
+    virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     
-    virtual void update_viewport(const RBCommandList& cmd, RBSwapchainExtent extent) override;
+    virtual void update_viewport(const RBCommandList& cmd, Extent extent) override;
     // Initialization section
     void create_frame_sync_objects();
     void create_descriptor_pool();
