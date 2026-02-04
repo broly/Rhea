@@ -207,6 +207,9 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& parameters)
             .execute = std::bind(&GameRenderGraph::pass_readback, this, std::placeholders::_1),
         });
     }
+    
+    if (capture_ibl)
+        set_post_render(std::bind(&GameRenderGraph::post_render, this, std::placeholders::_1));
 
     
     compile();
@@ -809,18 +812,21 @@ void GameRenderGraph::pass_tonemapping(RenderGraphContext& ctx)
 
 void GameRenderGraph::pass_readback(RenderGraphContext& ctx)
 {
+    
+}
+
+void GameRenderGraph::post_render(RenderGraphContext& ctx)
+{
     std::vector<std::byte> buffer;
     TextureFormat fmt;
     ctx.backend.copy_image_to_buffer(
-            ctx.cmd,
             get_image(hdr_color),
             buffer,
             fmt,
             Constants::ibl_extent
         );
     
-    Extent extent {Constants::ibl_extent.width, Constants::ibl_extent.height};
     
-    exr::save(buffer, fmt,  extent, "hdr/test.exr");
+    exr::save(buffer, fmt,  Constants::ibl_extent, "hdr/test.exr");
 }
 

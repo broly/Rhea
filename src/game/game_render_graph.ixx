@@ -34,6 +34,8 @@ public:
     void pass_tonemapping(RenderGraphContext& ctx);
     void pass_readback(RenderGraphContext& ctx);
     
+    void post_render(RenderGraphContext& ctx);
+    
     RGTextureHandle shadow_map;
     
     RenderResource* camera_resource;

@@ -118,6 +118,8 @@ public:
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
+    
+    void set_post_render(std::function<void(RenderGraphContext&)> in_post_render);
 
     RGPassId add_pass(RenderGraphPass&& pass);
 
@@ -168,6 +170,8 @@ public:
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
     std::shared_ptr<Renderer> renderer;
+    
+    std::function<void(RenderGraphContext& ctx)> post_render = nullptr;
     
     RGTexture* get_swapchain_texture();
     

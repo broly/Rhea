@@ -482,6 +482,13 @@ export namespace vk
                 VK_PIPELINE_STAGE_TRANSFER_BIT,
                 VK_ACCESS_TRANSFER_WRITE_BIT
             };
+            
+        case RBImageLayout::transfer_src_optimal:
+            return {
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_ACCESS_TRANSFER_READ_BIT
+            };
 
         case RBImageLayout::transfer_present:
             return {

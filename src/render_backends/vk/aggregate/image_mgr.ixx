@@ -52,11 +52,14 @@ namespace vk
             RBImageLayout before,
             RBImageLayout after);
         
-        void copy_image_to_buffer(RBCommandList cmd, RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& out_format, Extent extent);
+        void copy_image_to_buffer(RBImageHandle img, std::vector<std::byte>& buf, TextureFormat& out_format, Extent extent);
         
         void generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image, uint32_t width, uint32_t height, uint32_t mip_levels);
         
-        
+        void create_staging_buffer(
+            VkDeviceSize size,
+            VkBuffer& out_buffer,
+            VkDeviceMemory& out_memory);
         VkImageSubresourceRange full_subresource_range(RBImageHandle image);
         
         

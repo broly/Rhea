@@ -17,7 +17,7 @@ RBImageHandle RGTexture::get_image(RenderBackend& backend, RBFrameHandle frame) 
 
 void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImageLayout next, RBFrameHandle frame)
 {
-    
+    checkf(next != RBImageLayout::undefined, "wrong state");
     RBImageHandle img_handle = desc.swapchain_image ? backend.get_swapchain_image(frame) : *image;
     
     auto cur_layout = current_layout ? *current_layout : RBImageLayout::undefined;
@@ -79,6 +79,11 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     return handle;
 }
 
+void RenderGraph::set_post_render(std::function<void(RenderGraphContext&)> in_post_render)
+{
+    post_render = in_post_render;
+}
+
 RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
 {
     assert(!graph_compiled);
@@ -107,6 +112,8 @@ static RBImageLayout initial_layout_from_usage(RBImageUsage usage)
 
     case RBImageUsage::TransferDst:
         return RBImageLayout::transfer_dst_optimal;
+    case RBImageUsage::TransferSrc:
+        return RBImageLayout::transfer_src_optimal;
 
     case RBImageUsage::Present:
         return RBImageLayout::transfer_present;
@@ -344,6 +351,12 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
     if (auto tex = get_swapchain_texture())
         tex->memory_barrier(cmd, *backend, RBImageLayout::transfer_present, frame);
+    
+    if (post_render)
+    {
+        ctx.pass_name = "";
+        post_render(ctx);
+    }
 }
 
 
