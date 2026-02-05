@@ -7,3 +7,4 @@ export import :rhcomp_reflection_capture;
 export import :scene_view_proxy.camera;
 export import :scene_view_proxy.light;
 export import :scene_view_proxy.mesh;
+export import :scene_view_proxy.reflection_capture;

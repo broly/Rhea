@@ -260,6 +260,12 @@ export
     using RBFrameHandle = uint32_t;
 
 
+    enum class TextureDimension
+    {
+        Tex2D,
+        Cube
+    };
+
 
     namespace RenderTextureUsage
     {
@@ -283,7 +289,12 @@ export
         TextureFormat format;
         Mask<RenderTextureUsage::Type> usage;
         uint32_t mip_levels = 1;
-        bool is_imported = false;
+        bool is_cubemap = false;
+        
+        uint32_t get_array_layers() const
+        {
+            return is_cubemap ? 6 : 1;
+        }
     };
 
     struct RBImageHandle
@@ -304,6 +315,7 @@ export
         RBLoadOp load;
         RBStoreOp store;
         RBImageUsage usage;
+        uint32_t layer = 0;
     };
     
 

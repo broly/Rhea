@@ -26,7 +26,8 @@ void RhComp_ReflectionCapture::start()
     
     auto reflection_captures_path = paths::get_cache_path() / "reflection_captures";
     
-    //auto render_graph = RhGlobals::engine->renderer->get_render_graph("scene_capture");
+    const std::string filename = std::string("hdr/ibl_atlas_") + owner->name.to_string() + ".exr";
+    cubemap = AssetManager::get().load_cubemap(filename);
 }
 
 void RhComp_ReflectionCapture::finish()

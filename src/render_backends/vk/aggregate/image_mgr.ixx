@@ -29,7 +29,7 @@ namespace vk
             VkImage image);
         
         vk::ImageResource& get_image_resource(RBImageHandle image_handle);
-        VkImageView get_image_view(RBImageHandle image_handle);
+        VkImageView get_image_view(RBImageHandle image_handle, uint32_t base_layer = 0, uint32_t layer_count = 1);
         
         RBImageHandle create_image(const RBImageDesc& desc);
         

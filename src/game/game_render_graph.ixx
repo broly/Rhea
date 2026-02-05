@@ -45,6 +45,7 @@ public:
     RGTextureHandle depth_texture;
     RGTextureHandle noise_texture;
     RGTextureHandle hdr_color;
+    RGTextureHandle irradiance;
     
     std::shared_ptr<Material> tonemap_material;
     std::shared_ptr<Material> shadow_debug_material;

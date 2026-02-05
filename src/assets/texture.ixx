@@ -49,7 +49,7 @@ export struct Texture
     TextureFormat format;
     uint32_t id;
 
-    std::vector<uint8_t> pixels;
+    std::vector<std::byte> bulk;
     
     static std::optional<Texture> create_from_file(const std::filesystem::path& path);
     

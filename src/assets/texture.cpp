@@ -32,28 +32,31 @@ std::optional<Texture> Texture::create_from_file(const std::filesystem::path& pa
 {
     Texture texture;
     
-    int width, height, channels;
-    unsigned char* pixels = stb::load(path.string().c_str(), 
-                                &width, 
-                                &height, 
-                                &channels, 
-                                stb::STBI_rgb_alpha);
+    checkf(path.extension() == ".png", "could not load non .png files yet");
     
-    if (!pixels) {
+    int width, height, channels;
+    unsigned char* pixels = stb::load(path.string().c_str(),
+                                      &width,
+                                      &height,
+                                      &channels,
+                                      stb::STBI_rgb_alpha);
+
+    if (!pixels)
+    {
         return std::nullopt;
         // throw std::runtime_error("Failed to load texture: " + path.string());
     }
-    
+
     texture.extent.width = static_cast<uint32_t>(width);
     texture.extent.height = static_cast<uint32_t>(height);
     texture.format = TextureFormat::RGBA8;
-    
+
     size_t image_size = width * height * 4;
-    texture.pixels.resize(image_size);
-    memcpy(texture.pixels.data(), pixels, image_size);
-    
+    texture.bulk.resize(image_size);
+    memcpy(texture.bulk.data(), pixels, image_size);
+
     stb::free(pixels);
-    
+
     return texture;
 }
 

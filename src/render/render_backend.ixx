@@ -104,7 +104,7 @@ public:
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) = 0;
-    virtual RBImageView get_image_view(RBImageHandle handle) = 0;
+    virtual RBImageView get_image_view(RBImageHandle handle, uint32_t base_layer = 0, uint32_t layer_count = 1) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;

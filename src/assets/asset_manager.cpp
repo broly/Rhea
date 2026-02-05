@@ -47,9 +47,6 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
         LogAssets.Log("Texture %s already loaded", rel_path.c_str());
         return texture_by_path[rel_path];
     }
-    
-    
-    
     LogAssets.Log("Loading texture: %s", rel_path.c_str());
     
     const std::filesystem::path path = paths::get_assets_path() / rel_path;
@@ -88,6 +85,38 @@ AssetSceneInfo AssetManager::load_scene(const std::string& rel_path, const std::
     
 }
 
+CubemapHandle AssetManager::load_cubemap(const std::string& rel_path)
+{
+    if (cubemap_by_path.contains(rel_path))
+    {
+        LogAssets.Log("Texture %s already loaded", rel_path.c_str());
+        return cubemap_by_path[rel_path];
+    }
+    LogAssets.Log("Loading texture: %s", rel_path.c_str());
+    
+    const std::filesystem::path path = paths::get_cache_path() / rel_path;
+    
+    std::optional<Cubemap> cubemap_opt = Cubemap::load(path);
+    
+    if (!cubemap_opt.has_value())
+        return CubemapHandle::invalid();
+    
+    Cubemap cubemap = std::move(*cubemap_opt);
+    
+    std::scoped_lock<std::mutex> lock(mutex);
+    
+    cubemap.name = rel_path;
+    const uint32_t cubemap_id = ++cubemaps_counter;
+    cubemap.id = cubemap_id;
+    
+    const CubemapHandle cubemap_handle {cubemap_id};
+    
+    cubemap_by_path.insert({rel_path, cubemap_handle});
+    loaded_cubemaps.insert({cubemap_handle, std::move(cubemap)});
+
+    return cubemap_handle;
+}
+
 MeshHandle AssetManager::store_mesh(StaticMesh&& mesh)
 {
     const uint32_t mesh_id = ++meshes_counter;
@@ -99,11 +128,23 @@ MeshHandle AssetManager::store_mesh(StaticMesh&& mesh)
     return mesh_handle;
 }
 
+CubemapHandle AssetManager::store_cubemap(Cubemap&& cubemap)
+{
+    const uint32_t cubemap_id = ++cubemaps_counter;
+    
+    const CubemapHandle cubemap_handle {cubemap_id};
+    
+    loaded_cubemaps.insert({cubemap_handle, std::move(cubemap)});
+    
+    
+    return cubemap_handle;
+}
+
 std::shared_future<TextureHandle> AssetManager::load_texture_async(const std::string& path)
 {
     std::lock_guard lock(mutex);
 
-    if (auto it = in_flight.find(path); it != in_flight.end())
+    if (auto it = textures_in_flight.find(path); it != textures_in_flight.end())
     {
         return it->second;
     }
@@ -114,7 +155,31 @@ std::shared_future<TextureHandle> AssetManager::load_texture_async(const std::st
 
     auto future = task.get_future().share();
 
-    in_flight[path] = future;
+    textures_in_flight[path] = future;
+
+    std::thread([task = std::move(task)]() mutable {
+        task();
+    }).detach();
+
+    return future;
+}
+
+std::shared_future<CubemapHandle> AssetManager::load_cubemap_async(const std::string& path)
+{
+    std::lock_guard lock(mutex);
+
+    if (auto it = cubemaps_in_flight.find(path); it != cubemaps_in_flight.end())
+    {
+        return it->second;
+    }
+
+    std::packaged_task<CubemapHandle()> task([path]() {
+        return get().load_cubemap(path);
+    });
+
+    auto future = task.get_future().share();
+
+    cubemaps_in_flight[path] = future;
 
     std::thread([task = std::move(task)]() mutable {
         task();
@@ -139,4 +204,9 @@ const StaticMesh& AssetManager::get_mesh(MeshHandle id)
 const Texture& AssetManager::get_texture(TextureHandle texture_handle)
 {
     return loaded_textures[texture_handle];
+}
+
+const Cubemap& AssetManager::get_cubemap(CubemapHandle cubemap_handle)
+{
+    return loaded_cubemaps[cubemap_handle];
 }

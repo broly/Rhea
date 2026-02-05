@@ -20,8 +20,6 @@ export struct RenderObject_Mesh
     MeshHandle mesh;
     glm::mat4 world;
     AABB bounds;
-    // std::vector<MaterialKey> material_keys;
-    // std::vector<RenderResourceInstance*> material_instances;
     std::vector<std::shared_ptr<Material>> mats;
     std::vector<std::shared_ptr<MaterialInstance>> mats_instances;
     Name debug_name;

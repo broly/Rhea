@@ -32,7 +32,6 @@ export
         Buffer,
     };
 
-
     struct RGTextureDesc
     {
         Name name;
@@ -49,6 +48,9 @@ export
         bool imported_texture_layout_initialized = false;
         
         bool swapchain_image = false;
+        
+        TextureDimension dimension = TextureDimension::Tex2D;
+        uint32_t mip_levels = 1;
     };
 
 

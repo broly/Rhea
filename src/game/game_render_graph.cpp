@@ -70,6 +70,11 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
 
     hdr_color = create_texture(hdr_color_desc);
     
+    if (capture_ibl)
+    {
+        irradiance = create_texture(hdr_color_desc);
+    }
+    
     PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, backend, renderer);
     
     tonemap_pipeline = request_pipeline(
@@ -191,7 +196,16 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
     }
     else
     {
-    
+        // add_pass({
+        //     .name = "IBL_Irradiance",
+        //     .reads = {
+        //         { hdr_color, RBImageUsage::SampledFragment }
+        //     },
+        //     .writes = {
+        //         { irradiance, RBImageUsage::ColorAttachment }
+        //     },
+        //     .execute = pass_ibl_irradiance
+        // });
         add_pass({
             .name = "readback",
             .condition = [this] () { return !is_debugging(); },

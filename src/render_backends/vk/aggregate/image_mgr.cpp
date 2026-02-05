@@ -56,7 +56,7 @@ vk::ImageResource& vk::ImageManager::get_image_resource(RBImageHandle image_hand
     return image_resources[image_handle.id];
 }
 
-VkImageView vk::ImageManager::get_image_view(RBImageHandle image_handle)
+VkImageView vk::ImageManager::get_image_view(RBImageHandle image_handle, uint32_t base_layer, uint32_t layer_count)
 {
     return get_image_resource(image_handle).view;
 }
@@ -94,8 +94,12 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_info.imageType = VK_IMAGE_TYPE_2D;
     image_info.extent = { extent.width, extent.height, 1 };
+    if (desc.is_cubemap)
+    {
+        image_info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    }
     image_info.mipLevels = desc.mip_levels;
-    image_info.arrayLayers = 1;
+    image_info.arrayLayers = desc.is_cubemap ? 6 : 1;
     image_info.format = vk::to_vk_format(desc.format);
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -133,13 +137,22 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
         aspect, 0, desc.mip_levels, 0, 1
     };
     
+    if (desc.is_cubemap)
+    {
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        view_info.subresourceRange.layerCount = 6;
+    }
+    else
+    {
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        view_info.subresourceRange.layerCount = 1;
+    }
+    
 
     VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &res.view));
     
     LogVkImageManager.Log("Created image %p (view %p) '%s'", res.image, res.view, desc.name.to_string().c_str());
     
-    
-
     uint32_t id = static_cast<uint32_t>(image_resources.size());
     image_resources.push_back(res);
     
@@ -212,7 +225,6 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         desc.usage =
             RenderTextureUsage::Sampled |
             RenderTextureUsage::TransferDst;
-        desc.is_imported = texture_creation_info.imported;
 
         RBImageHandle image = create_image(desc);
         auto& res = get_image_resource(image);
@@ -324,7 +336,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     
     
     
-    vk::update_buffer(instance.device, staging_memory, tex.pixels.data(), upload_size);
+    vk::update_buffer(instance.device, staging_memory, tex.bulk.data(), upload_size);
     
     // 3. copy
     immediate_command_pool.submit([&](VkCommandBuffer cmd)

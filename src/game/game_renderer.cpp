@@ -44,7 +44,7 @@ void GameRenderer::init(RBWindowHandle in_window)
 
 void GameRenderer::capture_ibl(glm::vec3 pos, Name actor_name)
 {
-    current_cubemaps.insert({actor_name, CapturingCubemap{}});
+    current_cubemaps.insert({actor_name, Cubemap{}});
     
     for (int index = 0; index < 6; index++)
     {
@@ -65,7 +65,8 @@ void GameRenderer::capture_ibl(glm::vec3 pos, Name actor_name)
                     Constants::ibl_extent
                 );
             current_cubemaps[actor_name].faces[index] = buffer;
-            current_cubemaps[actor_name].ibl_format = fmt;
+            current_cubemaps[actor_name].format = fmt;
+            current_cubemaps[actor_name].face_size = 512;
             
             if (index == 5)
             {
@@ -110,12 +111,8 @@ void GameRenderer::finish_capturing_ibl(Name actor_name)
         }
     }
 
-    exr::save(
-        exr_pixels,
-        TextureFormat::RGBA32F,
-        { width, height },
-        std::string("hdr/ibl_atlas_") + actor_name.to_string() + ".exr"
-    );
+    auto name = std::string("hdr/ibl_atlas_") + actor_name.to_string() + ".exr";
+    current_cubemaps[actor_name].save(name);
 
     current_cubemaps.erase(actor_name);
 }

@@ -50,10 +50,6 @@ void SceneViewProcessor_Mesh::process()
         for (uint32_t index = 0; auto material : submitted.mats)
         {
             mesh_ro.mats[index] = submitted.mats[index];
-            // if (!mesh_ro.mats_instances[index])
-            // {
-            //     mesh_ro.mats_instances[index] = mesh_ro.mats[index]->create_instance(renderer);
-            // }
             index++;
         }
         
