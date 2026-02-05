@@ -15,6 +15,13 @@ RBImageHandle RGTexture::get_image(RenderBackend& backend, RBFrameHandle frame) 
     return is_swapchain() ? backend.get_swapchain_image(frame) : *image;
 }
 
+RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index) const
+{
+    if (is_swapchain())
+        checkf(array_index == 0, "Unable to get layers from swapchain");
+    return backend.get_image_view(get_image(backend, frame), array_index);
+}
+
 void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImageLayout next, RBFrameHandle frame)
 {
     checkf(next != RBImageLayout::undefined, "wrong state");
@@ -144,7 +151,8 @@ void RenderGraph::compile()
                 .name = std::string("RG_") + tex.desc.name.to_string(),
                 .extent  = tex.desc.extent,
                 .format = tex.desc.format,
-                .usage  = tex.desc.usage
+                .usage  = tex.desc.usage,
+                .is_cubemap = tex.desc.dimension == TextureDimension::Cube
             };
             tex.image = backend->create_image(desc);
         }

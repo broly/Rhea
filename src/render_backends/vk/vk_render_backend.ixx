@@ -125,7 +125,7 @@ public:   /// API Section
     virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) override;
-    virtual RBImageView get_image_view(RBImageHandle handle, uint32_t base_layer = 0, uint32_t layer_count = 1) override;
+    virtual RBImageView get_image_view(RBImageHandle handle, uint32_t array_index = 0) override;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;

@@ -309,9 +309,9 @@ void VkRenderBackend::destroy_image(RBImageHandle handle, bool wait_fences)
     return image_manager.destroy_image(handle, wait_fences);
 }
 
-RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t base_layer, uint32_t layer_count)
+RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t array_index)
 {
-    return image_manager.get_image_view(handle, base_layer, layer_count);
+    return image_manager.get_view(handle, array_index);
 }
 
 size_t hash_framebuffer(

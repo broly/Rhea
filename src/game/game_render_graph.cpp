@@ -65,15 +65,16 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
         .extent = resolution,
         .format = TextureFormat::RGBA16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
-        .external = false
+        .external = false,
+        .dimension = capture_ibl ? TextureDimension::Cube : TextureDimension::Tex2D
     };
 
     hdr_color = create_texture(hdr_color_desc);
     
-    if (capture_ibl)
-    {
-        irradiance = create_texture(hdr_color_desc);
-    }
+    // if (capture_ibl)
+    // {
+    //     irradiance = create_texture(hdr_color_desc);
+    // }
     
     PipelineFamily tonemap_pipeline_family("ToneMapping", tonemap_model, backend, renderer);
     

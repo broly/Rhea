@@ -7,6 +7,8 @@ import <map>;
 import rhmath;
 
 import render;
+import name;
+#include "common/assertion_macros.h"
 
 namespace vk
 {
@@ -54,11 +56,35 @@ namespace vk
     
     struct ImageResource
     {
+        Name debug_name;
         VkImage image = VK_NULL_HANDLE;
         VkDeviceMemory memory = VK_NULL_HANDLE;
-
-        // one view per image
-        VkImageView view = VK_NULL_HANDLE;
+        
+        std::vector<VkImageView> views;
+        
+        void set_img_view(VkImageView view, uint32_t array_index = 0)
+        {
+            checkf(array_index < array_layers, "Image view index out of bounds");
+            if (array_index >= views.size())
+                views.resize(array_index + 1, VK_NULL_HANDLE);
+            views[array_index] = view;
+        }
+        
+        VkImageView& alloc_img_view(uint32_t array_index = 0)
+        {
+            checkf(array_index < array_layers, "Image view index out of bounds");
+            if (array_index >= views.size())
+                views.resize(array_index + 1, VK_NULL_HANDLE);
+            return views[array_index];
+        }
+        
+        VkImageView get_img_view(uint32_t array_index = 0) const
+        {
+            checkf(array_index < array_layers, "Image view index out of bounds");
+            auto result = views[array_index];
+            checkf(result != VK_NULL_HANDLE, "NULL image handle detected");
+            return result;
+        }
 
         Extent extent;
         VkFormat format = VK_FORMAT_UNDEFINED;

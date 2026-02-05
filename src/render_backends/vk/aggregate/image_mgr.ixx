@@ -26,10 +26,11 @@ namespace vk
         RBImageHandle create_image_view(
             VkExtent2D vk_extent, 
             const VkSurfaceFormatKHR& surface_format,
-            VkImage image);
+            VkImage image,
+            uint32_t array_index = 0);
         
         vk::ImageResource& get_image_resource(RBImageHandle image_handle);
-        VkImageView get_image_view(RBImageHandle image_handle, uint32_t base_layer = 0, uint32_t layer_count = 1);
+        VkImageView get_view(RBImageHandle image_handle, uint32_t array_index = 0);
         
         RBImageHandle create_image(const RBImageDesc& desc);
         

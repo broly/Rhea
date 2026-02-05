@@ -14,7 +14,8 @@ import :log;
 RBImageHandle vk::ImageManager::create_image_view(
     VkExtent2D vk_extent, 
     const VkSurfaceFormatKHR& surface_format,
-    VkImage image)
+    VkImage image,
+    uint32_t array_index)
 {
     VkImageView view;
 
@@ -38,7 +39,7 @@ RBImageHandle vk::ImageManager::create_image_view(
 
     vk::ImageResource res{};
     res.image  = image;                 // VkImage
-    res.view   = view;                  // VkImageView
+    res.set_img_view(view);                  // VkImageView
     res.format = surface_format.format;
     res.extent.width  = vk_extent.width;
     res.extent.height = vk_extent.height;
@@ -56,9 +57,9 @@ vk::ImageResource& vk::ImageManager::get_image_resource(RBImageHandle image_hand
     return image_resources[image_handle.id];
 }
 
-VkImageView vk::ImageManager::get_image_view(RBImageHandle image_handle, uint32_t base_layer, uint32_t layer_count)
+VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t array_index)
 {
-    return get_image_resource(image_handle).view;
+    return get_image_resource(image_handle).get_img_view(array_index);
 }
 
 RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
@@ -149,9 +150,9 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     }
     
 
-    VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &res.view));
+    VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &res.alloc_img_view()));
     
-    LogVkImageManager.Log("Created image %p (view %p) '%s'", res.image, res.view, desc.name.to_string().c_str());
+    LogVkImageManager.Log("Created image %p (view %p) '%s'", res.image, res.get_img_view(), desc.name.to_string().c_str());
     
     uint32_t id = static_cast<uint32_t>(image_resources.size());
     image_resources.push_back(res);
@@ -170,10 +171,10 @@ void vk::ImageManager::destroy_image(RBImageHandle handle, bool wait_fences)
 
     vk::ImageResource& res = image_resources[handle.id];
 
-    if (res.view != VK_NULL_HANDLE)
+    if (res.get_img_view() != VK_NULL_HANDLE)
     {
-        vkDestroyImageView(instance.device, res.view, nullptr);
-        res.view = VK_NULL_HANDLE;
+        vkDestroyImageView(instance.device, res.get_img_view(), nullptr);
+        res.set_img_view(VK_NULL_HANDLE);
     }
 
     if (res.image != VK_NULL_HANDLE)
