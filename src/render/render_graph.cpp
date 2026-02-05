@@ -196,8 +196,14 @@ void RenderGraph::compile()
             checkf(allowed_in_write.contains(write.usage), 
                 "prohibited write usage: %s", reflect::enum_name(write.usage).to_string().c_str());
             
-            checkf(!textures[write.texture.id].desc.imported,
+            auto& texture = textures[write.texture.id];
+            
+            checkf(!texture.desc.imported,
                 "imported textures could not be written");
+            
+            checkf(pass.num_instances <= texture.get_layers_count(), 
+                "could not handle pass (%s) with num_instances greater than texture (%s) array count",
+                    pass.name.to_string().c_str(), texture.desc.name.to_string().c_str());
         }
         
         // generate pass barriers
@@ -286,48 +292,6 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         
         if (pass.condition && !pass.condition())
             continue;
-
-        // Build framebuffer
-        FramebufferDesc fb_desc{};
-        fb_desc.pass = pass.name;
-
-        bool size_set = false;
-
-        auto set_size = [&](Extent extent)
-        {
-            if (!size_set)
-            {
-                fb_desc.extent = extent;
-                size_set = true;
-            }
-            else
-            {
-                assert(fb_desc.extent == extent);
-            }
-        };
-
-        for (const auto& write : pass.writes)
-        {
-            if (!is_attachment(write.usage))
-                continue;
-
-            const RGTexture& tex = textures[write.texture.id];
-
-            RBImageHandle image = tex.get_image(*backend, frame);
-
-            set_size(tex.desc.extent);
-
-            if (tex.desc.usage & RenderTextureUsage::DepthStencil)
-            {
-                fb_desc.depth_attachment = { image, write.load_op, write.store_op, write.usage };
-            }
-            else
-            {
-                fb_desc.color_attachments.push_back({ image, write.load_op, RBStoreOp::Store, write.usage });
-            }
-        }
-
-        ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
         
         for (const auto& [tex, barrier] : pass.pass_barriers)
         {
@@ -335,16 +299,50 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
             if (barrier.before_pass && texture.allows_barrier())
                 texture.memory_barrier(cmd, *backend, barrier.before_pass->layout, frame);
         }
-
-        backend->begin_render_pass(cmd, ctx.framebuffer);
-
+        
+        for (uint32_t pass_inst_id = 0; pass_inst_id < pass.num_instances; ++pass_inst_id)
         {
-            PROFILE("RenderGraph Pass");
-            ctx.pass_name = pass.name;
-            pass.execute(ctx);
-        }
+            // Build framebuffer
+            FramebufferDesc fb_desc{};
+            fb_desc.pass = pass.name;
 
-        backend->end_render_pass(cmd);
+
+            for (const auto& write : pass.writes)
+            {
+                if (!is_attachment(write.usage))
+                    continue;
+
+                const RGTexture& tex = textures[write.texture.id];
+
+                RBImageHandle image = tex.get_image(*backend, frame);
+
+                if (!fb_desc.is_extent_set())
+                    fb_desc.update_extent(tex.desc.extent);
+
+                if (tex.desc.usage & RenderTextureUsage::DepthStencil)
+                {
+                    fb_desc.depth_attachment = { image, write.load_op, write.store_op, write.usage, pass_inst_id };
+                }
+                else
+                {
+                    fb_desc.color_attachments.push_back({ image, write.load_op, RBStoreOp::Store, write.usage, pass_inst_id });
+                }
+            }
+
+            ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
+        
+
+            backend->begin_render_pass(cmd, ctx.framebuffer);
+
+            {
+                PROFILE("RenderGraph Pass");
+                ctx.pass_name = pass.name;
+                pass.execute(ctx);
+            }
+
+            backend->end_render_pass(cmd);
+        
+        }
         
         for (auto& [tex, barrier] : pass.pass_barriers)
         {

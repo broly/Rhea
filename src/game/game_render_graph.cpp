@@ -58,7 +58,9 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
     auto swapchain_extent = backend->get_swapchain_extent();
     
     auto resolution = capture_ibl ? Constants::ibl_extent : Constants::zero_extent;
-
+    
+    const TextureDimension dim = capture_ibl ? TextureDimension::Cube : TextureDimension::Tex2D;
+    const uint32_t num_instances_per_pass = capture_ibl ? 6 : 1;
     
     RGTextureDesc hdr_color_desc{
         .name = "hdr_color",
@@ -66,7 +68,7 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
         .format = TextureFormat::RGBA16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false,
-        .dimension = capture_ibl ? TextureDimension::Cube : TextureDimension::Tex2D
+        .dimension = dim
     };
 
     hdr_color = create_texture(hdr_color_desc);
@@ -103,7 +105,8 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
         .name = "depth",
         .extent = resolution,
         .format = TextureFormat::Depth24Stencil8,
-        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
+        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
+        .dimension = dim
     });
     
     
@@ -147,7 +150,7 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
         .execute = std::bind(&GameRenderGraph::pass_geometry_base, this, std::placeholders::_1),
-
+        .num_instances = num_instances_per_pass
     });
     
     
@@ -160,6 +163,7 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },   
         },
         .execute = std::bind(&GameRenderGraph::pass_translucent, this, std::placeholders::_1),
+        .num_instances = num_instances_per_pass
     });
     
     
@@ -174,6 +178,7 @@ void GameRenderGraph::init_render_graph(const std::map<Name, bool>& init_params)
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
         },
         .execute = std::bind(&GameRenderGraph::pass_clouds, this, std::placeholders::_1),
+        .num_instances = num_instances_per_pass
         
     });
 

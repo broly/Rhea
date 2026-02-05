@@ -23,6 +23,8 @@ export struct RenderGraphPass
     std::function<void(class RenderGraphContext&)> execute;
     
     std::map<RGTextureHandle, RGImageBarriers> pass_barriers;
+    
+    uint32_t num_instances = 1;
 };
 
 
@@ -60,6 +62,11 @@ struct RGTexture
     bool is_swapchain() const
     {
         return desc.swapchain_image;
+    }
+    
+    uint32_t get_layers_count() const
+    {
+        return desc.dimension == TextureDimension::Cube ? 6 : 1;
     }
     
     void reset_layout();

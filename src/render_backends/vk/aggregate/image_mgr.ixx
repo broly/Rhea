@@ -29,6 +29,8 @@ namespace vk
             VkImage image,
             uint32_t array_index = 0);
         
+        RBImageView fetch_image_view(RBImageHandle image_handle, uint32_t array_index = 0);
+        
         vk::ImageResource& get_image_resource(RBImageHandle image_handle);
         VkImageView get_view(RBImageHandle image_handle, uint32_t array_index = 0);
         

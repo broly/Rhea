@@ -326,6 +326,16 @@ export
         std::vector<AttachmentDesc> color_attachments;
         std::optional<AttachmentDesc> depth_attachment;
         
+        void update_extent(const Extent& new_extent)
+        {
+            extent = new_extent;
+        }
+        
+        bool is_extent_set() const
+        {
+            return extent.is_not_zero();
+        }
+        
 
         Extent extent;
     };
