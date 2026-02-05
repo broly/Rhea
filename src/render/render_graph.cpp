@@ -285,6 +285,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     // Initialize external images (swapchain)
     for (auto& tex : textures)
         tex.reset_layout();  // for swapchain: transfer_present
+    
+    prepare_resources();
 
     for (uint32_t pass_index : execution_order)
     {
@@ -321,11 +323,11 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
                 if (tex.desc.usage & RenderTextureUsage::DepthStencil)
                 {
-                    fb_desc.depth_attachment = { image, write.load_op, write.store_op, write.usage, pass_inst_id };
+                    fb_desc.depth_attachment = { tex.desc.name, image, write.load_op, write.store_op, write.usage, pass_inst_id };
                 }
                 else
                 {
-                    fb_desc.color_attachments.push_back({ image, write.load_op, RBStoreOp::Store, write.usage, pass_inst_id });
+                    fb_desc.color_attachments.push_back({ tex.desc.name, image, write.load_op, RBStoreOp::Store, write.usage, pass_inst_id });
                 }
             }
 
@@ -337,6 +339,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
             {
                 PROFILE("RenderGraph Pass");
                 ctx.pass_name = pass.name;
+                ctx.pass_instance_id = pass_inst_id;
                 pass.execute(ctx);
             }
 

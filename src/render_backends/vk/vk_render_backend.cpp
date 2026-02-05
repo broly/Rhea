@@ -272,6 +272,11 @@ void VkRenderBackend::copy_image_to_buffer(RBImageHandle img, std::vector<float>
     image_manager.copy_image_to_buffer(img, buf, format, extent);
 }
 
+ImageReadback VkRenderBackend::readback_image(RBImageHandle img) const
+{
+    return image_manager.readback(img);
+}
+
 void VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle)
 {
     PROFILE(__FUNCTION__);
@@ -348,10 +353,12 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     {
         desc.color_attachments.push_back(
             RenderPassAttachmentInfo{
+                attachment.image_name,
                 get_image_format(attachment.image), 
                 attachment.load, 
                 attachment.store, 
-                attachment.usage
+                attachment.usage,
+                attachment.layer
             });
     }
 
@@ -359,10 +366,12 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     {
         auto attachment = *fb.depth_attachment;
         desc.depth_attachment.emplace(RenderPassAttachmentInfo{});
+        desc.depth_attachment->img_name = attachment.image_name;
         desc.depth_attachment->format = get_image_format(attachment.image);
         desc.depth_attachment->load_op = fb.depth_attachment->load;
         desc.depth_attachment->store_op = fb.depth_attachment->store;
         desc.depth_attachment->usage = attachment.usage;
+        desc.depth_attachment->array_index = attachment.layer;
     }
 
     auto it = render_pass_cache.find(desc);
@@ -374,24 +383,26 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     for (auto attachment : fb.color_attachments)
     {
         auto vk_img = image_manager.get_image_resource(attachment.image).image;
-        LogRBRenderPass.Log(" * color_attachment (image: %s [%p]). Usage: %s (initial & final layouts), load_op: %s, store_op: %s",
+        LogRBRenderPass.Log(" * color_attachment (image: %s [%p]). Usage: %s (initial & final layouts), load_op: %s, store_op: %s, layer: %i",
             debug.get_vk_image_name(vk_img).to_string().c_str(),
             vk_img,
             reflect::enum_name(attachment.usage).to_string().c_str(),
             reflect::enum_name(attachment.load).to_string().c_str(),
-            reflect::enum_name(attachment.store).to_string().c_str());
+            reflect::enum_name(attachment.store).to_string().c_str(),
+            attachment.layer);
     }
     if (fb.depth_attachment)
     {
         auto& attachment = *fb.depth_attachment;
         auto vk_img = image_manager.get_image_resource(attachment.image).image;
         
-        LogRBRenderPass.Log(" * depth_attachment (image: %s [%p}). Usage: %s (initial & final layouts), load_op: %s, store_op: %s",
+        LogRBRenderPass.Log(" * depth_attachment (image: %s [%p}). Usage: %s (initial & final layouts), load_op: %s, store_op: %s, layer: %i",
             debug.get_vk_image_name(vk_img).to_string().c_str(),
             vk_img,
             reflect::enum_name(attachment.usage).to_string().c_str(),
             reflect::enum_name(attachment.load).to_string().c_str(),
-            reflect::enum_name(attachment.store).to_string().c_str());
+            reflect::enum_name(attachment.store).to_string().c_str(),
+            attachment.layer);
     }
 
     std::vector<VkAttachmentDescription> attachments;
@@ -411,7 +422,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = vk::to_attachment_layout(attachment.usage),
-            .finalLayout   = vk::to_attachment_layout(attachment.usage),
+            .finalLayout   = vk::to_attachment_layout(attachment.usage)
         });
 
         color_refs.push_back({

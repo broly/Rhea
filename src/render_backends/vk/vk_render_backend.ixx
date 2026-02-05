@@ -24,10 +24,12 @@ import :debug;
 
 struct RenderPassAttachmentInfo
 {
+    Name img_name;
     RBFormat format;
     RBLoadOp load_op;
     RBStoreOp store_op;
     RBImageUsage usage;
+    uint32_t array_index = 0;
 };
 
 
@@ -118,6 +120,7 @@ public:   /// API Section
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) override;
+    virtual ImageReadback readback_image(RBImageHandle img) const;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) override;

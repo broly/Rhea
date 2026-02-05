@@ -26,6 +26,8 @@ public:
     
     CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false) const;
     
+    virtual void prepare_resources() override;
+    
     void pass_shadow_map(RenderGraphContext& ctx);
     void pass_shadow_debug(RenderGraphContext& ctx);
     void pass_geometry_base(RenderGraphContext& ctx);

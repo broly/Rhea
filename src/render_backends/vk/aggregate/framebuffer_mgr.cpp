@@ -1,4 +1,5 @@
 module vk:framebuffer_mgr;
+import :log;
 
 import <cassert>;
 
@@ -24,18 +25,30 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
             return RBFramebufferId{(uint64_t)i};
     }
     
+    LogVkFramebufferManager.Log("Creating framebuffer for pass '%s'",  desc.pass.to_string().c_str());
+    
     
     assert(!ext.is_zero());
 
     std::vector<VkImageView> attachments;
 
-    for (auto attachment : desc.color_attachments)
+    for (const auto& attachment : desc.color_attachments)
     {
-        attachments.push_back(image_manager.get_view(attachment.image));
+    
+        LogVkFramebufferManager.Log("Use color attachment %s (image: %p, layer: %i)", 
+            attachment.image_name.to_string().c_str(), attachment.image, attachment.layer);
+    
+        attachments.push_back(image_manager.fetch_image_view(attachment.image, attachment.layer));
     }
 
     if (desc.depth_attachment)
-        attachments.push_back(image_manager.get_view(desc.depth_attachment->image));
+    {
+        const auto& attachment = *desc.depth_attachment;
+    
+        LogVkFramebufferManager.Log("Use depth attachment %s (image: %p, layer: %i)", 
+            attachment.image_name.to_string().c_str(), attachment.image, attachment.layer);
+        attachments.push_back(image_manager.fetch_image_view(attachment.image, attachment.layer));
+    }
 
     VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     info.renderPass = render_pass;

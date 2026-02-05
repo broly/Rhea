@@ -95,6 +95,7 @@ public:
     RenderGraph& render_graph;
     RBFrameHandle frame;
     RenderGraphParameters params;
+    uint32_t pass_instance_id;
 };
 
 
@@ -106,6 +107,7 @@ public:
         const std::shared_ptr<Renderer>& in_renderer);
     
     virtual void init_render_graph(const std::map<Name, bool>& parameters) = 0;
+    virtual void prepare_resources() {};
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);

@@ -35,6 +35,16 @@ export struct TextureCreationInfo
     RBImageLayout current_layout = RBImageLayout::undefined;
 };
 
+export struct ImageReadback
+{
+    Extent extent;
+    uint32_t layers = 1;
+    TextureFormat format;
+
+    // layers[l][pixel * channels + c]
+    std::vector<std::vector<float>> layers_data;
+};
+
 export class RenderBackend 
 {
 public:
@@ -44,6 +54,8 @@ public:
     virtual void reset_frame_fence(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
+    virtual ImageReadback readback_image(RBImageHandle img) const = 0;
+    
     
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) = 0;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) = 0;

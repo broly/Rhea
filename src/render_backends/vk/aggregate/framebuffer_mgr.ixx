@@ -16,7 +16,7 @@ namespace vk
         Extent extent;
         std::vector<VkImageView> attachments;
         
-        bool matches(const FramebufferDesc& in_desc, VkRenderPass in_render_pass, Extent in_extent)
+        bool matches(const FramebufferDesc& in_desc, VkRenderPass in_render_pass, Extent in_extent) const
         {
             bool almost_identical = 
                 extent == in_extent && 
@@ -27,11 +27,13 @@ namespace vk
                 return false;
             
             for (uint32_t i = 0; i < desc.color_attachments.size(); ++i)
-                if (desc.color_attachments[i].image != in_desc.color_attachments[i].image)
+                if (desc.color_attachments[i].image != in_desc.color_attachments[i].image ||
+                    desc.color_attachments[i].layer != in_desc.color_attachments[i].layer)
                     return false;
             
             if (desc.depth_attachment.has_value() && in_desc.depth_attachment.has_value())
-                return desc.depth_attachment.value().image == in_desc.depth_attachment.value().image;
+                return desc.depth_attachment.value().image == in_desc.depth_attachment.value().image &&
+                    desc.depth_attachment.value().layer == in_desc.depth_attachment.value().layer;
             
             if (!desc.depth_attachment.has_value() && !in_desc.depth_attachment.has_value())
                 return true;

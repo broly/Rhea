@@ -32,6 +32,7 @@ namespace vk
         RBImageView fetch_image_view(RBImageHandle image_handle, uint32_t array_index = 0);
         
         vk::ImageResource& get_image_resource(RBImageHandle image_handle);
+        const vk::ImageResource& get_image_resource(RBImageHandle image_handle) const;
         VkImageView get_view(RBImageHandle image_handle, uint32_t array_index = 0);
         
         RBImageHandle create_image(const RBImageDesc& desc);
@@ -62,8 +63,10 @@ namespace vk
         void create_staging_buffer(
             VkDeviceSize size,
             VkBuffer& out_buffer,
-            VkDeviceMemory& out_memory);
+            VkDeviceMemory& out_memory) const;
         VkImageSubresourceRange full_subresource_range(RBImageHandle image);
+        
+        ImageReadback readback(RBImageHandle img) const;
         
         
         VkFormat get_image_format(RBImageHandle handle) const;

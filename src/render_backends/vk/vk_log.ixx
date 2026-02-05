@@ -10,7 +10,7 @@ DEFINE_LOGGER(LogVkDescriptors, DisplayFn);
 DEFINE_LOGGER(LogVkSwapchain, DisplayFn);
 DEFINE_LOGGER(LogVkSamplerManager, DisplayFn);
 DEFINE_LOGGER(LogVkImageManager, DisplayFn);
-DEFINE_LOGGER(LogVkBufferManager, Warning);
+DEFINE_LOGGER(LogVkBufferManager, DisplayFn);
 DEFINE_LOGGER(LogVkFramebufferManager, DisplayFn);
-DEFINE_LOGGER(LogVkShader, Warning);
+DEFINE_LOGGER(LogVkShader, DisplayFn);
 

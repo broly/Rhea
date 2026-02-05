@@ -696,12 +696,10 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
     {
         auto pos_it = ctx.params.vec3_params.find("capture_pos");
         checkf(pos_it != ctx.params.vec3_params.end(), "position not found");
-        
-        auto face_index_it = ctx.params.int_params.find("face_index");
-        checkf(face_index_it != ctx.params.int_params.end(), "face index not found");
+
         
         auto position = pos_it->second;
-        auto face_index = face_index_it->second;
+        uint32_t face_index = ctx.pass_instance_id;
         
         static const glm::vec3 cube_dirs[6] = {
             { 1,  0,  0}, {-1,  0,  0},
@@ -738,6 +736,11 @@ CameraUBO GameRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_po
     }
     
     return camera_ubo;
+}
+
+void GameRenderGraph::prepare_resources()
+{
+    // TODO: make/update resources/descriptors here
 }
 
 void GameRenderGraph::pass_shadow_map(RenderGraphContext& ctx)

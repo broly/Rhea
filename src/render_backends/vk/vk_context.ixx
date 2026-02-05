@@ -5,7 +5,7 @@ import <vector>;
 import <vulkan/vulkan_core.h>;
 import <map>;
 import rhmath;
-
+import enum_helpers;
 import render;
 import name;
 #include "common/assertion_macros.h"
@@ -56,11 +56,11 @@ namespace vk
     
     struct ImageResource
     {
-        Name debug_name;
+        Name debug_name = "";
         VkImage image = VK_NULL_HANDLE;
         VkDeviceMemory memory = VK_NULL_HANDLE;
         
-        std::vector<VkImageView> views;
+        std::vector<VkImageView> views = {};
         
         void set_img_view(VkImageView view, uint32_t array_index = 0)
         {
@@ -70,12 +70,9 @@ namespace vk
             views[array_index] = view;
         }
         
-        VkImageView& alloc_img_view(uint32_t array_index = 0)
+        bool has_view_index(uint32_t array_index) const
         {
-            checkf(array_index < array_layers, "Image view index out of bounds");
-            if (array_index >= views.size())
-                views.resize(array_index + 1, VK_NULL_HANDLE);
-            return views[array_index];
+            return array_index < views.size() && views[array_index] != VK_NULL_HANDLE;
         }
         
         VkImageView get_img_view(uint32_t array_index = 0) const
@@ -86,10 +83,11 @@ namespace vk
             return result;
         }
 
-        Extent extent;
+        Extent extent = {};
         VkFormat format = VK_FORMAT_UNDEFINED;
         
         uint32_t mip_levels   = 1; 
         uint32_t array_layers = 1;
+        Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
     };
 }

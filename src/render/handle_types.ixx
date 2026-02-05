@@ -311,6 +311,7 @@ export
     
     struct AttachmentDesc
     {
+        Name image_name;
         RBImageHandle image;
         RBLoadOp load;
         RBStoreOp store;
