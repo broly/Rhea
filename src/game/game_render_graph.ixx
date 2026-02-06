@@ -19,9 +19,6 @@ public:
     void build_passes(const std::map<Name, bool>& parameters) override;
     
     
-    
-    virtual void prepare_resources(RenderGraphContext& ctx) override;
-    
     void pass_shadow_map(RenderGraphContext& ctx);
     void pass_shadow_debug(RenderGraphContext& ctx);
     void pass_translucent(RenderGraphContext& ctx);

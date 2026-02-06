@@ -98,12 +98,6 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
 }
 
-
-void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
-{
-    // TODO: make/update resources/descriptors here
-}
-
 void GameRenderGraph::pass_shadow_map(RenderGraphContext& ctx)
 {
     draw_scene_shadow(ctx);

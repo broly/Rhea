@@ -215,6 +215,318 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
 }
 
+void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
+{
+    RenderGraph::prepare_resources(ctx);
+    
+    prepared_batches.clear();
+    prepared_pass_resources.clear();
+
+    // -------- batching --------
+    prepare_geometry_batches(ctx, Names::pass_geometry_base);
+    prepare_geometry_batches(ctx, Names::pass_geometry_translucent);
+
+    // -------- resources --------
+    prepare_geometry_resources(ctx, Names::pass_geometry_base);
+    prepare_geometry_resources(ctx, Names::pass_geometry_translucent);
+    
+    
+    prepare_clouds_pass(ctx);
+}
+
+LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
+{
+    auto& scene_view = engine->scene_view;
+    auto& light_processor =
+        scene_view->get_processor<SceneViewProcessor_Light>();
+
+    LightUBO light_ubo{};
+    light_ubo.light_count = 0;
+    light_ubo.has_dir_light = false;
+
+    // ---------- Point / spot lights ----------
+    const auto [lights, light_num] =
+        light_processor.query_nearest_lights_limited<8>(
+            camera_position /* или передавай явно */
+        );
+
+    light_ubo.light_count = light_num;
+
+    for (uint32_t i = 0; i < light_num; ++i)
+    {
+        light_ubo.lights[i].position =
+            glm::vec4(lights[i].position, 1.0f);
+
+        light_ubo.lights[i].color = lights[i].color;
+    }
+
+    // ---------- Directional light ----------
+    const auto dir_light =
+        light_processor.get_directional_light();
+
+    if (dir_light)
+    {
+        light_ubo.has_dir_light = true;
+
+        light_ubo.dir_light.direction =
+            glm::vec4(glm::normalize(dir_light->direction), 0.0f);
+
+        light_ubo.dir_light.color = dir_light->color;
+
+        light_ubo.dir_light.light_vp =
+            build_dir_light_vp();
+    }
+
+    return light_ubo;
+}
+
+void GenericRenderGraph::prepare_geometry_batches(RenderGraphContext& ctx, Name pass_name)
+{
+    auto& scene_view = engine->scene_view;
+    auto& meshes =
+        scene_view->get_processor<SceneViewProcessor_Mesh>().meshes;
+
+    auto& batches = prepared_batches[pass_name];
+    batches.clear();
+
+    std::unordered_map<ShaderKey, size_t> batch_lookup;
+
+    for (const auto& ro : meshes)
+    {
+        for (uint32_t geom = 0;
+             geom < ro.mesh.get().mesh_geometry.size();
+             ++geom)
+        {
+            const auto& geometry = ro.mesh.get().mesh_geometry[geom];
+
+            for (uint32_t prim = 0;
+                 prim < geometry.primitives.size();
+                 ++prim)
+            {
+                const auto& primitive = geometry.primitives[prim];
+                
+                
+                ctx.backend.get_or_create_mesh_buffers(MeshPrimHandle{ro.mesh, geom, prim});
+                uint32_t mat_index =
+                    primitive.material_index.value_or(0);
+
+                auto material = ro.mats[mat_index];
+
+                Name blend_mode =
+                    material->get_enum_parameter(Names::blend_mode);
+
+                const bool should_draw =
+                    (pass_name == Names::pass_geometry_base &&
+                     blend_mode == Names::blend_mode_opaque) ||
+                    (pass_name == Names::pass_geometry_translucent &&
+                     blend_mode == Names::blend_mode_trasnlucent);
+
+                if (!should_draw)
+                    continue;
+
+                auto model =
+                    renderer->find_model(material->model);
+
+                auto pipeline_family =
+                    renderer->query_pipeline_family(
+                        pass_name, model);
+
+                ShaderKey key =
+                    pipeline_family->make_shader_key(
+                        material, pass_name);
+
+                size_t batch_index;
+
+                auto it = batch_lookup.find(key);
+                if (it == batch_lookup.end())
+                {
+                    PipelineObject* pipeline =
+                        pipeline_family->request_pipeline(key);
+
+                    batch_index = batches.size();
+
+                    batches.push_back({
+                        .pipeline = pipeline,
+                        .items = {}
+                    });
+
+                    batch_lookup[key] = batch_index;
+                }
+                else
+                {
+                    batch_index = it->second;
+                }
+
+                batches[batch_index].items.push_back({
+                    .mesh     = MeshPrimHandle{ro.mesh, geom, prim},
+                    .world    = ro.world,
+                    .material = material
+                });
+                
+                
+            }
+        }
+    }
+}
+
+void GenericRenderGraph::prepare_geometry_resources(RenderGraphContext& ctx, Name pass_name)
+{
+    auto frame = ctx.frame;
+
+    auto& batches = prepared_batches[pass_name];
+    auto& pass_resources =
+        prepared_pass_resources[pass_name];
+
+    pass_resources.resize(num_pass_instances);
+
+    for (uint32_t inst = 0; inst < num_pass_instances; ++inst)
+    {
+        auto& resource_map = pass_resources[inst];
+
+        for (auto& batch : batches)
+        {
+            PipelineObject* pipeline = batch.pipeline;
+
+            PreparedPassResources prep{};
+
+            // ---------- Camera ----------
+            CameraUBO cam_ubo = make_camera_ubo(ctx);
+
+            auto cam =
+                camera_resource->query_single(
+                    pipeline, inst);
+
+            cam->update_uniform_buffer(
+                pipeline, "camera_ubo", cam_ubo, frame);
+
+            prep.camera = cam;
+
+            // ---------- Lights ----------
+            LightUBO light_ubo = build_light_ubo(cam_ubo.camera_pos);
+
+            auto light =
+                light_resource->query_single(pipeline);
+
+            light->update_uniform_buffer(
+                pipeline, "light_ubo", light_ubo, frame);
+
+            prep.light = light;
+
+            // ---------- Shadow ----------
+            auto shadow =
+                shadow_resource->query_single(pipeline);
+
+            shadow->update_image(
+                pipeline,
+                "u_shadow_depth",
+                get_image(shadow_map),
+                frame);
+
+            prep.shadow = shadow;
+
+            resource_map[pipeline] = prep;
+        }
+    }
+}
+
+void GenericRenderGraph::prepare_shadow_pass(RenderGraphContext& ctx)
+{
+}
+
+void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
+{
+    auto frame = ctx.frame;
+
+    static std::shared_ptr<Material> cloud_material;
+    if (!cloud_material)
+    {
+        cloud_material = std::make_shared<Material>();
+        cloud_material->model = "clouds";
+    }
+
+    auto cloud_model =
+        renderer->find_model("clouds");
+
+    auto pipeline_family =
+        renderer->query_pipeline_family(
+            "clouds",
+            cloud_model
+        );
+
+    PipelineObject* pipeline =
+        pipeline_family->request_pipeline({});
+
+    prepared_clouds.pipeline = pipeline;
+
+    // ---------- Camera ----------
+    CameraUBO camera_ubo = make_camera_ubo(ctx);
+
+    auto cam =
+        camera_resource->query_single(pipeline);
+
+    cam->update_uniform_buffer(
+        pipeline,
+        "camera_ubo",
+        camera_ubo,
+        frame
+    );
+
+    prepared_clouds.camera = cam;
+
+    // ---------- Clouds UBO ----------
+    CloudsUBO clouds_ubo{};
+    
+    clouds_ubo.planet_center = { 0, 0, 0, 0 };        // flat world
+    clouds_ubo.cloud_base    = { 150.0f, 400.0f, 0.3f, 1.0f };
+
+    clouds_ubo.sun_direction = { -0.4f, 0.8f, -0.3f, 0.0f };
+    clouds_ubo.sun_color     = { 1.0f, 0.98f, 0.95f, 15.0f };
+
+    clouds_ubo.cloud_color   = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+    clouds_ubo.scattering = { 1.0f, 0.4f, 0.25f, 0.0f };
+
+    clouds_ubo.wind          = { 0.02f, 0.0f, 0.01f, 0.0 };
+    
+    clouds_ubo.sky_ambient = { 0.45f, 0.55f, 0.7f, 0.0f };
+    clouds_ubo.horizon_color = { 0.8f, 0.9f, 1.0f, 0.0f };
+
+    auto material_instance =
+        renderer->query_material_instance(
+            cloud_material,
+            "Clouds"
+        );
+
+    auto* instance =
+        material_instance->get_or_create_resource_instance(
+            pipeline,
+            frame
+        );
+
+    instance->update_uniform_buffer(
+        pipeline,
+        "clouds_ubo",
+        clouds_ubo,
+        frame
+    );
+
+    instance->update_image(
+        pipeline,
+        "u_depth",
+        get_image(depth_texture),
+        frame
+    );
+
+    instance->update_image(
+        pipeline,
+        "u_noise",
+        get_image(noise_texture),
+        frame
+    );
+
+    prepared_clouds.instance = instance;
+}
+
 
 bool GenericRenderGraph::is_debugging() const
 {
@@ -275,162 +587,48 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 {    
     PROFILE("draw_scene");
     
-    auto& scene_view = engine->scene_view;
-    auto cmd = ctx.cmd;
+    auto cmd   = ctx.cmd;
     auto frame = ctx.frame;
 
-    Name pass_name = ctx.pass_name;
+    auto& batches =
+        prepared_batches[ctx.pass_name];
+    
+    auto& resources_by_instance = prepared_pass_resources[ctx.pass_name];
 
-    PipelineObject* current_pipeline = nullptr;
+    auto& pass_resources = resources_by_instance[ctx.pass_instance_id];
 
-    auto bind_pass_resources = [&](PipelineObject* pipeline)
+    for (auto& batch : batches)
     {
-        if (pipeline == current_pipeline)
-            return;
-
-        current_pipeline = pipeline;
-
-        CameraUBO camera_ubo = make_camera_ubo(ctx);
-        auto cam = camera_resource->query_single(pipeline, ctx.pass_instance_id);
-        cam->update_uniform_buffer(pipeline, "camera_ubo", camera_ubo, frame);
-        cam->bind(pipeline, cmd, frame);
-
-        // ---------- Lights ----------
-        auto& light_processor =
-            scene_view->get_processor<SceneViewProcessor_Light>();
-
-        const auto [lights, light_num] =
-            light_processor.query_nearest_lights_limited<8>(camera_ubo.camera_pos);
-
-        LightUBO light_ubo{};
-        light_ubo.light_count = light_num;
-        for (int i = 0; i < light_num; ++i)
-        {
-            light_ubo.lights[i].position = glm::vec4(lights[i].position, 1.f);
-            light_ubo.lights[i].color    = glm::vec4(lights[i].color);
-            
-        }
-        
-        const auto dir_light = light_processor.get_directional_light();
-        if (dir_light)
-        {
-            light_ubo.has_dir_light = true;
-            light_ubo.dir_light.direction = glm::vec4(glm::normalize(dir_light->direction), 0.f);
-            light_ubo.dir_light.color = glm::vec4(dir_light->color);
-
-            light_ubo.dir_light.light_vp = build_dir_light_vp();
-        }
-        
-
-        auto light = light_resource->query_single(pipeline);
-        light->update_uniform_buffer(pipeline, "light_ubo", light_ubo, frame);
-        light->bind(pipeline, cmd, frame);
-        
-        auto shadow = shadow_resource->query_single(pipeline);
-        shadow->update_image(pipeline, "u_shadow_depth", get_image(shadow_map), frame);
-        shadow->bind(pipeline, cmd, frame);
-    };
-
-
-
-    struct DrawItem
-    {
-        MeshPrimHandle mesh;
-        glm::mat4 world;
-        std::shared_ptr<Material> material;
-    };
-
-    using DrawBatch = std::vector<DrawItem>;
-    std::unordered_map<ShaderKey, DrawBatch> batches;
-
-    auto& meshes_processor =
-        scene_view->get_processor<SceneViewProcessor_Mesh>();
-
-    for (const auto& ro : meshes_processor.meshes)
-    {
-        for (uint32_t geom_index = 0;
-             geom_index < ro.mesh.get().mesh_geometry.size();
-             ++geom_index)
-        {
-            const auto& geom = ro.mesh.get().mesh_geometry[geom_index];
-
-            for (uint32_t prim_index = 0;
-                 prim_index < geom.primitives.size();
-                 ++prim_index)
-            {
-                const auto& prim = geom.primitives[prim_index];
-
-                uint32_t mat_index = prim.material_index.value_or(0);
-                std::shared_ptr<Material> material = ro.mats[mat_index];
-                
-                Name blend_mode = material->get_enum_parameter(Names::blend_mode);
-                
-                const bool should_draw = 
-                    (pass_name == Names::pass_geometry_base && blend_mode == Names::blend_mode_opaque) ||
-                    (pass_name == Names::pass_geometry_translucent && blend_mode == Names::blend_mode_trasnlucent);    
-                
-                if (!should_draw)
-                    continue;
-                
-                auto model = renderer->find_model(material->model);
-
-                // --------- Pipeline key ---------
-                auto pipeline_family = renderer->query_pipeline_family(pass_name, model);
-
-                ShaderKey key = pipeline_family->make_shader_key(material, pass_name);
-
-                batches[key].push_back({
-                    .mesh     = MeshPrimHandle{ro.mesh, geom_index, prim_index},
-                    .world    = ro.world,
-                    .material = material
-                });
-            }
-        }
-    }
-
-
-    for (auto& [key, batch] : batches)
-    {
-        std::shared_ptr<Material> first_material = batch[0].material;
-        
-        auto model = renderer->find_model(first_material->model);
-
-        auto pipeline_family =
-            renderer->query_pipeline_family(
-                pass_name, model);
-
-        PipelineObject* pipeline =
-            pipeline_family->request_pipeline(key);
+        PipelineObject* pipeline = batch.pipeline;
+        auto& prep = pass_resources.at(pipeline);
 
         ctx.backend.bind_pipeline(cmd, pipeline);
-        bind_pass_resources(pipeline);
 
-        for (auto& item : batch)
+        prep.camera->bind(pipeline, cmd, frame);
+        prep.light->bind(pipeline, cmd, frame);
+        prep.shadow->bind(pipeline, cmd, frame);
+
+        for (auto& item : batch.items)
         {
-            // ---------- Material ----------
-            std::shared_ptr<MaterialInstance> material_instance =
-                renderer->query_material_instance(item.material, pass_name);
+            auto material_instance =
+                renderer->query_material_instance(
+                    item.material,
+                    ctx.pass_name);
 
             material_instance->bind(pipeline, cmd, frame);
 
-            // ---------- Mesh ----------
-            ctx.backend.get_or_create_mesh_buffers(item.mesh);
             ctx.backend.bind_mesh(cmd, item.mesh, frame);
+            ctx.backend.push_constants(
+                cmd, item.world, pipeline);
 
-            // ---------- Push constants ----------
-            ctx.backend.push_constants(cmd, item.world, pipeline);
-
-            Extent extent = resolution;
-            
             ctx.backend.draw_indexed(
                 cmd,
                 item.mesh.get().indices.size(),
-                RBDrawParams {
+                RBDrawParams{
                     .update_viewport_extent = true,
-                    .use_swapchain_extent = use_swapchain_extent,
-                    .extent = extent
-                }
-            );
+                    .use_swapchain_extent = true,
+                    .extent = resolution
+                });
         }
     }
 }
@@ -562,93 +760,30 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
 void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture)
 {
     PROFILE("Clouds");
-
+    
+    
     auto cmd   = ctx.cmd;
     auto frame = ctx.frame;
 
-    static std::shared_ptr<Material> cloud_material;
-    static PipelineObject* cloud_pipeline = nullptr;
-
-    if (!cloud_material)
-    {
-        cloud_material = std::make_shared<Material>();
-        cloud_material->model = "clouds";
-    }
-
-    auto cloud_model = renderer->find_model("clouds");
-
-    PipelineFamily cloud_pipeline_family(
-        "clouds",
-        cloud_model,
-        backend,
-        renderer
+    ctx.backend.bind_pipeline(
+        cmd,
+        prepared_clouds.pipeline
     );
 
-    if (!cloud_pipeline)
-        cloud_pipeline = cloud_pipeline_family.request_pipeline({});
-    
-    ctx.backend.bind_pipeline(ctx.cmd, cloud_pipeline);
-    
-    
-    
-    CameraUBO camera_ubo = make_camera_ubo(ctx);
-    
-    CloudsUBO clouds_ubo;
-    
-    clouds_ubo.planet_center = { 0, 0, 0, 0 };        // flat world
-    clouds_ubo.cloud_base    = { 150.0f, 400.0f, 0.3f, 1.0f };
-
-    clouds_ubo.sun_direction = { -0.4f, 0.8f, -0.3f, 0.0f };
-    clouds_ubo.sun_color     = { 1.0f, 0.98f, 0.95f, 15.0f };
-
-    clouds_ubo.cloud_color   = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-    clouds_ubo.scattering = { 1.0f, 0.4f, 0.25f, 0.0f };
-
-    clouds_ubo.wind          = { 0.02f, 0.0f, 0.01f, 0.0 };
-    
-    clouds_ubo.sky_ambient = { 0.45f, 0.55f, 0.7f, 0.0f };
-    clouds_ubo.horizon_color = { 0.8f, 0.9f, 1.0f, 0.0f };
-    
-    auto cam = camera_resource->query_single(cloud_pipeline);
-    cam->update_uniform_buffer(cloud_pipeline, "camera_ubo", camera_ubo, frame);
-    cam->bind(cloud_pipeline, cmd, frame);
-    
-
-    // ---------- Resources ----------
-    auto material_instance =
-        renderer->query_material_instance(cloud_material, ctx.pass_name);
-
-    auto* instance =
-        material_instance->get_or_create_resource_instance(
-            cloud_pipeline,
-            frame
-        );
-
-    instance->update_image(
-        cloud_pipeline,
-        "u_depth",
-        get_image(depth_texture),
+    prepared_clouds.camera->bind(
+        prepared_clouds.pipeline,
+        cmd,
         frame
     );
-    
-    
-    instance->update_image(
-        cloud_pipeline,
-        "u_noise",
-        get_image(noise_texture),
+
+    prepared_clouds.instance->bind(
+        prepared_clouds.pipeline,
+        cmd,
         frame
     );
-    
-    instance->update_uniform_buffer(
-        cloud_pipeline,
-        "clouds_ubo",
-        clouds_ubo,
-        frame);
-
-    instance->bind(cloud_pipeline, cmd, frame);
 
     ctx.backend.draw_fullscreen(cmd);
+
 }
 
 CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos) const
