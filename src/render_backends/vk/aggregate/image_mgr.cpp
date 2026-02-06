@@ -52,14 +52,16 @@ RBImageHandle vk::ImageManager::create_image_view(
         
 }
 
-RBImageView vk::ImageManager::fetch_image_view(RBImageHandle image_handle, uint32_t array_index)
+RBImageView vk::ImageManager::fetch_image_view(RBImageHandle image_handle, uint32_t array_index, bool is_cubemap)
 {
     checkf(image_handle.id < image_resources.size(), "Unknown image id %i", image_handle.id);
     
     
     ImageResource& image_resource = image_resources[image_handle.id];
     
-    if (image_resource.has_view_index(array_index))
+    if (is_cubemap && image_resource.has_cubemap())
+        return image_resource.get_cubemap_view();
+    else if (!is_cubemap && image_resource.has_view_index(array_index))
         return image_resource.get_img_view(array_index);
     
     VkImage image = image_resource.image;
@@ -73,19 +75,22 @@ RBImageView vk::ImageManager::fetch_image_view(RBImageHandle image_handle, uint3
 
     VkImageViewCreateInfo view_info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
     view_info.image = image;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.viewType = is_cubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
     view_info.format = image_resource.format;
     view_info.subresourceRange = {
         aspect, 0, image_resource.mip_levels, 0, 1
     };
-    view_info.subresourceRange.layerCount = 1;
-    view_info.subresourceRange.baseArrayLayer = array_index;
+    view_info.subresourceRange.layerCount = is_cubemap ? 6 : 1;
+    view_info.subresourceRange.baseArrayLayer = is_cubemap ? 0 : array_index;
     
 
     VkImageView view;
     VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &view));
     
-    image_resource.set_img_view(view, array_index);
+    if (!is_cubemap)
+        image_resource.set_img_view(view, array_index);
+    else
+        image_resource.set_cubemap_img_view(view);
     
 
     return RBImageView(view);
@@ -104,6 +109,11 @@ const vk::ImageResource& vk::ImageManager::get_image_resource(RBImageHandle imag
 VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t array_index)
 {
     return get_image_resource(image_handle).get_img_view(array_index);
+}
+
+VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)
+{
+    return fetch_image_view(image_handle, 0, true);
 }
 
 RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
@@ -365,7 +375,6 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     
     vk::update_buffer(instance.device, staging_memory, tex.bulk.data(), upload_size);
     
-    // 3. copy
     immediate_command_pool.submit([&](VkCommandBuffer cmd)
     {
         transition_image(

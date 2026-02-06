@@ -15,6 +15,8 @@ import :render_resource;
 import :render_resource_instance;
 import :reflection;
 
+using UniqueResourcePair = std::pair<VkRenderResource*, uint32_t>;
+
 class VkPipelineObject : public PipelineObject
 {
 public:
@@ -41,7 +43,7 @@ public:
     }
     VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
     
-    RenderResourceInstance* query_unique_resource_instance(RenderResource* resource) override;
+    RenderResourceInstance* query_unique_resource_instance(RenderResource* resource, uint32_t instance_id = 0) override;
     RenderResourceInstance* create_resource_instance(RenderResource* resource) override;
     
     void update_buffers();
@@ -69,7 +71,9 @@ public:
     
     std::map<ShaderStage, PipelineReflection> pipeline_reflection;
     
-    std::map<VkRenderResource*, VkRenderResourceInstance*> unique_resource_instances; 
+    
+    
+    std::map<UniqueResourcePair, VkRenderResourceInstance*> unique_resource_instances; 
     std::vector<std::unique_ptr<VkRenderResourceInstance>> instances;
     
     std::map<VkRenderResource*, VkRenderResourcePipelineInfo> resources_pipeline_info;

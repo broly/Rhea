@@ -286,7 +286,9 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     for (auto& tex : textures)
         tex.reset_layout();  // for swapchain: transfer_present
     
-    prepare_resources();
+    ctx.is_preparing = true;
+    prepare_resources(ctx);
+    ctx.is_preparing = false;
 
     for (uint32_t pass_index : execution_order)
     {

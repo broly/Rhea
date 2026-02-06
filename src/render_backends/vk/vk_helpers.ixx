@@ -361,6 +361,8 @@ export namespace vk
             return VK_FORMAT_R8G8B8A8_UNORM;
         case TextureFormat::RGBA16F:
             return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case TextureFormat::RG16F:
+            return VK_FORMAT_R16G16_SFLOAT;
         case TextureFormat::RGBA32F:
             return VK_FORMAT_R32G32B32A32_SFLOAT;
         case TextureFormat::Depth24Stencil8:

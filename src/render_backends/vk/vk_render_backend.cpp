@@ -54,13 +54,13 @@ void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
 }
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
-    ResourceUsageType usage, std::optional<RBSampler> sampler)
+    ResourceUsageType usage, std::optional<RBSampler> sampler, bool cubemap)
 {
     // VkDescriptorSet set = get_descriptor_set(layout, usage);
 
 
     VkDescriptorImageInfo info{};
-    info.imageView   = get_image_view(image);
+    info.imageView   = cubemap ? get_cubemap_image_view(image) : get_image_view(image);
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     info.sampler     = sampler.has_value() ? VkSampler(*sampler) : sampler_manager.get_default_sampler();
 
@@ -317,6 +317,11 @@ void VkRenderBackend::destroy_image(RBImageHandle handle, bool wait_fences)
 RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t array_index)
 {
     return image_manager.get_view(handle, array_index);
+}
+
+RBImageView VkRenderBackend::get_cubemap_image_view(RBImageHandle handle)
+{
+    return image_manager.get_cubemap_view(handle);
 }
 
 size_t hash_framebuffer(

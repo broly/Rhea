@@ -14,6 +14,7 @@ import :constants;
 import texture_format;
 import <filesystem>;
 import paths;
+import :cubemap_capture_render_graph;
 
 #include "render_layout.h"
 #include "common/assertion_macros.h"
@@ -45,7 +46,8 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     Renderer::init(in_window);
     
-    create_render_graph(main_render_graph_name, {{"capture_ibl", true}}, "ibl");
+    auto aux_graph = reflect::get_object_type_name<CubemapCaptureRenderGraph>();
+    create_render_graph(aux_graph, {{"capture_ibl", true}}, "ibl");
 }
 
 void GameRenderer::capture_ibl(glm::vec3 pos, Name actor_name)
@@ -61,7 +63,7 @@ void GameRenderer::capture_ibl(glm::vec3 pos, Name actor_name)
         [=](RenderGraphContext& ctx)
         {
             auto image_opt =
-                ctx.render_graph.get_image_by_name("hdr_color");
+                ctx.render_graph.get_image_by_name("prefiltered_env");
 
             checkf(image_opt.has_value(),
                    "Unable to get IBL cubemap image");

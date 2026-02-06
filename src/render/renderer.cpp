@@ -93,7 +93,9 @@ std::shared_ptr<RenderGraph> Renderer::create_render_graph(Name render_graph_nam
     
     auto result = reflection_info->instantiate<RenderGraph>();
     result->setup(render_backend, shared_from_this());
-    result->init_render_graph(parameters);
+    result->init_resources(parameters);
+    result->build_passes(parameters);
+    result->compile();
     
     if (aux_graph_name.has_value())
         aux_graphs.insert({*aux_graph_name, result});

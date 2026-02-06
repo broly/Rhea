@@ -21,7 +21,7 @@ public:
                                             Name buffer_name, size_t size, void* data, RBFrameHandle frame);
     
     void update_image(class PipelineObject* pipeline_object, Name buffer_name, RBImageHandle image_handle, RBFrameHandle
-                      frame) override;
+                      frame, bool cubemap) override;
     
     void bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame) override;
 

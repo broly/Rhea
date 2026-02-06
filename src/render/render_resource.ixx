@@ -36,7 +36,7 @@ public:
         : desc(in_desc)
     {}
 
-    virtual RenderResourceInstance* query_single(PipelineObject* pipeline_object);
+    virtual RenderResourceInstance* query_single(PipelineObject* pipeline_object, uint32_t instance_id = 0);
 
     const RenderResourceDesc desc;
 };

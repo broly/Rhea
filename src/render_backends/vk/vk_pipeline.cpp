@@ -419,16 +419,18 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     return vk_pipeline;
 }
 
-RenderResourceInstance* VkPipelineObject::query_unique_resource_instance(RenderResource* resource)
+RenderResourceInstance* VkPipelineObject::query_unique_resource_instance(RenderResource* resource, uint32_t instance_id )
 {
-    if (unique_resource_instances.contains((VkRenderResource*)resource))
-        return unique_resource_instances.at((VkRenderResource*)resource);
+    UniqueResourcePair key = {(VkRenderResource*)resource, instance_id};
+    
+    if (unique_resource_instances.contains(key))
+        return unique_resource_instances.at(key);
     
     auto resource_instance = create_resource_instance(resource);
     
     update_buffers();
     
-    unique_resource_instances.insert({(VkRenderResource*)resource, (VkRenderResourceInstance*)resource_instance});
+    unique_resource_instances.insert({key, (VkRenderResourceInstance*)resource_instance});
     return resource_instance;
 }
 

@@ -15,7 +15,7 @@ public:
     }
     
     virtual void update_image(class PipelineObject* pipeline_object, Name buffer_name,
-                              RBImageHandle image_handle, RBFrameHandle frame) = 0;
+                              RBImageHandle image_handle, RBFrameHandle frame, bool cubemap = false) = 0;
     
     virtual void bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame) = 0;
     

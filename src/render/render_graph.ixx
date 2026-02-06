@@ -96,6 +96,7 @@ public:
     RBFrameHandle frame;
     RenderGraphParameters params;
     uint32_t pass_instance_id;
+    bool is_preparing;
 };
 
 
@@ -106,8 +107,9 @@ public:
         const std::shared_ptr<RenderBackend>& in_backend,
         const std::shared_ptr<Renderer>& in_renderer);
     
-    virtual void init_render_graph(const std::map<Name, bool>& parameters) = 0;
-    virtual void prepare_resources() {};
+    virtual void init_resources(const std::map<Name, bool>& parameters) = 0;
+    virtual void build_passes(const std::map<Name, bool>& parameters) = 0;
+    virtual void prepare_resources(RenderGraphContext& ctx) {};
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);

@@ -60,6 +60,8 @@ namespace vk
         VkImage image = VK_NULL_HANDLE;
         VkDeviceMemory memory = VK_NULL_HANDLE;
         
+        VkImageView cubemap_view = VK_NULL_HANDLE;
+        
         std::vector<VkImageView> views = {};
         
         void set_img_view(VkImageView view, uint32_t array_index = 0)
@@ -68,6 +70,17 @@ namespace vk
             if (array_index >= views.size())
                 views.resize(array_index + 1, VK_NULL_HANDLE);
             views[array_index] = view;
+        }
+        
+        
+        void set_cubemap_img_view(VkImageView view)
+        {
+            cubemap_view = view;
+        }
+        
+        bool has_cubemap() const
+        {
+            return cubemap_view != VK_NULL_HANDLE;
         }
         
         bool has_view_index(uint32_t array_index) const
@@ -81,6 +94,11 @@ namespace vk
             auto result = views[array_index];
             checkf(result != VK_NULL_HANDLE, "NULL image handle detected");
             return result;
+        }
+        
+        VkImageView get_cubemap_view() const
+        {
+            return cubemap_view;
         }
 
         Extent extent = {};

@@ -112,7 +112,8 @@ public:   /// API Section
         uint32_t binding,
         RBImageHandle image,
         ResourceUsageType usage,
-        std::optional<RBSampler> sampler) override;
+        std::optional<RBSampler> sampler, 
+        bool cubemap) override;
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) override;
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;
     virtual RBFrameHandle get_current_frame() const override;
@@ -129,6 +130,7 @@ public:   /// API Section
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) override;
     virtual RBImageView get_image_view(RBImageHandle handle, uint32_t array_index = 0) override;
+    virtual RBImageView get_cubemap_image_view(RBImageHandle handle) override;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) override;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;

@@ -117,6 +117,7 @@ public:
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) = 0;
     virtual RBImageView get_image_view(RBImageHandle handle, uint32_t array_index = 0) = 0;
+    virtual RBImageView get_cubemap_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
@@ -135,7 +136,8 @@ public:
         uint32_t binding,
         RBImageHandle image,
         ResourceUsageType usage,
-        std::optional<RBSampler> sampler) = 0;
+        std::optional<RBSampler> sampler, 
+        bool cubemap) = 0;
     
     virtual Extent get_viewport_extent() const = 0;
     

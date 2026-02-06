@@ -33,7 +33,7 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeli
 }
 
 void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_object, Name buffer_name,
-                                            RBImageHandle image_handle, RBFrameHandle frame)
+                                            RBImageHandle image_handle, RBFrameHandle frame, bool cubemap)
 {
     auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
     
@@ -54,7 +54,8 @@ void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_objec
         binding.binding_index,
         image_handle,
         usage,
-        resource.desc.sampler);
+        resource.desc.sampler,
+        cubemap);
 }
 
 void VkRenderResourceInstance::bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame)

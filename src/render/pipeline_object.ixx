@@ -6,7 +6,7 @@ import :render_resource;
 export class PipelineObject
 {
 public:
-    virtual RenderResourceInstance* query_unique_resource_instance(RenderResource* resource) = 0;
+    virtual RenderResourceInstance* query_unique_resource_instance(RenderResource* resource, uint32_t instance_id = 0) = 0;
     virtual RenderResourceInstance* create_resource_instance(RenderResource* resource) = 0;
     
     Name debug_name;
