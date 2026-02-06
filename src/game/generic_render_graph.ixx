@@ -65,7 +65,7 @@ public:
     
     glm::mat4 build_dir_light_vp() const;
     
-    virtual CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false) const;
+    virtual CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false, uint32_t face_index = 0) const;
     LightUBO build_light_ubo(glm::vec3 camera_position) const;
     
     

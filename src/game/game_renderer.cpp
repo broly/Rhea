@@ -63,7 +63,7 @@ void GameRenderer::capture_ibl(glm::vec3 pos, Name actor_name)
         [=](RenderGraphContext& ctx)
         {
             auto image_opt =
-                ctx.render_graph.get_image_by_name("prefiltered_env");
+                ctx.render_graph.get_image_by_name("hdr_color");
 
             checkf(image_opt.has_value(),
                    "Unable to get IBL cubemap image");

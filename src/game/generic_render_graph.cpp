@@ -38,6 +38,8 @@ GenericRenderGraph::GenericRenderGraph()
 
 void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
 {
+    engine = RhGlobals::engine;
+    
     camera_resource = renderer->find_resource("camera");
     light_resource = renderer->find_resource("light");
     light_resource_shadow = renderer->find_resource("shadow_light");
@@ -390,7 +392,7 @@ void GenericRenderGraph::prepare_geometry_resources(RenderGraphContext& ctx, Nam
             PreparedPassResources prep{};
 
             // ---------- Camera ----------
-            CameraUBO cam_ubo = make_camera_ubo(ctx);
+            CameraUBO cam_ubo = make_camera_ubo(ctx, false, inst);
 
             auto cam =
                 camera_resource->query_single(
@@ -786,7 +788,7 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
 
 }
 
-CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos) const
+CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos, uint32_t face_index) const
 {
     auto& scene_view = engine->scene_view;
     CameraUBO camera_ubo;

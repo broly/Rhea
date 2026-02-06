@@ -156,7 +156,7 @@ void CubemapCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
         });
 }
 
-CameraUBO CubemapCaptureRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos) const
+CameraUBO CubemapCaptureRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos, uint32_t face_index) const
 {
     auto& scene_view = engine->scene_view;
     CameraUBO camera_ubo;
@@ -167,7 +167,6 @@ CameraUBO CubemapCaptureRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bo
 
         
     auto position = pos_it->second;
-    uint32_t face_index = ctx.pass_instance_id;
         
     static const glm::vec3 cube_dirs[6] = {
         { 1,  0,  0}, {-1,  0,  0},

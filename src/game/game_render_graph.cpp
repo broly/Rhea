@@ -33,7 +33,6 @@ GameRenderGraph::GameRenderGraph()
 
 void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
 {
-    engine = RhGlobals::engine;
 
     
     set_flag(Names::debug_shadow2, false);

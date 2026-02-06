@@ -56,8 +56,8 @@ void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& fn)
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
 
-    vkQueueSubmit(instance.graphics_queue, 1, &submit, fence);
-    vkWaitForFences(instance.device, 1, &fence, VK_TRUE, UINT64_MAX);
+    VK_CHECK(vkQueueSubmit(instance.graphics_queue, 1, &submit, fence));
+    VK_CHECK(vkWaitForFences(instance.device, 1, &fence, VK_TRUE, UINT64_MAX));
 }
 
 VkCommandBuffer vk::ImmediateCommandPool::begin_single_time_commands()
@@ -88,7 +88,7 @@ void vk::ImmediateCommandPool::end_single_time_commands()
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
 
-    vkQueueSubmit(instance.graphics_queue, 1, &submit, VK_NULL_HANDLE);
+    VK_CHECK(vkQueueSubmit(instance.graphics_queue, 1, &submit, VK_NULL_HANDLE));
     vkQueueWaitIdle(instance.graphics_queue);
 
     vkFreeCommandBuffers(instance.device, pool, 1, &cmd);

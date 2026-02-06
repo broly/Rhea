@@ -19,7 +19,7 @@ public:
     void init_resources(const std::map<Name, bool>& parameters) override;
     void build_passes(const std::map<Name, bool>& parameters) override;
     
-    CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos) const override;
+    CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos, uint32_t face_index) const override;
 
     RGTextureHandle irradiance;
     RGTextureHandle prefiltered_env;
