@@ -55,7 +55,7 @@ namespace vk
             RBCommandList cmd,
             RBImageHandle image,
             RBImageLayout before,
-            RBImageLayout after);
+            RBImageLayout after) const;
         
         void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& out_format, Extent extent);
         
@@ -65,7 +65,7 @@ namespace vk
             VkDeviceSize size,
             VkBuffer& out_buffer,
             VkDeviceMemory& out_memory) const;
-        VkImageSubresourceRange full_subresource_range(RBImageHandle image);
+        VkImageSubresourceRange full_subresource_range(RBImageHandle image) const;
         
         ImageReadback readback(RBImageHandle img) const;
         

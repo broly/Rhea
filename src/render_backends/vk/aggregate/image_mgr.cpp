@@ -190,7 +190,13 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     
     fetch_image_view(img_handle, 0);
     
-    LogVkImageManager.Log("Created image %p (view[0]=%p) '%s'", res.image, res.get_img_view(0), desc.name.to_string().c_str());
+    
+    
+    LogVkImageManager.Log("Created image%s %p (view[0]=%p) '%s'", 
+        desc.is_cubemap ? " [CUBEMAP]" : "",
+        res.image, 
+        res.get_img_view(0), 
+        desc.name.to_string().c_str());
     
     
     debug.register_vk_image_name(res.image, desc.name);
@@ -438,7 +444,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     return image;
 }
 
-void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after)
+void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after) const
 {
     auto vk_img = get_image_resource(image).image;
     LogVkImageManager.Log<VeryVerbose>("Transition for image '%s' (%p): %s -> %s",
@@ -693,7 +699,7 @@ void vk::ImageManager::generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image
 
 
 
-VkImageSubresourceRange vk::ImageManager::full_subresource_range(RBImageHandle image)
+VkImageSubresourceRange vk::ImageManager::full_subresource_range(RBImageHandle image) const
 {
     const auto& img = get_image_resource(image);
 
@@ -795,6 +801,8 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
 
     immediate_command_pool.submit([&](VkCommandBuffer cmd)
     {
+        transition_image(cmd, img, RBImageLayout::undefined, RBImageLayout::transfer_src_optimal);
+        
         vkCmdCopyImageToBuffer(
             cmd,
             image,
