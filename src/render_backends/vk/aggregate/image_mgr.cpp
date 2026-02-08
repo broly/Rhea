@@ -106,9 +106,9 @@ const vk::ImageResource& vk::ImageManager::get_image_resource(RBImageHandle imag
     return image_resources[image_handle.id];
 }
 
-VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t array_index)
+VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t array_index, uint32_t mip_index)
 {
-    return get_image_resource(image_handle).get_img_view(array_index);
+    return get_image_resource(image_handle).get_img_view(array_index, mip_index);
 }
 
 VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)
@@ -130,7 +130,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     res.extent = extent;
     res.format = vk::to_vk_format(desc.format);
     res.mip_levels = desc.mip_levels;
-    res.array_layers = desc.get_array_layers();
+    res.num_layers = desc.get_array_layers();
     res.usage = desc.usage;
 
     VkImageUsageFlags vk_usage = 0;
@@ -517,7 +517,7 @@ void vk::ImageManager::copy_image_to_buffer(
     Extent extent)
 {
     vk::ImageResource& img_resource = get_image_resource(img);
-    const uint32_t array_dim = img_resource.array_layers;  // TODO
+    const uint32_t array_dim = img_resource.num_layers;  // TODO
     
     VkImage image = img_resource.image;
     VkFormat format = get_image_format(img);
@@ -707,7 +707,7 @@ VkImageSubresourceRange vk::ImageManager::full_subresource_range(RBImageHandle i
     range.baseMipLevel   = 0;
     range.levelCount     = img.mip_levels;  // default = 1
     range.baseArrayLayer = 0;
-    range.layerCount     = img.array_layers;  // default = 1
+    range.layerCount     = img.num_layers;  // default = 1
 
     if (vk::is_depth_format(img.format))
     {
@@ -728,7 +728,7 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
 {
     const vk::ImageResource& img_resource = get_image_resource(img);
 
-    const uint32_t layers = img_resource.array_layers;
+    const uint32_t layers = img_resource.num_layers;
     const Extent extent   = img_resource.extent;
 
     VkImage image   = img_resource.image;

@@ -18,6 +18,7 @@ public:
     
     void init_resources(const std::map<Name, bool>& parameters) override;
     void build_passes(const std::map<Name, bool>& parameters) override;
+    void prepare_resources(RenderGraphContext& ctx) override;
     
     CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos, uint32_t face_index) const override;
 
@@ -32,6 +33,8 @@ public:
     std::shared_ptr<Material> irradiance_material;
     std::shared_ptr<Material> prefilter_material;
     std::shared_ptr<Material> brdf_lut_material;
+    
+    std::shared_ptr<MaterialInstance> irradiance_material_instance;
 
 };
 REFLECT_OBJECT(CubemapCaptureRenderGraph, GenericRenderGraph)

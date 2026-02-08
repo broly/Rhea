@@ -54,13 +54,13 @@ void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
 }
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
-    ResourceUsageType usage, std::optional<RBSampler> sampler, bool cubemap)
+    ResourceUsageType usage, std::optional<RBSampler> sampler, uint32_t array_index, bool cubemap)
 {
     // VkDescriptorSet set = get_descriptor_set(layout, usage);
 
 
     VkDescriptorImageInfo info{};
-    info.imageView   = cubemap ? get_cubemap_image_view(image) : get_image_view(image);
+    info.imageView   = cubemap ? get_cubemap_image_view(image) : get_image_view(image, array_index);
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     info.sampler     = sampler.has_value() ? VkSampler(*sampler) : sampler_manager.get_default_sampler();
 
@@ -314,9 +314,9 @@ void VkRenderBackend::destroy_image(RBImageHandle handle, bool wait_fences)
     return image_manager.destroy_image(handle, wait_fences);
 }
 
-RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t array_index)
+RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t array_index, uint32_t mip_index)
 {
-    return image_manager.get_view(handle, array_index);
+    return image_manager.get_view(handle, array_index, mip_index);
 }
 
 RBImageView VkRenderBackend::get_cubemap_image_view(RBImageHandle handle)
@@ -518,11 +518,23 @@ void VkRenderBackend::push_constants_impl(const RBCommandList& cmd, const void* 
 {
     PROFILE(__FUNCTION__);
     
+    auto pipeline = (VkPipelineObject*)pipeline_object;
+    
+    uint32_t stage_bits = 0;
+    
+    for (auto& stage : pipeline->pipeline_desc->layout.push_constants)
+    {
+        if ((stage.stages & ShaderStage::fragment) != ShaderStage::none)
+            stage_bits |= VK_SHADER_STAGE_FRAGMENT_BIT;
+        if ((stage.stages & ShaderStage::vertex) != ShaderStage::none)
+            stage_bits |= VK_SHADER_STAGE_VERTEX_BIT;
+    }
+
     auto as_vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
     vkCmdPushConstants(
         cmd,
         pipelines[as_vk_pipeline->get_pipeline_handle()]->get_pipeline_layout(),
-        VK_SHADER_STAGE_VERTEX_BIT, 
+        VkShaderStageFlagBits(stage_bits), 
         0, 
         size,
         data

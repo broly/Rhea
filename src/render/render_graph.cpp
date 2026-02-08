@@ -15,11 +15,11 @@ RBImageHandle RGTexture::get_image(RenderBackend& backend, RBFrameHandle frame) 
     return is_swapchain() ? backend.get_swapchain_image(frame) : *image;
 }
 
-RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index) const
+RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index, uint32_t mip_index) const
 {
     if (is_swapchain())
-        checkf(array_index == 0, "Unable to get layers from swapchain");
-    return backend.get_image_view(get_image(backend, frame), array_index);
+        checkf(array_index == 0 && mip_index == 0, "Unable to get layers from swapchain");
+    return backend.get_image_view(get_image(backend, frame), array_index, mip_index);
 }
 
 void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImageLayout next, RBFrameHandle frame)

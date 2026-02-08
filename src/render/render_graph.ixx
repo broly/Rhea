@@ -37,7 +37,7 @@ struct RGTexture
     std::optional<RBImageLayout> current_layout;
     
     RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
-    RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index = 0) const;
+    RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
     
     
     bool should_create_image() const

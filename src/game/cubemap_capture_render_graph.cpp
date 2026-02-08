@@ -47,9 +47,9 @@ void CubemapCaptureRenderGraph::init_resources(const std::map<Name, bool>& param
         .name = "prefiltered_env",
         .extent = {128, 128},
         .format = TextureFormat::RGBA16F,
-        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false,
-        .dimension = TextureDimension::Cube
+        .dimension = capture_dimension
     };
     prefiltered_env = create_texture(prefiltered_color_desc);
     
@@ -67,93 +67,118 @@ void CubemapCaptureRenderGraph::init_resources(const std::map<Name, bool>& param
     
 }
 
+
+
+void CubemapCaptureRenderGraph::prepare_resources(RenderGraphContext& ctx)
+{
+    GenericRenderGraph::prepare_resources(ctx);
+    
+    
+    if (!irradiance_material)
+    {
+        irradiance_material = std::make_shared<Material>();
+        irradiance_material->model = "IBL_Irradiance";
+    }
+    
+    
+    if (!prefilter_material)
+    {
+        prefilter_material = std::make_shared<Material>();
+        prefilter_material->model = "IBL_Prefilter";
+    }
+
+    
+    {
+        auto mat_inst = renderer->query_material_instance(irradiance_material, "IBL_Irradiance");
+        auto* inst = mat_inst->get_or_create_resource_instance(irradiance_pipeline, ctx.frame);
+    
+        inst->update_image(irradiance_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+    }
+    {
+        auto mat_inst = renderer->query_material_instance(prefilter_material, "IBL_Prefilter");
+        auto* inst = mat_inst->get_or_create_resource_instance(prefilter_pipeline, ctx.frame);
+
+        inst->update_image(prefilter_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+    } 
+}
+
 void CubemapCaptureRenderGraph::build_passes(const std::map<Name, bool>& parameters)
 {
     GenericRenderGraph::build_passes(parameters);
     
     
-    
-    
-    // Pass: compute irradiance
-        add_pass({
-            .name = "IBL_Irradiance",
-            .reads = { { hdr_color, RBImageUsage::SampledFragment } },
-            .writes = { { irradiance, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
-            .execute = [this](RenderGraphContext& ctx) {
-                ctx.backend.bind_pipeline(ctx.cmd, irradiance_pipeline);
-                
-                if (!irradiance_material)
-                {
-                    irradiance_material = std::make_shared<Material>();
-                    irradiance_material->model = "IBL_Irradiance";
-                }
+   add_pass({
+       .name = "IBL_Irradiance",
+       .reads = { { hdr_color, RBImageUsage::SampledFragment } },
+       .writes = { { irradiance, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
+       .execute = [this](RenderGraphContext& ctx) {
+           ctx.backend.bind_pipeline(ctx.cmd, irradiance_pipeline);
+           
+   
+           auto mat_inst = renderer->query_material_instance(irradiance_material, ctx.pass_name);
+           auto* inst = mat_inst->get_or_create_resource_instance(irradiance_pipeline, ctx.frame);
+   
+           // inst->update_image(irradiance_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+           inst->bind(irradiance_pipeline, ctx.cmd, ctx.frame);
+   
+           const uint32_t pc = ctx.pass_instance_id;
+           ctx.backend.push_constants(ctx.cmd, pc, irradiance_pipeline);
+           ctx.backend.draw_fullscreen(ctx.cmd);
+       },
+       .num_instances = 6,
+   });
+   
+   add_pass({
+       .name = "IBL_Prefilter",
+       .reads = { { hdr_color, RBImageUsage::SampledFragment } },
+       .writes = { { prefiltered_env, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
+       .execute = [this](RenderGraphContext& ctx) {
+           ctx.backend.bind_pipeline(ctx.cmd, prefilter_pipeline);
+           
+           auto mat_inst = renderer->query_material_instance(prefilter_material, ctx.pass_name);
+           auto* inst = mat_inst->get_or_create_resource_instance(prefilter_pipeline, ctx.frame);
+   
+           inst->bind(prefilter_pipeline, ctx.cmd, ctx.frame);
+   
+           const uint32_t pc = ctx.pass_instance_id;
+           ctx.backend.push_constants(ctx.cmd, pc, prefilter_pipeline);
+           ctx.backend.draw_fullscreen(ctx.cmd);
+       },
+       .num_instances = 6,
+   });
 
-                auto mat_inst = renderer->query_material_instance(irradiance_material, ctx.pass_name);
-                auto* inst = mat_inst->get_or_create_resource_instance(irradiance_pipeline, ctx.frame);
-
-                inst->update_image(irradiance_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, true);
-                inst->bind(irradiance_pipeline, ctx.cmd, ctx.frame);
-
-                ctx.backend.draw_fullscreen(ctx.cmd);
-            }
-        });
-        
-        // Pass: compute irradiance
-        add_pass({
-            .name = "IBL_Prefilter",
-            .reads = { { hdr_color, RBImageUsage::SampledFragment } },
-            .writes = { { irradiance, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
-            .execute = [this](RenderGraphContext& ctx) {
-                ctx.backend.bind_pipeline(ctx.cmd, prefilter_pipeline);
-                
-                if (!prefilter_material)
-                {
-                    prefilter_material = std::make_shared<Material>();
-                    prefilter_material->model = "IBL_Prefilter";
-                }
-
-                auto mat_inst = renderer->query_material_instance(prefilter_material, ctx.pass_name);
-                auto* inst = mat_inst->get_or_create_resource_instance(prefilter_pipeline, ctx.frame);
-
-                inst->update_image(prefilter_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, true);
-                inst->bind(prefilter_pipeline, ctx.cmd, ctx.frame);
-
-                ctx.backend.draw_fullscreen(ctx.cmd);
-            }
-        });
-
-        // Pass: compute BRDF LUT
-        // add_pass({
-        //     .name = "IBL_BRDF_LUT",
-        //     .writes = { { brdf_lut, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
-        //     .execute = [this](RenderGraphContext& ctx) {
-        //         ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);
-        //         
-        //         
-        //         if (!brdf_lut_material)
-        //         {
-        //             brdf_lut_material = std::make_shared<Material>();
-        //             brdf_lut_material->model = "IBL_BRDF_LUT";
-        //         }
-        //
-        //         auto mat_inst = renderer->query_material_instance(brdf_lut_material, ctx.pass_name);
-        //         auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
-        //
-        //         inst->bind(brdf_lut_pipeline, ctx.cmd, ctx.frame);
-        //         ctx.backend.draw_fullscreen(ctx.cmd);
-        //     }
-        // });
-        add_pass({
-            .name = "readback",
-            .condition = [this] () { return !is_debugging(); },
-            .reads = {
-                { hdr_color,  RBImageUsage::TransferSrc }
-            },
-            .execute = [this] (RenderGraphContext& ctx)
-            {
-                
-            },
-        });
+   // Pass: compute BRDF LUT
+   // add_pass({
+   //     .name = "IBL_BRDF_LUT",
+   //     .writes = { { brdf_lut, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
+   //     .execute = [this](RenderGraphContext& ctx) {
+   //         ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);
+   //         
+   //         
+   //         if (!brdf_lut_material)
+   //         {
+   //             brdf_lut_material = std::make_shared<Material>();
+   //             brdf_lut_material->model = "IBL_BRDF_LUT";
+   //         }
+   //
+   //         auto mat_inst = renderer->query_material_instance(brdf_lut_material, ctx.pass_name);
+   //         auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
+   //
+   //         inst->bind(brdf_lut_pipeline, ctx.cmd, ctx.frame);
+   //         ctx.backend.draw_fullscreen(ctx.cmd);
+   //     }
+   // });
+   add_pass({
+       .name = "readback",
+       .condition = [this] () { return !is_debugging(); },
+       .reads = {
+           { hdr_color,  RBImageUsage::TransferSrc }
+       },
+       .execute = [this] (RenderGraphContext& ctx)
+       {
+           
+       },
+   });
 }
 
 CameraUBO CubemapCaptureRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos, uint32_t face_index) const

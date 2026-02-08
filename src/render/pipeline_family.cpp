@@ -210,12 +210,20 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     desc.layout.push_constants.clear();
     for (auto& push_constant_info : pass->push_constants)
     {
-        const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(push_constant_info.type);
+        size_t pc_size = 0;
+        if (push_constant_info.type == "uint32_t")
+        {
+            pc_size = sizeof(uint32_t);
+        } else
+        {
+            const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(push_constant_info.type);
+            pc_size = info->size;
+        }
         PushConstantRange pcr;
-        pcr.size = info->size;
+        pcr.size = pc_size;
         pcr.offset = cur_offset;
         pcr.stages = make_shader_stages_mask(push_constant_info.stages);
-        cur_offset += info->size;
+        cur_offset += pc_size;
         desc.layout.push_constants.push_back(pcr);
     }
     auto pipeline = backend->create_pipeline(desc);

@@ -33,7 +33,7 @@ namespace vk
         
         vk::ImageResource& get_image_resource(RBImageHandle image_handle);
         const vk::ImageResource& get_image_resource(RBImageHandle image_handle) const;
-        VkImageView get_view(RBImageHandle image_handle, uint32_t array_index = 0);
+        VkImageView get_view(RBImageHandle image_handle, uint32_t array_index = 0, uint32_t mip_index = 0);
         VkImageView get_cubemap_view(RBImageHandle image_handle);
         
         RBImageHandle create_image(const RBImageDesc& desc);

@@ -628,7 +628,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
                 item.mesh.get().indices.size(),
                 RBDrawParams{
                     .update_viewport_extent = true,
-                    .use_swapchain_extent = true,
+                    .use_swapchain_extent = use_swapchain_extent,
                     .extent = resolution
                 });
         }
