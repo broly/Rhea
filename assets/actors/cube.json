@@ -1,0 +1,35 @@
+{
+	"name": "lymphocyte",
+	"class": "RhActor",
+	"components": [
+		{
+			"name": "mesh",
+			"class": "RhComp_StaticMesh",
+			"fields": {
+				"transform": {
+					"position": { "x": 0, "y": 0, "z": 0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
+					"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
+				},
+				"mesh": "meshes/cube/cube.glb",
+				"mats": [
+					{
+						"model": "pbr",
+						"parameters": {
+							"blend_mode": "opaque",
+							"base_color": "TEXTURE(textures/lymphocyte/Lymphocyte_B.png)",
+							"emissive": "TEXTURE(textures/lymphocyte/Lymphocyte_E.png)",
+							"normal": "TEXTURE(textures/lymphocyte/Lymphocyte_N.png)",
+							"orm": "TEXTURE(textures/lymphocyte/Lymphocyte_ORM.png)",
+							"base_color_factor": 1.0,
+							"emissive_factor": 0.3,
+							"occlusion_factor": 1.0,
+							"roughness_factor": 1.0,
+							"metallic_factor": 1.0
+						}
+					}
+				]
+			}
+		}
+	]
+}

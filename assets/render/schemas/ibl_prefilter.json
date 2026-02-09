@@ -1,0 +1,52 @@
+{
+	"model_name": "IBL_Prefilter",
+	
+	"usage_type": "frame",
+	
+	"enums": {},
+	"vertex_layouts": [],
+	"uniform_buffers": {},
+	"sampler": "default",
+	
+	"parameters": {
+		"env_map": {
+			"type": "sampler",
+			"variable": "u_env_map",
+			"binding": "BINDING_ENV_MAP"
+		},
+		"roughness": {
+			"type": "float",
+			"variable": "u_roughness",
+			"binding": "BINDING_ROUGHNESS"
+		}
+	},	
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"set": "SET_IBL",
+	"passes": [
+		{
+			"name": "IBL_Prefilter",
+			"requirements": "",
+			"shaders": {
+				"vertex": "fullscreen.vert",
+				"fragment": "ibl_prefilter.frag"
+			},
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "greater",
+			"resources": [],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false,
+			"push_constants": [
+				{
+					"type": "LevelAndMip",
+					"name": "level_and_mip",
+					"stages": ["fragment"]
+				}
+			]
+		}
+	]
+}

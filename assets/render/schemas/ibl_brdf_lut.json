@@ -1,0 +1,34 @@
+{
+	"model_name": "IBL_BRDF_LUT",
+	
+	"usage_type": "frame",
+	
+	"enums": {},
+	"vertex_layouts": [],
+	"uniform_buffers": {},
+	"sampler": "default",
+	
+	"parameters": {},	
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"set": "SET_IBL",
+	"passes": [
+		{
+			"name": "IBL_BRDF_LUT",
+			"requirements": "",
+			"shaders": {
+				"vertex": "fullscreen.vert",
+				"fragment": "ibl_brdf_lut.frag"
+			},
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "greater",
+			"resources": [],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false
+		}
+	]
+}

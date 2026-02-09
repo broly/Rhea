@@ -1,0 +1,47 @@
+{
+	"model_name": "IBL_Irradiance",
+	
+	"usage_type": "frame",
+	
+	"enums": {},
+	"vertex_layouts": [],
+	"uniform_buffers": {},
+	"sampler": "default",
+	
+	"parameters": {
+		"env_map": {
+			"type": "sampler",
+			"variable": "u_env_map",
+			"binding": "BINDING_ENV_MAP"
+		}
+	},	
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"set": "SET_IBL",
+	"passes": [
+		{
+			"name": "IBL_Irradiance",
+			"requirements": "",
+			"shaders": {
+				"vertex": "fullscreen.vert",
+				"fragment": "ibl_irradiance.frag"
+			},
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "greater",
+			"resources": [],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false,
+			"push_constants": [
+				{
+					"type": "uint32_t",
+					"name": "pc",
+					"stages": ["fragment"]
+				}
+			]
+		}
+	]
+}

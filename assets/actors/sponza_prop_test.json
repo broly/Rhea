@@ -1,0 +1,31 @@
+{
+	"name": "lymphocyte",
+	"class": "RhActor",
+	"components": [
+		{
+			"name": "mesh",
+			"class": "RhComp_StaticMesh",
+			"fields": {
+				"transform": {
+					"position": { "x": 0, "y": 0, "z": 0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
+					"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
+				},
+				"mesh": "meshes/sponza/column_2ndfloor_01.glb",
+				"materials": {
+					"default": {
+						"base_color": "textures/lymphocyte/Lymphocyte_B.png",
+						"emissive": "textures/lymphocyte/Lymphocyte_E.png",
+						"normal": "textures/lymphocyte/Lymphocyte_N.png",
+						"occlusion_roughness_metallic": "textures/lymphocyte/Lymphocyte_ORM.png",
+						"base_color_mult": 1.0,
+						"emissive_mult": 1.0,
+						"occlusion_mult": 1.0,
+						"roughness_mult": 1.0,
+						"metallic_mult": 1.0
+					}
+				}
+			}
+		}
+	]
+}
