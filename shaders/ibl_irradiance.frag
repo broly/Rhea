@@ -11,6 +11,7 @@ layout(push_constant) uniform Push
 
 const float PI = 3.14159265359;
 
+
 // -----------------------------
 // Cubemap face + UV → direction
 // -----------------------------
@@ -84,6 +85,7 @@ void main()
 {
     // Normal for this cubemap texel
     vec3 N = face_uv_to_dir(pc.face_index, v_uv);
+    
 
     vec3 irradiance = vec3(0.0);
 

@@ -29,7 +29,8 @@ struct RenderPassAttachmentInfo
     RBLoadOp load_op;
     RBStoreOp store_op;
     RBImageUsage usage;
-    uint32_t array_index = 0;
+    uint32_t layer = 0;
+    uint32_t mip_level = 0;
 };
 
 
@@ -136,7 +137,7 @@ public:   /// API Section
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
-    virtual void draw_fullscreen(RBCommandList cmd) override;
+    virtual void draw_fullscreen(RBCommandList cmd, RBDrawParams params) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) override;
     virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;

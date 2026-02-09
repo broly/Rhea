@@ -74,7 +74,7 @@ namespace vk
             const uint32_t array_index = get_array_index(layer_index, mip_index);
             checkf(layer_index < num_layers, "Image view layer out of bounds");
             checkf(mip_index < mip_levels, "Image view mip index out of bounds");
-            if (layer_index >= views.size())
+            if (array_index >= views.size())
                 views.resize(array_index + 1, VK_NULL_HANDLE);
             views[array_index] = view;
         }
@@ -90,10 +90,15 @@ namespace vk
             return cubemap_view != VK_NULL_HANDLE;
         }
         
-        bool has_view_index(uint32_t layer_index, uint32_t mip_index = 0) const
+        bool has_view(uint32_t layer_index, uint32_t mip_index = 0) const
         {
             const uint32_t array_index = get_array_index(layer_index, mip_index);
             return array_index < views.size() && views[array_index] != VK_NULL_HANDLE;
+        }
+        
+        bool is_valid_view(uint32_t layer_index, uint32_t mip_index = 0) const
+        {
+            return layer_index < num_layers && mip_index < mip_levels;
         }
         
         VkImageView get_img_view(uint32_t layer_index = 0, uint32_t mip_index = 0) const
@@ -114,7 +119,7 @@ namespace vk
         Extent extent = {};
         VkFormat format = VK_FORMAT_UNDEFINED;
         
-        uint32_t mip_levels   = 1; 
+        uint32_t mip_levels = 1; 
         uint32_t num_layers = 1;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
     };

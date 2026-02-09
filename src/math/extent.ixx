@@ -5,22 +5,27 @@ export struct Extent
 {
     uint32_t width, height;
     
-    bool operator==(const Extent& other) const
+    constexpr Extent operator>>(uint32_t shift) const
+    {
+        return Extent{width >> shift, height >> shift};
+    }
+    
+    constexpr bool operator==(const Extent& other) const
     {
         return width == other.width && height == other.height;
     }
     
-    bool operator!=(const Extent& other) const
+    constexpr bool operator!=(const Extent& other) const
     {
         return !(*this == other);
     }
     
-    bool is_zero() const
+    constexpr bool is_zero() const
     {
         return width == 0 || height == 0;
     }
     
-    bool is_not_zero() const
+    constexpr bool is_not_zero() const
     {
         return !is_zero();
     }

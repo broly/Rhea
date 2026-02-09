@@ -12,6 +12,7 @@ import <optional>;
 import <array>;
 import <vector>;
 import assets;
+import <string>;
 
 export class GameRenderer : public Renderer
 {
@@ -23,7 +24,7 @@ public:
     std::shared_ptr<Engine> engine;
     
     void capture_ibl(glm::vec3 pos, Name actor_name);
-    void finish_capturing_ibl(Name actor_name);
+    void finish_capturing_ibl(const std::string& filename);
     
-    std::map<Name, Cubemap> current_cubemaps;
+    std::map<std::string, Cubemap> current_cubemaps;
 };

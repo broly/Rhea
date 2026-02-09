@@ -28,12 +28,14 @@ namespace vk
             
             for (uint32_t i = 0; i < desc.color_attachments.size(); ++i)
                 if (desc.color_attachments[i].image != in_desc.color_attachments[i].image ||
-                    desc.color_attachments[i].layer != in_desc.color_attachments[i].layer)
+                desc.color_attachments[i].layer != in_desc.color_attachments[i].layer ||
+                desc.color_attachments[i].mip_level != in_desc.color_attachments[i].mip_level)
                     return false;
             
             if (desc.depth_attachment.has_value() && in_desc.depth_attachment.has_value())
                 return desc.depth_attachment.value().image == in_desc.depth_attachment.value().image &&
-                    desc.depth_attachment.value().layer == in_desc.depth_attachment.value().layer;
+                    desc.depth_attachment.value().layer == in_desc.depth_attachment.value().layer &&
+                    desc.depth_attachment.value().mip_level == in_desc.depth_attachment.value().mip_level ;
             
             if (!desc.depth_attachment.has_value() && !in_desc.depth_attachment.has_value())
                 return true;

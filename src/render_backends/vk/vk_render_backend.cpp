@@ -42,17 +42,6 @@ void VkRenderBackend::transition_image(
 }
 
 
-void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
-{
-    vkCmdDraw(
-        cmd.as<VkCommandBuffer>(),
-        3, // fullscreen triangle
-        1,
-        0,
-        0
-    );
-}
-
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
     ResourceUsageType usage, std::optional<RBSampler> sampler, uint32_t array_index, bool cubemap)
 {
@@ -363,7 +352,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
                 attachment.load, 
                 attachment.store, 
                 attachment.usage,
-                attachment.layer
+                attachment.layer,
+                attachment.mip_level
             });
     }
 
@@ -376,7 +366,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
         desc.depth_attachment->load_op = fb.depth_attachment->load;
         desc.depth_attachment->store_op = fb.depth_attachment->store;
         desc.depth_attachment->usage = attachment.usage;
-        desc.depth_attachment->array_index = attachment.layer;
+        desc.depth_attachment->layer = attachment.layer;
+        desc.depth_attachment->mip_level = attachment.mip_level;
     }
 
     auto it = render_pass_cache.find(desc);
@@ -550,6 +541,23 @@ void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_coun
     }
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 }
+
+void VkRenderBackend::draw_fullscreen(RBCommandList cmd, RBDrawParams params)
+{
+    if (params.update_viewport_extent)
+    {
+        update_viewport(cmd, params.use_swapchain_extent ? get_swapchain_extent() : params.extent);
+    }
+    
+    vkCmdDraw(
+        cmd.as<VkCommandBuffer>(),
+        3, // fullscreen triangle
+        1,
+        0,
+        0
+    );
+}
+
 
 
 void VkRenderBackend::create_command_pool()

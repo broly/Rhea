@@ -152,7 +152,8 @@ void RenderGraph::compile()
                 .extent  = tex.desc.extent,
                 .format = tex.desc.format,
                 .usage  = tex.desc.usage,
-                .is_cubemap = tex.desc.dimension == TextureDimension::Cube
+                .mip_levels = tex.desc.mip_levels,
+                .is_cubemap = tex.desc.dimension == TextureDimension::Cube,
             };
             tex.image = backend->create_image(desc);
         }
@@ -201,7 +202,7 @@ void RenderGraph::compile()
             checkf(!texture.desc.imported,
                 "imported textures could not be written");
             
-            checkf(pass.num_instances <= texture.get_layers_count(), 
+            checkf(pass.num_layers <= texture.get_layers_count(), 
                 "could not handle pass (%s) with num_instances greater than texture (%s) array count",
                     pass.name.to_string().c_str(), texture.desc.name.to_string().c_str());
         }
@@ -304,55 +305,60 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
                 texture.memory_barrier(cmd, *backend, barrier.before_pass->layout, frame);
         }
         
-        for (uint32_t pass_inst_id = 0; pass_inst_id < pass.num_instances; ++pass_inst_id)
+        
+        for (uint32_t layer_id = 0; layer_id < pass.num_layers; ++layer_id)
         {
-            // Build framebuffer
-            FramebufferDesc fb_desc{};
-            fb_desc.pass = pass.name;
-
-
-            for (const auto& write : pass.writes)
+            for (uint32_t mip_map_id = 0; mip_map_id < pass.num_mip_maps; ++mip_map_id)
             {
-                if (!is_attachment(write.usage))
-                    continue;
+                // Build framebuffer
+                FramebufferDesc fb_desc{};
+                fb_desc.pass = pass.name;
 
-                const RGTexture& tex = textures[write.texture.id];
 
-                RBImageHandle image = tex.get_image(*backend, frame);
-
-                if (!fb_desc.is_extent_set())
-                    fb_desc.update_extent(tex.desc.extent);
-
-                if (tex.desc.usage & RenderTextureUsage::DepthStencil)
+                for (const auto& write : pass.writes)
                 {
-                    fb_desc.depth_attachment = { tex.desc.name, image, write.load_op, write.store_op, write.usage, pass_inst_id };
-                }
-                else
-                {
-                    fb_desc.color_attachments.push_back({ tex.desc.name, image, write.load_op, RBStoreOp::Store, write.usage, pass_inst_id });
-                }
-            }
+                    if (!is_attachment(write.usage))
+                        continue;
 
-            ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
+                    const RGTexture& tex = textures[write.texture.id];
+
+                    RBImageHandle image = tex.get_image(*backend, frame);
+
+                    if (!fb_desc.is_extent_set())
+                        fb_desc.update_extent(tex.desc.extent);
+
+                    if (tex.desc.usage & RenderTextureUsage::DepthStencil)
+                    {
+                        fb_desc.depth_attachment = { tex.desc.name, image, write.load_op, write.store_op, write.usage, layer_id, mip_map_id };
+                    }
+                    else
+                    {
+                        fb_desc.color_attachments.push_back({ tex.desc.name, image, write.load_op, RBStoreOp::Store, write.usage, layer_id, mip_map_id });
+                    }
+                }
+
+                ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
         
 
-            backend->begin_render_pass(cmd, ctx.framebuffer);
+                backend->begin_render_pass(cmd, ctx.framebuffer);
 
+                {
+                    PROFILE("RenderGraph Pass");
+                    ctx.pass_name = pass.name;
+                    ctx.level = layer_id;
+                    ctx.mip = mip_map_id;
+                    pass.execute(ctx);
+                }
+
+                backend->end_render_pass(cmd);
+        
+            }
+        
+            for (auto& [tex, barrier] : pass.pass_barriers)
             {
-                PROFILE("RenderGraph Pass");
-                ctx.pass_name = pass.name;
-                ctx.pass_instance_id = pass_inst_id;
-                pass.execute(ctx);
+                if (barrier.after_pass)
+                    textures[tex.id].memory_barrier(cmd, *backend, barrier.after_pass->layout, frame);
             }
-
-            backend->end_render_pass(cmd);
-        
-        }
-        
-        for (auto& [tex, barrier] : pass.pass_barriers)
-        {
-            if (barrier.after_pass)
-                textures[tex.id].memory_barrier(cmd, *backend, barrier.after_pass->layout, frame);
         }
     }
 

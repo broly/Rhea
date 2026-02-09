@@ -174,7 +174,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             
             draw_scene(ctx);
         },
-        .num_instances = num_pass_instances
+        .num_layers = num_pass_instances
     });
     
     
@@ -192,7 +192,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             
             draw_scene(ctx);
         },
-        .num_instances = num_pass_instances
+        .num_layers = num_pass_instances
     });
     
     
@@ -212,7 +212,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             
             draw_clouds(ctx, depth_texture, noise_texture);
         },
-        .num_instances = num_pass_instances
+        .num_layers = num_pass_instances
         
     });
 }
@@ -597,7 +597,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     
     auto& resources_by_instance = prepared_pass_resources[ctx.pass_name];
 
-    auto& pass_resources = resources_by_instance[ctx.pass_instance_id];
+    auto& pass_resources = resources_by_instance[ctx.level];
 
     for (auto& batch : batches)
     {

@@ -38,7 +38,7 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
         LogVkFramebufferManager.Log("Use color attachment %s (image: %p, layer: %i)", 
             attachment.image_name.to_string().c_str(), attachment.image, attachment.layer);
     
-        attachments.push_back(image_manager.fetch_image_view(attachment.image, attachment.layer));
+        attachments.push_back(image_manager.fetch_image_view_generic(attachment.image, attachment.layer, attachment.mip_level));
     }
 
     if (desc.depth_attachment)
@@ -47,7 +47,7 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
     
         LogVkFramebufferManager.Log("Use depth attachment %s (image: %p, layer: %i)", 
             attachment.image_name.to_string().c_str(), attachment.image, attachment.layer);
-        attachments.push_back(image_manager.fetch_image_view(attachment.image, attachment.layer));
+        attachments.push_back(image_manager.fetch_image_view_generic(attachment.image, attachment.layer, attachment.mip_level));
     }
 
     VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };

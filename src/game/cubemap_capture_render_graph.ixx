@@ -11,6 +11,14 @@ import assets;
 import :generic_render_graph;
 #include "object/object_reflection_macro.h"
 
+struct LevelAndMip
+{
+    uint32_t level;
+    float roghness;
+};
+REFLECT_STRUCT_RUNTIME(LevelAndMip,
+    level, roghness);
+
 class CubemapCaptureRenderGraph : public GenericRenderGraph
 {
 public:

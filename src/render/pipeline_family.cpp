@@ -175,7 +175,6 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         desc.layout.resources.push_back(resource_info);
     }
 
-    if (!model->parameters.empty())
     {
         defines.insert({model->set, set_index});
         int binding_index = 0;

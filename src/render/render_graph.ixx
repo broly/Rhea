@@ -17,6 +17,7 @@ export struct RenderGraphPass
     Name name;
     
     std::function<bool()> condition = nullptr;
+    
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
 
@@ -24,7 +25,8 @@ export struct RenderGraphPass
     
     std::map<RGTextureHandle, RGImageBarriers> pass_barriers;
     
-    uint32_t num_instances = 1;
+    uint32_t num_layers = 1;
+    uint32_t num_mip_maps = 1;
 };
 
 
@@ -95,7 +97,8 @@ public:
     RenderGraph& render_graph;
     RBFrameHandle frame;
     RenderGraphParameters params;
-    uint32_t pass_instance_id;
+    uint32_t level;
+    uint32_t mip;
     bool is_preparing;
 };
 

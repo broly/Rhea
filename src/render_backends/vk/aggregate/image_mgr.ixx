@@ -29,7 +29,7 @@ namespace vk
             VkImage image,
             uint32_t array_index = 0);
         
-        RBImageView fetch_image_view(RBImageHandle image_handle, uint32_t array_index = 0, bool is_cubemap = false);
+        RBImageView fetch_image_view_generic(RBImageHandle image_handle, uint32_t layer_index = 0, uint32_t mip_level = 0, bool is_cubemap = false);
         
         vk::ImageResource& get_image_resource(RBImageHandle image_handle);
         const vk::ImageResource& get_image_resource(RBImageHandle image_handle) const;

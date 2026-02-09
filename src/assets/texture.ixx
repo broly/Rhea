@@ -52,6 +52,7 @@ export struct Texture
     std::vector<std::byte> bulk;
     
     static std::optional<Texture> create_from_file(const std::filesystem::path& path);
+    bool save_to_file(const std::filesystem::path& path) const;
     
 };
 

@@ -16,7 +16,7 @@ export struct Cubemap
     Name name;
     uint32_t id;
     TextureFormat format = TextureFormat::RGBA32F;
-    std::array<std::vector<float>, 6> faces;
+    std::array<std::vector<std::vector<float>>, 6> faces;
     uint32_t face_size = 0;
     
     void save(const std::filesystem::path& filename) const;

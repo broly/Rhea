@@ -8,8 +8,8 @@ import <optional>;
 
 using AssetId = uint32_t;
 
-static constexpr auto INVALID_ASSET_ID = std::numeric_limits<AssetId>::max();
-static constexpr auto PENDING_ASSET_ID = std::numeric_limits<AssetId>::max() - 1;
+export constexpr auto INVALID_ASSET_ID = std::numeric_limits<AssetId>::max();
+export constexpr auto PENDING_ASSET_ID = std::numeric_limits<AssetId>::max() - 1;
 
 
 export template<typename T>

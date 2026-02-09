@@ -317,6 +317,7 @@ export
         RBStoreOp store;
         RBImageUsage usage;
         uint32_t layer = 0;
+        uint32_t mip_level = 0;
     };
     
 
@@ -345,7 +346,7 @@ export
     {
         bool update_viewport_extent = false;
         bool use_swapchain_extent = false;
-        Extent extent;
+        Extent extent = {};
     };
 
     using RBRenderPass = RBHandle<VkRenderPass>;

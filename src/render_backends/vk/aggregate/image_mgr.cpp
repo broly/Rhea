@@ -52,7 +52,7 @@ RBImageHandle vk::ImageManager::create_image_view(
         
 }
 
-RBImageView vk::ImageManager::fetch_image_view(RBImageHandle image_handle, uint32_t array_index, bool is_cubemap)
+RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handle, uint32_t layer_index, uint32_t mip_level, bool is_cubemap)
 {
     checkf(image_handle.id < image_resources.size(), "Unknown image id %i", image_handle.id);
     
@@ -61,8 +61,11 @@ RBImageView vk::ImageManager::fetch_image_view(RBImageHandle image_handle, uint3
     
     if (is_cubemap && image_resource.has_cubemap())
         return image_resource.get_cubemap_view();
-    else if (!is_cubemap && image_resource.has_view_index(array_index))
-        return image_resource.get_img_view(array_index);
+    else if (!is_cubemap && image_resource.has_view(layer_index, mip_level))
+        return image_resource.get_img_view(layer_index, mip_level);
+    
+    checkf(image_resource.is_valid_view(layer_index, mip_level),
+        "invalid layer_index or mip_level");
     
     VkImage image = image_resource.image;
     
@@ -78,17 +81,18 @@ RBImageView vk::ImageManager::fetch_image_view(RBImageHandle image_handle, uint3
     view_info.viewType = is_cubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
     view_info.format = image_resource.format;
     view_info.subresourceRange = {
-        aspect, 0, image_resource.mip_levels, 0, 1
+        aspect, 0, 1, 0, 1
     };
     view_info.subresourceRange.layerCount = is_cubemap ? 6 : 1;
-    view_info.subresourceRange.baseArrayLayer = is_cubemap ? 0 : array_index;
+    view_info.subresourceRange.baseArrayLayer = is_cubemap ? 0 : layer_index;
+    view_info.subresourceRange.baseMipLevel = mip_level;
     
 
     VkImageView view;
     VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &view));
     
     if (!is_cubemap)
-        image_resource.set_img_view(view, array_index);
+        image_resource.set_img_view(view, layer_index, mip_level);
     else
         image_resource.set_cubemap_img_view(view);
     
@@ -113,7 +117,7 @@ VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t arra
 
 VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)
 {
-    return fetch_image_view(image_handle, 0, true);
+    return fetch_image_view_generic(image_handle, 0, 0, true);
 }
 
 RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
@@ -188,7 +192,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     
     RBImageHandle img_handle { id };
     
-    fetch_image_view(img_handle, 0);
+    fetch_image_view_generic(img_handle, 0, 0);
     
     
     
@@ -728,13 +732,15 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
 {
     const vk::ImageResource& img_resource = get_image_resource(img);
 
-    const uint32_t layers = img_resource.num_layers;
-    const Extent extent   = img_resource.extent;
+    const uint32_t layers    = img_resource.num_layers;
+    const uint32_t mip_count = img_resource.mip_levels;
+    const Extent base_extent = img_resource.extent;
 
-    VkImage image   = img_resource.image;
+    VkImage  image  = img_resource.image;
     VkFormat format = img_resource.format;
 
-    uint32_t channels = 4;
+    constexpr uint32_t channels = 4;
+
     uint32_t bytes_per_channel = 0;
     TextureFormat out_format;
 
@@ -755,54 +761,122 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
             return {};
     }
 
-    const size_t pixel_count     = extent.width * extent.height;
-    const size_t layer_byte_size = pixel_count * channels * bytes_per_channel;
-    const size_t total_byte_size = layer_byte_size * layers;
+    auto mip_extent = [](const Extent& e, uint32_t mip) -> Extent
+    {
+        return {
+            std::max(1u, e.width  >> mip),
+            std::max(1u, e.height >> mip)
+        };
+    };
 
-    // ---------- Result ----------
+    // ------------------------------------------------------------
+    // Calculate layout
+    // ------------------------------------------------------------
+
+    struct MipInfo
+    {
+        size_t offset;
+        Extent extent;
+        size_t byte_size;
+    };
+
+    std::vector<std::vector<MipInfo>> mip_infos(layers);
+    size_t total_byte_size = 0;
+
+    for (uint32_t layer = 0; layer < layers; ++layer)
+    {
+        mip_infos[layer].resize(mip_count);
+
+        for (uint32_t mip = 0; mip < mip_count; ++mip)
+        {
+            Extent me = mip_extent(base_extent, mip);
+            size_t pixel_count = me.width * me.height;
+            size_t byte_size   = pixel_count * channels * bytes_per_channel;
+
+            mip_infos[layer][mip] = {
+                total_byte_size,
+                me,
+                byte_size
+            };
+
+            total_byte_size += byte_size;
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Result
+    // ------------------------------------------------------------
+
     ImageReadback result{};
-    result.extent = extent;
+    result.extent = base_extent;
     result.layers = layers;
+    result.mips   = mip_count;
     result.format = out_format;
-    result.layers_data.resize(layers);
 
-    for (uint32_t l = 0; l < layers; ++l)
-        result.layers_data[l].resize(pixel_count * channels);
+    result.data.resize(layers);
 
-    // ---------- Staging buffer ----------
+    for (uint32_t layer = 0; layer < layers; ++layer)
+    {
+        result.data[layer].resize(mip_count);
+
+        for (uint32_t mip = 0; mip < mip_count; ++mip)
+        {
+            const Extent& me = mip_infos[layer][mip].extent;
+            size_t pixel_count = me.width * me.height;
+            result.data[layer][mip].resize(pixel_count * channels);
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Staging buffer
+    // ------------------------------------------------------------
+
     VkBuffer staging_buffer;
     VkDeviceMemory staging_memory;
     create_staging_buffer(total_byte_size, staging_buffer, staging_memory);
 
-    // ---------- Copy ----------
+    // ------------------------------------------------------------
+    // Copy regions
+    // ------------------------------------------------------------
+
     std::vector<VkBufferImageCopy> regions;
-    regions.reserve(layers);
+    regions.reserve(layers * mip_count);
 
     for (uint32_t layer = 0; layer < layers; ++layer)
     {
-        VkBufferImageCopy region{};
-        region.bufferOffset = layer * layer_byte_size;
-        region.bufferRowLength = 0;
-        region.bufferImageHeight = 0;
+        for (uint32_t mip = 0; mip < mip_count; ++mip)
+        {
+            const auto& info = mip_infos[layer][mip];
 
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.mipLevel = 0;
-        region.imageSubresource.baseArrayLayer = layer;
-        region.imageSubresource.layerCount = 1;
+            VkBufferImageCopy region{};
+            region.bufferOffset = info.offset;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
 
-        region.imageExtent = {
-            extent.width,
-            extent.height,
-            1
-        };
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.mipLevel = mip;
+            region.imageSubresource.baseArrayLayer = layer;
+            region.imageSubresource.layerCount = 1;
 
-        regions.push_back(region);
+            region.imageExtent = {
+                info.extent.width,
+                info.extent.height,
+                1
+            };
+
+            regions.push_back(region);
+        }
     }
 
     immediate_command_pool.submit([&](VkCommandBuffer cmd)
     {
-        transition_image(cmd, img, RBImageLayout::undefined, RBImageLayout::transfer_src_optimal);
-        
+        transition_image(
+            cmd,
+            img,
+            RBImageLayout::undefined,
+            RBImageLayout::transfer_src_optimal
+        );
+
         vkCmdCopyImageToBuffer(
             cmd,
             image,
@@ -813,7 +887,10 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
         );
     });
 
-    // ---------- Map & convert ----------
+    // ------------------------------------------------------------
+    // Map & convert
+    // ------------------------------------------------------------
+
     void* mapped = nullptr;
     VK_CHECK(vkMapMemory(
         instance.device,
@@ -826,22 +903,30 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
 
     for (uint32_t layer = 0; layer < layers; ++layer)
     {
-        uint8_t* src_bytes =
-            reinterpret_cast<uint8_t*>(mapped) + layer * layer_byte_size;
-
-        float* dst = result.layers_data[layer].data();
-
-        if (format == VK_FORMAT_R32G32B32A32_SFLOAT)
+        for (uint32_t mip = 0; mip < mip_count; ++mip)
         {
-            memcpy(dst, src_bytes, layer_byte_size);
-        }
-        else // RGBA16F → float
-        {
-            const uint16_t* src = reinterpret_cast<const uint16_t*>(src_bytes);
-            const size_t float_count = pixel_count * channels;
+            const auto& info = mip_infos[layer][mip];
 
-            for (size_t i = 0; i < float_count; ++i)
-                dst[i] = math::half_to_float(src[i]);
+            uint8_t* src_bytes =
+                reinterpret_cast<uint8_t*>(mapped) + info.offset;
+
+            float* dst = result.data[layer][mip].data();
+
+            size_t pixel_count = info.extent.width * info.extent.height;
+            size_t float_count = pixel_count * channels;
+
+            if (format == VK_FORMAT_R32G32B32A32_SFLOAT)
+            {
+                memcpy(dst, src_bytes, float_count * sizeof(float));
+            }
+            else // RGBA16F → float
+            {
+                const uint16_t* src =
+                    reinterpret_cast<const uint16_t*>(src_bytes);
+
+                for (size_t i = 0; i < float_count; ++i)
+                    dst[i] = math::half_to_float(src[i]);
+            }
         }
     }
 
@@ -852,6 +937,7 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
 
     return result;
 }
+
 
 VkFormat vk::ImageManager::get_image_format(RBImageHandle handle) const
 {

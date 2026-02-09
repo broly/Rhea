@@ -39,10 +39,19 @@ export struct ImageReadback
 {
     Extent extent;
     uint32_t layers = 1;
+    uint32_t mips   = 1;
     TextureFormat format;
+    
+    static Extent mip_extent(const Extent& base, uint32_t mip)
+    {
+        return {
+            std::max(1u, base.width  >> mip),
+            std::max(1u, base.height >> mip)
+        };
+    }
 
-    // layers[l][pixel * channels + c]
-    std::vector<std::vector<float>> layers_data;
+    // data[layer][mip][pixel * channels + c]
+    std::vector<std::vector<std::vector<float>>> data;
 };
 
 export class RenderBackend 
@@ -112,6 +121,7 @@ public:
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) = 0;
+    virtual void draw_fullscreen(RBCommandList cmd, RBDrawParams params = {}) = 0;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
@@ -128,8 +138,6 @@ public:
         RBImageHandle image,
         RBImageLayout before,
         RBImageLayout after) = 0;
-    
-    virtual void draw_fullscreen(RBCommandList cmd) = 0;
     
     virtual void update_sampled_image(
         RBDescriptorSet set,

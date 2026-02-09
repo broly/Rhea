@@ -60,6 +60,29 @@ std::optional<Texture> Texture::create_from_file(const std::filesystem::path& pa
     return texture;
 }
 
+bool Texture::save_to_file(const std::filesystem::path& path) const
+{
+    checkf(format == TextureFormat::RGBA8, "Only RGBA8 textures are supported");
+    checkf(!bulk.empty(), "Texture bulk data is empty");
+    checkf(path.extension() == ".png", "Only .png saving is supported");
+
+    const int width  = static_cast<int>(extent.width);
+    const int height = static_cast<int>(extent.height);
+    const int channels = 4; // RGBA
+    const int stride = width * channels;
+
+    int result = stb::write_png(
+        path.string().c_str(),
+        width,
+        height,
+        channels,
+        bulk.data(),
+        stride
+    );
+
+    return result != 0;
+}
+
 void serialize_json_value(TextureHandle& target, const Json::Value& value, DependencyCollector* dc)
 {
     if (!value.isString())
