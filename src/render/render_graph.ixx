@@ -154,6 +154,7 @@ public:
     {
         assert(tex.id < textures.size());
         const auto& rg_tex = textures[tex.id];
+        
 
         assert(rg_tex.image.has_value());
         return rg_tex.image.value();
@@ -173,6 +174,8 @@ public:
     std::vector<RGTexture> textures;
     std::shared_ptr<RenderBackend> backend;
     std::shared_ptr<Renderer> renderer;
+    
+    Name current_pass_name;
     
     RGTexture* get_swapchain_texture();
     

@@ -4,12 +4,14 @@ import name;
 import :rhcomp_reflection_capture;
 
 import render_scene;
+import glm;
 #include "object/object_reflection_macro.h"
 
 export struct RenderObject_ReflectionCapture
 {
-    CubemapHandle cubemap;
-    vec3 position;
+    CubemapHandle irradiance;
+    CubemapHandle prefiltered_env;
+    glm::vec3 position;
     Name debug_name;
 };
 
@@ -24,6 +26,8 @@ public:
     RenderId register_proxy() override;
     void unregister_proxy(RenderId render_id) override;
     void process() override;
+    
+    std::optional<RenderObject_ReflectionCapture> query_nearest(glm::vec3 origin) const;
 
     std::vector<RenderObject_ReflectionCapture> cubemaps;
     std::vector<RenderId> vacated_cubemap_ids;

@@ -126,7 +126,7 @@
 			"depth_write": true,
 			"depth_test": true,
 	
-			"resources": ["camera", "light", "shadow"],
+			"resources": ["camera", "light", "shadow", "reflection"],
 			"translucent": false,
 			"cull_mode": "back",
 			"front_face": "CW",
@@ -146,7 +146,7 @@
 				"vertex": "geometry.vert",
 				"fragment": "geometry.frag"
 			},
-			"resources": ["camera", "light", "shadow"],
+			"resources": ["camera", "light", "shadow", "reflection"],
 			"depth_write": false,
 			"depth_test": true,
 			"translucent": true,

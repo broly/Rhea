@@ -31,6 +31,7 @@ struct PreparedPassResources
     RenderResourceInstance* camera = nullptr;
     RenderResourceInstance* light  = nullptr;
     RenderResourceInstance* shadow = nullptr;
+    RenderResourceInstance* reflection = nullptr;
 };
 
 struct PreparedCloudsPass
@@ -75,10 +76,13 @@ public:
     RGTextureHandle hdr_color;
     RGTextureHandle swapchain_color;
     
+    RGTextureHandle brdf_lut;
+    
     RenderResource* camera_resource = nullptr;
     RenderResource* light_resource = nullptr;
     RenderResource* light_resource_shadow = nullptr;
     RenderResource* shadow_resource = nullptr;
+    RenderResource* reflection_resource = nullptr;
     
     Extent resolution;
     Extent swapchain_extent;

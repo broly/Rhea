@@ -39,7 +39,9 @@ public:  // public API
     void toggle_flag(Name name, bool needs_rebuild = false);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle);
+    RBImageHandle create_cubemap_from_asset(CubemapHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
+    RBImageHandle get_cubemap(CubemapHandle handle);
     RenderResource* find_resource(Name resource_name) const;
     std::shared_ptr<PipelineFamily> query_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model_name);
     RenderResource* query_resource(std::shared_ptr<MaterialModel> model, Name pass_name);
@@ -76,6 +78,7 @@ protected: // materials and resources
 
 protected:  // textures
     std::map<TextureHandle, RBImageHandle> texture_cache;
+    std::map<CubemapHandle, RBImageHandle> cubemap_cache;
     
     struct RenderGraphJob
     {

@@ -78,6 +78,7 @@ public:
     virtual Extent get_swapchain_extent() const = 0;
 
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) = 0;
+    virtual RBImageHandle create_texture_cubemap(const Cubemap& data, const TextureCreationInfo& texture_creation_info) = 0;
     virtual void update_viewport(const RBCommandList& cmd, Extent extent) = 0;
 
     template<RenderBackendType T>

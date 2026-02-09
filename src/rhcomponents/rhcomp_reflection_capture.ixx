@@ -11,7 +11,8 @@ import render_scene;
 export struct SceneViewProxy_ReflectionCapture : public SceneViewProxy_Transform
 {
     bool active = false;
-    CubemapHandle cubemap;
+    CubemapHandle irradiance;
+    CubemapHandle prefiltered_env;
 };
 
 
@@ -26,7 +27,8 @@ public:
     
     bool active;
     
-    CubemapHandle cubemap;
+    CubemapHandle irradiance;
+    CubemapHandle prefiltered_env;
     
     void update_scene_proxy();
     

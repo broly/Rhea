@@ -339,7 +339,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
                 ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
         
-
+                current_pass_name = pass.name;
+                
                 backend->begin_render_pass(cmd, ctx.framebuffer);
 
                 {
@@ -382,6 +383,11 @@ void RenderGraph::rebuild_resources()
         if (tex.is_swapchain())
         {
             tex.desc.extent = extent;
+            continue;
+        }
+        
+        if (tex.is_imported())
+        {
             continue;
         }
         

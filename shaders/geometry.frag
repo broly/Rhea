@@ -63,10 +63,9 @@ layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 
 
 
-layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW) uniform sampler2D u_shadow_depth;
-
-
 // ================== SHADOW ==================
+
+layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW) uniform sampler2D u_shadow_depth;
 
 
 #define WITH_POISSON 1
@@ -138,7 +137,18 @@ float shadow_factor(vec3 world_pos, vec3 Ng)
 #endif    
 }
 
+// ============= reflection =================
 
+layout(set = SET_IBL, binding = BINDING_SAMPLER_IRRADIANCE) uniform samplerCube u_irradiance;
+layout(set = SET_IBL, binding = BINDING_SAMPLER_PREFILTERED_ENV) uniform samplerCube u_prefilter_map;
+layout(set = SET_IBL, binding = BINDING_SAMPLER_BRDF_LUT) uniform sampler2D u_brdf_lut;
+
+
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) *
+    pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
 
 // ================== MAIN ==================
 void main()
@@ -266,7 +276,44 @@ void main()
     }
 
     // ================== AMBIENT ==================
+
+
+#if !BLEND_MODE_TRANSLUCENT
+    // ================== IBL ==================
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+    // ---- Diffuse IBL ----
+    vec3 kS = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 kD = (1.0 - kS) * (1.0 - metallic);
+
+    vec3 irradiance = texture(u_irradiance, N).rgb;
+    
+    vec3 diffuseIBL = irradiance * albedo;
+
+    // ---- Specular IBL ----
+    vec3 R = reflect(-V, N);
+
+    const float MAX_REFLECTION_LOD = 5.0;
+    vec3 prefilteredColor =
+    textureLod(u_prefilter_map, R, roughness * MAX_REFLECTION_LOD).rgb;
+
+    vec2 brdf = texture(
+        u_brdf_lut,
+        vec2(max(dot(N, V), 0.0), roughness)
+    ).rg;
+
+    vec3 specularIBL =
+    prefilteredColor * (kS * brdf.x + brdf.y);
+
+    vec3 ibl = (kD * diffuseIBL + specularIBL) * ao;
+#endif
+    
+#if BLEND_MODE_TRANSLUCENT
     vec3 ambient = vec3(0.01) * albedo * ao;
+#else
+    vec3 ambient = ibl;
+#endif
+
 
 #if BLEND_MODE_TRANSLUCENT
     ambient *= shadow;

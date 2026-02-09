@@ -448,6 +448,149 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     return image;
 }
 
+RBImageHandle vk::ImageManager::create_cubemap(
+    const Cubemap& cubemap,
+    const TextureCreationInfo& texture_creation_info)
+{
+    const TextureFormat format =
+        texture_creation_info.format_override.value_or(cubemap.format);
+
+    const uint32_t mip_levels =
+        static_cast<uint32_t>(cubemap.faces[0].size());
+
+    if (cubemap.face_size == 0 || mip_levels == 0)
+        throw std::runtime_error("Cubemap has invalid size");
+
+    // =========================
+    // IMAGE DESCRIPTION
+    // =========================
+    RBImageDesc desc;
+    desc.name       = std::string("CUBEMAP_") + cubemap.name.to_string();
+    desc.extent     = { cubemap.face_size, cubemap.face_size };
+    desc.format     = format;
+    desc.mip_levels = mip_levels;
+    desc.is_cubemap = true;
+    
+    desc.usage =
+        RenderTextureUsage::Sampled |
+        RenderTextureUsage::TransferDst;
+
+    RBImageHandle image = create_image(desc);
+    auto& res = get_image_resource(image);
+
+    // =========================
+    // STAGING SIZE
+    // =========================
+    const size_t pixel_size = bytes_per_pixel(format);
+
+    size_t staging_size = 0;
+    for (uint32_t mip = 0; mip < mip_levels; ++mip)
+    {
+        const uint32_t size = std::max(1u, cubemap.face_size >> mip);
+        staging_size += 6 * size * size * pixel_size;
+    }
+
+    if (staging_size == 0)
+        throw std::runtime_error("Cubemap staging_size == 0");
+
+    // =========================
+    // CREATE STAGING BUFFER
+    // =========================
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+
+    vk::create_buffer(
+        instance.device,
+        instance.physical_device,
+        staging_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buffer,
+        staging_memory);
+
+    // =========================
+    // BUILD CPU BLOB
+    // =========================
+    std::vector<uint8_t> blob;
+    blob.resize(staging_size);
+
+    std::vector<VkBufferImageCopy> copies;
+    copies.reserve(6 * mip_levels);
+
+    size_t offset = 0;
+
+    for (uint32_t face = 0; face < 6; ++face)
+    {
+        for (uint32_t mip = 0; mip < mip_levels; ++mip)
+        {
+            const uint32_t size = std::max(1u, cubemap.face_size >> mip);
+            const auto& src = cubemap.faces[face][mip];
+
+            const size_t bytes = size * size * pixel_size;
+
+            memcpy(blob.data() + offset, src.data(), bytes);
+
+            VkBufferImageCopy copy{};
+            copy.bufferOffset = offset;
+            copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy.imageSubresource.mipLevel = mip;
+            copy.imageSubresource.baseArrayLayer = face;
+            copy.imageSubresource.layerCount = 1;
+            copy.imageExtent = { size, size, 1 };
+
+            copies.push_back(copy);
+            offset += bytes;
+        }
+    }
+
+    // =========================
+    // UPLOAD TO STAGING
+    // =========================
+    vk::update_buffer(
+        instance.device,
+        staging_memory,
+        blob.data(),
+        staging_size);
+
+    // =========================
+    // GPU COPY
+    // =========================
+    immediate_command_pool.submit([&](VkCommandBuffer cmd)
+    {
+        transition_image(
+            cmd,
+            image,
+            RBImageLayout::undefined,
+            RBImageLayout::transfer_dst_optimal);
+
+        vkCmdCopyBufferToImage(
+            cmd,
+            staging_buffer,
+            res.image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            static_cast<uint32_t>(copies.size()),
+            copies.data());
+
+        transition_image(
+            cmd,
+            image,
+            RBImageLayout::transfer_dst_optimal,
+            texture_creation_info.current_layout != RBImageLayout::undefined
+                ? texture_creation_info.current_layout
+                : RBImageLayout::shader_read_only_optimal);
+    });
+
+    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
+
+    LogVkImageManager.Log<Verbose>(
+        "Allocated cubemap: %s (%u mips)",
+        cubemap.name.to_string().c_str(),
+        mip_levels);
+
+    return image;
+}
+
 void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after) const
 {
     auto vk_img = get_image_resource(image).image;

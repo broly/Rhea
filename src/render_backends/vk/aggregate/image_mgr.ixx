@@ -50,6 +50,7 @@ namespace vk
         void set_default_extent(Extent extent);
         
         RBImageHandle create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info);
+        RBImageHandle create_cubemap(const Cubemap& tex, const TextureCreationInfo& texture_creation_info);
         
         void transition_image(
             RBCommandList cmd,

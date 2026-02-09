@@ -139,6 +139,7 @@ public:   /// API Section
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual void draw_fullscreen(RBCommandList cmd, RBDrawParams params) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) override;
+    virtual RBImageHandle create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info) override;
     virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     

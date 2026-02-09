@@ -44,12 +44,16 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     light_resource = renderer->find_resource("light");
     light_resource_shadow = renderer->find_resource("shadow_light");
     shadow_resource = renderer->find_resource("shadow");
+    reflection_resource = renderer->find_resource("reflection");
     
     
     
     auto& asset_manager = AssetManager::get();
-    auto texh = asset_manager.load_texture("textures/noise/noise_512.png");
-    noise_texture = create_texture_from_asset(texh, false);
+    auto noise_tex = asset_manager.load_texture("textures/noise/noise_512.png");
+    noise_texture = create_texture_from_asset(noise_tex, false);
+    
+    auto brdf_lut_tex = asset_manager.load_texture("textures/brdf_lut.png");
+    brdf_lut = create_texture_from_asset(brdf_lut_tex, false);
     
     auto tonemap_model = renderer->find_model("tonemap");
     auto shadow_debug_model = renderer->find_model("shadow_debug");
@@ -162,11 +166,12 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = Names::pass_geometry_base,
         .reads = {
-            {  shadow_map, RBImageUsage::SampledFragment }
+            {  shadow_map, RBImageUsage::SampledFragment },
+            { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
         },
         .writes = { 
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -181,10 +186,11 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = Names::pass_geometry_translucent,
         .reads = {
+            { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
         },
         .writes = { 
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },   
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },  
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -390,7 +396,7 @@ void GenericRenderGraph::prepare_geometry_resources(RenderGraphContext& ctx, Nam
             PipelineObject* pipeline = batch.pipeline;
 
             PreparedPassResources prep{};
-
+            
             // ---------- Camera ----------
             CameraUBO cam_ubo = make_camera_ubo(ctx, false, inst);
 
@@ -402,6 +408,29 @@ void GenericRenderGraph::prepare_geometry_resources(RenderGraphContext& ctx, Nam
                 pipeline, "camera_ubo", cam_ubo, frame);
 
             prep.camera = cam;
+            
+            
+            // ---------- reflection capture -----
+            
+            auto refl = reflection_resource->query_single(pipeline);
+            
+            auto& scene_view = engine->scene_view;
+            auto& reflection_capture_processor =
+                scene_view->get_processor<SceneViewProcessor_ReflectionCapture>();
+            
+            auto reflection_capture = reflection_capture_processor.query_nearest(
+                cam_ubo.camera_pos
+            );
+            if (reflection_capture)
+            {
+                refl->update_image(pipeline, "u_irradiance", renderer->get_cubemap(reflection_capture->irradiance), ctx.frame, 0, true);
+                refl->update_image(pipeline, "u_prefilter_map", renderer->get_cubemap(reflection_capture->prefiltered_env), ctx.frame, 0, true);
+                refl->update_image(pipeline, "u_brdf_lut", get_image(brdf_lut), ctx.frame);
+            }
+            
+            prep.reflection = refl;
+            
+
 
             // ---------- Lights ----------
             LightUBO light_ubo = build_light_ubo(cam_ubo.camera_pos);
@@ -609,6 +638,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         prep.camera->bind(pipeline, cmd, frame);
         prep.light->bind(pipeline, cmd, frame);
         prep.shadow->bind(pipeline, cmd, frame);
+        prep.reflection->bind(pipeline, cmd, frame);
 
         for (auto& item : batch.items)
         {

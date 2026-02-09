@@ -220,6 +220,22 @@ RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
     return image;
 }
 
+RBImageHandle Renderer::create_cubemap_from_asset(CubemapHandle handle)
+{
+    const Cubemap& data = handle.get();
+    
+    RBImageHandle image = render_backend->create_texture_cubemap(
+        data,
+        TextureCreationInfo{
+            TextureFormat::RGBA32F,
+            false,
+        }
+    );
+    
+    cubemap_cache.emplace(handle, image);
+    return image;
+}
+
 RBImageHandle Renderer::get_texture(TextureHandle handle)
 {
     auto it = texture_cache.find(handle);
@@ -227,6 +243,15 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
         return it->second;
 
     return create_texture_from_asset(handle);
+}
+
+RBImageHandle Renderer::get_cubemap(CubemapHandle handle)
+{
+    auto it = cubemap_cache.find(handle);
+    if (it != cubemap_cache.end())
+        return it->second;
+
+    return create_cubemap_from_asset(handle);
 }
 
 std::shared_ptr<PipelineFamily> Renderer::query_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model)

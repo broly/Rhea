@@ -1,6 +1,6 @@
 module rhcomponents:scene_view_proxy.reflection_capture;
 import globals;
-
+import <algorithm>;
 
 RenderId SceneViewProcessor_ReflectionCapture::register_proxy()
 {
@@ -34,10 +34,29 @@ void SceneViewProcessor_ReflectionCapture::process()
         
         auto renderer = RhGlobals::engine->renderer;  // crutch
         
-        const CubemapHandle cubemap_handle = submitted.cubemap;
-        auto& cubemap = cubemap_handle.get();
+        const CubemapHandle irradiance = submitted.irradiance;
+        const CubemapHandle prefiltered_env = submitted.prefiltered_env;
+        irradiance.get();
+        prefiltered_env.get();
         
         cubemap_ro.debug_name = submitted.debug_name;
-        cubemap_ro.cubemap = cubemap_handle;
+        cubemap_ro.irradiance = irradiance;
+        cubemap_ro.prefiltered_env = prefiltered_env;
     }
+}
+
+std::optional<RenderObject_ReflectionCapture> SceneViewProcessor_ReflectionCapture::query_nearest(glm::vec3 origin) const
+{
+    std::vector<RenderObject_ReflectionCapture> all = cubemaps;
+        
+    std::sort(all.begin(), all.end(),
+        [origin](const RenderObject_ReflectionCapture& a, const RenderObject_ReflectionCapture& b) {
+                
+            return glm::distance(a.position, origin) <
+                   glm::distance(b.position, origin);
+        });
+    
+    if (all.empty())
+        return std::nullopt;
+    return all[0];
 }

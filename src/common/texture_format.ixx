@@ -1,4 +1,8 @@
 export module texture_format;
+import <exception>;
+#include <glm/fwd.hpp>
+
+#include "assertion_macros.h"
 
 export enum class TextureFormat
 {
@@ -17,3 +21,16 @@ export enum class TextureFormat
     Depth32F,
     Depth16UNorm,
 };
+
+export uint32_t bytes_per_pixel(TextureFormat format)
+{
+    switch (format)
+    {
+        case TextureFormat::RGBA16F:
+            return 4 * sizeof(uint16_t);
+        case TextureFormat::RGBA32F:
+            return 4 * sizeof(uint32_t);
+        default:
+            todo();
+    }
+}

@@ -485,6 +485,11 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, const Textu
     return image_manager.create_texture_2d(tex, texture_creation_info);
 }
 
+RBImageHandle VkRenderBackend::create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info)
+{
+    return image_manager.create_cubemap(cubemap, texture_creation_info);
+}
+
 Extent VkRenderBackend::get_viewport_extent() const
 {
     return {swapchain.vk_extent.width, swapchain.vk_extent.height};
