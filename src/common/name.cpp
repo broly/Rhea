@@ -62,16 +62,12 @@ static uint32_t get_or_create_name_id(const std::string& str)
     
     uint32_t id = static_cast<uint32_t>(globals.table.size());
     
-    if (id == 61 || id == 96)
-    {
-        std::cout << str << std::endl;
-    }
     
-    globals.table.push_back(key);
+    globals.table.push_back(str);
     globals.lookup.emplace(key, id);
     
     
-    NameDebug::register_name(id, key);
+    NameDebug::register_name(id, str);
     
     return id;
 }
