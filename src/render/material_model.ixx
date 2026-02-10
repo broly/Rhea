@@ -28,11 +28,32 @@ export struct MatModel_PushConstant
 REFLECT_STRUCT(MatModel_PushConstant,
     name, type, stages);
 
+
+
+export struct MatModel_LayoutAttributeInfo
+{
+    Name name;
+    Name definition;
+    Name variable;
+};
+REFLECT_STRUCT(MatModel_LayoutAttributeInfo,
+    name, definition, variable);
+
+export struct MatModel_AttributesLayout
+{
+    Name vertex_type;
+    std::vector<MatModel_LayoutAttributeInfo> attributes;
+};
+REFLECT_STRUCT(MatModel_AttributesLayout,
+    vertex_type, attributes);
+
+
+
 export struct MatModel_Pass
 {
     Name name;
     std::string requirements;
-    std::map<Name, std::vector<Name>> enum_whitelist;
+    std::vector<MatModel_AttributesLayout> vertex_layouts;
     std::map<ShaderStage, std::string> shaders;
     bool depth_test;
     bool depth_write;
@@ -45,7 +66,7 @@ export struct MatModel_Pass
     std::optional<DepthBiasInfo> depth_bias;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, shaders, depth_test, push_constants, depth_write, resources, translucent, cull_mode, front_face, compare_op, depth_bias);
+    name, requirements, shaders, depth_test, push_constants, depth_write, resources, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 export enum class MaterialParamType
 {
@@ -72,28 +93,11 @@ export struct MatModel_Parameter
 REFLECT_STRUCT(MatModel_Parameter,
     type, variable, ubo, binding, storage);
 
-export struct MatModel_LayoutAttributeInfo
-{
-    Name name;
-    Name definition;
-    Name variable;
-};
-REFLECT_STRUCT(MatModel_LayoutAttributeInfo,
-    name, definition, variable);
-
-export struct MatModel_AttributesLayout
-{
-    Name vertex_type;
-    std::vector<MatModel_LayoutAttributeInfo> attributes;
-};
-REFLECT_STRUCT(MatModel_AttributesLayout,
-    vertex_type, attributes);
 
 export class MaterialModel : public RhObject
 {
 public:
     Name model_name;
-    std::vector<MatModel_AttributesLayout> vertex_layouts;
     std::map<Name, std::vector<Name>> enums;
     std::map<Name, MatModel_Parameter> parameters;
     MatModel_Permutations permutations;
@@ -115,7 +119,7 @@ public:
 };
 
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, vertex_layouts, set, enums, parameters, ubo_access, sampler, permutations, passes, usage_type);
+                      model_name, set, enums, parameters, ubo_access, sampler, permutations, passes, usage_type);
 
 export class RenderResourceInfo : public RhObject
 {

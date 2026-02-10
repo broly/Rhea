@@ -81,18 +81,18 @@ struct Logger
     {
         if (verbosity.verbosity_level <= default_verbosity_level)
         {
-            char const buffer[512] = {};
+            char const buffer[1024] = {};
             sprintf_s(
                 (char* const)buffer, 
-                512, 
+                1024, 
                 (const char*)fmt, 
                 std::forward<Args>(args)...);
             
             
-            char const buffer2[512] = {};
+            char const buffer2[1024] = {};
             sprintf_s(
                 (char* const)buffer2, 
-                512, 
+                1024, 
                 "%s: %s", 
                 name.buffer, buffer);
             

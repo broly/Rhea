@@ -12,8 +12,13 @@ import expr;
 import assets;
 import :renderer;
 
+import log;
+#include "logging/log_macro.h"
+
 #include "common/assertion_macros.h"
 #include "common/projection.h"
+
+DEFINE_LOGGER(LogPipelineFamily, DisplayFn);
 
 PipelineFamily::PipelineFamily(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend,
                                std::shared_ptr<Renderer> in_renderer)
@@ -24,7 +29,7 @@ PipelineFamily::PipelineFamily(Name in_pass_name, std::shared_ptr<MaterialModel>
     pass = model->get_pass_info(in_pass_name);
     checkf(pass, "MaterialModel has no pass '%s'", in_pass_name.to_string().c_str());
     
-    for (uint32_t index = 0; auto& vertex_layout : model->vertex_layouts)
+    for (uint32_t index = 0; auto& vertex_layout : pass->vertex_layouts)
     {
         const Name vertex_type_name = vertex_layout.vertex_type;
         auto runtime_info = reflect::find_runtime_info(vertex_type_name);
@@ -139,7 +144,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     
     // add attributes support for vertex shader
     int location = 0;
-    for (auto& attr_layout : model->vertex_layouts)
+    for (auto& attr_layout : pass->vertex_layouts)
     {
         for (auto& attr : attr_layout.attributes)
         {
@@ -334,8 +339,13 @@ std::filesystem::path PipelineFamily::request_permutation(
     cmd += std::string("-I ") + shaders_dir.string() + " ";
     cmd += "-o " + compiled_shader_permutation_file.string();
     
+    LogPipelineFamily.Log("Compiling shader: %s", cmd.c_str());
+    
     std::system("chcp 65001");
     int result = std::system(cmd.c_str());
+    
+    
+    
     if (result == 0)
     {
         std::filesystem::file_time_type filetime = std::filesystem::last_write_time(shader_path);

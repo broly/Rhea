@@ -43,7 +43,8 @@
             "cull_mode": "none",
             "front_face": "CW",
 			"compare_op": "less_or_equal",
-			"push_constants": []
+			"push_constants": [],
+			"vertex_layouts": []
         }
     ]
 }

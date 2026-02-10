@@ -4,7 +4,6 @@
 	"usage_type": "frame",
 	
 	"enums": {},
-	"vertex_layouts": [],
 	"uniform_buffers": {},
 	"sampler": "default",
 	
@@ -46,7 +45,8 @@
 					"name": "level_and_mip",
 					"stages": ["fragment"]
 				}
-			]
+			],
+			"vertex_layouts": []
 		}
 	]
 }

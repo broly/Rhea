@@ -4,7 +4,6 @@
 	"usage_type": "frame",
 	
 	"enums": {},
-	"vertex_layouts": [],
 	"uniform_buffers": {},
 	"sampler": "default",
 	
@@ -34,7 +33,8 @@
 			"resources": [],
 			"translucent": false,
 			"depth_test": false,
-			"depth_write": false
+			"depth_write": false,
+			"vertex_layouts": []
 		}
 	]
 }

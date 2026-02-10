@@ -5,19 +5,6 @@
 	
 	"enums": {},
 	
-	"vertex_layouts": [
-		{
-			"vertex_type": "Vertex",
-			"attributes": [ 
-				{ 
-					"name": "position",
-					"definition": "LOCATION_ATTR_POSITION",
-					"variable": "in_position"
-				},
-			]
-		}
-	],
-	
 	"parameters": {},	
 	"permutations": {
 		"enums": {},
@@ -53,7 +40,19 @@
 				"constant_factor": 0.1,
 				"slope_factor": 1.0,
 				"clamp": 0
-			}
+			},
+			"vertex_layouts": [
+				{
+					"vertex_type": "Vertex",
+					"attributes": [ 
+						{ 
+							"name": "position",
+							"definition": "LOCATION_ATTR_POSITION",
+							"variable": "in_position"
+						},
+					]
+				}
+			],
 		}
 	]
 }

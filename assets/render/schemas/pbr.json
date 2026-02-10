@@ -84,36 +84,9 @@
 	
 	"set": "SET_PBR",
 	
-	"vertex_layouts": [
-		{
-			"vertex_type": "Vertex",
-			"attributes": [ 
-				{ 
-					"name": "position",
-					"definition": "LOCATION_ATTR_POSITION",
-					"variable": "in_position"
-				},
-				{
-					"name": "normal",
-					"definition": "LOCATION_ATTR_NORMAL",
-					"variable": "in_normal"
-				},
-				{
-					"name": "tex_coord",
-					"definition": "LOCATION_ATTR_UV",
-					"variable": "in_uv"
-				},
-				{
-					"name": "tangent",
-					"definition": "LOCATION_ATTR_TANGENT",
-					"variable": "in_tangent"
-				}
-			]
-		}
-	],
-	
 	"passes": [	
 		{
+			
 			"name": "GeometryBase",
 			"requirements": "blend_mode != translucent",
 			"enum_white_list": {
@@ -137,6 +110,33 @@
 					"name": "camera",
 					"stages": ["vertex"]
 				}
+			],
+			"vertex_layouts": [
+				{
+					"vertex_type": "Vertex",
+					"attributes": [ 
+						{ 
+							"name": "position",
+							"definition": "LOCATION_ATTR_POSITION",
+							"variable": "in_position"
+						},
+						{
+							"name": "normal",
+							"definition": "LOCATION_ATTR_NORMAL",
+							"variable": "in_normal"
+						},
+						{
+							"name": "tex_coord",
+							"definition": "LOCATION_ATTR_UV",
+							"variable": "in_uv"
+						},
+						{
+							"name": "tangent",
+							"definition": "LOCATION_ATTR_TANGENT",
+							"variable": "in_tangent"
+						}
+					]
+				}
 			]
 		},
 		{
@@ -158,6 +158,33 @@
 					"type": "mat4",
 					"name": "camera",
 					"stages": ["vertex"]
+				}
+			],
+			"vertex_layouts": [
+				{
+					"vertex_type": "Vertex",
+					"attributes": [ 
+						{ 
+							"name": "position",
+							"definition": "LOCATION_ATTR_POSITION",
+							"variable": "in_position"
+						},
+						{
+							"name": "normal",
+							"definition": "LOCATION_ATTR_NORMAL",
+							"variable": "in_normal"
+						},
+						{
+							"name": "tex_coord",
+							"definition": "LOCATION_ATTR_UV",
+							"variable": "in_uv"
+						},
+						{
+							"name": "tangent",
+							"definition": "LOCATION_ATTR_TANGENT",
+							"variable": "in_tangent"
+						}
+					]
 				}
 			]
 		}

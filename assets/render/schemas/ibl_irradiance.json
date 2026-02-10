@@ -4,7 +4,6 @@
 	"usage_type": "frame",
 	
 	"enums": {},
-	"vertex_layouts": [],
 	"uniform_buffers": {},
 	"sampler": "default",
 	
@@ -41,7 +40,8 @@
 					"name": "pc",
 					"stages": ["fragment"]
 				}
-			]
+			],
+			"vertex_layouts": []
 		}
 	]
 }

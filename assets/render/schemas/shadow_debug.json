@@ -7,8 +7,6 @@
 	
 	"uniform_buffers": {},
 	
-	"vertex_layouts": [],
-	
 	"sampler": "default",
 	
 	"parameters": {
@@ -40,7 +38,8 @@
 			"compare_op": "less",
 			"translucent": false,
 			"depth_test": false,
-			"depth_write": false
+			"depth_write": false,
+			"vertex_layouts": []
 		}
 	]
 }
