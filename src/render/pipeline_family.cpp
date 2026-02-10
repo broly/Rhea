@@ -315,44 +315,22 @@ std::filesystem::path PipelineFamily::request_permutation(
         }
     }
     
-    
-    
-    std::vector<std::string> new_shader_lines;
-    auto shader_lines = file_helpers::load_lines_from_file(shader_path);
-
-    auto version_line = shader_lines[0];
-    shader_lines.erase(shader_lines.begin());
-    
-    new_shader_lines.push_back(version_line);
-    
+    std::string cmd;
+    cmd += "glslc ";
+    cmd += shader_path.string() + " ";
     for (auto define : defines)
     {
         auto define_str = define.first.to_string();
         std::transform(define_str.begin(), define_str.end(), define_str.begin(), PROJECTION(std::toupper));
-        
-        new_shader_lines.push_back(std::string("#undef ") + define_str);
-        std::string new_line;
         if (std::holds_alternative<bool>(define.second))
-            new_line = std::string("#define ") + define_str + " " + (std::get<bool>(define.second) ? "1" : "0");
+            cmd += std::string("-D") + define_str + "=" + (std::get<bool>(define.second) ? "1" : "0") + " ";
         else if (std::holds_alternative<int>(define.second))
-            new_line = std::string("#define ") + define_str + " " + std::to_string(std::get<int>(define.second));
+            cmd += std::string("-D") + define_str + "=" + std::to_string(std::get<int>(define.second)) + " ";
         else
         {
             todo("support more types");
         }
-        new_shader_lines.push_back(new_line);
     }
-    
-    new_shader_lines.insert(new_shader_lines.end(), shader_lines.begin(), shader_lines.end());
-    
-    
-    auto permutation_source_file = permutations_dir / hashed_shader_name;
-    
-    file_helpers::save_lines_to_file(permutation_source_file, new_shader_lines);
-    
-    std::string cmd;
-    cmd += "glslc ";
-    cmd += permutation_source_file.string() + " ";
     cmd += std::string("-I ") + shaders_dir.string() + " ";
     cmd += "-o " + compiled_shader_permutation_file.string();
     
@@ -366,7 +344,7 @@ std::filesystem::path PipelineFamily::request_permutation(
     }
     else
     {
-        checkf(false, "could not compile shader %s", permutation_source_file.string().c_str());
+        checkf(false, "could not compile shader %s", shader_path.string().c_str());
     }
     
     return compiled_shader_permutation_file;
