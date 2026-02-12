@@ -64,9 +64,10 @@ export struct MatModel_Pass
     FrontFace front_face;
     CompareOp compare_op;
     std::optional<DepthBiasInfo> depth_bias;
+    Name set;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, shaders, depth_test, push_constants, depth_write, resources, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+    name, requirements, shaders, depth_test, push_constants, depth_write, set, resources, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 export enum class MaterialParamType
 {
@@ -117,7 +118,7 @@ public:
 };
 
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, set, enums, parameters, sampler, permutations, passes, usage_type);
+                      model_name, enums, parameters, sampler, permutations, passes, usage_type);
 
 export class RenderResourceInfo : public RhObject
 {

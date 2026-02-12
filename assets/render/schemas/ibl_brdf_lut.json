@@ -12,10 +12,10 @@
 		"flags": {},
 		"enums": {}
 	},
-	"set": "SET_IBL",
 	"passes": [
 		{
 			"name": "IBL_BRDF_LUT",
+			"set": "SET_IBL",
 			"requirements": "",
 			"shaders": {
 				"vertex": "fullscreen.vert",

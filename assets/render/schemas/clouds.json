@@ -26,10 +26,9 @@
 		}
     },
 
-    "set": "SET_CLOUDS",
-
     "passes": [
         {
+			"set": "SET_CLOUDS",
             "name": "Clouds",
             "shaders": {
                 "vertex": "fullscreen.vert",

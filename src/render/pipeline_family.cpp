@@ -185,7 +185,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     }
 
     {
-        defines.insert({model->set, set_index});
+        defines.insert({pass->set, set_index});
         int binding_index = 0;
         GraphicsPipelineResourceInfo material_resource_info;
         material_resource_info.set = set_index;

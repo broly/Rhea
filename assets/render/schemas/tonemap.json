@@ -18,10 +18,10 @@
 		"flags": {},
 		"enums": {}
 	},
-	"set": "SET_TONEMAP",
 	"passes": [
 		{
 			"name": "ToneMapping",
+			"set": "SET_TONEMAP",
 			"requirements": "",
 			"shaders": {
 				"vertex": "fullscreen.vert",

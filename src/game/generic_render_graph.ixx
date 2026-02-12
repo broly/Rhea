@@ -50,8 +50,7 @@ public:
     void init_resources(const std::map<Name, bool>& parameters) override;
     void build_passes(const std::map<Name, bool>& parameters) override;
     void prepare_resources(RenderGraphContext& ctx) override;
-    
-    void prepare_geometry_batches(RenderGraphContext& ctx, Name pass_name);
+
     void prepare_geometry_resources(RenderGraphContext& ctx);
     void prepare_shadow_pass(RenderGraphContext& ctx);
     void prepare_clouds_pass(RenderGraphContext& ctx);

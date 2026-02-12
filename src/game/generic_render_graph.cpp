@@ -227,10 +227,6 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     prepared_batches.clear();
     prepared_pass_resources.clear();
 
-    // -------- batching --------
-    prepare_geometry_batches(ctx, Names::pass_geometry_base);
-    prepare_geometry_batches(ctx, Names::pass_geometry_translucent);
-
     // -------- resources --------
     prepare_geometry_resources(ctx);
     
@@ -322,79 +318,6 @@ void GenericRenderGraph::bind_shadow_globals(
     light->bind(pipeline, cmd, frame);
 }
 
-void GenericRenderGraph::prepare_geometry_batches(
-    RenderGraphContext& ctx,
-    Name pass_name)
-{
-    // PROFILE("prepare_geometry_batches");
-    //
-    // auto& scene_view = engine->scene_view;
-    // auto& mesh_proc =
-    //     scene_view->get_processor<SceneViewProcessor_Mesh>();
-    //
-    // auto& primitives = mesh_proc.primitives;
-    // auto& buckets    = mesh_proc.buckets;
-    //
-    // auto& batches = prepared_batches[pass_name];
-    // batches.clear();
-    //
-    // for (auto& [sort_key, prim_ids] : buckets)
-    // {
-    //     
-    //     
-    //     // ---------- Resolve pipeline lazily ----------
-
-    //     
-    //     auto model =
-    //                 renderer->find_model(material->model);
-    //     auto pipeline_family =
-    //                     renderer->query_pipeline_family(
-    //                         pass_name,
-    //                         model
-    //                     );
-    //
-    //     
-    //     PipelineObject* pipeline = request_pipeline(sort_key, pass_name);
-    //
-    //     GeometryBatch batch{};
-    //     batch.pipeline = pipeline;
-    //
-    //     for (RenderPrimitiveId pid : prim_ids)
-    //     {
-    //         const RenderPrimitive& prim = primitives[pid];
-    //
-    //         // ---------- Pass filtering ----------
-    //         Name blend_mode =
-    //             prim.material->get_enum_parameter(
-    //                 Names::blend_mode
-    //             );
-    //
-    //         const bool should_draw =
-    //             (pass_name == Names::pass_geometry_base &&
-    //              blend_mode == Names::blend_mode_opaque) ||
-    //             (pass_name == Names::pass_geometry_translucent &&
-    //              blend_mode == Names::blend_mode_trasnlucent);
-    //
-    //         if (!should_draw)
-    //             continue;
-    //
-    //         // ---------- Ensure GPU buffers ----------
-    //         ctx.backend.get_or_create_mesh_buffers(
-    //             prim.mesh
-    //         );
-    //
-    //         batch.items.push_back({
-    //             .mesh     = prim.mesh,
-    //             .world    = *prim.world,
-    //             .material = prim.material
-    //         });
-    //     }
-    //
-    //     if (!batch.items.empty())
-    //         batches.push_back(std::move(batch));
-    // }
-}
-
 
 void GenericRenderGraph::prepare_geometry_resources(
     RenderGraphContext& ctx)
@@ -407,18 +330,6 @@ void GenericRenderGraph::prepare_geometry_resources(
         engine->scene_view
             ->get_processor<SceneViewProcessor_Mesh>();
     
-
-    // auto& pass_resources_by_level =
-    //     prepared_pass_resources[pass_name];
-    //
-    // if (pass_resources_by_level.size() <= 1)
-    //     pass_resources_by_level.resize(1);
-    //
-    // auto& resource_map =
-    //     pass_resources_by_level[0];
-
-    // resource_map.clear();
-
     // ----------------------------------------
     // Collect unique pipelines
     // ----------------------------------------
@@ -698,6 +609,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     auto& mesh_processor =
         engine->scene_view
             ->get_processor<SceneViewProcessor_Mesh>();
+    
 
     auto& pass_preps_by_level =
         prepared_pass_resources[ctx.pass_name];

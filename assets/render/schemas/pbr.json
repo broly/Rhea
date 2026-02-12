@@ -79,8 +79,7 @@
 			}
 		}
 	},
-	
-	"set": "SET_PBR",
+
 	
 	"passes": [	
 		{
@@ -96,6 +95,7 @@
 			},
 			"depth_write": true,
 			"depth_test": true,
+			"set": "SET_PBR",
 	
 			"resources": ["camera", "light", "shadow", "reflection"],
 			"translucent": false,
@@ -151,6 +151,7 @@
 			"cull_mode": "back",
 			"front_face": "CW",
 			"compare_op": "less",
+			"set": "SET_PBR",
 			"push_constants": [
 				{
 					"type": "mat4",

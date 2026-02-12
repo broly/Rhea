@@ -20,9 +20,9 @@
 		"flags": {},
 		"enums": {}
 	},
-	"set": "SET_SHADOWDEBUG",
 	"passes": [
 		{
+			"set": "SET_SHADOWDEBUG",
 			"name": "ShadowDebug",
 			"requirements": "",
 			"enum_white_list": {

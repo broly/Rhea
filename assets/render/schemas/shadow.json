@@ -10,7 +10,6 @@
 		"enums": {},
 		"flags": {}
 	},
-	"set": "SET_SHADOW",
 	"passes": [	
 		{
 			"name": "shadowmap",
@@ -35,6 +34,7 @@
 					"stages": ["vertex"]
 				}
 			],
+			"set": "SET_SHADOW",
 			"depth_bias": {
 				"enable": true,
 				"constant_factor": 0.1,

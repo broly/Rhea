@@ -18,10 +18,10 @@
 		"flags": {},
 		"enums": {}
 	},
-	"set": "SET_IBL",
 	"passes": [
 		{
 			"name": "IBL_Irradiance",
+			"set": "SET_IBL",
 			"requirements": "",
 			"shaders": {
 				"vertex": "fullscreen.vert",

@@ -282,7 +282,7 @@ RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, N
     desc.name = model->model_name;
     desc.usage_type = model->usage_type;
     desc.sampler = samplers[model->sampler];
-    desc.set = model->set;
+    desc.set = pass->set;
 
     // UBOs
     for (const auto& [name, param] : model->parameters)
