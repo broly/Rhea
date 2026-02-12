@@ -3,6 +3,7 @@
 import <cassert>;
 
 import :helpers;
+#include "common/assertion_macros.h"
 
 void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle)
 {
@@ -64,6 +65,11 @@ void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle)
 
 void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
 {
+    auto mesh_info_it = mesh_map.find(mesh);
+    
+    checkf(mesh_info_it != mesh_map.end(), "Could not find mesh info for '%s' (geom: %i, prim: %i)",
+        mesh.mesh.get().name.c_str(), mesh.geom_index, mesh.prim_index);
+    
     VkBuffer vertex_buffers = mesh_map[mesh].vertex_buffer;
     VkBuffer index_buffer = mesh_map[mesh].index_buffer;
     VkDeviceSize offsets[] = { 0 };

@@ -14,7 +14,7 @@ void BrdfLutCaptureRenderGraph::init_resources(const std::map<Name, bool>& param
 {
     
     auto brdf_lut_model = renderer->find_model("IBL_BRDF_LUT");
-    PipelineFamily brdf_lut_pipeline_family("IBL_BRDF_LUT", brdf_lut_model, backend, renderer);
+    brdf_lut_pipeline_family = renderer->query_pipeline_family("IBL_BRDF_LUT", brdf_lut_model);
     brdf_lut_pipeline = request_pipeline(brdf_lut_pipeline_family, {});
     
     

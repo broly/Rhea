@@ -26,6 +26,8 @@ void vk::SwapchainControl::init()
     const Extent extent = {vk_extent.width, vk_extent.height};
     
     image_manager.set_default_extent(extent);
+    
+    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 
     // --- Image count ---
     uint32_t image_count = support.caps.minImageCount + 1;
@@ -96,6 +98,8 @@ void vk::SwapchainControl::init()
         auto handle = image_manager.create_image_view(vk_extent, surface_format, swapchain_images[i]);
         swapchain_image_handles[i] = handle;
     }
+
+    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 }
 
 void vk::SwapchainControl::recreate_swapchain()
@@ -143,15 +147,13 @@ RBImageHandle vk::SwapchainControl::get_image() const
 
 bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 {
-    LogVkSwapchain.Log<VeryVerbose>("acquire_next_image");
-    
     auto& frame = frames[frame_handle];
 
     VkResult res = vkAcquireNextImageKHR(
         instance.device,
         swapchain,
         UINT64_MAX,
-        frame.image_available, // semaphore
+        frame.image_available,
         VK_NULL_HANDLE,
         &current_swapchain_index
     );
@@ -163,8 +165,26 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
     }
 
     VK_CHECK(res);
+
+
+    if (images_in_flight[current_swapchain_index] != VK_NULL_HANDLE)
+    {
+        vkWaitForFences(
+            instance.device,
+            1,
+            &images_in_flight[current_swapchain_index],
+            VK_TRUE,
+            UINT64_MAX
+        );
+    }
+
+
+    images_in_flight[current_swapchain_index] =
+        frames[frame_handle].in_flight;
+
     return true;
 }
+
 
 void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list)
 {
@@ -254,7 +274,8 @@ void vk::SwapchainControl::cleanup()
         vkDestroySwapchainKHR(instance.device, swapchain, nullptr);
         swapchain = VK_NULL_HANDLE;
     }
-
+    images_in_flight.clear();
+    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 }
 
 void vk::SwapchainControl::create_sync_objects()

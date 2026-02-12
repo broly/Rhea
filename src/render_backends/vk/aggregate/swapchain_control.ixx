@@ -17,6 +17,7 @@ namespace vk
 
         VkSemaphore image_available = VK_NULL_HANDLE;
         VkFence in_flight = VK_NULL_HANDLE;
+        
     };
     
     class SwapchainControl
@@ -70,6 +71,8 @@ namespace vk
         
         std::array<FrameContext, MAX_FRAMES_IN_FLIGHT> frames;
         std::vector<VkSemaphore> render_finished_per_image;
+        
+        std::vector<VkFence> images_in_flight;
         
         uint32_t current_frame = 0;
         

@@ -277,7 +277,7 @@ bool is_attachment(RBImageUsage usage)
 
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback)
 {
-    PROFILE();
+    PROFILE("RenderGraph::execute");
     assert(graph_compiled);
 
     RenderGraphContext ctx(*backend, cmd, {}, *this, params);
@@ -423,10 +423,10 @@ void RenderGraph::recompile()
 }
 
 PipelineObject* RenderGraph::request_pipeline(
-    PipelineFamily& pipeline_family, ShaderKey shader_key)
+    std::shared_ptr<PipelineFamily> pipeline_family, ShaderKey shader_key)
 {
     assert(!graph_compiled);
-    PipelineObject* pipeline = pipeline_family.request_pipeline(shader_key);
+    PipelineObject* pipeline = pipeline_family->request_pipeline(shader_key);
     return pipeline;
 }
 

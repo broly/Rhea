@@ -17,15 +17,17 @@ import log;
 
 #include "common/assertion_macros.h"
 #include "common/projection.h"
+#include "profiling/profile.h"
 
 DEFINE_LOGGER(LogPipelineFamily, DisplayFn);
 
-PipelineFamily::PipelineFamily(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend,
+
+void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend,
                                std::shared_ptr<Renderer> in_renderer)
-    : backend(in_backend)
-    , renderer(in_renderer)
-    , model(model)
 {
+    backend = in_backend;
+    renderer = in_renderer;
+    this->model = model;
     pass = model->get_pass_info(in_pass_name);
     checkf(pass, "MaterialModel has no pass '%s'", in_pass_name.to_string().c_str());
     
@@ -55,8 +57,9 @@ PipelineFamily::PipelineFamily(Name in_pass_name, std::shared_ptr<MaterialModel>
     }
 }
 
-ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<Material> material, Name pass_name) const
+ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> material, Name pass_name) const
 {
+    PROFILE("PipelineFamily::make_shader_key");
     auto options = material->get_shader_options(pass_name);
     
     uint64_t bits = 0;
@@ -76,7 +79,7 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<Material> material, Na
             ctx[param_name.to_string()] = provided;
         } else if (param_info.type == MaterialParamType::definition)
         {
-            ctx[param_name.to_string()] = material->parameters[param_name.to_string()].as<Name>().to_string();
+            ctx[param_name.to_string()] = material->parameters.find(param_name.to_string())->second.as<Name>().to_string();
         }
     }
     
@@ -124,6 +127,7 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<Material> material, Na
 
 PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
 {
+    PROFILE("PipelineFamily::request_pipeline");
     if (auto it = pipelines.find(key.key); it != pipelines.end())
         return it->second;
 

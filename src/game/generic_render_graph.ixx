@@ -52,7 +52,7 @@ public:
     void prepare_resources(RenderGraphContext& ctx) override;
     
     void prepare_geometry_batches(RenderGraphContext& ctx, Name pass_name);
-    void prepare_geometry_resources(RenderGraphContext& ctx, Name pass_name);
+    void prepare_geometry_resources(RenderGraphContext& ctx);
     void prepare_shadow_pass(RenderGraphContext& ctx);
     void prepare_clouds_pass(RenderGraphContext& ctx);
     
@@ -62,13 +62,16 @@ public:
     void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
     
     
+    
     bool is_debugging() const;
     
     glm::mat4 build_dir_light_vp() const;
     
     virtual CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false, uint32_t face_index = 0) const;
     LightUBO build_light_ubo(glm::vec3 camera_position) const;
-    
+    void bind_shadow_globals(
+        RenderGraphContext& ctx,
+        PipelineObject* pipeline);
     
     RGTextureHandle shadow_map;
     RGTextureHandle depth_texture;
@@ -101,6 +104,9 @@ public:
     PipelineObject* shadow_debug_pipeline;
     PipelineObject* clouds_pipeline;
     PipelineObject* tonemap_pipeline;
+    
+    std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
+    std::shared_ptr<PipelineFamily> shadow_debug_pipeline_family;
     
     bool use_swapchain_extent;
     

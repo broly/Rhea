@@ -29,8 +29,15 @@ export struct MaterialParameterType
         checkf(!std::holds_alternative<Name>(data) && !std::holds_alternative<Name>(data), "Can read only float or LinearColor in memory");
         return &data;
     }
+    
     template<typename T>
     T& as()
+    {
+        return std::get<T>(data);
+    }
+    
+    template<typename T>
+    const T& as() const
     {
         return std::get<T>(data);
     }

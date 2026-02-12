@@ -103,8 +103,6 @@ public:
     MatModel_Permutations permutations;
     std::vector<MatModel_Pass> passes;
     
-    Name ubo_access;
-    
     Name sampler;
     
     Name set;
@@ -119,7 +117,7 @@ public:
 };
 
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, set, enums, parameters, ubo_access, sampler, permutations, passes, usage_type);
+                      model_name, set, enums, parameters, sampler, permutations, passes, usage_type);
 
 export class RenderResourceInfo : public RhObject
 {

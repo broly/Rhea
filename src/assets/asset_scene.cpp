@@ -75,7 +75,7 @@ AssetSceneInfo AssetSceneHandle::load(const std::filesystem::path& path, const s
     
     for (auto& scene_mat : asset.materials)
     {
-        std::shared_ptr<Material> mat = std::make_shared<Material>();
+        std::shared_ptr<Material> mat = new_object<Material>();
         mat->model = "pbr";
         switch (scene_mat.alphaMode)
         {

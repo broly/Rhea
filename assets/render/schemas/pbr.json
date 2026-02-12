@@ -13,8 +13,6 @@
 	
 	"sampler": "surface",
 	
-	"ubo_access": "material",
-	
 	"parameters": {
 		"blend_mode": {
 			"type": "definition",

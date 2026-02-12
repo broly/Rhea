@@ -29,6 +29,7 @@ public:
     {
         set_type_name(type_name);
         set_name(init_data.name);
+        unique_id = next_id(this);
         is_default = init_data.is_default;
         on_init();
     }
@@ -50,10 +51,20 @@ public:
         return type_name;
     }
     
+    static uint32_t next_id(RhObject* obj);
+    
     virtual void on_serialize(DependencyCollector* dc) {}
     
     Name type_name;
     Name name;
+    uint32_t unique_id;
     bool is_default;
 };
+
+uint32_t RhObject::next_id(RhObject* obj)
+{
+    static uint32_t id_counter = 0;
+    
+    return id_counter++;
+}
 

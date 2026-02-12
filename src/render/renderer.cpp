@@ -8,6 +8,7 @@ import reflect;
 import :render_graph;
 import json_utils;
 #include "common/assertion_macros.h"
+#include "profiling/profile.h"
 
 
 void Renderer::init(RBWindowHandle in_window)
@@ -60,6 +61,7 @@ void Renderer::execute_graph(
     const RenderGraphParameters& params, 
     RGPostRenderCallback callback)
 {
+    PROFILE("execute_graph");
     
     auto& backend = *render_backend;
     
@@ -256,15 +258,17 @@ RBImageHandle Renderer::get_cubemap(CubemapHandle handle)
 
 std::shared_ptr<PipelineFamily> Renderer::query_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model)
 {
+    PROFILE("Renderer::query_pipeline_family");
     if (material_pipeline_families.contains({pass_name, model}))
         return material_pipeline_families.at({pass_name, model});
     
-    auto family = std::make_shared<PipelineFamily>(pass_name, model, render_backend, shared_from_this());
+    auto family = new_object<PipelineFamily>(pass_name, model, render_backend, shared_from_this());
     
     material_pipeline_families.insert({{pass_name, model}, family});
     
     return family;
 }
+
 
 RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, Name pass_name)
 {
@@ -334,6 +338,7 @@ std::shared_ptr<MaterialInstance> Renderer::query_material_instance(std::shared_
 
 std::shared_ptr<MaterialModel> Renderer::find_model(Name model_name) const
 {
+    PROFILE("Renderer::find_model");
     auto model_it = models.find(model_name);
     if (model_it == models.end())
         return nullptr;

@@ -28,15 +28,15 @@ void CubemapCaptureRenderGraph::init_resources(const std::map<Name, bool>& param
     GenericRenderGraph::init_resources(parameters);
     
     auto irradiance_model = renderer->find_model("IBL_Irradiance");
-    PipelineFamily irradiance_pipeline_family("IBL_Irradiance", irradiance_model, backend, renderer);
+    irradiance_pipeline_family = renderer->query_pipeline_family("IBL_Irradiance", irradiance_model);
     irradiance_pipeline = request_pipeline(irradiance_pipeline_family, {});
     
     auto prefilter_model = renderer->find_model("IBL_Prefilter");
-    PipelineFamily prefilter_pipeline_family("IBL_Prefilter", prefilter_model, backend, renderer);
+    prefilter_pipeline_family = renderer->query_pipeline_family("IBL_Prefilter", prefilter_model);
     prefilter_pipeline = request_pipeline(prefilter_pipeline_family, {});
     
     auto brdf_lut_model = renderer->find_model("IBL_BRDF_LUT");
-    PipelineFamily brdf_lut_pipeline_family("IBL_BRDF_LUT", brdf_lut_model, backend, renderer);
+    brdf_lut_pipeline_family = renderer->query_pipeline_family("IBL_BRDF_LUT", brdf_lut_model);
     brdf_lut_pipeline = request_pipeline(brdf_lut_pipeline_family, {});
     
     RGTextureDesc irradiance_color_desc{

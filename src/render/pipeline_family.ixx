@@ -8,22 +8,24 @@ import <map>;
 import <variant>;
 import <filesystem>;
 
+#include "object/object_reflection_macro.h"
+
 export class Renderer;
 
 using DefinitionValue = std::variant<bool, int>;
 using DefinitionMap = std::map<Name, DefinitionValue>;
 
-export class PipelineFamily
+export class PipelineFamily : public RhObject
 {
 public:
-    PipelineFamily(
+    void ctor(
         Name in_pass_name,
         std::shared_ptr<MaterialModel> in_model,
         std::shared_ptr<RenderBackend> in_backend,
         std::shared_ptr<Renderer> in_renderer
     );
 
-    ShaderKey make_shader_key(std::shared_ptr<Material> material, Name pass_name) const;
+    ShaderKey make_shader_key(std::shared_ptr<const Material> material, Name pass_name) const;
 
     PipelineObject* request_pipeline(ShaderKey key);
 
@@ -43,3 +45,4 @@ private:
     std::unordered_map<uint64_t, PipelineObject*> pipelines;
     
 };
+REFLECT_OBJECT(PipelineFamily, RhObject)

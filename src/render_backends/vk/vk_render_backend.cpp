@@ -242,6 +242,7 @@ RBFrameHandle VkRenderBackend::get_current_frame() const
 
 void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
 {
+    PROFILE("wait_for_frame");
     swapchain.wait_for_frame(frame_handle);
 }
 
@@ -715,6 +716,7 @@ void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 
 void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object)
 {
+    PROFILE("VkRenderBackend::bind_pipeline");
     LogRB.Log<Verbose>("bind_pipeline");
     
     auto vk_pipeline_object = static_cast<VkPipelineObject*>(pipeline_object);

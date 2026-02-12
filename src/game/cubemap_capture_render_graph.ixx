@@ -43,6 +43,10 @@ public:
     std::shared_ptr<Material> brdf_lut_material;
     
     std::shared_ptr<MaterialInstance> irradiance_material_instance;
+    
+    std::shared_ptr<PipelineFamily> irradiance_pipeline_family;
+    std::shared_ptr<PipelineFamily> prefilter_pipeline_family;
+    std::shared_ptr<PipelineFamily> brdf_lut_pipeline_family;
 
 };
 REFLECT_OBJECT(CubemapCaptureRenderGraph, GenericRenderGraph)

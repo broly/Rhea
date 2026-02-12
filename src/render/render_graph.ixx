@@ -165,7 +165,7 @@ public:
     void recompile();
 
     PipelineObject* request_pipeline(
-        PipelineFamily& pipeline_family, ShaderKey shader_key);
+        std::shared_ptr<PipelineFamily> pipeline_family, ShaderKey shader_key);
 
     std::vector<RenderGraphPass> passes;
 

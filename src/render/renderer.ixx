@@ -47,14 +47,18 @@ public:  // public API
     RenderResource* query_resource(std::shared_ptr<MaterialModel> model, Name pass_name);
     std::shared_ptr<MaterialInstance> query_material_instance(std::shared_ptr<Material> material, Name pass_name);
     std::shared_ptr<MaterialModel> find_model(Name model_name) const;
-    
+
     bool get_render_flag(Name flag) const;
 
+   
+    std::shared_ptr<RenderBackend> get_backend() const
+    {
+        return render_backend;
+    }
 protected:  // internal functions
     
     void load_schemas();
     void load_resources();
-   
     
 protected:  // internal system accessors
     std::shared_ptr<RenderBackend> render_backend;
@@ -93,4 +97,5 @@ protected:  // textures
     
 
     
+    std::map<Name, std::shared_ptr<PipelineFamily>> pipeline_families;
 };

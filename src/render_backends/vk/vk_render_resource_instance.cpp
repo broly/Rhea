@@ -35,6 +35,8 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeli
 void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_object, Name buffer_name,
                                             RBImageHandle image_handle, RBFrameHandle frame, uint32_t array_index, bool cubemap)
 {
+    PROFILE("VkRenderResourceInstance::update_image");
+    
     auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
     
     auto inst_info = vk_pipeline->instance_pipeline_data.at(this);

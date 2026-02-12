@@ -98,7 +98,7 @@ AABB RhComp_StaticMesh::get_aabb() const
 
 void RhComp_StaticMesh::update_scene_proxy()
 {
-    scene_proxy.mats = mats;
+    scene_proxy.materials = mats;
     scene_proxy.mesh = mesh;
     scene_proxy.transform = transform;
     scene_proxy.debug_name = owner->name;

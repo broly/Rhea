@@ -450,3 +450,14 @@ export namespace reflect
 }
 
 
+
+
+export template<typename T = RhObject, typename... Ts>
+std::shared_ptr<T> new_object(Ts&&... vs)
+{
+    auto info = reflect::find_info<T>();
+    auto obj = info->template instantiate<T>();
+    obj->ctor(std::forward<Ts>(vs)...);
+    
+    return obj;
+}
