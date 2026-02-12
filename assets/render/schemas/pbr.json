@@ -21,28 +21,33 @@
 		"base_color": {
 			"type": "sampler",
 			"variable": "u_base_color",
-			"binding": "BINDING_SAMPLER_ALBEDO"
+			"binding": "BINDING_SAMPLER_ALBEDO",
+			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"emissive": {
 			"type": "sampler",
 			"variable": "u_emissive",
-			"binding": "BINDING_SAMPLER_EMISSIVE"
+			"binding": "BINDING_SAMPLER_EMISSIVE",
+			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"normal": {
 			"type": "sampler",
 			"variable": "u_normal_map",
-			"binding": "BINDING_SAMPLER_NORMAL"
+			"binding": "BINDING_SAMPLER_NORMAL",
+			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"orm": {
 			"type": "sampler",
 			"variable": "u_orm",
-			"binding": "BINDING_SAMPLER_ORM"
+			"binding": "BINDING_SAMPLER_ORM",
+			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"material": {
 			"type": "uniform",
 			"ubo": "MaterialUBO",
 			"binding": "BINDING_MATERIAL",
-			"variable": "material_ubo"
+			"variable": "material_ubo",
+			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"base_color_factor": {
 			"type": "vec4",
@@ -83,12 +88,8 @@
 	
 	"passes": [	
 		{
-			
 			"name": "GeometryBase",
 			"requirements": "blend_mode != translucent",
-			"enum_white_list": {
-				"blend_mode": ["opaque", "masked"]
-			},
 			"shaders": {
 				"vertex": "geometry.vert",
 				"fragment": "geometry.frag"
@@ -186,6 +187,47 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "shadowmap",
+			"requirements": "blend_mode != translucent",
+			"shaders": {
+				"vertex": "shadow.vert",
+				"fragment": "shadow.frag"
+			},
+			"resources": ["shadow_light"],
+			"depth_write": true,
+			"depth_test": true,
+			"translucent": false,
+			"cull_mode": "none",
+			"front_face": "CCW",
+			"compare_op": "less",
+			"push_constants": [
+				{
+					"type": "mat4",
+					"name": "camera",
+					"stages": ["vertex"]
+				}
+			],
+			"set": "SET_SHADOW",
+			"depth_bias": {
+				"enable": true,
+				"constant_factor": 0.1,
+				"slope_factor": 1.0,
+				"clamp": 0
+			},
+			"vertex_layouts": [
+				{
+					"vertex_type": "Vertex",
+					"attributes": [ 
+						{ 
+							"name": "position",
+							"definition": "LOCATION_ATTR_POSITION",
+							"variable": "in_position"
+						},
+					]
+				}
+			],
 		}
 	]
 }

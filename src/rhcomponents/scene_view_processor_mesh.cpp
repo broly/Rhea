@@ -37,10 +37,6 @@ void SceneViewProcessor_Mesh::process()
 {
     auto& renderer = *RhGlobals::engine->renderer;
 
-    static std::map<BlendMode, Name> pass_by_blend_mode = {
-        {BlendMode::opaque, "GeometryBase"},
-        {BlendMode::translucent, "GeometryTranslucent"}
-    };
     for (const auto& submitted :
          read_submission_buffer<SceneViewProxy_Mesh>())
     {
@@ -78,52 +74,50 @@ void SceneViewProcessor_Mesh::process()
                     
                     auto blend_mode = material->get_enum_parameter<BlendMode>("blend_mode");
 
-                    auto instance =
-                        renderer.query_material_instance(
-                            submitted.materials[mat_index], pass_by_blend_mode[blend_mode]);
 
                     RenderPrimitive rp{};
                     rp.mesh = MeshPrimHandle{
                         submitted.mesh, geom, prim_index };
                     rp.world = &ro.world;
                     rp.bounds = ro.bounds;
-                    rp.material_instance = instance;
 
-                    Name pass_name;
+                    std::set<Name> passes;
         
                     if (blend_mode == BlendMode::opaque)
-                        pass_name = "GeometryBase";
+                        passes.emplace("GeometryBase");
                     else if (blend_mode == BlendMode::translucent)
-                        pass_name = "GeometryTranslucent";
+                         passes.emplace("GeometryTranslucent");
+                    
+                    if (blend_mode != BlendMode::translucent)
+                        passes.emplace("ShadowMap");
 
                     auto model =
-                        renderer.find_model(instance->material->model);
+                        renderer.find_model(material->model);
+                    
+                    for (Name pass_name : passes)
+                    {
+                        
+                        auto instance =
+                            renderer.query_material_instance(
+                                submitted.materials[mat_index], pass_name);
+                        
+                        auto geom_pipeline_family =
+                            renderer.query_pipeline_family(pass_name, model);
 
-                    auto geom_pipeline_family =
-                        renderer.query_pipeline_family(pass_name, model);
-
-                    auto pipeline =
-                        geom_pipeline_family->request_pipeline(
-                            geom_pipeline_family->make_shader_key(
-                                instance->material,
-                                pass_name));
+                        auto pipeline =
+                            geom_pipeline_family->request_pipeline(
+                                geom_pipeline_family->make_shader_key(
+                                    instance->material,
+                                    pass_name));
                     
+                        rp.pipeline_by_pass[pass_name] = pipeline;
+                        rp.material_instance_by_pass[pass_name] = instance;
                     
-                    rp.pipeline = pipeline;
-                    rp.pipeline_family = geom_pipeline_family;
-                    rp.pass_name = pass_name;
+                        primitives.push_back(rp);
+                        ro.primitives.push_back(primitives.size() - 1);
                     
-                    
-                    auto shadow_model =
-                        renderer.find_model("shadow");
-                    auto shadow_pipeline_family = renderer.query_pipeline_family("shadowmap", shadow_model);
-                    rp.shadow_pipeline_family = shadow_pipeline_family;
-                    rp.shadow_pipeline = shadow_pipeline_family->request_pipeline({});
-                    
-                    primitives.push_back(rp);
-                    ro.primitives.push_back(primitives.size() - 1);
-                    
-                    renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh);
+                        renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh);
+                    }
                 }
             }
 

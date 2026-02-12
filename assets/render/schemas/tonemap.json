@@ -11,7 +11,8 @@
 		"hdr_color": {
 			"type": "sampler",
 			"variable": "u_hdr_color",
-			"binding": "BINDING_SAMPLER_HDR_COLOR"
+			"binding": "BINDING_SAMPLER_HDR_COLOR",
+			"passes": ["ToneMapping"]
 		}
 	},	
 	"permutations": {

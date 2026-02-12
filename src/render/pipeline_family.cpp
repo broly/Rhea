@@ -193,6 +193,8 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         {
             if (param.type == MaterialParamType::sampler || param.type == MaterialParamType::uniform)
             {
+                if (!param.passes.contains(pass->name))
+                    continue;
                 checkf(param.binding, "Binding definition must be set");
                 defines.insert({*param.binding, binding_index});
                 material_resource_info.resource_variable_bindings.push_back(binding_index);

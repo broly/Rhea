@@ -11,18 +11,21 @@
 		"clouds": {
 		    "type": "sampler",
 		    "variable": "u_noise",
-		    "binding": "BINDING_SAMPLER_NOISE"
+		    "binding": "BINDING_SAMPLER_NOISE",
+			"passes": ["Clouds"]
 		},
 		"depth": {
 		    "type": "sampler",
 		    "variable": "u_depth",
-		    "binding": "BINDING_SAMPLER_DEPTH"
+		    "binding": "BINDING_SAMPLER_DEPTH",
+			"passes": ["Clouds"]
 		},
 		"material": {
 		    "type": "uniform",
 		    "ubo": "CloudsUBO",
 		    "binding": "BINDING_UBO_CLOUDS",
-		    "variable": "clouds_ubo"
+		    "variable": "clouds_ubo",
+			"passes": ["Clouds"]
 		}
     },
 

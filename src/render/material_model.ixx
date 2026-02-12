@@ -90,9 +90,10 @@ export struct MatModel_Parameter
     std::optional<Name> ubo;
     std::optional<Name> binding;
     std::optional<Name> storage;
+    std::set<Name> passes;
 };
 REFLECT_STRUCT(MatModel_Parameter,
-    type, variable, ubo, binding, storage);
+    type, variable, ubo, binding, storage, passes);
 
 
 export class MaterialModel : public RhObject

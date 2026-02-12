@@ -11,7 +11,8 @@
 		"env_map": {
 			"type": "sampler",
 			"variable": "u_env_map",
-			"binding": "BINDING_ENV_MAP"
+			"binding": "BINDING_ENV_MAP",
+			"passes": ["IBL_Irradiance"]
 		}
 	},	
 	"permutations": {

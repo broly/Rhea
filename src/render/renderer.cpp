@@ -287,6 +287,9 @@ RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, N
     // UBOs
     for (const auto& [name, param] : model->parameters)
     {
+        if (param.type == MaterialParamType::uniform || param.type == MaterialParamType::sampler)
+            if (!param.passes.contains(pass_name))
+                continue;
         if (param.type == MaterialParamType::uniform)
         {
             const Name cpp_ubo_name = *param.ubo;

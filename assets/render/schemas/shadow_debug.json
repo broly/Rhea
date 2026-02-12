@@ -13,7 +13,8 @@
 		"base_color": {
 			"type": "sampler",
 			"variable": "u_shadow_depth",
-			"binding": "BINDING_SHADOW_DEPTH"
+			"binding": "BINDING_SHADOW_DEPTH",
+			"passes": ["ShadowDebug"]
 		}
 	},	
 	"permutations": {

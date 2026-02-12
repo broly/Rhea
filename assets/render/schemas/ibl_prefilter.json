@@ -11,12 +11,14 @@
 		"env_map": {
 			"type": "sampler",
 			"variable": "u_env_map",
-			"binding": "BINDING_ENV_MAP"
+			"binding": "BINDING_ENV_MAP",
+			"passes": ["IBL_Prefilter"]
 		},
 		"roughness": {
 			"type": "float",
 			"variable": "u_roughness",
-			"binding": "BINDING_ROUGHNESS"
+			"binding": "BINDING_ROUGHNESS",
+			"passes": ["IBL_Prefilter"]
 		}
 	},	
 	"permutations": {

@@ -36,14 +36,9 @@ struct RenderPrimitive
     const glm::mat4* world;
     AABB bounds;
 
-    std::shared_ptr<MaterialInstance> material_instance;
+    std::map<Name, std::shared_ptr<MaterialInstance>> material_instance_by_pass;
     
-    std::shared_ptr<PipelineFamily> pipeline_family;
-    std::shared_ptr<PipelineFamily> shadow_pipeline_family;
-    PipelineObject* pipeline;
-    PipelineObject* shadow_pipeline;
-    
-    Name pass_name;
+    std::map<Name, PipelineObject*> pipeline_by_pass;
 
     uint8_t dirty;
 };

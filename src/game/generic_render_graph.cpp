@@ -335,17 +335,19 @@ void GenericRenderGraph::prepare_geometry_resources(
     // ----------------------------------------
 
     std::map<PipelineObject*, Name> unique_pipelines;
-
-    for (auto& prim : mesh_processor.primitives)
+    
+    for (Name pass_name : {Names::pass_geometry_base,Names::pass_geometry_translucent})
     {
-        auto instance = prim.material_instance;
-        if (!instance)
-            continue;
+        for (auto& prim : mesh_processor.primitives)
+        {
+            auto instance_it = prim.material_instance_by_pass.find(pass_name);
+            if (instance_it == prim.material_instance_by_pass.end())
+                continue;
 
 
-        unique_pipelines.insert({prim.pipeline, prim.pass_name});
+            unique_pipelines.insert({prim.pipeline_by_pass[pass_name], pass_name});
+        }
     }
-
     // ----------------------------------------
     // Prepare resources per pipeline
     // ----------------------------------------
@@ -379,7 +381,7 @@ void GenericRenderGraph::prepare_geometry_resources(
 
         auto& reflection_capture_processor =
             engine->scene_view
-                ->get_processor<SceneViewProcessor_ReflectionCapture>();
+                  ->get_processor<SceneViewProcessor_ReflectionCapture>();
 
         auto reflection_capture =
             reflection_capture_processor.query_nearest(
@@ -623,9 +625,10 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     
     for (auto& prim : mesh_processor.primitives)
     {
-        auto instance = prim.material_instance;
-        if (!instance)
+        auto instance_it = prim.material_instance_by_pass.find(ctx.pass_name);
+        if (instance_it == prim.material_instance_by_pass.end())
             continue;
+        const auto& instance = instance_it->second;
         
         auto blend_mode = instance->material->get_enum_parameter<BlendMode>("blend_mode");
         
@@ -636,7 +639,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         if (!should_draw)
             continue;
 
-        auto pipeline = prim.pipeline;
+        auto pipeline = prim.pipeline_by_pass[ctx.pass_name];
         
         if (pipeline != current_pipeline)
         {
@@ -704,17 +707,11 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
 
     for (auto& prim : mesh_processor.primitives)
     {
-        std::shared_ptr<MaterialInstance> instance = prim.material_instance;
+        auto instance_it = prim.material_instance_by_pass.find(ctx.pass_name);
+        if (instance_it == prim.material_instance_by_pass.end())
+            continue;
 
-        // if (!instance->material->casts_shadow())
-        //     continue;
-        
-        // auto model = renderer->find_model("shadow");
-        // auto pipeline_family = renderer->query_pipeline_family("shadowmap", model);
-        //
-        // auto pipeline = pipeline_family->request_pipeline({});
-
-        auto pipeline = prim.shadow_pipeline;
+        auto pipeline = prim.pipeline_by_pass[ctx.pass_name];
         if (pipeline != current_pipeline)
         {
             current_pipeline = pipeline;

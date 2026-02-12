@@ -14,7 +14,7 @@ import :object;
 import dependency_collector;
 import name;
 import static_name;
-
+import <set>;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 
@@ -179,6 +179,23 @@ constexpr bool is_map_v = is_map<T>::value;
 
 
 
+template<typename>
+struct is_set
+{
+    static bool constexpr value = false;
+};
+
+
+
+template<typename... Ts>
+struct is_set<std::set<Ts...> > 
+{
+    static bool constexpr value = true;
+};
+
+template<typename T>
+constexpr bool is_set_v = is_set<T>::value;
+
 
 template<typename>
 struct is_shared_ptr 
@@ -235,7 +252,17 @@ export namespace reflect::json
                 target.push_back(array_item);
                 do_serialize_json_value(target.back(), json_item, is_loading, dc);
             }
-        } else if constexpr (is_optional_v<std::decay_t<T>>)
+        } else if constexpr (is_set_v<std::decay_t<T>>)
+        {
+            assert(value.isArray());
+            target.clear();
+            for (auto& json_item : value)
+            {
+                typename T::value_type set_item;
+                serialize_json_value(set_item, json_item, dc);
+                target.emplace(set_item);
+            }
+        }else if constexpr (is_optional_v<std::decay_t<T>>)
         {
             if (value.isNull())
             {
