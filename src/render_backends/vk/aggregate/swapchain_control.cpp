@@ -8,6 +8,7 @@ import <vulkan/vulkan_core.h>;
 
 import render;
 
+#include "profiling/profile.h"
 #include "render_backends/vk/vk_macro.h"
 
 void vk::SwapchainControl::init()
@@ -147,16 +148,21 @@ RBImageHandle vk::SwapchainControl::get_image() const
 
 bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 {
+    PROFILE(__FUNCTION__);
     auto& frame = frames[frame_handle];
-
-    VkResult res = vkAcquireNextImageKHR(
-        instance.device,
-        swapchain,
-        UINT64_MAX,
-        frame.image_available,
-        VK_NULL_HANDLE,
-        &current_swapchain_index
-    );
+    
+    VkResult res;
+    {
+        PROFILE("vkAcquireNextImageKHR");
+        res = vkAcquireNextImageKHR(
+            instance.device,
+            swapchain,
+            UINT64_MAX,
+            frame.image_available,
+            VK_NULL_HANDLE,
+            &current_swapchain_index
+        );
+    }
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
     {
@@ -169,6 +175,7 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 
     if (images_in_flight[current_swapchain_index] != VK_NULL_HANDLE)
     {
+        PROFILE("vkWaitForFences");
         vkWaitForFences(
             instance.device,
             1,
@@ -188,6 +195,7 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 
 void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list)
 {
+    PROFILE(__FUNCTION__);
     LogVkSwapchain.Log<VeryVerbose>("submit_frame");
     auto& frame = frames[frame_handle];
 
@@ -311,6 +319,7 @@ void vk::SwapchainControl::create_sync_objects()
 
 void vk::SwapchainControl::wait_for_frame(RBFrameHandle frame_handle)
 {
+    PROFILE(__FUNCTION__);
     LogVkSwapchain.Log<VeryVerbose>("wait_for_frame");
     
     auto& f = frames[frame_handle];
@@ -326,6 +335,7 @@ void vk::SwapchainControl::wait_for_frame(RBFrameHandle frame_handle)
 
 void vk::SwapchainControl::reset_frame_fence(uint32_t frame)
 {
+    PROFILE(__FUNCTION__);
     auto& f = frames[frame];
 
     vkResetFences(instance.device, 1, &f.in_flight);

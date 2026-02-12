@@ -64,10 +64,8 @@ void BrdfLutCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
            auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
    
            inst->bind(brdf_lut_pipeline, ctx.cmd, ctx.frame);
-           ctx.backend.draw_fullscreen(ctx.cmd, RBDrawParams{
-               .update_viewport_extent = true,
-               .extent = {512, 512}
-           });
+           ctx.backend.update_viewport(ctx.cmd, {512, 512});
+           ctx.backend.draw_fullscreen(ctx.cmd);
        }
    });
 }

@@ -126,7 +126,8 @@ public:   /// API Section
     virtual ImageReadback readback_image(RBImageHandle img) const;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) override;
-    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) override;
+    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
+    virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) override;
     virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
@@ -137,13 +138,12 @@ public:   /// API Section
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const override;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
-    virtual void draw_fullscreen(RBCommandList cmd, RBDrawParams params) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) override;
     virtual RBImageHandle create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info) override;
     virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     
-    virtual void update_viewport(const RBCommandList& cmd, Extent extent) override;
+    virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) override;
     // Initialization section
     void create_frame_sync_objects();
     void create_descriptor_pool();
@@ -183,7 +183,10 @@ public:   /// cache and state section:
     vk::PipelineContext pipeline_context = {};
     
     // currently working pipelines (moving from pending_pipelines)
-    std::map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
+    std::unordered_map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
+    
+    RBPipelineHandle current_pipeline_handle{};
+    VkDescriptorSet current_descriptor_set = {};
     
     // pipelines objects that only have layouts, but not real pipelines yet
     std::vector<std::unique_ptr<VkPipelineObject>> pending_pipelines;

@@ -149,10 +149,8 @@ void CubemapCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
    
            const uint32_t pc = ctx.level;
            ctx.backend.push_constants(ctx.cmd, pc, irradiance_pipeline);
-           ctx.backend.draw_fullscreen(ctx.cmd, RBDrawParams {  
-               .update_viewport_extent = true,
-               .extent = Constants::ibl_extent
-           });
+           ctx.backend.update_viewport(ctx.cmd, Constants::ibl_extent);
+           ctx.backend.draw_fullscreen(ctx.cmd);
        },
        .num_layers = 6,
    });
@@ -173,10 +171,8 @@ void CubemapCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
            pc.level = ctx.level;
            pc.roghness = (float)ctx.mip / (float)(CUBEMAP_PREFILTER_FACE_NUM_MIPS - 1);
            ctx.backend.push_constants(ctx.cmd, pc, prefilter_pipeline);
-           ctx.backend.draw_fullscreen(ctx.cmd, RBDrawParams {  
-               .update_viewport_extent = true,
-               .extent = Constants::ibl_prefilter_extent >> ctx.mip
-           });
+           ctx.backend.update_viewport(ctx.cmd, Constants::ibl_prefilter_extent >> ctx.mip);
+           ctx.backend.draw_fullscreen(ctx.cmd);
        },
        .num_layers = 6,
        .num_mip_maps = CUBEMAP_PREFILTER_FACE_NUM_MIPS
@@ -193,10 +189,8 @@ void CubemapCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
            auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
    
            inst->bind(brdf_lut_pipeline, ctx.cmd, ctx.frame);
-           ctx.backend.draw_fullscreen(ctx.cmd, RBDrawParams{
-               .update_viewport_extent = true,
-               .extent = {512, 512}
-           });
+           ctx.backend.update_viewport(ctx.cmd, Constants::ibl_extent);
+           ctx.backend.draw_fullscreen(ctx.cmd);
        }
    });
    add_pass({

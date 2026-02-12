@@ -707,6 +707,8 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 
     PipelineObject* current_pipeline = nullptr;
 
+    ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+    
     for (auto& prim : mesh_processor.primitives)
     {
         auto instance = prim.material_instance;
@@ -773,12 +775,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 
         ctx.backend.draw_indexed(
             ctx.cmd,
-            prim.mesh.get().indices.size(),
-            RBDrawParams{
-                .update_viewport_extent = true,
-                .use_swapchain_extent = use_swapchain_extent,
-                .extent = resolution
-            });
+            prim.mesh.get().indices.size());
     }
 }
 
@@ -791,6 +788,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
     auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
 
     PipelineObject* current_pipeline = nullptr;
+    ctx.backend.update_viewport(ctx.cmd, Constants::shadowmap_extent);
 
     for (auto& prim : mesh_processor.primitives)
     {
@@ -818,12 +816,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         
         ctx.backend.draw_indexed(
             ctx.cmd,
-            prim.mesh.get().indices.size(),
-            RBDrawParams{
-                .update_viewport_extent = true,
-                .use_swapchain_extent = false,
-                .extent = Constants::shadowmap_extent
-            });
+            prim.mesh.get().indices.size());
     }
     // auto& scene_view = engine->scene_view;
     // auto cmd = ctx.cmd;

@@ -70,8 +70,19 @@ void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
     checkf(mesh_info_it != mesh_map.end(), "Could not find mesh info for '%s' (geom: %i, prim: %i)",
         mesh.mesh.get().name.c_str(), mesh.geom_index, mesh.prim_index);
     
-    VkBuffer vertex_buffers = mesh_map[mesh].vertex_buffer;
-    VkBuffer index_buffer = mesh_map[mesh].index_buffer;
+    static VkBuffer last_vb = nullptr;
+    static VkBuffer last_ib = nullptr;
+
+    
+    VkBuffer vertex_buffers = mesh_info_it->second.vertex_buffer;
+    VkBuffer index_buffer = mesh_info_it->second.index_buffer;
+    
+    if (vertex_buffers == last_vb &&
+        index_buffer == last_ib)
+    {
+        return;
+    }
+    
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffers, offsets);
     vkCmdBindIndexBuffer(cmd, index_buffer, 0, VK_INDEX_TYPE_UINT32);

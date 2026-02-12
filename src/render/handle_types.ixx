@@ -195,7 +195,15 @@ export
             return handle != 0;
         }
     };
-
+    
+    template<typename... Ts>
+    struct std::hash<RBHandle<Ts...>>
+    {
+        size_t operator()(const RBHandle<Ts...>& h) const noexcept
+        {
+            return h.handle;
+        }
+    };
 
 
     // enum class TextureFormat

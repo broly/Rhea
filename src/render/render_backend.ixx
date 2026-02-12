@@ -79,7 +79,7 @@ public:
 
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) = 0;
     virtual RBImageHandle create_texture_cubemap(const Cubemap& data, const TextureCreationInfo& texture_creation_info) = 0;
-    virtual void update_viewport(const RBCommandList& cmd, Extent extent) = 0;
+    virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) = 0;
 
     template<RenderBackendType T>
     static std::shared_ptr<RenderBackend> create(RBWindowHandle window_handle)
@@ -121,8 +121,8 @@ public:
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) = 0;
-    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params) = 0;
-    virtual void draw_fullscreen(RBCommandList cmd, RBDrawParams params = {}) = 0;
+    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_countaram) = 0;
+    virtual void draw_fullscreen(RBCommandList cmd) = 0;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;

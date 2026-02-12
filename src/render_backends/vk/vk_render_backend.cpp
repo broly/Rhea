@@ -188,8 +188,18 @@ void VkRenderBackend::update_viewport_extent(const RBCommandList& cmd)
 }
 
 
-void VkRenderBackend::update_viewport(const RBCommandList& cmd, Extent extent)
+void VkRenderBackend::update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent)
 {
+    PROFILE("VkRenderBackend::update_viewport");
+    
+    if (use_swapchain_extent)
+        extent = swapchain.get_extent();
+    
+    static std::optional<Extent> current_viewport_extent = std::nullopt;
+    
+    if (current_viewport_extent == extent)
+        return;
+    
     VkViewport viewport{};
     viewport.x = 0;
     viewport.y = 0;
@@ -197,6 +207,8 @@ void VkRenderBackend::update_viewport(const RBCommandList& cmd, Extent extent)
     viewport.height = float(extent.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
+    
+    
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
@@ -220,19 +232,32 @@ void VkRenderBackend::create_descriptor_pool()
 
 void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle)
 {
+    PROFILE("bind_descriptor_set");
+    
+    VkDescriptorSet vk_set = rb_descriptors.as<VkDescriptorSet>();
+    
+    if (vk_set == current_descriptor_set && current_pipeline_handle == pipeline_handle)
+        return;
+    
+    current_descriptor_set = vk_set;
+    current_pipeline_handle = pipeline_handle;
+    
     auto& pipeline = pipelines[pipeline_handle];
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    VkDescriptorSet vk_set = rb_descriptors.as<VkDescriptorSet>();
-
-    vkCmdBindDescriptorSets(
-        cmd,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipeline->get_pipeline_layout(),
-        set_index, 
-        1, 
-        &vk_set,
-        0, nullptr
-    );
+    
+    
+    {
+        PROFILE("vkCmdBindDescriptorSets");
+        vkCmdBindDescriptorSets(
+            cmd,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipeline->get_pipeline_layout(),
+            set_index, 
+            1, 
+            &vk_set,
+            0, nullptr
+        );
+    }
 }
 
 RBFrameHandle VkRenderBackend::get_current_frame() const
@@ -538,22 +563,22 @@ void VkRenderBackend::push_constants_impl(const RBCommandList& cmd, const void* 
     );
 }
 
-void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count, RBDrawParams params)
+void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)
 {
     PROFILE("draw_indexed");
-    if (params.update_viewport_extent)
-    {
-        update_viewport(cmd, params.use_swapchain_extent ? get_swapchain_extent() : params.extent);
-    }
+    // if (params.update_viewport_extent)
+    // {
+    //     update_viewport(cmd, params.use_swapchain_extent ? get_swapchain_extent() : params.extent);
+    // }
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 }
 
-void VkRenderBackend::draw_fullscreen(RBCommandList cmd, RBDrawParams params)
+void VkRenderBackend::draw_fullscreen(RBCommandList cmd)
 {
-    if (params.update_viewport_extent)
-    {
-        update_viewport(cmd, params.use_swapchain_extent ? get_swapchain_extent() : params.extent);
-    }
+    // if (params.update_viewport_extent)
+    // {
+    //     update_viewport(cmd, params.use_swapchain_extent ? get_swapchain_extent() : params.extent);
+    // }
     
     vkCmdDraw(
         cmd.as<VkCommandBuffer>(),
