@@ -88,13 +88,14 @@ export struct MatModel_Parameter
     MaterialParamType type;
     std::optional<Name> definition;
     std::optional<Name> variable;
+    std::optional<Name> sampler;
     std::optional<Name> ubo;
     std::optional<Name> binding;
     std::optional<Name> storage;
     std::set<Name> passes;
 };
 REFLECT_STRUCT(MatModel_Parameter,
-    type, variable, ubo, binding, storage, passes);
+    type, variable, ubo, binding, storage, passes, sampler);
 
 
 export class MaterialModel : public RhObject
@@ -105,8 +106,6 @@ public:
     std::map<Name, MatModel_Parameter> parameters;
     MatModel_Permutations permutations;
     std::vector<MatModel_Pass> passes;
-    
-    Name sampler;
     
     Name set;
     
@@ -120,17 +119,16 @@ public:
 };
 
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, parameters, sampler, permutations, passes, usage_type);
+                      model_name, enums, parameters, permutations, passes, usage_type);
 
 export class RenderResourceInfo : public RhObject
 {
 public:
     Name name;
-    std::optional<Name> sampler;
     std::vector<ShaderStage> stages;
     ResourceUsageType usage;
     std::vector<MatModel_Parameter> variables;
     Name set;
 };
 REFLECT_OBJECT_FIELDS(RenderResourceInfo, RhObject,
-    name, stages, usage, sampler, variables, set);
+    name, stages, usage, variables, set);

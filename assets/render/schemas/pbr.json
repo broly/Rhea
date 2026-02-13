@@ -11,8 +11,6 @@
 		]
 	},
 	
-	"sampler": "surface",
-	
 	"parameters": {
 		"blend_mode": {
 			"type": "definition",
@@ -20,24 +18,28 @@
 		},
 		"base_color": {
 			"type": "sampler",
+			"sampler": "surface",
 			"variable": "u_base_color",
 			"binding": "BINDING_SAMPLER_ALBEDO",
 			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"emissive": {
 			"type": "sampler",
+			"sampler": "surface",
 			"variable": "u_emissive",
 			"binding": "BINDING_SAMPLER_EMISSIVE",
 			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"normal": {
 			"type": "sampler",
+			"sampler": "surface",
 			"variable": "u_normal_map",
 			"binding": "BINDING_SAMPLER_NORMAL",
 			"passes": ["GeometryBase", "GeometryTranslucent"]
 		},
 		"orm": {
 			"type": "sampler",
+			"sampler": "surface",
 			"variable": "u_orm",
 			"binding": "BINDING_SAMPLER_ORM",
 			"passes": ["GeometryBase", "GeometryTranslucent"]

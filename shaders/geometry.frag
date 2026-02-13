@@ -65,22 +65,9 @@ layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
 
 // ================== SHADOW ==================
 
-layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW) uniform sampler2D u_shadow_depth;
+layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW)
+uniform sampler2DShadow u_shadow_depth;
 
-
-#define WITH_POISSON 1
-const int POISSON_STEPS = 8;
-
-const vec2 POISSON[8] = vec2[](
-    vec2(-0.326, -0.406),
-    vec2(-0.840, -0.074),
-    vec2(-0.696,  0.457),
-    vec2(-0.203,  0.621),
-    vec2( 0.962, -0.195),
-    vec2( 0.473, -0.480),
-    vec2( 0.519,  0.767),
-    vec2( 0.185, -0.893)
-);
 
 float hash12(vec2 p)
 {
@@ -112,30 +99,15 @@ float shadow_factor(vec3 world_pos, vec3 Ng)
     float ndotl = max(dot(Ng, -light_ubo.dir_light.direction.xyz), 0.0);
     float bias = mix(0.0005, 0.0025, 1.0 - ndotl);
 
-    vec2 texelSize = 1.0 / vec2(textureSize(u_shadow_depth, 0));
 
-    
-#if WITH_POISSON
-    float radius = mix(1.25, 2.5, 1.0 - ndotl);
-    
-    // --- rotate kernel per-pixel
-    float angle = hash12(gl_FragCoord.xy) * 6.2831853;
-    mat2 R = rot2(angle);
-    float shadow = 0.0;
+    float shadow = texture(
+        u_shadow_depth,
+        vec3(uv, proj.z - bias)
+    );
 
-    for (int i = 0; i < POISSON_STEPS; ++i)
-    {
-        vec2 offset = R * POISSON[i] * texelSize * radius;
-        float depth = texture(u_shadow_depth, uv + offset).r;
-        shadow += (proj.z - bias <= depth) ? 1.0 : 0.0;
-    }
-
-    return shadow / POISSON_STEPS;
-#else
-    float depth = texture(u_shadow_depth, uv).r;
-    return (proj.z - bias > depth) ? 0.0 : 1.0;
-#endif    
+    return shadow;
 }
+
 
 // ============= reflection =================
 

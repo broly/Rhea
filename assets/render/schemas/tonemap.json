@@ -5,11 +5,11 @@
 	
 	"enums": {},
 	"uniform_buffers": {},
-	"sampler": "depth",
 	
 	"parameters": {
 		"hdr_color": {
 			"type": "sampler",
+			"sampler": "default",
 			"variable": "u_hdr_color",
 			"binding": "BINDING_SAMPLER_HDR_COLOR",
 			"passes": ["ToneMapping"]

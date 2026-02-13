@@ -11,6 +11,7 @@ struct RenderResourceVariableDesc
     
     Name set;
     Name binding;
+    RBSampler sampler;
     
     size_t size;
 };
@@ -21,7 +22,6 @@ export struct RenderResourceDesc
     
     ShaderStage stages = ShaderStage::all;
     ResourceUsageType usage_type = ResourceUsageType::persistent;
-    std::optional<RBSampler> sampler;
     
     std::vector<RenderResourceVariableDesc> variables;
     Name set;

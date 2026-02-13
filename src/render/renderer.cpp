@@ -156,13 +156,6 @@ void Renderer::load_resources()
         RenderResourceDesc desc;
         desc.name = resource_info->name;
         desc.set = resource_info->set;
-        if (resource_info->sampler.has_value())
-        {
-            auto found_sampler = samplers.find(*resource_info->sampler);
-            checkf(found_sampler != samplers.end(), "Could not find sampler named %s", 
-                resource_info->sampler->to_string().c_str());
-            desc.sampler = found_sampler->second;
-        }
         desc.stages = ShaderStage::none;
         for (ShaderStage stage : resource_info->stages)
             desc.stages |= stage;
@@ -183,6 +176,10 @@ void Renderer::load_resources()
             }
             else if (variable.type == MaterialParamType::sampler)
             {
+                auto found_sampler = samplers.find(*variable.sampler);
+                checkf(found_sampler != samplers.end(), "Could not find sampler named %s", 
+                    variable.sampler->to_string().c_str());
+                var_desc.sampler = found_sampler->second;
                 var_desc.size = -1;
             }
             else
@@ -281,7 +278,6 @@ RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, N
     RenderResourceDesc desc{};
     desc.name = model->model_name;
     desc.usage_type = model->usage_type;
-    desc.sampler = samplers[model->sampler];
     desc.set = pass->set;
 
     // UBOs
@@ -302,7 +298,8 @@ RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, N
         } else if (param.type == MaterialParamType::sampler)
         {
             desc.variables.push_back(RenderResourceVariableDesc{
-                .name = *param.variable
+                .name = *param.variable,
+                .sampler = samplers[*param.sampler],
             });
         }
     }

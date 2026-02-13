@@ -3,19 +3,19 @@
 
     "usage_type": "frame",
 
-    "sampler": "default",
-
     "ubo_access": "none",
 
     "parameters": {
 		"clouds": {
 		    "type": "sampler",
 		    "variable": "u_noise",
+			"sampler": "default",
 		    "binding": "BINDING_SAMPLER_NOISE",
 			"passes": ["Clouds"]
 		},
 		"depth": {
 		    "type": "sampler",
+			"sampler": "default",
 		    "variable": "u_depth",
 		    "binding": "BINDING_SAMPLER_DEPTH",
 			"passes": ["Clouds"]

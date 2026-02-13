@@ -56,7 +56,7 @@ void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_objec
         binding.binding_index,
         image_handle,
         usage,
-        resource.desc.sampler,
+        binding.sampler,
         array_index,
         cubemap);
 }

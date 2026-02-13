@@ -6,16 +6,19 @@
 		{
 			"variable": "u_irradiance",
 			"type": "sampler",
+			"sampler": "default",
 			"binding": "BINDING_SAMPLER_IRRADIANCE"
 		},
 		{
 			"variable": "u_prefilter_map",
 			"type": "sampler",
+			"sampler": "default",
 			"binding": "BINDING_SAMPLER_PREFILTERED_ENV"
 		},
 		{
 			"variable": "u_brdf_lut",
 			"type": "sampler",
+			"sampler": "default",
 			"binding": "BINDING_SAMPLER_BRDF_LUT"
 		}
 	],

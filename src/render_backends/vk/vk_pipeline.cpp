@@ -127,6 +127,7 @@ void VkPipelineObject::prepare()
                     DescriptorBinding binding{};
                     binding.name          = variable.name;
                     binding.binding_index = variable_binding;
+                    binding.sampler       = variable.sampler;
                     binding.count         = it->second.count; // todo!
                     binding.size          = variable.size;
                     binding.stages        = resource->desc.stages;

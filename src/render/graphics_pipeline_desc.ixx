@@ -127,6 +127,7 @@ export
         uint32_t count = 1; // arrays...
         uint32_t size = 0;
         Name name;
+        RBSampler sampler;
     };
 
     struct PushConstantRange

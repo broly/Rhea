@@ -5,11 +5,11 @@
 	
 	"enums": {},
 	"uniform_buffers": {},
-	"sampler": "default",
 	
 	"parameters": {
 		"env_map": {
 			"type": "sampler",
+			"sampler": "default",
 			"variable": "u_env_map",
 			"binding": "BINDING_ENV_MAP",
 			"passes": ["IBL_Prefilter"]
