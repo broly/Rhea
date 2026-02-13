@@ -17,6 +17,7 @@ import texture_format;
 import :constants;
 import :names;
 import <set>;
+import <algorithm>;
 
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
@@ -160,6 +161,33 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
        });
     }
     
+    
+    
+    swapchain_color = create_texture({
+        .name = "swapchain",
+        .extent = swapchain_extent,
+        .format = backend->get_swapchain_format(),
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
+        .external = true,
+        .swapchain_image = true,
+    });
+    
+    // add_pass({
+    //     .name = "DepthPrepass",
+    //     .reads = {
+    //     },
+    //     .writes = {
+    //         { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
+    //     },
+    //     .execute = [this](RenderGraphContext& ctx)
+    //     {
+    //         PROFILE("DepthPrepass");
+    //         draw_scene(ctx);
+    //     },
+    //     .num_layers = 1
+    // });
+
+    
     add_pass({
         .name = Names::pass_geometry_base,
         .reads = {
@@ -167,7 +195,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
         },
         .writes = { 
-            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
+            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
@@ -247,7 +275,7 @@ LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
     // ---------- Point / spot lights ----------
     const auto [lights, light_num] =
         light_processor.query_nearest_lights_limited<8>(
-            camera_position /* или передавай явно */
+            camera_position
         );
 
     light_ubo.light_count = light_num;
@@ -336,7 +364,12 @@ void GenericRenderGraph::prepare_geometry_resources(
 
     std::map<PipelineObject*, Name> unique_pipelines;
     
-    for (Name pass_name : {Names::pass_geometry_base,Names::pass_geometry_translucent})
+    for (Name pass_name : 
+        {
+            Names::pass_geometry_base,
+            Names::pass_geometry_translucent, 
+            Name("DepthPrepass")
+        })
     {
         for (auto& prim : mesh_processor.primitives)
         {
@@ -354,6 +387,8 @@ void GenericRenderGraph::prepare_geometry_resources(
 
     for (auto& [pipeline, pass_name] : unique_pipelines)
     {
+        bool is_depth_prepass = (pass_name == Name("DepthPrepass"));
+        
         PreparedPassResources prep{};
 
         // ---------- Camera ----------
@@ -373,75 +408,78 @@ void GenericRenderGraph::prepare_geometry_resources(
             frame);
 
         prep.camera = cam;
-
-        // ---------- Reflection ----------
-
-        auto refl =
-            reflection_resource->query_single(pipeline);
-
-        auto& reflection_capture_processor =
-            engine->scene_view
-                  ->get_processor<SceneViewProcessor_ReflectionCapture>();
-
-        auto reflection_capture =
-            reflection_capture_processor.query_nearest(
-                cam_ubo.camera_pos);
-
-        if (reflection_capture)
+        
+        if (!is_depth_prepass)
         {
-            refl->update_image(
-                pipeline,
-                "u_irradiance",
-                renderer->get_cubemap(reflection_capture->irradiance),
-                frame,
-                0,
-                true);
+            // ---------- Reflection ----------
 
-            refl->update_image(
-                pipeline,
-                "u_prefilter_map",
-                renderer->get_cubemap(reflection_capture->prefiltered_env),
-                frame,
-                0,
-                true);
+            auto refl =
+                reflection_resource->query_single(pipeline);
 
-            refl->update_image(
+            auto& reflection_capture_processor =
+                engine->scene_view
+                      ->get_processor<SceneViewProcessor_ReflectionCapture>();
+
+            auto reflection_capture =
+                reflection_capture_processor.query_nearest(
+                    cam_ubo.camera_pos);
+
+            if (reflection_capture)
+            {
+                refl->update_image(
+                    pipeline,
+                    "u_irradiance",
+                    renderer->get_cubemap(reflection_capture->irradiance),
+                    frame,
+                    0,
+                    true);
+
+                refl->update_image(
+                    pipeline,
+                    "u_prefilter_map",
+                    renderer->get_cubemap(reflection_capture->prefiltered_env),
+                    frame,
+                    0,
+                    true);
+
+                refl->update_image(
+                    pipeline,
+                    "u_brdf_lut",
+                    get_image(brdf_lut),
+                    frame);
+            }
+
+            prep.reflection = refl;
+
+            // ---------- Lights ----------
+
+            LightUBO light_ubo =
+                build_light_ubo(cam_ubo.camera_pos);
+
+            auto light =
+                light_resource->query_single(pipeline);
+
+            light->update_uniform_buffer(
                 pipeline,
-                "u_brdf_lut",
-                get_image(brdf_lut),
+                "light_ubo",
+                light_ubo,
                 frame);
+
+            prep.light = light;
+
+            // ---------- Shadow ----------
+
+            auto shadow =
+                shadow_resource->query_single(pipeline);
+
+            shadow->update_image(
+                pipeline,
+                "u_shadow_depth",
+                get_image(shadow_map),
+                frame);
+
+            prep.shadow = shadow;
         }
-
-        prep.reflection = refl;
-
-        // ---------- Lights ----------
-
-        LightUBO light_ubo =
-            build_light_ubo(cam_ubo.camera_pos);
-
-        auto light =
-            light_resource->query_single(pipeline);
-
-        light->update_uniform_buffer(
-            pipeline,
-            "light_ubo",
-            light_ubo,
-            frame);
-
-        prep.light = light;
-
-        // ---------- Shadow ----------
-
-        auto shadow =
-            shadow_resource->query_single(pipeline);
-
-        shadow->update_image(
-            pipeline,
-            "u_shadow_depth",
-            get_image(shadow_map),
-            frame);
-
-        prep.shadow = shadow;
         
         prepared_pass_resources[pass_name].resize(1);
         prepared_pass_resources[pass_name][0][pipeline] = prep;
@@ -604,14 +642,13 @@ glm::mat4 GenericRenderGraph::build_dir_light_vp() const
     return lightProj * lightView;
 }
 
-
 void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 {
     PROFILE("GenericRenderGraph::draw_scene");
+
     auto& mesh_processor =
         engine->scene_view
             ->get_processor<SceneViewProcessor_Mesh>();
-    
 
     auto& pass_preps_by_level =
         prepared_pass_resources[ctx.pass_name];
@@ -621,26 +658,61 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 
     PipelineObject* current_pipeline = nullptr;
 
-    ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+    ctx.backend.update_viewport(
+        ctx.cmd,
+        resolution,
+        use_swapchain_extent);
     
-    for (auto& prim : mesh_processor.primitives)
+    bool is_depth_prepass = (ctx.pass_name == Name("DepthPrepass"));
+
+    // -------------------------------------------------
+    // 1️⃣ Gather visible + build sort keys
+    // -------------------------------------------------
+
+    std::vector<ViewRenderItem> items;
+    
+    auto view_info = build_view_info(ctx, false);
+
+    mesh_processor.gather_for_view(
+        view_info.view,
+        view_info.frustum,
+        ctx.pass_name,
+        items);
+
+    // -------------------------------------------------
+    // 2️⃣ Sort
+    // -------------------------------------------------
+    if (ctx.pass_name == Name("DepthPrepass"))
     {
-        auto instance_it = prim.material_instance_by_pass.find(ctx.pass_name);
-        if (instance_it == prim.material_instance_by_pass.end())
-            continue;
-        const auto& instance = instance_it->second;
-        
-        auto blend_mode = instance->material->get_enum_parameter<BlendMode>("blend_mode");
-        
-        const bool should_draw = 
-            (blend_mode == BlendMode::opaque && ctx.pass_name == Names::pass_geometry_base) ||
-            (blend_mode == BlendMode::translucent && ctx.pass_name == Names::pass_geometry_translucent);    
-        
-        if (!should_draw)
+        PROFILE("draw_scene - sort");
+        std::sort(items.begin(), items.end(),
+            [](const ViewRenderItem& a,
+               const ViewRenderItem& b)
+            {
+                return a.sort_key < b.sort_key;
+            });
+    }
+
+    // -------------------------------------------------
+    // 3️⃣ Draw
+    // -------------------------------------------------
+    PROFILE("GenericRenderGraph::draw_scene - items");
+    for (auto& item : items)
+    {
+        RenderPrimitive& prim = *item.primitive;
+
+        auto instance_it =
+            prim.material_instance_by_pass.find(ctx.pass_name);
+
+        if (instance_it ==
+            prim.material_instance_by_pass.end())
             continue;
 
-        auto pipeline = prim.pipeline_by_pass[ctx.pass_name];
-        
+        const auto& instance = instance_it->second;
+
+        auto pipeline =
+            prim.pipeline_by_pass[ctx.pass_name];
+
         if (pipeline != current_pipeline)
         {
             current_pipeline = pipeline;
@@ -656,27 +728,32 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
                 pipeline,
                 ctx.cmd,
                 ctx.frame);
+            
+            if (!is_depth_prepass)
+            {
+                prep.light->bind(
+                    pipeline,
+                    ctx.cmd,
+                    ctx.frame);
 
-            prep.light->bind(
-                pipeline,
-                ctx.cmd,
-                ctx.frame);
+                prep.shadow->bind(
+                    pipeline,
+                    ctx.cmd,
+                    ctx.frame);
 
-            prep.shadow->bind(
-                pipeline,
-                ctx.cmd,
-                ctx.frame);
-
-            prep.reflection->bind(
-                pipeline,
-                ctx.cmd,
-                ctx.frame);
+                prep.reflection->bind(
+                    pipeline,
+                    ctx.cmd,
+                    ctx.frame);
+            }
         }
-
-        instance->bind(
-            pipeline,
-            ctx.cmd,
-            ctx.frame);
+        if (!is_depth_prepass)
+        {
+            instance->bind(
+               pipeline,
+               ctx.cmd,
+               ctx.frame);
+        }
 
         ctx.backend.bind_mesh(
             ctx.cmd,
@@ -693,7 +770,6 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
             prim.mesh.get().indices.size());
     }
 }
-
 
 
 void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
@@ -868,6 +944,45 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
 
     ctx.backend.draw_fullscreen(cmd);
 
+}
+
+ViewInfo GenericRenderGraph::build_view_info(RenderGraphContext& ctx, bool zero_pos) const
+{
+    auto& scene_view = engine->scene_view;
+
+    auto& camera_processor =
+        scene_view->get_processor<SceneViewProcessor_Camera>();
+
+    const RenderObject_Camera* cam_ro =
+        camera_processor.get_active_camera();
+
+    auto [width, height] =
+        ctx.backend.get_viewport_extent();
+
+    float aspect =
+        float(width) / float(height);
+
+    glm::mat4 proj =
+        cam_ro->get_projection(aspect);
+
+    glm::mat4 view =
+        cam_ro->view;
+
+    if (zero_pos)
+    {
+        view[3][0] = 0.0f;
+        view[3][1] = 0.0f;
+        view[3][2] = 0.0f;
+    }
+
+    glm::mat4 vp = proj * view;
+
+    ViewInfo info;
+    info.view = view;
+    info.proj = proj;
+    info.frustum = Frustum::from_view_projection(vp);
+
+    return info;
 }
 
 CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos, uint32_t face_index) const

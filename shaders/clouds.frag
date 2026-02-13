@@ -12,8 +12,8 @@ layout(location = 0) out vec4 out_color;
 // ================== CAMERA =================
 layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
 {
-    mat4 view;
     mat4 proj;
+    mat4 view;
     vec4 camera_pos;
 } camera_ubo;
 

@@ -234,6 +234,7 @@ export
         bool depth_test;
         bool depth_write;
         bool is_translucent;
+        bool no_color_attachments;
         CullMode cull_mode;
         FrontFace front_face;
         CompareOp compare_op;

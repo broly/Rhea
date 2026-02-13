@@ -12,9 +12,9 @@ VkFilter vk_convert_SamplerFilter(SamplerFilter v)
     case SamplerFilter::Linear:
         return VK_FILTER_LINEAR;
     case SamplerFilter::CubicExt:
-        return VK_FILTER_CUBIC_EXT;   // VK_EXT_filter_cubic
+        return VK_FILTER_CUBIC_EXT;
     case SamplerFilter::CubicImg:
-        return VK_FILTER_CUBIC_IMG;
+        return VK_FILTER_CUBIC_IMG; 
     default:
         return VK_FILTER_NEAREST;
     }

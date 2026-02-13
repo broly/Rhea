@@ -99,6 +99,11 @@ public:
         out[6] = { min.x, max.y, max.z };
         out[7] = { max.x, max.y, max.z };
     }
+    
+    glm::vec3 get_extents() const
+    {
+        return max - min;
+    }
 
     
     glm::vec3 min;

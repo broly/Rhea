@@ -167,27 +167,6 @@ void VkRenderBackend::destroy_depth_resources()
 }
 
 
-void VkRenderBackend::update_viewport_extent(const RBCommandList& cmd)
-{
-    Extent extent = swapchain.get_extent();
-
-    VkViewport viewport;
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width  = (float)extent.width;
-    viewport.height = (float)extent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor;
-    scissor.offset = {0, 0};
-    scissor.extent = {extent.width, extent.height};
-
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-    vkCmdSetScissor (cmd, 0, 1, &scissor);
-}
-
-
 void VkRenderBackend::update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent)
 {
     PROFILE("VkRenderBackend::update_viewport");
@@ -485,7 +464,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     subpass.pColorAttachments = color_refs.data();
     if (desc.depth_attachment.has_value())
         subpass.pDepthStencilAttachment = &depth_ref;
-
+    
+    
     VkRenderPassCreateInfo rpci{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     rpci.attachmentCount = uint32_t(attachments.size());
     rpci.pAttachments = attachments.data();
@@ -714,6 +694,7 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
 
     VkClearValue clears[2]{};
     clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
+    clears[0].depthStencil = {1.0f, 0};
     clears[1].depthStencil = {1.0f, 0};
 
     VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };

@@ -41,6 +41,13 @@ struct PreparedCloudsPass
     RenderResourceInstance* instance = nullptr;
 };
 
+struct ViewInfo
+{
+    glm::mat4 view;
+    glm::mat4 proj;
+    Frustum   frustum;
+};
+
 
 class GenericRenderGraph : public RenderGraph
 {
@@ -60,7 +67,9 @@ public:
     void draw_scene_shadow(RenderGraphContext& ctx);
     void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
     
-    
+    ViewInfo  build_view_info(
+        RenderGraphContext& ctx,
+        bool zero_pos) const;
     
     bool is_debugging() const;
     

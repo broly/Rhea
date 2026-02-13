@@ -16,10 +16,10 @@
 							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
 						},
-						"fov": 1.04,
+						"fov": 1.54,
 						"active": true,
-						"near_plane": 0.1,
-						"far_plane": 100
+						"near_plane": 0.2,
+						"far_plane": 2000
 						
 					}
 				}

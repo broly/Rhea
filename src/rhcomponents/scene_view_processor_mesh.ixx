@@ -28,7 +28,7 @@ export struct RenderObject_Mesh
     bool dirty;
 };
 
-struct RenderPrimitive
+export struct RenderPrimitive
 {
     RenderPrimitiveId id;
 
@@ -39,10 +39,16 @@ struct RenderPrimitive
     std::map<Name, std::shared_ptr<MaterialInstance>> material_instance_by_pass;
     
     std::map<Name, PipelineObject*> pipeline_by_pass;
+    std::map<Name, std::shared_ptr<PipelineFamily>> pipeline_family_by_pass;
 
     uint8_t dirty;
 };
 
+export struct ViewRenderItem
+{
+    RenderPrimitive* primitive = nullptr;
+    uint64_t sort_key = 0;
+};
 
 export class SceneViewProcessor_Mesh : public SceneViewProcessor
 {
@@ -55,6 +61,12 @@ public:
     RenderId register_proxy() override;
     void unregister_proxy(RenderId render_id) override;
     void process() override;
+    
+    void gather_for_view(
+        const glm::mat4& view_matrix,
+        const Frustum& frustum,
+        Name pass_name,
+        std::vector<ViewRenderItem>& out_items);
 
     std::vector<RenderObject_Mesh> meshes;
     std::vector<RenderId> vacated_mesh_ids;

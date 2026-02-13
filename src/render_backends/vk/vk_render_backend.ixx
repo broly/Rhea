@@ -156,9 +156,7 @@ public:   /// API Section
 private: // internal section
     
     void destroy_depth_resources();
-    
-    void update_viewport_extent(const RBCommandList& cmd);
-    
+
     vk::DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
 
     VkFormat get_image_format(RBImageHandle handle) const;

@@ -84,7 +84,10 @@ void SceneViewProcessor_Mesh::process()
                     std::set<Name> passes;
         
                     if (blend_mode == BlendMode::opaque)
+                    {
                         passes.emplace("GeometryBase");
+                        // passes.emplace("DepthPrepass");
+                    }
                     else if (blend_mode == BlendMode::translucent)
                          passes.emplace("GeometryTranslucent");
                     
@@ -111,6 +114,7 @@ void SceneViewProcessor_Mesh::process()
                                     pass_name));
                     
                         rp.pipeline_by_pass[pass_name] = pipeline;
+                        rp.pipeline_family_by_pass[pass_name] = geom_pipeline_family;
                         rp.material_instance_by_pass[pass_name] = instance;
                     
                         primitives.push_back(rp);
@@ -126,5 +130,92 @@ void SceneViewProcessor_Mesh::process()
 
         if (transform_changed)
             ro.world = new_world;
+    }
+}
+
+static float compute_view_depth(
+    const glm::mat4& view,
+    const glm::mat4& world)
+{
+    glm::vec3 world_pos = glm::vec3(world[3]);
+
+    glm::vec4 view_pos = view * glm::vec4(world_pos, 1.0f);
+
+    return -view_pos.z;
+}
+
+static uint64_t build_sort_key_opaque(
+    uint32_t pipeline_id,
+    uint32_t material_id,
+    float depth)
+{
+    // depth bucket (0 .. 65535)
+    uint32_t depth_bucket =
+        std::min(65535u, uint32_t(depth * 100.0f));
+
+    uint64_t key = 0;
+
+    key |= uint64_t(pipeline_id) << 48;
+    key |= uint64_t(material_id) << 32;
+    key |= uint64_t(depth_bucket);
+
+    return key;
+}
+
+static uint64_t build_sort_key_translucent(float depth)
+{
+    uint32_t depth_bucket =
+        std::min(65535u, uint32_t(depth * 100.0f));
+
+    depth_bucket = 65535u - depth_bucket;
+
+    return uint64_t(depth_bucket);
+}
+
+
+
+void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, const Frustum& frustum, Name pass_name,
+    std::vector<ViewRenderItem>& out_items)
+{
+    PROFILE(__FUNCTION__);
+    out_items.clear();
+    out_items.reserve(primitives.size());
+
+    for (auto& prim : primitives)
+    {
+        // Frustum culling
+        // if (!frustum.test_aabb(prim.bounds, *prim.world))
+        //     continue;
+        
+        auto pipeline_family_it = prim.pipeline_family_by_pass.find(pass_name);
+        
+        if (pipeline_family_it == prim.pipeline_family_by_pass.end())
+            continue;
+
+        auto pipeline_family = pipeline_family_it->second;
+        auto material_instancce = prim.material_instance_by_pass[pass_name];
+
+        float depth =
+            compute_view_depth(view_matrix, *prim.world);
+
+        uint64_t key = 0;
+
+        if (pass_name == "GeometryBase" || pass_name == "DepthPrepass")
+        {
+            key = build_sort_key_opaque(
+                pipeline_family->unique_id,
+                material_instancce->unique_id,
+                depth);
+        }
+        else if (pass_name == "GeometryTranslucent")
+        {
+            key = build_sort_key_translucent(depth);
+        }
+        else if (pass_name == "shadowmap")
+        {
+            key = uint64_t(pipeline_family->unique_id);
+        }
+
+        out_items.push_back({ &prim, key });
     }
 }

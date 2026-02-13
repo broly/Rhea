@@ -2,7 +2,9 @@ export module render:sampler_desc;
 
 
 import hash_utils;
+import name;
 import <type_traits>;
+import <string_view>;
 
 export enum class SamplerFilter : uint32_t
 {
@@ -52,6 +54,8 @@ export enum class SamplerBorderColor : uint32_t
 export struct SamplerDesc
 {
     constexpr SamplerDesc() {}
+    
+    std::string_view name;
     
     SamplerFilter min_filter = SamplerFilter::Linear;
     SamplerFilter mag_filter = SamplerFilter::Linear;
@@ -112,6 +116,8 @@ export namespace samplers
     constexpr SamplerDesc default_surface()
     {
         SamplerDesc surface_sampler{};
+        surface_sampler.name = "surface";
+        
         surface_sampler.min_filter   = SamplerFilter::Linear;
         surface_sampler.mag_filter   = SamplerFilter::Linear;
         surface_sampler.mipmap_mode  = SamplerMipMapMode::Linear;
@@ -137,6 +143,7 @@ export namespace samplers
     constexpr SamplerDesc default_shadow()
     {
         SamplerDesc sampler{};
+        sampler.name = "shadow";
         sampler.min_filter   = SamplerFilter::Linear;
         sampler.mag_filter   = SamplerFilter::Linear;
         sampler.mipmap_mode  = SamplerMipMapMode::Linear;
@@ -158,5 +165,24 @@ export namespace samplers
         sampler.border_color = SamplerBorderColor::float_opaque_white;
         
         return sampler;
+    }
+    
+    
+    constexpr SamplerDesc default_depth()
+    {
+        SamplerDesc depth_sampler{};
+        depth_sampler.name = "depth";
+        depth_sampler.min_filter  = SamplerFilter::Nearest;
+        depth_sampler.mag_filter  = SamplerFilter::Nearest;
+        depth_sampler.mipmap_mode = SamplerMipMapMode::Nearest;
+
+        depth_sampler.address_u = SamplerAddressMode::ClampToEdge;
+        depth_sampler.address_v = SamplerAddressMode::ClampToEdge;
+        depth_sampler.address_w = SamplerAddressMode::ClampToEdge;
+
+        depth_sampler.anisotropy = false;
+        depth_sampler.comparison = false;
+        
+        return depth_sampler;
     }
 }

@@ -40,14 +40,6 @@ void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
     GenericRenderGraph::init_resources(init_params);
 
 
-    swapchain_color = create_texture({
-        .name = "swapchain",
-        .extent = swapchain_extent,
-        .format = backend->get_swapchain_format(),
-        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
-        .external = true,
-        .swapchain_image = true,
-    });
 
 }
 
@@ -60,7 +52,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },
             .reads = {
-                { hdr_color, RBImageUsage::SampledFragment }
+                { hdr_color, RBImageUsage::SampledFragment },
             },
             .writes = {
                 { swapchain_color, RBImageUsage::ColorAttachment }

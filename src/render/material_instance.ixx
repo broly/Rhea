@@ -6,6 +6,7 @@ import :renderer;
 import assets;
 
 
+
 export class MaterialInstance
 {
 public:
@@ -34,4 +35,6 @@ public:
     std::shared_ptr<Renderer> renderer;
     
     std::map<Name, std::vector<std::byte>> cached_ubos;
+    
+    uint32_t unique_id;
 };

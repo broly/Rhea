@@ -86,7 +86,42 @@
 	},
 
 	
-	"passes": [	
+	"passes": [
+		// {
+		// 	"name": "DepthPrepass",
+		// 	"requirements": "blend_mode != translucent",
+		// 	"shaders": {
+		// 		"vertex": "depth_prepass.vert",
+		// 		"fragment": "depth_prepass.frag"
+		// 	},
+		// 	"resources": ["camera"],
+		// 	"depth_write": true,
+		// 	"depth_test": true,
+		// 	"translucent": false,
+		// 	"cull_mode": "back",
+		// 	"front_face": "CW",
+		// 	"compare_op": "less",
+		// 	"set": "SET_PBR",
+		// 	"push_constants": [
+		// 		{
+		// 			"type": "mat4",
+		// 			"name": "model",
+		// 			"stages": ["vertex"]
+		// 		}
+		// 	],
+		// 	"vertex_layouts": [
+		// 		{
+		// 			"vertex_type": "Vertex",
+		// 			"attributes": [
+		// 				{
+		// 					"name": "position",
+		// 					"definition": "LOCATION_ATTR_POSITION",
+		// 					"variable": "in_position"
+		// 				}
+		// 			]
+		// 		}
+		// 	]
+		// },
 		{
 			"name": "GeometryBase",
 			"requirements": "blend_mode != translucent",
@@ -102,7 +137,7 @@
 			"translucent": false,
 			"cull_mode": "back",
 			"front_face": "CW",
-			"compare_op": "less",
+			"compare_op": "less_or_equal",
 			"push_constants": [
 				{
 					"type": "mat4",
@@ -151,7 +186,7 @@
 			"translucent": true,
 			"cull_mode": "back",
 			"front_face": "CW",
-			"compare_op": "less",
+			"compare_op": "less_or_equal",
 			"set": "SET_PBR",
 			"push_constants": [
 				{

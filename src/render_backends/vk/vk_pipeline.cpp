@@ -140,8 +140,8 @@ void VkPipelineObject::prepare()
         {
             for (int variable_index = 0; variable_index < resource->desc.variables.size(); ++variable_index)
             {
-                checkf(occupied_variables.contains(variable_index), "Variable %s declared, but not used in any shader",
-                    resource->desc.variables[variable_index].name.to_string().c_str());
+                // checkf(occupied_variables.contains(variable_index), "Variable %s declared, but not used in any shader",
+                //     resource->desc.variables[variable_index].name.to_string().c_str());
             }
         }
         
@@ -384,7 +384,9 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     depth_ci.depthCompareOp = conv_compare_op(pipeline_desc->compare_op);
     depth_ci.depthBoundsTestEnable = VK_FALSE;
     depth_ci.stencilTestEnable = VK_FALSE;
-
+    depth_ci.minDepthBounds = 0.0f;
+    depth_ci.maxDepthBounds = 1.0f;
+    
     pci.stageCount = vk_stages.size();
     pci.pStages = vk_stages.data();
     pci.pVertexInputState = &vertex_input;
@@ -398,6 +400,12 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
     pci.pDynamicState = &dynamic_ci;
+    
+    if (!pipeline_desc->no_color_attachments) {
+        pci.pColorBlendState = &blend;
+    } else {
+        pci.pColorBlendState = nullptr;  // Depth-only
+    }
 
     VK_CHECK(vkCreateGraphicsPipelines(
         instance.device,

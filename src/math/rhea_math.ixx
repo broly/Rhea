@@ -45,10 +45,8 @@ export namespace math
     {
         glm::vec3 forward = glm::normalize(target - origin);
 
-
         if (glm::abs(glm::dot(forward, up)) > 0.999f)
         {
-
             return look_at(origin, target, glm::vec3(1, 0, 0));
         }
 

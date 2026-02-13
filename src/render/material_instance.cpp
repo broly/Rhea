@@ -11,6 +11,10 @@ MaterialInstance::MaterialInstance(const std::shared_ptr<const Material>& in_mat
     checkf(model, "Could not find specified model");
     
     render_resource = renderer->query_resource(model, pass_name);
+    
+    static uint32_t unique_id_counter = 0;
+    
+    unique_id = unique_id_counter++;
 
 }
 

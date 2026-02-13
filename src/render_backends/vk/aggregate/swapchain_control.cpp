@@ -185,7 +185,6 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
         );
     }
 
-
     images_in_flight[current_swapchain_index] =
         frames[frame_handle].in_flight;
 

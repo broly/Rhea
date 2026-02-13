@@ -24,18 +24,23 @@ vec3 ACES(vec3 x)
                  (x * (c * x + d) + e), 0.0, 1.0);
 }
 
+const float NEAR = 0.5;
+const float FAR = 2000;
+
+float linearize_depth(float depth)
+{
+    float z = depth;
+    return (NEAR * FAR) / (FAR - z * (FAR - NEAR));
+}
+
 void main()
 {
     vec3 hdr_color = texture(u_hdr_color, v_uv).rgb;
-
     // exposure
     hdr_color *= 0.2;
-
     // tonemap
     vec3 mapped = ACES(hdr_color);
-
     // gamma
     mapped = pow(mapped, vec3(1.0 / 2.2));
-
     out_color = vec4(mapped, 1.0);
 }

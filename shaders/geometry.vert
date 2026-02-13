@@ -18,8 +18,8 @@ layout(location = 4) out vec3 v_world_bitangent;
 // ---------- Camera ----------
 layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
 {
-    mat4 view;
     mat4 proj;
+    mat4 view;
     vec4 camera_pos;
 } camera;
 

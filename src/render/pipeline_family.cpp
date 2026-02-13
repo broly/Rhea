@@ -142,6 +142,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     desc.is_translucent = pass->translucent;
     desc.cull_mode = pass->cull_mode;
     desc.front_face = pass->front_face;
+    desc.no_color_attachments = pass->no_color_attachments;
     desc.compare_op = pass->compare_op;
     desc.depth_bias = pass->depth_bias ? *pass->depth_bias : DepthBiasInfo{};
     desc.layout = layout;
@@ -193,8 +194,8 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         {
             if (param.type == MaterialParamType::sampler || param.type == MaterialParamType::uniform)
             {
-                if (!param.passes.contains(pass->name))
-                    continue;
+                // if (!param.passes.contains(pass->name))
+                //     continue;
                 checkf(param.binding, "Binding definition must be set");
                 defines.insert({*param.binding, binding_index});
                 material_resource_info.resource_variable_bindings.push_back(binding_index);

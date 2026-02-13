@@ -4,7 +4,7 @@ import render_scene;
 
 glm::mat4 RenderObject_Camera::get_projection(float aspect) const
 {
-    auto p = glm::perspectiveRH(fov, aspect, near, far);
+    auto p = glm::perspectiveRH_ZO(fov, aspect, near, far);
     p[1][1] *= -1; // Vulkan NDC
     return p;
 }

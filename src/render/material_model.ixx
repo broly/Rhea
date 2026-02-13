@@ -62,12 +62,13 @@ export struct MatModel_Pass
     std::vector<MatModel_PushConstant> push_constants;
     CullMode cull_mode;
     FrontFace front_face;
+    bool no_color_attachments = false;
     CompareOp compare_op;
     std::optional<DepthBiasInfo> depth_bias;
     Name set;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, shaders, depth_test, push_constants, depth_write, set, resources, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+    name, requirements, shaders, depth_test, push_constants, depth_write, set, no_color_attachments, resources, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 export enum class MaterialParamType
 {

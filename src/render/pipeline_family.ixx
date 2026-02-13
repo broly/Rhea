@@ -40,8 +40,8 @@ private:
     std::shared_ptr<Renderer> renderer;
     std::shared_ptr<MaterialModel> model;
     const MatModel_Pass* pass = nullptr;
-
-
+    
+    // PSO cache
     std::unordered_map<uint64_t, PipelineObject*> pipelines;
     
 };

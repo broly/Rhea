@@ -6,8 +6,8 @@ import rhmath;
 
 export struct CameraUBO
 {
-    glm::mat4 view;
     glm::mat4 proj;
+    glm::mat4 view;
     glm::vec3 camera_pos;
     float _pad = 0.f;
 };

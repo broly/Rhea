@@ -19,7 +19,7 @@ export namespace json_utils
     
         std::ifstream file(level_path);
         if (!file.is_open()) {
-            std::cerr << "Failed to open json object" << std::endl;
+            std::cerr << "Failed to open json object " << level_path.string().c_str() << std::endl;
             throw std::runtime_error("Failed to open json object");
         }
     
