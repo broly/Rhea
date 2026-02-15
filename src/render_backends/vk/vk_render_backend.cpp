@@ -341,7 +341,7 @@ size_t hash_framebuffer(
 RBImageHandle VkRenderBackend::get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const
 {
     // frame_handle is unused yet
-    return swapchain.get_image();
+    return swapchain.get_image(*frame_handle);
 }
 
 RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& fb)
@@ -694,8 +694,8 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
 
     VkClearValue clears[2]{};
     clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
-    clears[0].depthStencil = {1.0f, 0};
-    clears[1].depthStencil = {1.0f, 0};
+    // clears[0].depthStencil = {1.0f, 0};
+    clears[1].depthStencil = {0.0f, 0};
 
     VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     rpbi.renderPass  = fb.render_pass;
