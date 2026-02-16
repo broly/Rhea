@@ -32,6 +32,7 @@ struct RenderPassAttachmentInfo
     uint32_t layer = 0;
     uint32_t mip_level = 0;
     bool is_swapchain = false;
+    VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 };
 
 

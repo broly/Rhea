@@ -9,6 +9,7 @@ import game;
 import name;
 import log;
 import rhobject;
+import assets;
 
 #include "logging/log_macro.h"
 
@@ -17,6 +18,11 @@ DEFINE_LOGGER(LogMain, DisplayFn);
 extern "C" const char* NameDebugResolve(uint32_t id)
 {
     return NameDebug::resolve(id);
+}
+
+extern "C" const char* MeshHandleDebugResolve(uint32_t id)
+{
+    return AssetManager::get().get_mesh(MeshHandle{id}).name.c_str();
 }
 
 int main() 

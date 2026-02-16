@@ -622,7 +622,8 @@ RBImageHandle vk::ImageManager::create_cubemap(
 void vk::ImageManager::transition_image(
 RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after, bool log ) const
 {
-    auto vk_img = get_image_resource(image).image;
+    auto& image_res = get_image_resource(image);
+    auto vk_img = image_res.image;
     if (log)
     {
         LogVkImageManager.Log<VeryVerbose>("Transition for image '%s' (%p): %s -> %s",
@@ -677,6 +678,14 @@ RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout afte
         0, nullptr,
         1, &barrier
     );
+    
+    image_res.set_layout(dst.layout);
+}
+
+VkImageLayout vk::ImageManager::get_image_layout(RBImageHandle image)
+{
+    auto& image_res = get_image_resource(image);
+    return image_res.layout;
 }
 
 void vk::ImageManager::create_staging_buffer(

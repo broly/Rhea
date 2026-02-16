@@ -365,7 +365,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
                 attachment.usage,
                 attachment.layer,
                 attachment.mip_level,
-                image_manager.is_swapchain_image(attachment.image)
+                image_manager.is_swapchain_image(attachment.image),
+                image_manager.get_image_layout(attachment.image)
             });
     }
 
@@ -380,6 +381,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
         desc.depth_attachment->usage = attachment.usage;
         desc.depth_attachment->layer = attachment.layer;
         desc.depth_attachment->mip_level = attachment.mip_level;
+        desc.depth_attachment->current_layout = image_manager.get_image_layout(attachment.image);
     }
 
     auto it = render_pass_cache.find(desc);
@@ -429,7 +431,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = vk::to_initial_layout(attachment.load_op, VK_IMAGE_LAYOUT_UNDEFINED),//vk::to_attachment_layout(attachment.usage),
+            .initialLayout = vk::to_initial_layout(attachment.load_op, attachment.current_layout),//vk::to_attachment_layout(attachment.usage),
             .finalLayout   = vk::to_final_layout(attachment.usage, attachment.is_swapchain)//vk::to_attachment_layout(attachment.usage)
         });
 
@@ -451,7 +453,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = vk::to_initial_layout(attachment.load_op, VK_IMAGE_LAYOUT_UNDEFINED), // vk::to_attachment_layout(attachment.usage), // vk::to_attachment_layout(attachment.usage),
+            .initialLayout = vk::to_initial_layout(attachment.load_op, attachment.current_layout), // vk::to_attachment_layout(attachment.usage), // vk::to_attachment_layout(attachment.usage),
             .finalLayout   = vk::to_final_layout(attachment.usage, false), // vk::to_attachment_layout(attachment.usage) // vk::to_attachment_layout(attachment.usage),
         });
 
@@ -502,7 +504,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     VkRenderPass rp;
     VK_CHECK(vkCreateRenderPass(instance.get_device(), &rpci, nullptr, &rp));
     
-    LogRBRenderPass.Log<DisplayFn>("Render pass %p created", rp);
+    LogRBRenderPass.Log<DisplayFn>("Render pass %p created (%s)", rp, fb.pass.to_string().c_str());
     for (int i = 0; auto& attachment : attachments)
     {
         LogRBRenderPass.Log<DisplayFn>(" * attachment %i. rp=%p, format=%s, initialLayout=%s, finalLayout=%s, loadOp=%s, storeOp=%s", 

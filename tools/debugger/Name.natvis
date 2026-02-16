@@ -7,4 +7,11 @@
     </DisplayString>
   </Type>
 
+
+  <Type Name="MeshHandle">
+    <DisplayString>
+      {MeshHandleDebugResolve(id)}
+    </DisplayString>
+  </Type>
+
 </AutoVisualizer>

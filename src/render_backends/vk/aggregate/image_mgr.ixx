@@ -63,6 +63,8 @@ namespace vk
             RBImageLayout after,
             bool log = false) const;
         
+        VkImageLayout get_image_layout(RBImageHandle image);
+        
         void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& out_format, Extent extent);
         
         void generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image, uint32_t width, uint32_t height, uint32_t mip_levels);

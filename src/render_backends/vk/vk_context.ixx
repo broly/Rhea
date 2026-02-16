@@ -126,6 +126,11 @@ namespace vk
             return cubemap_view;
         }
         
+        void set_layout(VkImageLayout in_layout) const
+        {
+            layout = in_layout;
+        }
+        
         void mark_destroyed()
         {
             destroyed = true;
@@ -137,5 +142,6 @@ namespace vk
         uint32_t mip_levels = 1; 
         uint32_t num_layers = 1;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
+        mutable VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
 }
