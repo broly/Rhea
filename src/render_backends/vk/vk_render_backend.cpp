@@ -25,6 +25,11 @@ void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, s
     resource_manager.update_uniform_buffer(buffer_handle, size, data, frame);
 }
 
+void VkRenderBackend::destroy_render_pass_cache()
+{
+    render_pass_cache.clear();
+}
+
 
 Extent VkRenderBackend::get_swapchain_extent() const
 {
@@ -683,7 +688,7 @@ void VkRenderBackend::init(RBWindowHandle in_window)
 
     create_descriptor_pool();
 
-    swapchain.init();
+    swapchain.create();
     immediate_command_pool.init();
     
     create_depth_resources();
@@ -805,10 +810,10 @@ bool VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 }
 
 
-void VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
+bool VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
                                   RBCommandList cmd_list)
 {
-    swapchain.submit_frame(frame_handle, cmd_list);
+    return swapchain.submit_frame(frame_handle, cmd_list);
 }
 
 

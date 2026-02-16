@@ -381,6 +381,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
 void RenderGraph::rebuild_resources()
 {
+    backend->destroy_render_pass_cache();
     auto extent = backend->get_swapchain_extent();
 
     for (auto& tex : textures)

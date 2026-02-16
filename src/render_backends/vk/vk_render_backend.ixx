@@ -99,10 +99,11 @@ public:   /// API Section
     virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) override;
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
     virtual bool acquire_next_image(RBFrameHandle frame_handle) override;
-    virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
+    virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
     virtual PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc) override;
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) override;
+    void destroy_render_pass_cache() override;
     virtual Extent get_swapchain_extent() const override;
     virtual void transition_image(
         RBCommandList cmd,

@@ -35,13 +35,14 @@ namespace vk
         {
         }
 
-        void init();
+        void create();
+        void init(VkSwapchainKHR old_swapchain);
         void recreate_swapchain();
         Extent get_extent() const;
 
         RBImageHandle get_image(RBFrameHandle frame_handle) const;
         bool acquire_next_image(RBFrameHandle frame_handle);
-        void submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list);
+        bool submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list);
         void advance_frame();
         void cleanup();
         void create_sync_objects();
@@ -76,6 +77,6 @@ namespace vk
         uint32_t current_frame = 0;
         
         bool framebuffer_resized = false;
-        
+        std::vector<VkFence> images_in_flight;
     };
 }

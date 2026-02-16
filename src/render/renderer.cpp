@@ -70,8 +70,6 @@ void Renderer::execute_graph(
 
     backend.wait_for_frame(frame);
 
-    backend.reset_frame_fence(frame);
-
     if (!backend.acquire_next_image(frame))
     {
         rg->rebuild_resources();
@@ -79,12 +77,21 @@ void Renderer::execute_graph(
     }
 
     RBCommandList cmd = backend.begin_commands(frame);
+
+    backend.reset_frame_fence(frame);
+
     rg->execute(cmd, frame, params, callback);
+
     backend.end_commands(cmd);
 
-    backend.submit_frame(frame, cmd);
+    if (!backend.submit_frame(frame, cmd))
+    {
+        rg->rebuild_resources();
+        return;
+    }
 
     backend.advance_frame();
+
 }
 
 std::shared_ptr<RenderGraph> Renderer::create_render_graph(Name render_graph_name,

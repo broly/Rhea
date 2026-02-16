@@ -235,7 +235,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { noise_texture, RBImageUsage::SampledFragment }
         },
         .writes = {
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {

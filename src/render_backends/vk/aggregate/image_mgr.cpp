@@ -12,10 +12,10 @@ import :log;
 
 
 RBImageHandle vk::ImageManager::register_swapchain_image(
-    VkExtent2D vk_extent, 
-    const VkSurfaceFormatKHR& surface_format,
-    VkImage image,
-    uint32_t array_index)
+            VkExtent2D vk_extent, 
+            const VkSurfaceFormatKHR& surface_format,
+            VkImage image,
+            std::optional<RBImageHandle> old_image_handle)
 {
     VkImageView view;
 
@@ -36,8 +36,22 @@ RBImageHandle vk::ImageManager::register_swapchain_image(
         &ivci,
         nullptr,
         &view));
+    
+    uint32_t id = 0;
+    
+    if (!old_image_handle.has_value())
+    {
+        id = static_cast<uint32_t>(image_resources.size());
+        vk::ImageResource res{};
+        image_resources.push_back(res);
+    }
+    else
+    {
+        id = old_image_handle.value().id;
+    }
+    
+    auto& res = image_resources[id];
 
-    vk::ImageResource res{};
     res.image  = image; 
     res.set_img_view(view);
     res.format = surface_format.format;
@@ -46,12 +60,19 @@ RBImageHandle vk::ImageManager::register_swapchain_image(
     
     res.is_swapchain_image = true;
     
-
-    uint32_t id = static_cast<uint32_t>(image_resources.size());
-    image_resources.push_back(res);
     
     return {id};
         
+}
+
+void vk::ImageManager::unregister_swapchain_image(RBImageHandle image_handle)
+{
+    auto& res = image_resources[image_handle.id];
+    
+    auto view = res.get_img_view();
+    vkDestroyImageView(instance.device, view, nullptr);
+    
+    res.mark_destroyed();
 }
 
 RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handle, uint32_t layer_index, uint32_t mip_level, bool is_cubemap)

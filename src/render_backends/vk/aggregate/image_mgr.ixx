@@ -27,7 +27,9 @@ namespace vk
             VkExtent2D vk_extent, 
             const VkSurfaceFormatKHR& surface_format,
             VkImage image,
-            uint32_t array_index = 0);
+            std::optional<RBImageHandle> old_image_handle = std::nullopt);
+        
+        void unregister_swapchain_image(RBImageHandle image_handle);
         
         RBImageView fetch_image_view_generic(RBImageHandle image_handle, uint32_t layer_index = 0, uint32_t mip_level = 0, bool is_cubemap = false);
         

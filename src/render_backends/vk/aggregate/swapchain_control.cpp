@@ -11,35 +11,51 @@ import render;
 #include "profiling/profile.h"
 #include "render_backends/vk/vk_macro.h"
 
-void vk::SwapchainControl::init()
+void vk::SwapchainControl::create()
 {
+    init(VK_NULL_HANDLE);
     
-    vk::SwapchainSupport support = vk::query_swapchain_support(
-        instance.physical_device, instance.surface);
+    create_sync_objects();
 
-    // --- Surface format ---
-    surface_format = vk::choose_surface_format(support.formats);
+    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+}
 
-    VkPresentModeKHR present_mode = vk::choose_present_mode(support.present_modes);
+void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
+{
+    vk::SwapchainSupport support =
+        vk::query_swapchain_support(
+            instance.physical_device,
+            instance.surface);
 
-    vk_extent = vk::choose_extent(support.caps, instance.window);
-    
-    const Extent extent = {vk_extent.width, vk_extent.height};
-    
+    surface_format =
+        vk::choose_surface_format(support.formats);
+
+    VkPresentModeKHR present_mode =
+        vk::choose_present_mode(support.present_modes);
+
+    vk_extent =
+        vk::choose_extent(support.caps, instance.window);
+
+    const Extent extent = {
+        vk_extent.width,
+        vk_extent.height
+    };
+
     image_manager.set_default_extent(extent);
 
-    // --- Image count ---
-    uint32_t image_count = support.caps.minImageCount + 1;
+    uint32_t image_count =
+        support.caps.minImageCount + 1;
+
     if (support.caps.maxImageCount > 0 &&
         image_count > support.caps.maxImageCount)
     {
         image_count = support.caps.maxImageCount;
     }
 
-    // --- Swapchain create info ---
     VkSwapchainCreateInfoKHR sci{
         VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR
     };
+
     sci.surface = instance.surface;
     sci.minImageCount = image_count;
     sci.imageFormat = surface_format.format;
@@ -47,9 +63,13 @@ void vk::SwapchainControl::init()
     sci.imageExtent = vk_extent;
     sci.imageArrayLayers = 1;
     sci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    sci.preTransform = support.caps.currentTransform;
+    sci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    sci.presentMode = present_mode;
+    sci.clipped = VK_TRUE;
+    sci.oldSwapchain = old_swapchain;
 
-    if (instance.queues.graphics !=
-        instance.queues.present)
+    if (instance.queues.graphics != instance.queues.present)
     {
         sci.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         sci.queueFamilyIndexCount = 2;
@@ -60,45 +80,43 @@ void vk::SwapchainControl::init()
         sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
-    sci.preTransform   = support.caps.currentTransform;
-    sci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    sci.presentMode    = present_mode;
-    sci.clipped        = VK_TRUE;
-    sci.oldSwapchain   = VK_NULL_HANDLE;
+    VK_CHECK(vkCreateSwapchainKHR(
+        instance.device, &sci, nullptr, &swapchain));
 
-    VK_CHECK(
-        vkCreateSwapchainKHR(instance.device, &sci, nullptr, &swapchain)
-    );
-
-    // --- Get swapchain images ---
-    uint32_t sc_image_count = 0;
-    vkGetSwapchainImagesKHR(instance.device, swapchain, 
-        &sc_image_count, nullptr);
-
-    std::vector<VkImage> swapchain_images(sc_image_count);
-    vkGetSwapchainImagesKHR(instance.device, swapchain, 
-        &sc_image_count, swapchain_images.data());
-    
-    LogVkSwapchain.Log("Swapchain images: ");
-    int image_index = 0;
-    for (auto img : swapchain_images)
+    if (old_swapchain != VK_NULL_HANDLE)
     {
-        LogVkSwapchain.Log(" * image %p", img);
-        debug.register_vk_image_name(img, std::string("swapchain_image_") + std::to_string(image_index));
-        image_index++;
-    }
-    
-    swapchain_image_handles.clear();
-    swapchain_image_handles.resize(sc_image_count);
-    
-
-    for (uint32_t i = 0; i < sc_image_count; ++i)
-    {
-        auto handle = image_manager.register_swapchain_image(vk_extent, surface_format, swapchain_images[i]);
-        swapchain_image_handles[i] = handle;
+        vkDestroySwapchainKHR(
+            instance.device,
+            old_swapchain,
+            nullptr);
     }
 
-    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+    // --- Images ---
+    uint32_t count = 0;
+    vkGetSwapchainImagesKHR(instance.device, swapchain, &count, nullptr);
+
+    std::vector<VkImage> images(count);
+    vkGetSwapchainImagesKHR(instance.device, swapchain, &count, images.data());
+
+    bool has_swapchain_images = swapchain_image_handles.size() > 0;
+    if (!has_swapchain_images)
+    {
+        swapchain_image_handles.resize(count);
+    }
+    
+    
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        auto old_image_handle = swapchain_image_handles[i];
+        swapchain_image_handles[i] =
+            image_manager.register_swapchain_image(
+                vk_extent,
+                surface_format,
+                images[i],
+                has_swapchain_images ? std::optional{old_image_handle} : std::nullopt);
+    }
+    
+    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 }
 
 void vk::SwapchainControl::recreate_swapchain()
@@ -110,17 +128,23 @@ void vk::SwapchainControl::recreate_swapchain()
 
     while (width == 0 || height == 0)
     {
-        glfwGetFramebufferSize(instance.window, &width, &height);
+        glfwGetFramebufferSize(
+            instance.window,
+            &width,
+            &height);
         glfwWaitEvents();
     }
 
     vkDeviceWaitIdle(instance.device);
 
-    cleanup();
+    VkSwapchainKHR old_swapchain = swapchain;
+    
+    // for (auto image : swapchain_image_handles)
+    // {
+    //     image_manager.unregister_swapchain_image(image);
+    // }
 
-    init();
-
-    create_sync_objects();
+    init(old_swapchain);
 
     current_swapchain_index = 0;
 }
@@ -137,70 +161,86 @@ RBImageHandle vk::SwapchainControl::get_image(RBFrameHandle frame_handle) const
     return swapchain_image_handles[current_swapchain_index];
 }
 
-
-bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
+bool vk::SwapchainControl::acquire_next_image(uint32_t frame)
 {
-    auto& frame = frames[frame_handle];
+    auto& f = frames[frame];
+    
+    if (images_in_flight[current_swapchain_index] != VK_NULL_HANDLE)
+    {
+        vkWaitForFences(
+            instance.device,
+            1,
+            &images_in_flight[current_swapchain_index],
+            VK_TRUE,
+            UINT64_MAX);
+    }
+
+    images_in_flight[current_swapchain_index] =
+        frames[frame].in_flight;
+
 
     VkResult res = vkAcquireNextImageKHR(
         instance.device,
         swapchain,
         UINT64_MAX,
-        frame.image_available,
+        f.image_available,
         VK_NULL_HANDLE,
-        &current_swapchain_index
-    );
+        &current_swapchain_index);
 
-    if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
+    if (res == VK_ERROR_OUT_OF_DATE_KHR || 
+        res == VK_SUBOPTIMAL_KHR)
     {
         recreate_swapchain();
         return false;
     }
 
     VK_CHECK(res);
-
     return true;
 }
 
-
-
-void vk::SwapchainControl::submit_frame(
-    RBFrameHandle frame_handle,
+bool vk::SwapchainControl::submit_frame(
+    RBFrameHandle frame,
     const RBCommandList& cmd_list)
 {
-    auto& frame = frames[frame_handle];
+    if (swapchain == VK_NULL_HANDLE)
+        return false;
 
-    VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
+    auto& f = frames[frame];
+
+    VkCommandBuffer cmd =
+        cmd_list.as<VkCommandBuffer>();
 
     VkPipelineStageFlags wait_stage =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
+    vkResetFences(instance.device, 1, &f.in_flight);
+
     VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit.waitSemaphoreCount = 1;
-    submit.pWaitSemaphores = &frame.image_available;
+    submit.pWaitSemaphores = &f.image_available;
     submit.pWaitDstStageMask = &wait_stage;
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &frame.render_finished;
+    submit.pSignalSemaphores = &f.render_finished;
 
     VK_CHECK(vkQueueSubmit(
         instance.graphics_queue,
         1,
         &submit,
-        frame.in_flight
-    ));
+        f.in_flight));
 
-    VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+    VkPresentInfoKHR present{
+        VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &frame.render_finished;
+    present.pWaitSemaphores = &f.render_finished;
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain;
     present.pImageIndices = &current_swapchain_index;
 
-    VkResult res = vkQueuePresentKHR(
-        instance.present_queue,
-        &present);
+    VkResult res =
+        vkQueuePresentKHR(instance.present_queue, &present);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR ||
         res == VK_SUBOPTIMAL_KHR ||
@@ -208,12 +248,14 @@ void vk::SwapchainControl::submit_frame(
     {
         framebuffer_resized = false;
         recreate_swapchain();
+        return false;
     }
-    else
-    {
-        VK_CHECK(res);
-    }
+    
+    VK_CHECK(res);
+    
+    return true;
 }
+
 
 
 void vk::SwapchainControl::advance_frame()
@@ -278,19 +320,16 @@ void vk::SwapchainControl::create_sync_objects()
     }
 }
 
-
-void vk::SwapchainControl::wait_for_frame(RBFrameHandle frame_handle)
+void vk::SwapchainControl::wait_for_frame(uint32_t frame)
 {
-    auto& f = frames[frame_handle];
-
     vkWaitForFences(
         instance.device,
         1,
-        &f.in_flight,
+        &frames[frame].in_flight,
         VK_TRUE,
-        UINT64_MAX
-    );
+        UINT64_MAX);
 }
+
 
 void vk::SwapchainControl::reset_frame_fence(uint32_t frame)
 {

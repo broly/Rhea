@@ -63,14 +63,17 @@ namespace vk
         VkImageView cubemap_view = VK_NULL_HANDLE;
         
         std::vector<VkImageView> views = {};
+        bool destroyed = false;
         
         uint32_t get_array_index(uint32_t layer_index = 0, uint32_t mip_index = 0) const
         {
+            checkf(!destroyed, "Image has been destroyed");
             return mip_index * mip_levels + layer_index;
         }
         
         void set_img_view(VkImageView view, uint32_t layer_index = 0, uint32_t mip_index = 0)
         {
+            checkf(!destroyed, "Image has been destroyed");
             const uint32_t array_index = get_array_index(layer_index, mip_index);
             checkf(layer_index < num_layers, "Image view layer out of bounds");
             checkf(mip_index < mip_levels, "Image view mip index out of bounds");
@@ -83,27 +86,32 @@ namespace vk
         bool is_swapchain_image = false;
         void set_cubemap_img_view(VkImageView view)
         {
+            checkf(!destroyed, "Image has been destroyed");
             cubemap_view = view;
         }
         
         bool has_cubemap() const
         {
+            checkf(!destroyed, "Image has been destroyed");
             return cubemap_view != VK_NULL_HANDLE;
         }
         
         bool has_view(uint32_t layer_index, uint32_t mip_index = 0) const
         {
+            checkf(!destroyed, "Image has been destroyed");
             const uint32_t array_index = get_array_index(layer_index, mip_index);
             return array_index < views.size() && views[array_index] != VK_NULL_HANDLE;
         }
         
         bool is_valid_view(uint32_t layer_index, uint32_t mip_index = 0) const
         {
+            checkf(!destroyed, "Image has been destroyed");
             return layer_index < num_layers && mip_index < mip_levels;
         }
         
         VkImageView get_img_view(uint32_t layer_index = 0, uint32_t mip_index = 0) const
         {
+            checkf(!destroyed, "Image has been destroyed");
             const uint32_t array_index = get_array_index(layer_index, mip_index);
             checkf(layer_index < num_layers, "Image view layer out of bounds");
             checkf(mip_index < mip_levels, "Image view mip level out of bounds");
@@ -114,7 +122,13 @@ namespace vk
         
         VkImageView get_cubemap_view() const
         {
+            checkf(!destroyed, "Image has been destroyed");
             return cubemap_view;
+        }
+        
+        void mark_destroyed()
+        {
+            destroyed = true;
         }
 
         Extent extent = {};

@@ -68,12 +68,13 @@ public:
     
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) = 0;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) = 0;
-    
     template<typename T>
     void update_uniform_buffer(RBBufferHandle buffer_handle, const T& data, RBFrameHandle frame)
     {
         update_uniform_buffer_impl(buffer_handle, sizeof(T), (void*)&data, frame);
     }
+    
+    virtual void destroy_render_pass_cache() = 0;
 
     virtual Extent get_swapchain_extent() const = 0;
 
@@ -104,7 +105,7 @@ public:
     virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) = 0;
 
     virtual bool acquire_next_image(RBFrameHandle frame_handle) = 0;
-    virtual void submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
+    virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
     
     virtual PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc) = 0;
 
