@@ -133,77 +133,77 @@ void CubemapCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
     GenericRenderGraph::build_passes(parameters);
     
     
-   add_pass({
-       .name = "IBL_Irradiance",
-       .reads = { { hdr_color, RBImageUsage::SampledFragment } },
-       .writes = { { irradiance, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
-       .execute = [this](RenderGraphContext& ctx) {
-           ctx.backend.bind_pipeline(ctx.cmd, irradiance_pipeline);
-           
-   
-           auto mat_inst = renderer->query_material_instance(irradiance_material, ctx.pass_name);
-           auto* inst = mat_inst->get_or_create_resource_instance(irradiance_pipeline, ctx.frame);
-   
-           // inst->update_image(irradiance_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, 0, true);
-           inst->bind(irradiance_pipeline, ctx.cmd, ctx.frame);
-   
-           const uint32_t pc = ctx.level;
-           ctx.backend.push_constants(ctx.cmd, pc, irradiance_pipeline);
-           ctx.backend.update_viewport(ctx.cmd, Constants::ibl_extent);
-           ctx.backend.draw_fullscreen(ctx.cmd);
-       },
-       .num_layers = 6,
-   });
-   
-   add_pass({
-       .name = "IBL_Prefilter",
-       .reads = { { hdr_color, RBImageUsage::SampledFragment } },
-       .writes = { { prefiltered_env, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
-       .execute = [this](RenderGraphContext& ctx) {
-           ctx.backend.bind_pipeline(ctx.cmd, prefilter_pipeline);
-           
-           auto mat_inst = renderer->query_material_instance(prefilter_material, ctx.pass_name);
-           auto* inst = mat_inst->get_or_create_resource_instance(prefilter_pipeline, ctx.frame);
-   
-           inst->bind(prefilter_pipeline, ctx.cmd, ctx.frame);
-   
-           LevelAndMip pc;
-           pc.level = ctx.level;
-           pc.roghness = (float)ctx.mip / (float)(CUBEMAP_PREFILTER_FACE_NUM_MIPS - 1);
-           ctx.backend.push_constants(ctx.cmd, pc, prefilter_pipeline);
-           ctx.backend.update_viewport(ctx.cmd, Constants::ibl_prefilter_extent >> ctx.mip);
-           ctx.backend.draw_fullscreen(ctx.cmd);
-       },
-       .num_layers = 6,
-       .num_mip_maps = CUBEMAP_PREFILTER_FACE_NUM_MIPS
-   });
-
-   // Pass: compute BRDF LUT
-   add_pass({
-       .name = "IBL_BRDF_LUT",
-       .writes = { { brdf_lut, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
-       .execute = [this](RenderGraphContext& ctx) {
-           ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);
-   
-           auto mat_inst = renderer->query_material_instance(brdf_lut_material, ctx.pass_name);
-           auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
-   
-           inst->bind(brdf_lut_pipeline, ctx.cmd, ctx.frame);
-           ctx.backend.update_viewport(ctx.cmd, Constants::ibl_extent);
-           ctx.backend.draw_fullscreen(ctx.cmd);
-       }
-   });
-   add_pass({
-       .name = "readback",
-       .condition = [this] () { return !is_debugging(); },
-       .reads = {
-           { hdr_color,  RBImageUsage::TransferSrc }
-       },
-       .execute = [this] (RenderGraphContext& ctx)
-       {
-           
-       },
-   });
+   // add_pass({
+   //     .name = "IBL_Irradiance",
+   //     .reads = { { hdr_color, RBImageUsage::SampledFragment } },
+   //     .writes = { { irradiance, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
+   //     .execute = [this](RenderGraphContext& ctx) {
+   //         ctx.backend.bind_pipeline(ctx.cmd, irradiance_pipeline);
+   //         
+   //
+   //         auto mat_inst = renderer->query_material_instance(irradiance_material, ctx.pass_name);
+   //         auto* inst = mat_inst->get_or_create_resource_instance(irradiance_pipeline, ctx.frame);
+   //
+   //         // inst->update_image(irradiance_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+   //         inst->bind(irradiance_pipeline, ctx.cmd, ctx.frame);
+   //
+   //         const uint32_t pc = ctx.level;
+   //         ctx.backend.push_constants(ctx.cmd, pc, irradiance_pipeline);
+   //         ctx.backend.update_viewport(ctx.cmd, Constants::ibl_extent);
+   //         ctx.backend.draw_fullscreen(ctx.cmd);
+   //     },
+   //     .num_layers = 6,
+   // });
+   //
+   // add_pass({
+   //     .name = "IBL_Prefilter",
+   //     .reads = { { hdr_color, RBImageUsage::SampledFragment } },
+   //     .writes = { { prefiltered_env, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
+   //     .execute = [this](RenderGraphContext& ctx) {
+   //         ctx.backend.bind_pipeline(ctx.cmd, prefilter_pipeline);
+   //         
+   //         auto mat_inst = renderer->query_material_instance(prefilter_material, ctx.pass_name);
+   //         auto* inst = mat_inst->get_or_create_resource_instance(prefilter_pipeline, ctx.frame);
+   //
+   //         inst->bind(prefilter_pipeline, ctx.cmd, ctx.frame);
+   //
+   //         LevelAndMip pc;
+   //         pc.level = ctx.level;
+   //         pc.roghness = (float)ctx.mip / (float)(CUBEMAP_PREFILTER_FACE_NUM_MIPS - 1);
+   //         ctx.backend.push_constants(ctx.cmd, pc, prefilter_pipeline);
+   //         ctx.backend.update_viewport(ctx.cmd, Constants::ibl_prefilter_extent >> ctx.mip);
+   //         ctx.backend.draw_fullscreen(ctx.cmd);
+   //     },
+   //     .num_layers = 6,
+   //     .num_mip_maps = CUBEMAP_PREFILTER_FACE_NUM_MIPS
+   // });
+   //
+   // // Pass: compute BRDF LUT
+   // add_pass({
+   //     .name = "IBL_BRDF_LUT",
+   //     .writes = { { brdf_lut, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
+   //     .execute = [this](RenderGraphContext& ctx) {
+   //         ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);
+   //
+   //         auto mat_inst = renderer->query_material_instance(brdf_lut_material, ctx.pass_name);
+   //         auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
+   //
+   //         inst->bind(brdf_lut_pipeline, ctx.cmd, ctx.frame);
+   //         ctx.backend.update_viewport(ctx.cmd, Constants::ibl_extent);
+   //         ctx.backend.draw_fullscreen(ctx.cmd);
+   //     }
+   // });
+   // add_pass({
+   //     .name = "readback",
+   //     .condition = [this] () { return !is_debugging(); },
+   //     .reads = {
+   //         { hdr_color,  RBImageUsage::TransferSrc }
+   //     },
+   //     .execute = [this] (RenderGraphContext& ctx)
+   //     {
+   //         
+   //     },
+   // });
 }
 
 CameraUBO CubemapCaptureRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero_pos, uint32_t face_index) const

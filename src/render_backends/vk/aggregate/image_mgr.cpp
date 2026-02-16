@@ -11,7 +11,7 @@ import :helpers;
 import :log;
 
 
-RBImageHandle vk::ImageManager::create_image_view(
+RBImageHandle vk::ImageManager::register_swapchain_image(
     VkExtent2D vk_extent, 
     const VkSurfaceFormatKHR& surface_format,
     VkImage image,
@@ -43,6 +43,8 @@ RBImageHandle vk::ImageManager::create_image_view(
     res.format = surface_format.format;
     res.extent.width  = vk_extent.width;
     res.extent.height = vk_extent.height;
+    
+    res.is_swapchain_image = true;
     
 
     uint32_t id = static_cast<uint32_t>(image_resources.size());
@@ -243,6 +245,11 @@ void vk::ImageManager::destroy_image(RBImageHandle handle, bool wait_fences)
 void vk::ImageManager::set_default_extent(Extent extent)
 {
     default_extent = extent;
+}
+
+bool vk::ImageManager::is_swapchain_image(RBImageHandle image)
+{
+    return get_image_resource(image).is_swapchain_image;
 }
 
 
@@ -591,18 +598,43 @@ RBImageHandle vk::ImageManager::create_cubemap(
     return image;
 }
 
-void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after) const
+void vk::ImageManager::transition_image(
+RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after, bool log ) const
 {
     auto vk_img = get_image_resource(image).image;
-    LogVkImageManager.Log<VeryVerbose>("Transition for image '%s' (%p): %s -> %s",
-        debug.get_vk_image_name(vk_img).to_string().c_str(),
-        vk_img, 
-        reflect::enum_name(before).to_string().c_str(),
-        reflect::enum_name(after).to_string().c_str());
-    
+    if (log)
+    {
+        LogVkImageManager.Log<VeryVerbose>("Transition for image '%s' (%p): %s -> %s",
+            debug.get_vk_image_name(vk_img).to_string().c_str(),
+            vk_img, 
+            reflect::enum_name(before).to_string().c_str(),
+            reflect::enum_name(after).to_string().c_str());
+    }
     
     auto src = vk::to_vk_state(before);
     auto dst = vk::to_vk_state(after);
+    
+    if (log)
+    {
+        LogVkImageManager.Log<VeryVerbose>("Transition for image '%s' (%p): %s -> %s",
+            debug.get_vk_image_name(vk_img).to_string().c_str(),
+            vk_img, 
+            enum_to_string(src.layout).data(),
+            enum_to_string(dst.layout).data());
+        LogVkImageManager.Log<VeryVerbose>("Transition access src flags: %s",
+            access_flags_to_string(src.access).c_str());
+        LogVkImageManager.Log<VeryVerbose>("Transition access dst flags: %s",
+            access_flags_to_string(dst.access).c_str());
+        LogVkImageManager.Log<VeryVerbose>("Transition stage src flags: %s",
+            pipeline_stage_flags_to_string(src.stage).c_str());
+        LogVkImageManager.Log<VeryVerbose>("Transition stage dst flags: %s",
+            pipeline_stage_flags_to_string(dst.stage).c_str());
+    }
+    if (get_image_resource(image).is_swapchain_image)
+    {
+        checkf(before != RBImageLayout::undefined, "Swapchain image could not be in undefined layout");
+    }
+    
 
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     barrier.oldLayout = src.layout;

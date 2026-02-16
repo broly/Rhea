@@ -63,6 +63,7 @@ void Renderer::execute_graph(
 {
     PROFILE("execute_graph");
     
+    
     auto& backend = *render_backend;
     
     RBFrameHandle frame = backend.get_current_frame();

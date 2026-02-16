@@ -27,8 +27,6 @@ void vk::SwapchainControl::init()
     const Extent extent = {vk_extent.width, vk_extent.height};
     
     image_manager.set_default_extent(extent);
-    
-    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 
     // --- Image count ---
     uint32_t image_count = support.caps.minImageCount + 1;
@@ -96,11 +94,11 @@ void vk::SwapchainControl::init()
 
     for (uint32_t i = 0; i < sc_image_count; ++i)
     {
-        auto handle = image_manager.create_image_view(vk_extent, surface_format, swapchain_images[i]);
+        auto handle = image_manager.register_swapchain_image(vk_extent, surface_format, swapchain_images[i]);
         swapchain_image_handles[i] = handle;
     }
 
-    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 }
 
 void vk::SwapchainControl::recreate_swapchain()
@@ -122,12 +120,6 @@ void vk::SwapchainControl::recreate_swapchain()
 
     init();
 
-    for (auto sem : render_finished_per_image)
-    {
-        vkDestroySemaphore(instance.device, sem, nullptr);
-    }
-    render_finished_per_image.clear();
-
     create_sync_objects();
 
     current_swapchain_index = 0;
@@ -140,7 +132,7 @@ Extent vk::SwapchainControl::get_extent() const
     return Extent{vk_extent.width, vk_extent.height};
 }
 
-RBImageHandle vk::SwapchainControl::get_image() const
+RBImageHandle vk::SwapchainControl::get_image(RBFrameHandle frame_handle) const
 {
     return swapchain_image_handles[current_swapchain_index];
 }
@@ -148,21 +140,16 @@ RBImageHandle vk::SwapchainControl::get_image() const
 
 bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 {
-    PROFILE(__FUNCTION__);
     auto& frame = frames[frame_handle];
-    
-    VkResult res;
-    {
-        PROFILE("vkAcquireNextImageKHR");
-        res = vkAcquireNextImageKHR(
-            instance.device,
-            swapchain,
-            UINT64_MAX,
-            frame.image_available,
-            VK_NULL_HANDLE,
-            &current_swapchain_index
-        );
-    }
+
+    VkResult res = vkAcquireNextImageKHR(
+        instance.device,
+        swapchain,
+        UINT64_MAX,
+        frame.image_available,
+        VK_NULL_HANDLE,
+        &current_swapchain_index
+    );
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
     {
@@ -172,39 +159,21 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame_handle)
 
     VK_CHECK(res);
 
-
-    if (images_in_flight[current_swapchain_index] != VK_NULL_HANDLE)
-    {
-        PROFILE("vkWaitForFences");
-        vkWaitForFences(
-            instance.device,
-            1,
-            &images_in_flight[current_swapchain_index],
-            VK_TRUE,
-            UINT64_MAX
-        );
-    }
-
-    images_in_flight[current_swapchain_index] =
-        frames[frame_handle].in_flight;
-
     return true;
 }
 
 
-void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list)
+
+void vk::SwapchainControl::submit_frame(
+    RBFrameHandle frame_handle,
+    const RBCommandList& cmd_list)
 {
-    PROFILE(__FUNCTION__);
-    LogVkSwapchain.Log<VeryVerbose>("submit_frame");
     auto& frame = frames[frame_handle];
 
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
 
     VkPipelineStageFlags wait_stage =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-    VkSemaphore render_finished =
-    render_finished_per_image[current_swapchain_index];
 
     VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit.waitSemaphoreCount = 1;
@@ -213,38 +182,39 @@ void vk::SwapchainControl::submit_frame(RBFrameHandle frame_handle, const RBComm
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &render_finished;
+    submit.pSignalSemaphores = &frame.render_finished;
 
     VK_CHECK(vkQueueSubmit(
         instance.graphics_queue,
         1,
-        &submit, 
+        &submit,
         frame.in_flight
     ));
 
-    
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &render_finished;
+    present.pWaitSemaphores = &frame.render_finished;
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain;
     present.pImageIndices = &current_swapchain_index;
 
-    auto res = vkQueuePresentKHR(
-        instance.present_queue, &present);
+    VkResult res = vkQueuePresentKHR(
+        instance.present_queue,
+        &present);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR ||
         res == VK_SUBOPTIMAL_KHR ||
         framebuffer_resized)
     {
         framebuffer_resized = false;
-        // backend.recreate_swapchain();
+        recreate_swapchain();
     }
     else
     {
         VK_CHECK(res);
     }
 }
+
 
 void vk::SwapchainControl::advance_frame()
 {
@@ -281,8 +251,8 @@ void vk::SwapchainControl::cleanup()
         vkDestroySwapchainKHR(instance.device, swapchain, nullptr);
         swapchain = VK_NULL_HANDLE;
     }
-    images_in_flight.clear();
-    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+    // images_in_flight.clear();
+    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 }
 
 void vk::SwapchainControl::create_sync_objects()
@@ -292,35 +262,25 @@ void vk::SwapchainControl::create_sync_objects()
     VkFenceCreateInfo fence_ci{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    // --- frame sync ---
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
         VK_CHECK(vkCreateSemaphore(
             instance.device, &sem_ci, nullptr,
             &frames[i].image_available));
 
+        VK_CHECK(vkCreateSemaphore(
+            instance.device, &sem_ci, nullptr,
+            &frames[i].render_finished));
+
         VK_CHECK(vkCreateFence(
             instance.device, &fence_ci, nullptr,
             &frames[i].in_flight));
-    }
-
-    // --- per swapchain image sync ---
-    render_finished_per_image.resize(swapchain_image_handles.size());
-
-    for (size_t i = 0; i < render_finished_per_image.size(); ++i)
-    {
-        VK_CHECK(vkCreateSemaphore(
-            instance.device, &sem_ci, nullptr,
-            &render_finished_per_image[i]));
     }
 }
 
 
 void vk::SwapchainControl::wait_for_frame(RBFrameHandle frame_handle)
 {
-    PROFILE(__FUNCTION__);
-    LogVkSwapchain.Log<VeryVerbose>("wait_for_frame");
-    
     auto& f = frames[frame_handle];
 
     vkWaitForFences(

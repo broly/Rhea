@@ -48,8 +48,8 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     Renderer::init(in_window);
     
-    auto aux_graph1 = reflect::get_object_type_name<CubemapCaptureRenderGraph>();
-    create_render_graph(aux_graph1, {{"capture_ibl", true}}, "ibl");
+    // auto aux_graph1 = reflect::get_object_type_name<CubemapCaptureRenderGraph>();
+    // create_render_graph(aux_graph1, {{"capture_ibl", true}}, "ibl");
 }
 void GameRenderer::capture_ibl(glm::vec3 pos, Name actor_name)
 {

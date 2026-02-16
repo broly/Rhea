@@ -80,6 +80,7 @@ namespace vk
         }
         
         
+        bool is_swapchain_image = false;
         void set_cubemap_img_view(VkImageView view)
         {
             cubemap_view = view;

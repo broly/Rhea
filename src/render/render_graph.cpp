@@ -24,6 +24,9 @@ RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle fram
 
 void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImageLayout next, RBFrameHandle frame)
 {
+    if (is_swapchain())
+        return;
+    
     checkf(next != RBImageLayout::undefined, "wrong state");
     RBImageHandle img_handle = desc.swapchain_image ? backend.get_swapchain_image(frame) : *image;
     
@@ -34,6 +37,8 @@ void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImag
 
 void RGTexture::reset_layout()
 {
+    if (is_swapchain())
+        return (void)(current_layout = RBImageLayout::transfer_present);
     current_layout = RBImageLayout::undefined;
 }
 

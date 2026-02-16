@@ -23,7 +23,7 @@ namespace vk
             , debug(in_debug)
         {}
         
-        RBImageHandle create_image_view(
+        RBImageHandle register_swapchain_image(
             VkExtent2D vk_extent, 
             const VkSurfaceFormatKHR& surface_format,
             VkImage image,
@@ -49,6 +49,8 @@ namespace vk
         
         void set_default_extent(Extent extent);
         
+        bool is_swapchain_image(RBImageHandle image);
+        
         RBImageHandle create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info);
         RBImageHandle create_cubemap(const Cubemap& tex, const TextureCreationInfo& texture_creation_info);
         
@@ -56,7 +58,8 @@ namespace vk
             RBCommandList cmd,
             RBImageHandle image,
             RBImageLayout before,
-            RBImageLayout after) const;
+            RBImageLayout after,
+            bool log = false) const;
         
         void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& out_format, Extent extent);
         

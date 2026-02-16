@@ -55,7 +55,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 { hdr_color, RBImageUsage::SampledFragment },
             },
             .writes = {
-                { swapchain_color, RBImageUsage::ColorAttachment }
+                { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this] (RenderGraphContext& ctx)
             {

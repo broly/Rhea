@@ -99,7 +99,6 @@ float shadow_factor(vec3 world_pos, vec3 Ng)
     float ndotl = max(dot(Ng, -light_ubo.dir_light.direction.xyz), 0.0);
     float bias = mix(0.0005, 0.0025, 1.0 - ndotl);
 
-
     float shadow = texture(
         u_shadow_depth,
         vec3(uv, proj.z - bias)

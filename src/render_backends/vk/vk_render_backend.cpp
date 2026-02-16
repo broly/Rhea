@@ -7,6 +7,7 @@ import <algorithm>;
 import <span>;
 
 #include "vk_macro.h"
+#include "logging/log_macro.h"
 #include "profiling/profile.h"
 
 import render;
@@ -17,7 +18,7 @@ import :pipeline;
 import profile;
 import reflect;
 
-
+DEFINE_LOGGER(LogVkCommands, DisplayFn);
 
 void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
 {
@@ -38,7 +39,7 @@ void VkRenderBackend::transition_image(
         RBImageLayout before,
         RBImageLayout after)
 {
-    image_manager.transition_image(cmd, image, before, after);
+    image_manager.transition_image(cmd, image, before, after, true);
 }
 
 
@@ -341,7 +342,7 @@ size_t hash_framebuffer(
 RBImageHandle VkRenderBackend::get_swapchain_image(std::optional<RBFrameHandle> frame_handle) const
 {
     // frame_handle is unused yet
-    return swapchain.get_image(*frame_handle);
+    return swapchain.get_image(frame_handle.value());
 }
 
 RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& fb)
@@ -358,7 +359,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
                 attachment.store, 
                 attachment.usage,
                 attachment.layer,
-                attachment.mip_level
+                attachment.mip_level,
+                image_manager.is_swapchain_image(attachment.image)
             });
     }
 
@@ -384,7 +386,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     for (auto attachment : fb.color_attachments)
     {
         auto vk_img = image_manager.get_image_resource(attachment.image).image;
-        LogRBRenderPass.Log(" * color_attachment (image: %s [%p]). Usage: %s (initial & final layouts), load_op: %s, store_op: %s, layer: %i",
+        LogRBRenderPass.Log(" * color_attachment (image: %s [%p]). Usage: %s, load_op: %s, store_op: %s, layer: %i",
             debug.get_vk_image_name(vk_img).to_string().c_str(),
             vk_img,
             reflect::enum_name(attachment.usage).to_string().c_str(),
@@ -397,7 +399,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
         auto& attachment = *fb.depth_attachment;
         auto vk_img = image_manager.get_image_resource(attachment.image).image;
         
-        LogRBRenderPass.Log(" * depth_attachment (image: %s [%p}). Usage: %s (initial & final layouts), load_op: %s, store_op: %s, layer: %i",
+        LogRBRenderPass.Log(" * depth_attachment (image: %s [%p}). Usage: %s, load_op: %s, store_op: %s, layer: %i",
             debug.get_vk_image_name(vk_img).to_string().c_str(),
             vk_img,
             reflect::enum_name(attachment.usage).to_string().c_str(),
@@ -422,8 +424,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = vk::to_attachment_layout(attachment.usage),
-            .finalLayout   = vk::to_attachment_layout(attachment.usage)
+            .initialLayout = vk::to_initial_layout(attachment.load_op, VK_IMAGE_LAYOUT_UNDEFINED),//vk::to_attachment_layout(attachment.usage),
+            .finalLayout   = vk::to_final_layout(attachment.usage, attachment.is_swapchain)//vk::to_attachment_layout(attachment.usage)
         });
 
         color_refs.push_back({
@@ -437,9 +439,6 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     {
         auto& attachment = *desc.depth_attachment;
         
-        
-        VkImageLayout layout = vk::to_attachment_layout(attachment.usage);
-        
         attachments.push_back({
             .format = attachment.format,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -447,14 +446,14 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .storeOp = vk::vk_convert_attachment_store(attachment.store_op),
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = vk::to_attachment_layout(attachment.usage), // vk::to_attachment_layout(attachment.usage),
-            .finalLayout   = vk::to_attachment_layout(attachment.usage) // vk::to_attachment_layout(attachment.usage),
+            .initialLayout = vk::to_initial_layout(attachment.load_op, VK_IMAGE_LAYOUT_UNDEFINED), // vk::to_attachment_layout(attachment.usage), // vk::to_attachment_layout(attachment.usage),
+            .finalLayout   = vk::to_final_layout(attachment.usage, false), // vk::to_attachment_layout(attachment.usage) // vk::to_attachment_layout(attachment.usage),
         });
 
 
         depth_ref = {
             .attachment = index,
-            .layout = layout
+            .layout = vk::to_subpass_layout(attachment.usage)
         };
     }
 
@@ -465,15 +464,52 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     if (desc.depth_attachment.has_value())
         subpass.pDepthStencilAttachment = &depth_ref;
     
+    VkSubpassDependency dep{};
+    dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dep.dstSubpass = 0;
+
+    dep.srcStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+
+    dep.dstStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+
+    dep.srcAccessMask = 0;
+
+    dep.dstAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    
     
     VkRenderPassCreateInfo rpci{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     rpci.attachmentCount = uint32_t(attachments.size());
     rpci.pAttachments = attachments.data();
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
+    rpci.dependencyCount = 1;
+    rpci.pDependencies = &dep;
 
     VkRenderPass rp;
     VK_CHECK(vkCreateRenderPass(instance.get_device(), &rpci, nullptr, &rp));
+    
+    LogRBRenderPass.Log<DisplayFn>("Render pass %p created", rp);
+    for (int i = 0; auto& attachment : attachments)
+    {
+        LogRBRenderPass.Log<DisplayFn>(" * attachment %i. rp=%p, format=%s, initialLayout=%s, finalLayout=%s, loadOp=%s, storeOp=%s", 
+            i, rp, 
+            vk::enum_to_string(attachment.format).data(),
+            vk::enum_to_string(attachment.initialLayout).data(),
+            vk::enum_to_string(attachment.finalLayout).data(),
+            vk::enum_to_string(attachment.loadOp).data(),
+            vk::enum_to_string(attachment.storeOp).data()
+        );
+        i++;
+    }
 
     render_pass_cache[desc] = rp;
     return rp;
@@ -658,7 +694,7 @@ void VkRenderBackend::init(RBWindowHandle in_window)
 
 RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
 {
-    LogRB.Log<DisplayFn>("Begin commands");
+    LogVkCommands.Log<VeryVerbose>(" ==================== Begin commands %lu ===================", frame_handle);
     
     auto& frame = swapchain.frames[frame_handle];
 
@@ -674,7 +710,7 @@ RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
 
 void VkRenderBackend::end_commands(RBCommandList cmd_list)
 {
-    LogRB.Log<DisplayFn>("End commands");
+    LogVkCommands.Log<VeryVerbose>("========================= End commands =====================");
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     VK_CHECK(vkEndCommandBuffer(cmd));
 }
@@ -688,14 +724,14 @@ RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc
 
 void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index)
 {
-    LogRB.Log<DisplayFn>("begin_render_pass");
+    LogRBRenderPass.Log<VeryVerbose>("------------ begin_render_pass %llu -----------", framebuffer_index.as<uint64_t>());
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     const auto& fb = framebuffer_manager.get_framebuffer_resource(framebuffer_index);
 
     VkClearValue clears[2]{};
     clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
     // clears[0].depthStencil = {1.0f, 0};
-    clears[1].depthStencil = {0.0f, 0};
+    clears[1].depthStencil = {1.0f, 0};
 
     VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     rpbi.renderPass  = fb.render_pass;
@@ -712,7 +748,7 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
 
 void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 {
-    LogRB.Log("end_render_pass");
+    LogRBRenderPass.Log<VeryVerbose>("------------- end_render_pass -------------");
     
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdEndRenderPass(cmd);

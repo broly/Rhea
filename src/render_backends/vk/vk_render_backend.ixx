@@ -31,6 +31,7 @@ struct RenderPassAttachmentInfo
     RBImageUsage usage;
     uint32_t layer = 0;
     uint32_t mip_level = 0;
+    bool is_swapchain = false;
 };
 
 

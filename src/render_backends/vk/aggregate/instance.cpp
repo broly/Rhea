@@ -4,8 +4,14 @@ import <set>;
 import <vulkan/vulkan_core.h>;
 
 import :helpers;
+
 #include "render_backends/vk/vk_macro.h"
 import <cassert>;
+
+import log;
+#include "logging/log_macro.h"
+
+DEFINE_LOGGER(LogVkInstance, DisplayFn);
 
 constexpr const char* VALIDATION_LAYERS[] = {
     "VK_LAYER_KHRONOS_validation"
@@ -23,6 +29,18 @@ void vk::Instance::init(GLFWwindow* in_window)
     ici.pApplicationInfo = &appInfo;
     ici.enabledLayerCount = 1;
     ici.ppEnabledLayerNames = VALIDATION_LAYERS;
+    
+    VkValidationFeatureEnableEXT enables[] = {
+        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
+    };
+
+    VkValidationFeaturesEXT validationFeatures{};
+    validationFeatures.sType =
+        VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+    validationFeatures.enabledValidationFeatureCount = 1;
+    validationFeatures.pEnabledValidationFeatures = enables;
+
+    ici.pNext = &validationFeatures;
 
     // extensions (by GLFW)
     uint32_t ext_count = 0;
@@ -88,14 +106,37 @@ void vk::Instance::match_queue_families()
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
     
-    for (auto device : devices) {
+    // Choose second 'complete' device (second is target)
+    constexpr uint8_t target_device_index = 1;
+    
+    for (uint8_t index = 0; auto device : devices) {
         auto q = vk::find_queue_families(device, surface);
-        if (q.complete()) {
+        if (q.complete() && target_device_index == index) {
+            VkPhysicalDeviceProperties props;
+            vkGetPhysicalDeviceProperties(device, &props);
+            LogVkInstance.Log("Chosen GPU: %s (%i)",
+                props.deviceName, props.deviceID);
+            
+            
+            VkBool32 presentSupported = VK_FALSE;
+            vkGetPhysicalDeviceSurfaceSupportKHR(
+                device,
+                q.present,
+                surface,
+                &presentSupported
+            );
+
+            LogVkInstance.Log("Present support: %i",
+                presentSupported);
+            
             physical_device = device;
             queues = q;
             break;
         }
+        index++;
     }
+    
+    
     
     assert(physical_device != VK_NULL_HANDLE);
     

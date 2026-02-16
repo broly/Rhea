@@ -195,7 +195,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
         },
         .writes = { 
-            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
+            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
@@ -211,11 +211,11 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = Names::pass_geometry_translucent,
         .reads = {
-            { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
+             { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
         },
         .writes = { 
-            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },  
+             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {

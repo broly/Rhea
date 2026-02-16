@@ -18,6 +18,7 @@ namespace vk
         VkSemaphore image_available = VK_NULL_HANDLE;
         VkFence in_flight = VK_NULL_HANDLE;
         
+        VkSemaphore render_finished;
     };
     
     class SwapchainControl
@@ -38,7 +39,7 @@ namespace vk
         void recreate_swapchain();
         Extent get_extent() const;
 
-        RBImageHandle get_image() const;
+        RBImageHandle get_image(RBFrameHandle frame_handle) const;
         bool acquire_next_image(RBFrameHandle frame_handle);
         void submit_frame(RBFrameHandle frame_handle, const RBCommandList& cmd_list);
         void advance_frame();
@@ -70,9 +71,7 @@ namespace vk
         
         
         std::array<FrameContext, MAX_FRAMES_IN_FLIGHT> frames;
-        std::vector<VkSemaphore> render_finished_per_image;
         
-        std::vector<VkFence> images_in_flight;
         
         uint32_t current_frame = 0;
         
