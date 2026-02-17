@@ -1,6 +1,6 @@
 #version 450
 #include "definitions.glsl"
-
+#include "resources/camera.glsl"
 
 // ---------- Vertex inputs ----------
 layout(location = LOCATION_ATTR_POSITION) in vec3 in_position;
@@ -15,13 +15,6 @@ layout(location = 2) out vec2 v_uv;
 layout(location = 3) out vec3 v_world_tangent;
 layout(location = 4) out vec3 v_world_bitangent;
 
-// ---------- Camera ----------
-layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
-{
-    mat4 proj;
-    mat4 view;
-    vec4 camera_pos;
-} camera;
 
 // ---------- Push constants ----------
 layout(push_constant) uniform PushConstants
@@ -51,6 +44,6 @@ void main()
     v_world_tangent  = T;
     v_world_bitangent = B;
 
-    gl_Position = camera.proj * camera.view * world_pos;
+    gl_Position = camera_ubo.proj * camera_ubo.view * world_pos;
     // gl_Position.y = -gl_Position.y;
 }

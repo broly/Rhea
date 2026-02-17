@@ -3,6 +3,10 @@
 #include "definitions.glsl"
 #include "pbr_helpers.glsl"
 #include "math.glsl"
+#include "resources/camera.glsl"
+#include "resources/light.glsl"
+#include "resources/shadow.glsl"
+#include "resources/reflection.glsl"
 
 // ================== INPUTS ==================
 layout(location = 0) in vec3 v_world_pos;
@@ -29,44 +33,10 @@ layout(set = SET_PBR, binding = BINDING_SAMPLER_EMISSIVE) uniform sampler2D u_em
 layout(set = SET_PBR, binding = BINDING_SAMPLER_NORMAL) uniform sampler2D u_normal_map;
 layout(set = SET_PBR, binding = BINDING_SAMPLER_ORM) uniform sampler2D u_orm;
 
-// ================== CAMERA ==================
-layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
-{
-    mat4 proj;
-    mat4 view;
-    vec4 camera_pos;
-} camera_ubo;
-
-// ================== LIGHT ==================
-struct PointLight
-{
-    vec4 position;
-    vec4 color;
-};
-
-struct DirectionalLight
-{
-    mat4 light_vp;  // view-projection for shadow
-    vec4 direction; // xyz normalized (world)
-    vec4 color;     // rgb * intensity
-};
-
-layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) uniform LightUBO
-{
-    PointLight lights[8];
-    int light_count;
-
-    DirectionalLight dir_light;
-    int has_dir_light;
-
-} light_ubo;
-
 
 
 // ================== SHADOW ==================
 
-layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW)
-uniform sampler2DShadow u_shadow_depth;
 
 
 float hash12(vec2 p)
@@ -109,10 +79,6 @@ float shadow_factor(vec3 world_pos, vec3 Ng)
 
 
 // ============= reflection =================
-
-layout(set = SET_IBL, binding = BINDING_SAMPLER_IRRADIANCE) uniform samplerCube u_irradiance;
-layout(set = SET_IBL, binding = BINDING_SAMPLER_PREFILTERED_ENV) uniform samplerCube u_prefilter_map;
-layout(set = SET_IBL, binding = BINDING_SAMPLER_BRDF_LUT) uniform sampler2D u_brdf_lut;
 
 
 vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
