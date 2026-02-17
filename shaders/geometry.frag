@@ -21,11 +21,11 @@ layout(location = 0) out vec4 out_color;
 // ================== MATERIAL ==================
 layout(set = SET_PBR, binding = BINDING_MATERIAL) uniform MaterialUBO
 {
-    float base_color_mult;
-    float emissive_mult;
-    float occlusion_mult;
-    float roughness_mult;
-    float metallic_mult;
+    float base_color_factor;
+    float emissive_factor;
+    float occlusion_factor;
+    float roughness_factor;
+    float metallic_factor;
 } material_ubo;
 
 layout(set = SET_PBR, binding = BINDING_SAMPLER_ALBEDO) uniform sampler2D u_base_color;
@@ -101,13 +101,13 @@ void main()
 #endif
 
     // ----- Albedo (linear) -----
-    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * material_ubo.base_color_mult;
+    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * material_ubo.base_color_factor;
 
     // ----- ORM -----
     vec3 orm = texture(u_orm, v_uv).rgb;
-    float ao        = orm.r * material_ubo.occlusion_mult;
-    float roughness = orm.g * material_ubo.roughness_mult;
-    float metallic  = orm.b * material_ubo.metallic_mult;
+    float ao        = orm.r * material_ubo.occlusion_factor;
+    float roughness = orm.g * material_ubo.roughness_factor;
+    float metallic  = orm.b * material_ubo.metallic_factor;
 
 #if BLEND_MODE_TRANSLUCENT
     metallic  = 0.0;

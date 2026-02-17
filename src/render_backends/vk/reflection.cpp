@@ -3,8 +3,10 @@
 import <map>;
 import <iostream>;
 import <vulkan/vulkan_core.h>;
+import reflect;
 
 #define MAKE_SPV_RESULT_PAIR(x) {x, #x}
+#include "common/assertion_macros.h"
 
 const char* get_readable_spv_result(SpvReflectResult result)
 {
@@ -166,15 +168,37 @@ std::unordered_map<Name, ReflectedBinding> SpirvReflection::get_bindings() const
     );
     for (auto* v : descriptors)
     {
+        result.insert({v->name, 
+            ReflectedBinding{
+                .name = v->name, 
+                .set = v->set,
+                .binding = v->binding,
+                .count = v->count,
+                .descriptor_type = convert_spv_to_vk_descriptor_type(v->descriptor_type)
+            }});
+        
+        
+        // VALIDATION
+        if (auto type_desc = v->type_description)
         {
-            result.insert({v->name, 
-               ReflectedBinding{
-                   .name = v->name, 
-                   .set = v->set,
-                   .binding = v->binding,
-                   .count = v->count,
-                   .descriptor_type = convert_spv_to_vk_descriptor_type(v->descriptor_type)
-               }});
+            if (type_desc->type_name)
+            {
+                if (auto runtime_reflection = reflect::find_runtime_info(type_desc->type_name))
+                {
+                    checkf(type_desc->member_count == runtime_reflection->fields.size(),
+                        "fields number mismatched");
+                    for (int i = 0; i < type_desc->member_count; i++)
+                    {
+                        SpvReflectBlockVariable& block_var = v->block.members[i];
+                        const reflect::FieldRuntimeReflectionInfo& cpp_field = runtime_reflection->fields[i];
+                        checkf(cpp_field.name == block_var.name,
+                            "Different member names detected in %s", type_desc->type_name);
+                        checkf(cpp_field.offset == block_var.offset, 
+                            "'%s::%s' variable offset differs with shader and C++ struct (possible layout violation)",
+                            type_desc->type_name, block_var.name);
+                    }
+                }
+            }
         }
     }
     return result;

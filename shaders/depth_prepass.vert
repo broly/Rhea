@@ -1,14 +1,9 @@
 #version 450
 
+#include "resources/camera.glsl"
+
 layout(location = LOCATION_ATTR_POSITION) in vec3 in_position;
 
-// ---------- Camera ----------
-layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) uniform CameraUBO
-{
-    mat4 proj;
-    mat4 view;
-    vec4 camera_pos;
-} camera_ubo;
 
 // ---------- Push constants ----------
 layout(push_constant) uniform PushConstants

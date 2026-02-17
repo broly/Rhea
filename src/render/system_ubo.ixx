@@ -37,7 +37,8 @@ export struct LightUBO
     int has_dir_light;
     glm::vec3 _pad1;
 };
-REFLECT_STRUCT_RUNTIME_OPAQUE(LightUBO);
+REFLECT_STRUCT_RUNTIME(LightUBO,
+    lights, light_count, dir_light, has_dir_light);
 
 
 
@@ -71,4 +72,4 @@ export struct CloudsUBO
     glm::vec4 horizon_color;
 };
 REFLECT_STRUCT_RUNTIME(CloudsUBO,
-    planet_center, cloud_base, sun_direction, sun_color, cloud_color, scattering, wind);
+    planet_center, cloud_base, sun_direction, sun_color, cloud_color, scattering, wind, sky_ambient, horizon_color);

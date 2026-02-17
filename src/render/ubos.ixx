@@ -4,6 +4,7 @@ import glm;
 import rhmath;
 #include "common/reflect_macros.h"
 
+
 export struct CameraUBO
 {
     glm::mat4 proj;
@@ -11,10 +12,5 @@ export struct CameraUBO
     glm::vec3 camera_pos;
     float _pad = 0.f;
 };
-REFLECT_STRUCT_RUNTIME_OPAQUE(CameraUBO);
-
-export struct ModelUBO_Temp
-{
-    glm::mat4 position;
-    float pad;
-};
+REFLECT_STRUCT_RUNTIME(CameraUBO,
+    proj, view, camera_pos);
