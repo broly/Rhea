@@ -41,7 +41,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     camera_resource = renderer->find_resource("camera");
     light_resource = renderer->find_resource("light");
-    light_resource_shadow = renderer->find_resource("shadow_light");
     shadow_resource = renderer->find_resource("shadow");
     reflection_resource = renderer->find_resource("reflection");
     
@@ -363,11 +362,11 @@ void GenericRenderGraph::bind_shadow_globals(
         }
     }
 
-    auto light = light_resource_shadow->query_single(pipeline);
+    auto light = light_resource->query_single(pipeline);
 
     light->update_uniform_buffer(
         pipeline,
-        "shadow_light_ubo",
+        "light_ubo",
         light_ubo,
         frame);
 

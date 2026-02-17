@@ -1,6 +1,6 @@
 {
 	"name": "light",
-	"stages": ["fragment"],
+	"stages": ["vertex", "fragment"],
 	"usage": "frame",
 	"variables": [
 		{

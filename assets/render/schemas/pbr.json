@@ -235,7 +235,7 @@
 				"vertex": "shadow.vert",
 				"fragment": "shadow.frag"
 			},
-			"resources": ["shadow_light"],
+			"resources": ["camera", "light"],
 			"depth_write": true,
 			"depth_test": true,
 			"translucent": false,

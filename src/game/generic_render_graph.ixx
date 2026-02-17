@@ -98,7 +98,6 @@ public:
     
     RenderResource* camera_resource = nullptr;
     RenderResource* light_resource = nullptr;
-    RenderResource* light_resource_shadow = nullptr;
     RenderResource* shadow_resource = nullptr;
     RenderResource* reflection_resource = nullptr;
     
