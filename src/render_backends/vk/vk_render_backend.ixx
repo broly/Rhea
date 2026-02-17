@@ -20,6 +20,7 @@ import :immediate_commands;
 import :framebuffer_mgr;
 import :render_resource;
 import :debug;
+import :vertex_buffer_mgr;
 
 
 struct RenderPassAttachmentInfo
@@ -83,7 +84,6 @@ struct RenderPassDescHash
     }
 };
 
-
 export class VkRenderBackend final : public RenderBackend
 {
     friend class VkPipelineObject;
@@ -126,7 +126,10 @@ public:   /// API Section
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) override;
-    virtual ImageReadback readback_image(RBImageHandle img) const;
+    virtual RBVertexBufferHandle create_vertex_buffer(const VertexBufferDesc& desc) override;
+    virtual void* get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame) override;
+    virtual void bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame) override;
+    virtual ImageReadback readback_image(RBImageHandle img) const override;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
@@ -147,6 +150,7 @@ public:   /// API Section
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) override;
+    virtual uint32_t get_num_images_in_flight() const override;
     // Initialization section
     void create_frame_sync_objects();
     void create_descriptor_pool();
@@ -174,6 +178,7 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
     vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
     vk::MeshManager mesh_manager{instance};
+    vk::VertexBufferManager vertex_buffer_manager{instance.device, instance.physical_device};
     
     std::vector<std::unique_ptr<VkRenderResource>> resources;
     

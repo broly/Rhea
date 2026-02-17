@@ -23,6 +23,7 @@ export struct RenderObject_Camera
     Name debug_name;
     
     glm::mat4 get_projection(float aspect) const;
+    glm::mat4 get_frustum_projection(float aspect) const;
 };
 
 

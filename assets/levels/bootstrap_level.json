@@ -16,7 +16,7 @@
 							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 0.1, "y": 0.1, "z": 0.1}
 						},
-						"fov": 1.54,
+						"fov": 1.0,
 						"active": true,
 						"near_plane": 0.2,
 						"far_plane": 2000
@@ -81,7 +81,7 @@
 						"transform": {
 							"position": { "x": -5, "y": -5, "z": 0 },
 							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
-							"scale": { "x": 1, "y": 1, "z": 1}
+							"scale": { "x": 0.01, "y": 0.01, "z": 0.01}
 						},
 						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
 					},
@@ -140,7 +140,7 @@
 							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
 							"scale": { "x": 1, "y": 1, "z": 1}
 						},
-						"color": { "x": 8, "y": 8, "z": 4, "w": 0 },
+						"color": { "x": 10, "y": 10, "z": 5, "w": 0 },
 						"intensity": 100,
 						"falloff": 100,
 						"type": "point"
@@ -162,7 +162,7 @@
 						"transform": {
 							"position": { "x": 5.11173, "y": 1.51831, "z": 5.89107 },
 							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
-							"scale": { "x": 1, "y": 1, "z": 1}
+							"scale": { "x": 0.01, "y": 0.01, "z": 0.01}
 						},
 						"mesh_path": "meshes/lymphocyte/lymphocyte.glb"
 					},

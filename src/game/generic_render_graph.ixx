@@ -34,6 +34,11 @@ struct PreparedPassResources
     RenderResourceInstance* reflection = nullptr;
 };
 
+struct PreparedWireframe
+{
+    RenderResourceInstance* camera = nullptr;
+};
+
 struct PreparedCloudsPass
 {
     PipelineObject* pipeline = nullptr;
@@ -61,11 +66,13 @@ public:
     void prepare_geometry_resources(RenderGraphContext& ctx);
     void prepare_shadow_pass(RenderGraphContext& ctx);
     void prepare_clouds_pass(RenderGraphContext& ctx);
+    void prepare_wireframe_pass(RenderGraphContext& ctx);
     
     
     void draw_scene(RenderGraphContext& ctx);
     void draw_scene_shadow(RenderGraphContext& ctx);
     void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
+    void draw_wireframe(RenderGraphContext& ctx);
     
     ViewInfo  build_view_info(
         RenderGraphContext& ctx,
@@ -102,19 +109,22 @@ public:
     uint32_t num_pass_instances;
     bool allow_shadow_debug;
     
-    
+
     
     std::shared_ptr<Material> tonemap_material;
     std::shared_ptr<Material> shadow_debug_material;
     std::shared_ptr<Material> cloud_material;
+    std::shared_ptr<Material> wireframe_material;
     
     
     PipelineObject* shadow_debug_pipeline;
     PipelineObject* clouds_pipeline;
     PipelineObject* tonemap_pipeline;
+    PipelineObject* wireframe_pipeline;
     
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
     std::shared_ptr<PipelineFamily> shadow_debug_pipeline_family;
+    std::shared_ptr<PipelineFamily> wireframe_pipeline_family;
     
     bool use_swapchain_extent;
     
@@ -130,9 +140,19 @@ public:
         std::vector<PipelineResourceMap>
     > prepared_pass_resources;
     
+    PreparedWireframe prepared_wireframe;
+    
+    
+    
     PreparedCloudsPass prepared_clouds;
 
     
     Engine* engine;
+    
+    
+    RBVertexBufferHandle debug_line_buffer;
+    uint8_t*     debug_line_mapped = nullptr;
+
+    uint32_t debug_line_capacity = 19440*32;
 };
 REFLECT_OBJECT(GenericRenderGraph, RenderGraph)

@@ -39,6 +39,7 @@
 			"translucent": false,
 			"depth_test": false,
 			"depth_write": false,
+			"topology": "triangle_list",
 			"vertex_layouts": []
 		}
 	]

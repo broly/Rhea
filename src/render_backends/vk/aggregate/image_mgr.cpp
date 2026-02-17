@@ -9,6 +9,8 @@ import reflect;
 import <cassert>;
 import :helpers;
 import :log;
+import :enums_adapters;
+import :enums_to_string;
 
 
 RBImageHandle vk::ImageManager::register_swapchain_image(

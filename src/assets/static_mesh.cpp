@@ -66,7 +66,7 @@ std::optional<StaticMesh> StaticMesh::create_from_file(const std::filesystem::pa
 
     for (auto node_index : scene.nodeIndices)
     {
-        traverseNodeBake(
+        traverseNode(
             node_index,
             asset,
             root,

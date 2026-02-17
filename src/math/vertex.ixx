@@ -12,3 +12,13 @@ export struct Vertex
 };
 REFLECT_STRUCT_RUNTIME(Vertex,
     position, normal, tex_coord, tangent);
+
+
+export struct LineVertex
+{
+    glm::vec3 position;
+    float _pad;
+    glm::vec4 color;
+};
+REFLECT_STRUCT_RUNTIME(LineVertex,
+    position, color);

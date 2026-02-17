@@ -29,7 +29,7 @@ static glm::mat4 getLocalMatrix(const fastgltf::Node& node)
 }
 
 
-export void traverseNodeBake(
+void traverseNode(
     size_t nodeIndex,
     const fastgltf::Asset& asset,
     const glm::mat4& parentMatrix,
@@ -40,13 +40,11 @@ export void traverseNodeBake(
     glm::mat4 local = getLocalMatrix(node);
     glm::mat4 world = parentMatrix * local;
 
-    glm::mat3 normalMatrix =
-        glm::transpose(glm::inverse(glm::mat3(world)));
-
     if (node.meshIndex.has_value())
     {
         AssetSceneObject obj;
-        obj.transform = Transform::make_identity();
+
+        obj.transform = Transform(world);
 
         const auto& gltfMesh = asset.meshes[*node.meshIndex];
         auto& mesh = obj.mesh;
@@ -54,6 +52,9 @@ export void traverseNodeBake(
 
         mesh.mesh_geometry.push_back({});
         Geometry& geom = mesh.mesh_geometry.back();
+
+        mesh.bounds.min = glm::vec3(std::numeric_limits<float>::max());
+        mesh.bounds.max = glm::vec3(std::numeric_limits<float>::lowest());
 
         for (const auto& primitive : gltfMesh.primitives)
         {
@@ -82,49 +83,37 @@ export void traverseNodeBake(
 
             prim.vertices.resize(posAcc.count);
 
-            mesh.bounds.min = glm::vec3(std::numeric_limits<float>::max());
-            mesh.bounds.max = glm::vec3(std::numeric_limits<float>::lowest());
-
-            // POSITIONS
             fastgltf::iterateAccessorWithIndex<
                 fastgltf::math::fvec3>(asset, posAcc,
                 [&](auto p, size_t i)
                 {
-                    glm::vec3 wp =
-                        glm::vec3(world * glm::vec4(
-                            fastgltf_to_glm(p), 1.0f));
+                    glm::vec3 lp = fastgltf_to_glm(p);
 
-                    prim.vertices[i].position = wp;
-                    mesh.bounds.min = glm::min(mesh.bounds.min, wp);
-                    mesh.bounds.max = glm::max(mesh.bounds.max, wp);
+                    prim.vertices[i].position = lp;
+
+                    mesh.bounds.min = glm::min(mesh.bounds.min, lp);
+                    mesh.bounds.max = glm::max(mesh.bounds.max, lp);
                 });
 
-            
-            // NORMALS
             if (normAcc) {
                 fastgltf::iterateAccessorWithIndex<
                     fastgltf::math::fvec3>(asset, *normAcc,
                     [&](auto n, size_t i)
                     {
                         prim.vertices[i].normal =
-                            glm::normalize(
-                                normalMatrix * fastgltf_to_glm(n));
+                            glm::normalize(fastgltf_to_glm(n));
                     });
             }
-            
-            
-            
-            // TANGENTS
+
             if (tanAcc) {
                 fastgltf::iterateAccessorWithIndex<
                     fastgltf::math::fvec4>(asset, *tanAcc,
                     [&](auto t, size_t i)
                     {
-                        glm::vec3 tan =
-                            normalMatrix * glm::vec3(
-                                fastgltf_to_glm(t));
-                        prim.vertices[i].tangent = glm::vec4(glm::normalize(tan), t.w());
-                        prim.vertices[i].tangent = glm::vec4(t.x(), t.y(), t.z(), t.w());
+                        prim.vertices[i].tangent =
+                            glm::vec4(
+                                glm::normalize(glm::vec3(fastgltf_to_glm(t))),
+                                t.w());
                     });
             }
 
@@ -139,7 +128,6 @@ export void traverseNodeBake(
                     });
             }
 
-            // INDICES
             if (primitive.indicesAccessor) {
                 const auto& ia =
                     asset.accessors[*primitive.indicesAccessor];
@@ -154,19 +142,12 @@ export void traverseNodeBake(
             }
 
             geom.primitives.push_back(std::move(prim));
-            
         }
-        
-        
-        // float det = glm::determinant(glm::mat3(world));
-        // bool mirrored = (det < 0.0f);
-        //
-        // if (mirrored) 
-        {
-            for (auto& p : geom.primitives) {
-                for (size_t i = 0; i < p.indices.size(); i += 3) {
-                    std::swap(p.indices[i], p.indices[i + 1]);
-                }
+
+        // Vulkan NDC flip
+        for (auto& p : geom.primitives) {
+            for (size_t i = 0; i < p.indices.size(); i += 3) {
+                std::swap(p.indices[i], p.indices[i + 1]);
             }
         }
 
@@ -174,5 +155,6 @@ export void traverseNodeBake(
     }
 
     for (auto child : node.children)
-        traverseNodeBake(child, asset, world, outObjects);
+        traverseNode(child, asset, world, outObjects);
 }
+

@@ -9,6 +9,12 @@ glm::mat4 RenderObject_Camera::get_projection(float aspect) const
     return p;
 }
 
+glm::mat4 RenderObject_Camera::get_frustum_projection(float aspect) const
+{
+    auto p = glm::perspectiveRH_ZO(fov, aspect, near, far);
+    return p;
+}
+
 RenderId SceneViewProcessor_Camera::register_proxy()
 {
     if (!vacated_camera_ids.empty())

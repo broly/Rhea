@@ -54,7 +54,7 @@ void SceneViewProcessor_Mesh::process()
 
             ro.mesh   = submitted.mesh;
             ro.world  = new_world;
-            ro.bounds = submitted.mesh.get().bounds;
+            ro.bounds = submitted.bounds;
 
             const auto& mesh = submitted.mesh.get();
 
@@ -184,8 +184,8 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
     for (auto& prim : primitives)
     {
         // Frustum culling
-        // if (!frustum.test_aabb(prim.bounds, *prim.world))
-        //     continue;
+        if (!frustum.test_aabb_world(prim.bounds))
+            continue;
         
         auto pipeline_family_it = prim.pipeline_family_by_pass.find(pass_name);
         

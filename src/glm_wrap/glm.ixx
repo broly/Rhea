@@ -20,6 +20,7 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/common.hpp>
 #include <glm/gtx/compatibility.hpp>
+#include <glm/gtc/matrix_access.hpp>
 
 export namespace glm
 {
@@ -84,4 +85,5 @@ export namespace glm
     using glm::value_ptr;
     using glm::lerp;
     using glm::slerp;
+    using glm::row;
 }

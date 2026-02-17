@@ -46,6 +46,7 @@
             "front_face": "CW",
 			"compare_op": "less_or_equal",
 			"push_constants": [],
+			"topology": "triangle_list",
 			"vertex_layouts": []
         }
     ]

@@ -145,6 +145,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     desc.no_color_attachments = pass->no_color_attachments;
     desc.compare_op = pass->compare_op;
     desc.depth_bias = pass->depth_bias ? *pass->depth_bias : DepthBiasInfo{};
+    desc.topology = pass->topology;
     desc.layout = layout;
     
     // add attributes support for vertex shader

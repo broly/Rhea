@@ -13,6 +13,7 @@ import render;
 export struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
 {
     MeshHandle mesh;
+    AABB bounds;
     std::vector<std::shared_ptr<Material>> materials;
     Name debug_name;
 };

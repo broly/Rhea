@@ -55,6 +55,25 @@ REFLECT_ENUM(RBImageLayout,
     transfer_present);
 
 
+export enum RBBufferTopology
+{
+    point_list,
+    line_list,
+    line_strip,
+    triangle_list,
+    triangle_strip,
+    triangle_fan,
+    line_list_with_adjacency,
+    line_strip_with_adjacency,
+    triangle_list_with_adjacency,
+    triangle_strip_with_adjacency,
+    patch_list,
+};
+REFLECT_ENUM(RBBufferTopology, 
+    point_list, line_list, line_strip, triangle_list, triangle_strip, triangle_fan, line_list_with_adjacency, 
+    line_strip_with_adjacency, triangle_list_with_adjacency, triangle_strip_with_adjacency, patch_list)
+
+
 export enum class RBImageUsage
 {
     Undefined,
@@ -266,6 +285,8 @@ export
 
     using RBFramebufferId = RBHandle<uint64_t>;
     using RBFrameHandle = uint32_t;
+    
+    using RBVertexBufferHandle = RBHandle<uint32_t>;
 
 
     enum class TextureDimension

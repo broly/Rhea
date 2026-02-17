@@ -11,6 +11,7 @@ import :render_resource;
 import :log;
 #include "vk_macro.h"
 import reflect;
+import :enums_adapters;
 import <bit>;
 import <set>;
 #include "common/assertion_macros.h"
@@ -309,7 +310,7 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     VkPipelineInputAssemblyStateCreateInfo input_assembly{
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO
     };
-    input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    input_assembly.topology = vk::to_vk_primitive_topology(pipeline_desc->topology); // VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     VkDynamicState dynamic_states[] = {
         VK_DYNAMIC_STATE_VIEWPORT,

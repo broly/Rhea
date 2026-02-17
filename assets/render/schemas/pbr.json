@@ -111,6 +111,7 @@
 		// 			"stages": ["vertex"]
 		// 		}
 		// 	],
+		//	"topology": "triangle_list",
 		// 	"vertex_layouts": [
 		// 		{
 		// 			"vertex_type": "Vertex",
@@ -147,6 +148,7 @@
 					"stages": ["vertex"]
 				}
 			],
+			"topology": "triangle_list",
 			"vertex_layouts": [
 				{
 					"vertex_type": "Vertex",
@@ -197,6 +199,7 @@
 					"stages": ["vertex"]
 				}
 			],
+			"topology": "triangle_list",
 			"vertex_layouts": [
 				{
 					"vertex_type": "Vertex",
@@ -253,6 +256,7 @@
 				"slope_factor": 1.0,
 				"clamp": 0
 			},
+			"topology": "triangle_list",
 			"vertex_layouts": [
 				{
 					"vertex_type": "Vertex",

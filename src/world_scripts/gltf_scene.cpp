@@ -28,6 +28,7 @@ void RhComp_GltfScene::on_serialize(DependencyCollector* dc)
         comp->name = mesh_name;
         comp->mesh = mesh_handle;
         comp->mats = mesh_materials;
+        comp->transform = obj.transform;
         
         pending_mesh_comps.push_back(comp);  
     }

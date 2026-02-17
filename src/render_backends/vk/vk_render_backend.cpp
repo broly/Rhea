@@ -12,6 +12,8 @@ import <span>;
 
 import render;
 
+import :enums_to_string;
+import :enums_adapters;
 import :helpers;
 import :log;
 import :pipeline;
@@ -203,6 +205,10 @@ void VkRenderBackend::update_viewport(const RBCommandList& cmd, Extent extent, b
     vkCmdSetScissor (cmd, 0, 1, &scissor);
 }
 
+uint32_t VkRenderBackend::get_num_images_in_flight() const
+{
+    return vk::MAX_FRAMES_IN_FLIGHT;
+}
 
 
 RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout)
@@ -270,6 +276,21 @@ void VkRenderBackend::copy_image_to_buffer(RBImageHandle img, std::vector<float>
     TextureFormat& format,Extent extent)
 {
     image_manager.copy_image_to_buffer(img, buf, format, extent);
+}
+
+RBVertexBufferHandle VkRenderBackend::create_vertex_buffer(const VertexBufferDesc& desc)
+{
+    return vertex_buffer_manager.create_vertex_buffer(desc);
+}
+
+void* VkRenderBackend::get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame)
+{
+    return vertex_buffer_manager.get_mapped_pointer(handle, frame);
+}
+
+void VkRenderBackend::bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame)
+{
+    return vertex_buffer_manager.bind_vertex_buffer(cmd, handle, frame);
 }
 
 ImageReadback VkRenderBackend::readback_image(RBImageHandle img) const

@@ -65,10 +65,11 @@ export struct MatModel_Pass
     bool no_color_attachments = false;
     CompareOp compare_op;
     std::optional<DepthBiasInfo> depth_bias;
+    RBBufferTopology topology;
     Name set;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, shaders, depth_test, push_constants, depth_write, set, no_color_attachments, resources, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+    name, requirements, shaders, depth_test, push_constants, depth_write, set, no_color_attachments, topology, resources, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 export enum class MaterialParamType
 {

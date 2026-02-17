@@ -240,6 +240,7 @@ export
         FrontFace front_face;
         CompareOp compare_op;
         DepthBiasInfo depth_bias;
+        RBBufferTopology topology;
         
 
         PipelineRenderTargetDesc rt_compat;

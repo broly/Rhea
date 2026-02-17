@@ -64,7 +64,7 @@ AssetSceneInfo AssetSceneHandle::load(const std::filesystem::path& path, const s
 
     for (auto node_index : scene.nodeIndices)
     {
-        traverseNodeBake(
+        traverseNode(
             node_index,
             asset,
             root,

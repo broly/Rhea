@@ -16,3 +16,4 @@ export import :pipeline_family;
 export import :shader_key;
 export import :system_ubo;
 export import :rg_params;
+export import :vertex_buffer;

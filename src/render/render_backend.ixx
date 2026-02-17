@@ -10,6 +10,7 @@ import :pipeline_object;
 import :rg_types;
 import :render_resource;
 import :sampler_desc;
+import :vertex_buffer;
 
 import assets;
 
@@ -65,6 +66,10 @@ public:
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
     virtual ImageReadback readback_image(RBImageHandle img) const = 0;
     
+    virtual RBVertexBufferHandle create_vertex_buffer(const VertexBufferDesc& desc) = 0;
+    virtual void* get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame) = 0;
+    virtual void bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame) = 0;
+    
     
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) = 0;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) = 0;
@@ -82,6 +87,8 @@ public:
     virtual RBImageHandle create_texture_cubemap(const Cubemap& data, const TextureCreationInfo& texture_creation_info) = 0;
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) = 0;
 
+    virtual uint32_t get_num_images_in_flight() const = 0;
+    
     template<RenderBackendType T>
     static std::shared_ptr<RenderBackend> create(RBWindowHandle window_handle)
     {

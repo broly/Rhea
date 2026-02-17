@@ -37,10 +37,10 @@ void main()
 {
     vec3 hdr_color = texture(u_hdr_color, v_uv).rgb;
     // exposure
-    hdr_color *= 0.2;
+    hdr_color *= 0.6;
     // tonemap
     vec3 mapped = ACES(hdr_color);
     // gamma
-    mapped = pow(mapped, vec3(1.0 / 2.2));
+    mapped = pow(mapped, vec3(1.0 / 2.8));
     out_color = vec4(mapped, 1.0);
 }

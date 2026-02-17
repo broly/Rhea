@@ -16,6 +16,7 @@ import <functional>;
 import texture_format;
 import :constants;
 import :names;
+import :debug_line;
 import <set>;
 import <algorithm>;
 
@@ -55,6 +56,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     auto tonemap_model = renderer->find_model("tonemap");
     auto shadow_debug_model = renderer->find_model("shadow_debug");
+    auto wireframe_model = renderer->find_model("wireframe");
     
     
     swapchain_extent = backend->get_swapchain_extent();
@@ -73,13 +75,15 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     
     tonemap_pipeline_family = renderer->query_pipeline_family("ToneMapping", tonemap_model);
+    tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
     
-    tonemap_pipeline = request_pipeline(
-        tonemap_pipeline_family, {});
+    wireframe_pipeline_family = renderer->query_pipeline_family("Wireframe", wireframe_model);
+    wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
+    wireframe_material = std::make_shared<Material>();
+    wireframe_material->model = "wireframe";
     
     shadow_debug_pipeline_family = renderer->query_pipeline_family("ShadowDebug", shadow_debug_model);
-    shadow_debug_pipeline =
-        shadow_debug_pipeline_family->request_pipeline({});
+    shadow_debug_pipeline = shadow_debug_pipeline_family->request_pipeline({});
     shadow_debug_material = std::make_shared<Material>();
     shadow_debug_material->model = "shadow_debug";
     
@@ -104,6 +108,13 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
 
     tonemap_material = std::make_shared<Material>();
     tonemap_material->model = "Tonemap";
+    
+    
+    
+    debug_line_buffer = backend->create_vertex_buffer(VertexBufferDesc {
+        .frame_size  = debug_line_capacity * sizeof(LineVertex),
+        .dynamic = true
+    });
 }
 
 void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
@@ -246,6 +257,22 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
         
     });
+    
+    // add_pass({
+    //     .name = "Wireframe",
+    //     .reads = {
+    //     },
+    //     .writes = {
+    //         { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },
+    //          { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
+    //     },
+    //     .execute = [this](RenderGraphContext& ctx)
+    //     {
+    //         PROFILE("Wireframe");
+    //         draw_wireframe(ctx);
+    //     },
+    //     .num_layers = 1
+    // });
 }
 
 void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
@@ -260,6 +287,7 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     
     prepare_clouds_pass(ctx);
+    prepare_wireframe_pass(ctx);
 }
 
 LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
@@ -585,6 +613,24 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
     );
 
     prepared_clouds.instance = instance;
+}
+
+void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
+{
+    auto frame = ctx.frame;
+
+    CameraUBO cam_ubo = make_camera_ubo(ctx);
+
+    auto cam = camera_resource->query_single(wireframe_pipeline);
+
+    cam->update_uniform_buffer(
+        wireframe_pipeline,
+        "camera_ubo",
+        cam_ubo,
+        frame
+    );
+
+    prepared_wireframe.camera = cam;
 }
 
 
@@ -945,6 +991,111 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
     ctx.backend.draw_fullscreen(cmd);
 
 }
+
+
+void add_aabb_lines(
+    const AABB& box,
+    const glm::vec4& color,
+    std::vector<DebugLine>& out_lines)
+{
+    glm::vec3 c[8];
+    box.get_corners(c);
+
+    out_lines.push_back({ c[0], c[1], color });
+    out_lines.push_back({ c[1], c[3], color });
+    out_lines.push_back({ c[3], c[2], color });
+    out_lines.push_back({ c[2], c[0], color });
+
+    out_lines.push_back({ c[4], c[5], color });
+    out_lines.push_back({ c[5], c[7], color });
+    out_lines.push_back({ c[7], c[6], color });
+    out_lines.push_back({ c[6], c[4], color });
+
+    out_lines.push_back({ c[0], c[4], color });
+    out_lines.push_back({ c[1], c[5], color });
+    out_lines.push_back({ c[2], c[6], color });
+    out_lines.push_back({ c[3], c[7], color });
+}
+
+
+void GenericRenderGraph::draw_wireframe(RenderGraphContext& ctx)
+{
+    auto cmd   = ctx.cmd;
+    auto frame = ctx.frame;
+
+    auto& debug_processor =
+        engine->scene_view
+            ->get_processor<SceneViewProcessor_Mesh>();
+    
+    ctx.backend.bind_pipeline(
+        ctx.cmd,
+        wireframe_pipeline);
+    
+    prepared_wireframe.camera->bind(wireframe_pipeline, ctx.cmd, frame);
+
+    const auto& primitives = debug_processor.primitives; 
+    
+    if (primitives.empty())
+        return;
+
+    std::vector<DebugLine> lines;
+
+    int32_t index = 0;
+    for (const auto& prim : primitives)
+    {
+        add_aabb_lines(prim.bounds, vec4(1.0, 0.0, 0.0, 1.0), lines);
+        index++;
+        
+    }
+
+    if (lines.empty())
+        return;
+
+    const uint32_t vertex_count =
+        static_cast<uint32_t>(lines.size()) * 2;
+    
+    checkf(vertex_count * sizeof(LineVertex) <= debug_line_capacity,
+        "vertex count too large");
+
+    std::vector<LineVertex> vertices;
+    vertices.reserve(vertex_count);
+
+    for (const DebugLine& l : lines)
+    {
+        vertices.push_back({
+            l.a,
+            0.0f,
+            l.color
+        });
+
+        vertices.push_back({
+            l.b,
+            0.0f,
+            l.color
+        });
+    }
+
+    auto* dst = static_cast<LineVertex*>(
+        backend->get_vertex_buffer_ptr(
+            debug_line_buffer,
+            frame));
+
+    memcpy(dst,
+           vertices.data(),
+           vertex_count * sizeof(LineVertex));
+
+
+    backend->bind_vertex_buffer(
+        cmd,
+        debug_line_buffer,
+        frame);
+
+
+    backend->draw(
+        cmd,
+        vertex_count);
+}
+
 
 ViewInfo GenericRenderGraph::build_view_info(RenderGraphContext& ctx, bool zero_pos) const
 {

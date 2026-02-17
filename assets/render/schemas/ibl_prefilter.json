@@ -48,6 +48,7 @@
 					"stages": ["fragment"]
 				}
 			],
+			"topology": "triangle_list",
 			"vertex_layouts": []
 		}
 	]
