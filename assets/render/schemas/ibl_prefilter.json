@@ -44,6 +44,12 @@
 			"translucent": false,
 			"depth_test": false,
 			"depth_write": false,
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
 			"push_constants": [
 				{
 					"type": "LevelAndMip",

@@ -32,6 +32,12 @@
 					"resources": [],
 				}
 			},
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
 			"cull_mode": "none",
 			"front_face": "CW",
 			"compare_op": "greater",

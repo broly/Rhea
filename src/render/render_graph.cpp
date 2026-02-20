@@ -331,15 +331,31 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
                     if (!fb_desc.is_extent_set())
                         fb_desc.update_extent(tex.desc.extent);
+                    
+                    const bool is_depth_attachment = tex.desc.usage & RenderTextureUsage::DepthStencil;
+                    
+                    AttachmentDesc attachment_desc {
+                        .image_name = tex.desc.name,
+                        .image = image,
+                        .load = write.load_op,
+                        .store = write.store_op,
+                        .usage = write.usage,
+                        .layer = layer_id,
+                        .mip_level = mip_map_id,
+                        .depth_attachment = is_depth_attachment
+                    };
+                    
+                    fb_desc.attachments.push_back(attachment_desc);
 
-                    if (tex.desc.usage & RenderTextureUsage::DepthStencil)
-                    {
-                        fb_desc.depth_attachment = { tex.desc.name, image, write.load_op, write.store_op, write.usage, layer_id, mip_map_id };
-                    }
-                    else
-                    {
-                        fb_desc.color_attachments.push_back({ tex.desc.name, image, write.load_op, RBStoreOp::Store, write.usage, layer_id, mip_map_id });
-                    }
+                    // if ()
+                    // {
+                    //     fb_desc.depth_attachment = { tex.desc.name, image, write.load_op, write.store_op, write.usage, layer_id, mip_map_id };
+                    // }
+                    // else
+                    // {
+                    //     fb_desc.color_attachments.push_back({ tex.desc.name, image, write.load_op, RBStoreOp::Store, write.usage, layer_id, mip_map_id });
+                    //     
+                    // }
                 }
 
                 ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);

@@ -218,6 +218,20 @@ REFLECT_STRUCT(MatModel_Resource,
     name, usage, parameters, set);
 
 
+export enum class MatModel_WriteMaskEnum
+{
+    R, G, B, A
+};
+REFLECT_ENUM(MatModel_WriteMaskEnum,
+    R, G, B, A);
+
+export struct MatModel_ColorAttachmentInfo
+{
+    std::set<MatModel_WriteMaskEnum> write_mask;
+    bool translucent;
+};
+REFLECT_STRUCT(MatModel_ColorAttachmentInfo,
+    write_mask, translucent);
 
 
 export struct MatModel_Pass
@@ -228,17 +242,18 @@ export struct MatModel_Pass
     std::map<ShaderStage, MatModel_PassStage> stages;
     bool depth_test;
     bool depth_write;
-    bool translucent;
     std::vector<MatModel_PushConstant> push_constants;
+    std::vector<MatModel_ColorAttachmentInfo> color_attachments;
     CullMode cull_mode;
     FrontFace front_face;
     std::optional<bool> no_color_attachments;
     CompareOp compare_op;
     std::optional<DepthBiasInfo> depth_bias;
     RBBufferTopology topology;
+    uint32_t num_color_passes;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, topology, translucent, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+    name, requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts, num_color_passes);
 
 
 

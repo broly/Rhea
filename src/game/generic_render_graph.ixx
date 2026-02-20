@@ -92,6 +92,7 @@ public:
     RGTextureHandle depth_texture;
     RGTextureHandle noise_texture;
     RGTextureHandle hdr_color;
+    RGTextureHandle normal_color;
     RGTextureHandle swapchain_color;
     
     RGTextureHandle brdf_lut;

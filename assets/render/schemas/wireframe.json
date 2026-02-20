@@ -33,6 +33,12 @@
             "front_face": "CW",
 			"compare_op": "less_or_equal",
 			"push_constants": [],
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
 			"topology": "line_list",
 			"vertex_layouts": [
 				{

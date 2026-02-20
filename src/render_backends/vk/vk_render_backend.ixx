@@ -35,6 +35,7 @@ struct RenderPassAttachmentInfo
     uint32_t mip_level = 0;
     bool is_swapchain = false;
     VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    bool is_depth_attachment = false;
 };
 
 
@@ -42,7 +43,6 @@ struct RenderPassDesc
 {
     Name name;
     std::vector<RenderPassAttachmentInfo> color_attachments;
-    std::optional<RenderPassAttachmentInfo> depth_attachment;
         
 
     bool operator==(const RenderPassDesc& other) const
@@ -57,14 +57,6 @@ struct RenderPassDesc
             if (color_attachments[index].format != other.color_attachments[index].format)
                 return false;
         
-        if (depth_attachment.has_value() != other.depth_attachment.has_value())
-            return false;
-        
-        if (!depth_attachment.has_value() && !other.depth_attachment.has_value())
-            return true;
-            
-        if (depth_attachment->format != other.depth_attachment->format)
-            return false;
         
         return true;
     };
@@ -77,9 +69,6 @@ struct RenderPassDescHash
         size_t h = d.color_attachments.size();
         for (auto f : d.color_attachments)
             h ^= std::hash<uint32_t>()(f.format + 0x9e3779b9 + (h<<6) + (h>>2));
-
-        if (d.depth_attachment.has_value())
-            h ^= std::hash<uint32_t>()(d.depth_attachment->format);
 
         return h;
     }

@@ -258,8 +258,16 @@ export namespace reflect::json
             target.clear();
             for (auto& json_item : value)
             {
-                typename T::value_type set_item;
-                serialize_json_value(set_item, json_item, dc);
+                using value_type = typename T::value_type;
+                value_type set_item;
+                if constexpr (std::is_enum_v<value_type> && is_reflected_v<value_type>)
+                {
+                    // todo: crutch
+                    set_item = reflect::ReflectionInfo<value_type>::template enum_name_to_value(json_item.asString());
+                } else
+                {
+                    serialize_json_value(set_item, json_item, dc);
+                }
                 target.emplace(set_item);
             }
         }else if constexpr (is_optional_v<std::decay_t<T>>)

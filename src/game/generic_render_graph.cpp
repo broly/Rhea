@@ -70,7 +70,18 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .dimension = capture_dimension
     };
     
+    
+    RGTextureDesc normal_color_desc{
+        .name = "normal_color",
+        .extent = resolution,
+        .format = TextureFormat::RGBA8_UNORM,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension
+    };
+    
     hdr_color = create_texture(hdr_color_desc);
+    normal_color = create_texture(normal_color_desc);
     
     
     tonemap_pipeline_family = renderer->query_pipeline_family("ToneMapping", tonemap_model);
@@ -202,8 +213,9 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
         },
         .writes = { 
-            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
+            { normal_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {

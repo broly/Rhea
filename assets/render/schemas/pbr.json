@@ -43,8 +43,18 @@
 			},
 			"depth_write": true,
 			"depth_test": true,
+			
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				},
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				},
+			],
 	
-			"translucent": false,
 			"cull_mode": "back",
 			"front_face": "CW",
 			"compare_op": "less_or_equal",
@@ -99,11 +109,16 @@
 			},
 			"depth_write": false,
 			"depth_test": true,
-			"translucent": true,
 			"cull_mode": "back",
 			"front_face": "CW",
 			"compare_op": "less_or_equal",
 			"set": "SET_PBR",
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": true
+				}
+			],
 			"push_constants": [
 				{
 					"type": "mat4",
@@ -159,6 +174,12 @@
 			"cull_mode": "none",
 			"front_face": "CCW",
 			"compare_op": "less",
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
 			"push_constants": [
 				{
 					"type": "mat4",

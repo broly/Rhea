@@ -26,6 +26,12 @@
 					"resources": ["camera", "clouds"],
 				}
 			},
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
             "depth_test": true,
             "depth_write": false,
             "translucent": true,

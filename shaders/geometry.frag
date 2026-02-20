@@ -17,6 +17,9 @@ layout(location = 4) in vec3 v_world_bitangent;
 
 // ================== OUTPUT ==================
 layout(location = 0) out vec4 out_color;
+#if !BLEND_MODE_TRANSLUCENT
+layout(location = 1) out vec4 out_normal;
+#endif 
 
 // ================== MATERIAL ==================
 layout(set = SET_PBR, binding = BINDING_MATERIAL) uniform MaterialUBO
@@ -263,5 +266,12 @@ void main()
     out_color = vec4(color, alpha);
 #else
     out_color = vec4(color, 1.0);
+
+
+    vec3 N_view = normalize((camera_ubo.view * vec4(N, 0.0)).xyz);
+    out_normal = vec4(N_view * 0.5 + 0.5, roughness);
+    
 #endif
+    
+    
 }

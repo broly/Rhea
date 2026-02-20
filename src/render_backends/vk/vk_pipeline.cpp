@@ -229,32 +229,44 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
     };
     ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    VkPipelineColorBlendAttachmentState color{};
-    color.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT |
-        VK_COLOR_COMPONENT_G_BIT |
-        VK_COLOR_COMPONENT_B_BIT |
-        VK_COLOR_COMPONENT_A_BIT;
     
-    if (pipeline_desc->is_translucent)
+    std::vector<VkPipelineColorBlendAttachmentState> blend_attachments;
+    
+    for (auto& attachment_info : pipeline_desc->color_attachments)
     {
-        color.blendEnable = VK_TRUE; 
-        color.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; 
-        color.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
-        color.colorBlendOp = VK_BLEND_OP_ADD; 
-        color.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; 
-        color.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
-        color.alphaBlendOp = VK_BLEND_OP_ADD;
+        VkPipelineColorBlendAttachmentState color{};
+        if (attachment_info.write_mask.contains(MatModel_WriteMaskEnum::R))
+            color.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
+        
+        if (attachment_info.write_mask.contains(MatModel_WriteMaskEnum::G))
+            color.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
+        
+        if (attachment_info.write_mask.contains(MatModel_WriteMaskEnum::B))
+            color.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
+        
+        if (attachment_info.write_mask.contains(MatModel_WriteMaskEnum::A))
+            color.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
+        
+        if (attachment_info.translucent)
+        {
+            color.blendEnable = VK_TRUE; 
+            color.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; 
+            color.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
+            color.colorBlendOp = VK_BLEND_OP_ADD; 
+            color.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; 
+            color.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
+            color.alphaBlendOp = VK_BLEND_OP_ADD;
+        }
+        blend_attachments.push_back(color);
     }
-    
+      
     
 
     VkPipelineColorBlendStateCreateInfo blend{
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO
     };
-    blend.attachmentCount = 1;
-    blend.pAttachments = &color;
+    blend.attachmentCount = blend_attachments.size();
+    blend.pAttachments = blend_attachments.data();
 
     VkPipelineDepthStencilStateCreateInfo depth_ci{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO

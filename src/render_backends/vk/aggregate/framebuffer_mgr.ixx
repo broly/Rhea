@@ -21,24 +21,16 @@ namespace vk
             bool almost_identical = 
                 extent == in_extent && 
                 in_render_pass == render_pass &&
-                desc.color_attachments.size() == in_desc.color_attachments.size();
+                desc.attachments.size() == in_desc.attachments.size();
             
             if (!almost_identical)
                 return false;
             
-            for (uint32_t i = 0; i < desc.color_attachments.size(); ++i)
-                if (desc.color_attachments[i].image != in_desc.color_attachments[i].image ||
-                desc.color_attachments[i].layer != in_desc.color_attachments[i].layer ||
-                desc.color_attachments[i].mip_level != in_desc.color_attachments[i].mip_level)
+            for (uint32_t i = 0; i < desc.attachments.size(); ++i)
+                if (desc.attachments[i].image != in_desc.attachments[i].image ||
+                desc.attachments[i].layer != in_desc.attachments[i].layer ||
+                desc.attachments[i].mip_level != in_desc.attachments[i].mip_level)
                     return false;
-            
-            if (desc.depth_attachment.has_value() && in_desc.depth_attachment.has_value())
-                return desc.depth_attachment.value().image == in_desc.depth_attachment.value().image &&
-                    desc.depth_attachment.value().layer == in_desc.depth_attachment.value().layer &&
-                    desc.depth_attachment.value().mip_level == in_desc.depth_attachment.value().mip_level ;
-            
-            if (!desc.depth_attachment.has_value() && !in_desc.depth_attachment.has_value())
-                return true;
             
             return false;
         }

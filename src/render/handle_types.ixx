@@ -323,6 +323,7 @@ export
         RBImageUsage usage;
         uint32_t layer = 0;
         uint32_t mip_level = 0;
+        bool depth_attachment = false;
     };
     
 
@@ -330,8 +331,8 @@ export
     struct FramebufferDesc
     {
         Name pass;
-        std::vector<AttachmentDesc> color_attachments;
-        std::optional<AttachmentDesc> depth_attachment;
+        std::vector<AttachmentDesc> attachments;
+        //std::optional<AttachmentDesc> depth_attachment;
         
         void update_extent(const Extent& new_extent)
         {

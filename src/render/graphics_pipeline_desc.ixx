@@ -174,13 +174,14 @@ export
         PipelineLayoutDesc layout;
         bool depth_test;
         bool depth_write;
-        bool is_translucent;
         bool no_color_attachments;
         CullMode cull_mode;
         FrontFace front_face;
         CompareOp compare_op;
         DepthBiasInfo depth_bias;
         RBBufferTopology topology;
+        uint32_t num_color_passes;
+        std::vector<MatModel_ColorAttachmentInfo> color_attachments;
         
 
         PipelineRenderTargetDesc rt_compat;

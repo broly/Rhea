@@ -381,7 +381,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
 {
     RenderPassDesc desc{};
     desc.name = fb.pass;
-    for (auto& attachment : fb.color_attachments)
+    for (auto& attachment : fb.attachments)
     {
         desc.color_attachments.push_back(
             RenderPassAttachmentInfo{
@@ -393,22 +393,9 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
                 attachment.layer,
                 attachment.mip_level,
                 image_manager.is_swapchain_image(attachment.image),
-                image_manager.get_image_layout(attachment.image)
+                image_manager.get_image_layout(attachment.image),
+                attachment.depth_attachment
             });
-    }
-
-    if (fb.depth_attachment)
-    {
-        auto attachment = *fb.depth_attachment;
-        desc.depth_attachment.emplace(RenderPassAttachmentInfo{});
-        desc.depth_attachment->img_name = attachment.image_name;
-        desc.depth_attachment->format = get_image_format(attachment.image);
-        desc.depth_attachment->load_op = fb.depth_attachment->load;
-        desc.depth_attachment->store_op = fb.depth_attachment->store;
-        desc.depth_attachment->usage = attachment.usage;
-        desc.depth_attachment->layer = attachment.layer;
-        desc.depth_attachment->mip_level = attachment.mip_level;
-        desc.depth_attachment->current_layout = image_manager.get_image_layout(attachment.image);
     }
 
     auto it = render_pass_cache.find(desc);
@@ -417,23 +404,11 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     
     
     LogRBRenderPass.Log("get_or_create_render_pass (CREATE)");
-    for (auto attachment : fb.color_attachments)
+    for (auto attachment : fb.attachments)
     {
         auto vk_img = image_manager.get_image_resource(attachment.image).image;
-        LogRBRenderPass.Log(" * color_attachment (image: %s [%p]). Usage: %s, load_op: %s, store_op: %s, layer: %i",
-            debug.get_vk_image_name(vk_img).to_string().c_str(),
-            vk_img,
-            reflect::enum_name(attachment.usage).to_string().c_str(),
-            reflect::enum_name(attachment.load).to_string().c_str(),
-            reflect::enum_name(attachment.store).to_string().c_str(),
-            attachment.layer);
-    }
-    if (fb.depth_attachment)
-    {
-        auto& attachment = *fb.depth_attachment;
-        auto vk_img = image_manager.get_image_resource(attachment.image).image;
-        
-        LogRBRenderPass.Log(" * depth_attachment (image: %s [%p}). Usage: %s, load_op: %s, store_op: %s, layer: %i",
+        LogRBRenderPass.Log(" * %s (image: %s [%p]). Usage: %s, load_op: %s, store_op: %s, layer: %i",
+            attachment.depth_attachment ? "depth attachment" : "color attachment",
             debug.get_vk_image_name(vk_img).to_string().c_str(),
             vk_img,
             reflect::enum_name(attachment.usage).to_string().c_str(),
@@ -447,6 +422,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
 
     uint32_t index = 0;
     
+    std::optional<VkAttachmentReference> depth_ref;
     
     for (auto& attachment : desc.color_attachments)
     {
@@ -461,42 +437,29 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
             .initialLayout = vk::to_initial_layout(attachment.load_op, attachment.current_layout),//vk::to_attachment_layout(attachment.usage),
             .finalLayout   = vk::to_final_layout(attachment.usage, attachment.is_swapchain)//vk::to_attachment_layout(attachment.usage)
         });
-
-        color_refs.push_back({
-            .attachment = index++,
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        });
-    }
-
-    VkAttachmentReference depth_ref{};
-    if (desc.depth_attachment.has_value())
-    {
-        auto& attachment = *desc.depth_attachment;
-        
-        attachments.push_back({
-            .format = attachment.format,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = vk::vk_convert_attachment_load(attachment.load_op),
-            .storeOp = vk::vk_convert_attachment_store(attachment.store_op),
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = vk::to_initial_layout(attachment.load_op, attachment.current_layout), // vk::to_attachment_layout(attachment.usage), // vk::to_attachment_layout(attachment.usage),
-            .finalLayout   = vk::to_final_layout(attachment.usage, false), // vk::to_attachment_layout(attachment.usage) // vk::to_attachment_layout(attachment.usage),
-        });
-
-
-        depth_ref = {
-            .attachment = index,
-            .layout = vk::to_subpass_layout(attachment.usage)
-        };
+        if (!attachment.is_depth_attachment)
+        {
+            color_refs.push_back({
+                .attachment = index,
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            });
+        }
+        else
+        {
+            depth_ref = {
+                .attachment = index,
+                .layout = vk::to_subpass_layout(attachment.usage)
+            };
+        }
+        index++;
     }
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = uint32_t(color_refs.size());
     subpass.pColorAttachments = color_refs.data();
-    if (desc.depth_attachment.has_value())
-        subpass.pDepthStencilAttachment = &depth_ref;
+    if (depth_ref.has_value())
+        subpass.pDepthStencilAttachment = &depth_ref.value();
     
     VkSubpassDependency dep{};
     dep.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -740,17 +703,30 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     const auto& fb = framebuffer_manager.get_framebuffer_resource(framebuffer_index);
 
-    VkClearValue clears[2]{};
-    clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
-    // clears[0].depthStencil = {1.0f, 0};
-    clears[1].depthStencil = {1.0f, 0};
+    std::vector<VkClearValue> clears;
+    clears.resize(fb.desc.attachments.size());
+    for (int index = 0; auto& attachment : fb.desc.attachments)
+    {
+        if (attachment.depth_attachment)
+        {
+            clears[index].depthStencil = {1.0f, 0};
+        } else if (index == 0)
+        {
+            clears[0].color = {{0.1f, 0.1f, 0.3f, 1.0f}};
+        }
+        else
+        {
+            clears[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+        }
+        index++;
+    }
 
     VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     rpbi.renderPass  = fb.render_pass;
     rpbi.framebuffer = fb.framebuffer;
     rpbi.renderArea.extent = { fb.extent.width, fb.extent.height };
-    rpbi.clearValueCount = 2;
-    rpbi.pClearValues = clears;
+    rpbi.clearValueCount = clears.size();
+    rpbi.pClearValues = clears.data();
 
     vkCmdBeginRenderPass(cmd, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
     

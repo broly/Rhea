@@ -32,7 +32,7 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
 
     std::vector<VkImageView> attachments;
 
-    for (const auto& attachment : desc.color_attachments)
+    for (const auto& attachment : desc.attachments)
     {
     
         LogVkFramebufferManager.Log("Use color attachment %s (image: %p, layer: %i)", 
@@ -41,14 +41,6 @@ RBFramebufferId vk::FramebufferManager::get_or_create_framebuffer(const Framebuf
         attachments.push_back(image_manager.fetch_image_view_generic(attachment.image, attachment.layer, attachment.mip_level));
     }
 
-    if (desc.depth_attachment)
-    {
-        const auto& attachment = *desc.depth_attachment;
-    
-        LogVkFramebufferManager.Log("Use depth attachment %s (image: %p, layer: %i)", 
-            attachment.image_name.to_string().c_str(), attachment.image, attachment.layer);
-        attachments.push_back(image_manager.fetch_image_view_generic(attachment.image, attachment.layer, attachment.mip_level));
-    }
 
     VkFramebufferCreateInfo info{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     info.renderPass = render_pass;
