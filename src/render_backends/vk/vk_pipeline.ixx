@@ -15,7 +15,6 @@ import :render_resource;
 import :render_resource_instance;
 import :reflection;
 
-using UniqueResourcePair = std::pair<VkRenderResource*, uint32_t>;
 
 class VkPipelineObject : public PipelineObject
 {
@@ -28,6 +27,11 @@ public:
     ~VkPipelineObject();
 
     void prepare();
+    
+    RBPipelineLayout get_layout() const override
+    {
+        return pipeline_desc->layout.pipeline_layout;
+    }
 
     RBPipelineHandle get_pipeline_handle() const
     {
@@ -35,18 +39,7 @@ public:
         return vk_pipeline;
     }
     
-    
-    VkPipelineLayout get_pipeline_layout() const
-    {
-        assert(vk_pipeline != VK_NULL_HANDLE); 
-        return pipeline_layout;
-    }
     VkPipeline get_or_create_pipeline(VkRenderPass render_pass);
-    
-    RenderResourceInstance* query_unique_resource_instance(RenderResource* resource, uint32_t instance_id = 0) override;
-    RenderResourceInstance* create_resource_instance(RenderResource* resource) override;
-    
-    void update_buffers();
 
     
     std::optional<GraphicsPipelineDesc> pipeline_desc;
@@ -65,7 +58,7 @@ public:
 
     VkPipeline vk_pipeline = VK_NULL_HANDLE;
     
-    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+    // VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     
     std::vector<VkShader> shaders;
     
@@ -73,17 +66,5 @@ public:
     
     
     
-    std::map<UniqueResourcePair, VkRenderResourceInstance*> unique_resource_instances; 
-    std::vector<std::unique_ptr<VkRenderResourceInstance>> instances;
-    
-    std::map<VkRenderResource*, VkRenderResourcePipelineInfo> resources_pipeline_info;
-    
-    struct ResorceInstancePipelineData
-    {
-        std::vector<RBDescriptorSet> sets_per_frame = {};
-        std::vector<std::vector<RBBufferHandle>> buffers = {}; // [binding][frame]
-    };
-    
-    std::map<VkRenderResourceInstance*, ResorceInstancePipelineData> instance_pipeline_data;
     
 };

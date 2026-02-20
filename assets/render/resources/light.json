@@ -1,14 +1,16 @@
 {
-	"name": "light",
-	"stages": ["vertex", "fragment"],
-	"usage": "frame",
-	"variables": [
-		{
-			"variable": "light_ubo",
-			"type": "uniform",
-			"ubo": "LightUBO",
-			"binding": "BINDING_UBO_LIGHT"
-		}
-	],
-	"set": "SET_LIGHT"
+	"resource": {
+		"name": "light",
+		"stages": ["vertex", "fragment"],
+		"usage": "frame",
+		"parameters": {
+			"light": {
+				"variable": "light_ubo",
+				"type": "uniform",
+				"ubo": "LightUBO",
+				"binding": "BINDING_UBO_LIGHT"
+			}
+		},
+		"set": "SET_LIGHT"
+	}
 }

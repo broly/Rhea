@@ -1,26 +1,27 @@
 {
-	"name": "reflection",
-	"stages": ["fragment"],
-	"usage": "frame",
-	"variables": [		
-		{
-			"variable": "u_irradiance",
-			"type": "sampler",
-			"sampler": "default",
-			"binding": "BINDING_SAMPLER_IRRADIANCE"
+	"resource": {
+		"name": "reflection",
+		"usage": "frame",
+		"parameters": {
+			"irradiance": {
+				"variable": "u_irradiance",
+				"type": "sampler",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_IRRADIANCE"
+			},
+			"prefilter": {
+				"variable": "u_prefilter_map",
+				"type": "sampler",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_PREFILTERED_ENV"
+			},
+			"brdf_lut": {
+				"variable": "u_brdf_lut",
+				"type": "sampler",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_BRDF_LUT"
+			}
 		},
-		{
-			"variable": "u_prefilter_map",
-			"type": "sampler",
-			"sampler": "default",
-			"binding": "BINDING_SAMPLER_PREFILTERED_ENV"
-		},
-		{
-			"variable": "u_brdf_lut",
-			"type": "sampler",
-			"sampler": "default",
-			"binding": "BINDING_SAMPLER_BRDF_LUT"
-		}
-	],
-	"set": "SET_IBL"
+		"set": "SET_IBL"
+	}
 }

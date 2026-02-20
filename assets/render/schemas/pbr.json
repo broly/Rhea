@@ -1,7 +1,7 @@
 {
 	"model_name": "PBR",
 	
-	"usage_type": "persistent",
+	"material_resource": "pbr_material",
 	
 	"enums": {
 		"blend_mode": [
@@ -11,67 +11,6 @@
 		]
 	},
 	
-	"parameters": {
-		"blend_mode": {
-			"type": "definition",
-			"definition": "blend_mode"
-		},
-		"base_color": {
-			"type": "sampler",
-			"sampler": "surface",
-			"variable": "u_base_color",
-			"binding": "BINDING_SAMPLER_ALBEDO",
-			"passes": ["GeometryBase", "GeometryTranslucent"]
-		},
-		"emissive": {
-			"type": "sampler",
-			"sampler": "surface",
-			"variable": "u_emissive",
-			"binding": "BINDING_SAMPLER_EMISSIVE",
-			"passes": ["GeometryBase", "GeometryTranslucent"]
-		},
-		"normal": {
-			"type": "sampler",
-			"sampler": "surface",
-			"variable": "u_normal_map",
-			"binding": "BINDING_SAMPLER_NORMAL",
-			"passes": ["GeometryBase", "GeometryTranslucent"]
-		},
-		"orm": {
-			"type": "sampler",
-			"sampler": "surface",
-			"variable": "u_orm",
-			"binding": "BINDING_SAMPLER_ORM",
-			"passes": ["GeometryBase", "GeometryTranslucent"]
-		},
-		"material": {
-			"type": "uniform",
-			"ubo": "MaterialUBO",
-			"binding": "BINDING_MATERIAL",
-			"variable": "material_ubo",
-			"passes": ["GeometryBase", "GeometryTranslucent"]
-		},
-		"base_color_factor": {
-			"type": "vec4",
-			"storage": "material"
-		},
-		"emissive_factor": {
-			"type": "vec4",
-			"storage": "material"
-		},
-		"occlusion_factor": {
-			"type": "vec4",
-			"storage": "material"
-		},
-		"metallic_factor": {
-			"type": "vec4",
-			"storage": "material"
-		},
-		"roughness_factor": {
-			"type": "vec4",
-			"storage": "material"
-		}
-	},	
 	"permutations": {
 		"flags": {
 			"USE_BASE_COLOR": "base_color",
@@ -89,54 +28,22 @@
 
 	
 	"passes": [
-		// {
-		// 	"name": "DepthPrepass",
-		// 	"requirements": "blend_mode != translucent",
-		// 	"shaders": {
-		// 		"vertex": "depth_prepass.vert",
-		// 		"fragment": "depth_prepass.frag"
-		// 	},
-		// 	"resources": ["camera"],
-		// 	"depth_write": true,
-		// 	"depth_test": true,
-		// 	"translucent": false,
-		// 	"cull_mode": "back",
-		// 	"front_face": "CW",
-		// 	"compare_op": "less",
-		// 	"set": "SET_PBR",
-		// 	"push_constants": [
-		// 		{
-		// 			"type": "mat4",
-		// 			"name": "model",
-		// 			"stages": ["vertex"]
-		// 		}
-		// 	],
-		//	"topology": "triangle_list",
-		// 	"vertex_layouts": [
-		// 		{
-		// 			"vertex_type": "Vertex",
-		// 			"attributes": [
-		// 				{
-		// 					"name": "position",
-		// 					"definition": "LOCATION_ATTR_POSITION",
-		// 					"variable": "in_position"
-		// 				}
-		// 			]
-		// 		}
-		// 	]
-		// },
 		{
 			"name": "GeometryBase",
 			"requirements": "blend_mode != translucent",
-			"shaders": {
-				"vertex": "geometry.vert",
-				"fragment": "geometry.frag"
+			"stages": {
+				"vertex": {
+					"shader": "geometry.vert",
+					"resources": ["camera"]
+				},
+				"fragment": {
+					"shader": "geometry.frag",
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material"]
+				}
 			},
 			"depth_write": true,
 			"depth_test": true,
-			"set": "SET_PBR",
 	
-			"resources": ["camera", "light", "shadow", "reflection"],
 			"translucent": false,
 			"cull_mode": "back",
 			"front_face": "CW",
@@ -180,11 +87,16 @@
 		{
 			"name": "GeometryTranslucent",
 			"requirements": "blend_mode == translucent",
-			"shaders": {
-				"vertex": "geometry.vert",
-				"fragment": "geometry.frag"
+			"stages": {
+				"vertex": {
+					"shader": "geometry.vert",
+					"resources": ["camera"]
+				},
+				"fragment": {
+					"shader": "geometry.frag",
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material"]
+				}
 			},
-			"resources": ["camera", "light", "shadow", "reflection"],
 			"depth_write": false,
 			"depth_test": true,
 			"translucent": true,
@@ -231,11 +143,16 @@
 		{
 			"name": "shadowmap",
 			"requirements": "blend_mode != translucent",
-			"shaders": {
-				"vertex": "shadow.vert",
-				"fragment": "shadow.frag"
+			"stages": {
+				"vertex": {
+					"shader": "shadow.vert",
+					"resources": ["camera", "light"]
+				},
+				"fragment": {
+					"shader": "shadow.frag",
+					"resources": []
+				}
 			},
-			"resources": ["camera", "light"],
 			"depth_write": true,
 			"depth_test": true,
 			"translucent": false,

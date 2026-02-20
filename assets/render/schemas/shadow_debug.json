@@ -1,8 +1,6 @@
 {
 	"model_name": "shadow_debug",
 	
-	"usage_type": "frame",
-	
 	"enums": {},
 	
 	"uniform_buffers": {},
@@ -27,16 +25,22 @@
 			"requirements": "",
 			"enum_white_list": {
 			},
-			"shaders": {
-				"vertex": "fullscreen.vert",
-				"fragment": "shadow_debug.frag"
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "shadow_debug.frag",
+					"resources": ["base_color"],
+				}
 			},
-	
 			"resources": [],
 			"cull_mode": "none",
 			"front_face": "CW",
 			"compare_op": "less",
 			"translucent": false,
+			"push_constants": [],
 			"depth_test": false,
 			"depth_write": false,
 			"topology": "triangle_list",

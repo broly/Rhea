@@ -16,87 +16,9 @@ import name;
 
 export class RenderResource;
 
-
-export enum class ShaderStage : uint16_t
-{
-    none = 0x0,
-    vertex = 0x1,
-    fragment = 0x2,
-    reserved2 = 0x4,
-    reserved3 = 0x8,
-    reserved4 = 0x10,
-    reserved5 = 0x20,
-    reserved6 = 0x40,
-    reserved7 = 0x60,
-    all = vertex | fragment,
-};
-REFLECT_ENUM(ShaderStage,
-    none, vertex, fragment, reserved2, reserved3, reserved4, reserved5, reserved6, reserved7);
-ENUM_MASK_OPS(ShaderStage, export);
-
-export ShaderStage make_shader_stages_mask(const std::vector<ShaderStage>& stages)
-{
-    ShaderStage result = ShaderStage::none;
-    for (auto& stage : stages)
-        result |= stage;
-    return result;
-}
-
-export enum class CullMode
-{
-    none, front, back, both
-};
-REFLECT_ENUM(CullMode,
-    none, front, back, both);
-
-struct DepthBiasInfo
-{
-    bool enable = false;
-    float constant_factor = 0.0;
-    float clamp = 0.0;
-    float slope_factor = 0.0;
-};
-REFLECT_STRUCT(DepthBiasInfo,
-    enable, constant_factor, clamp, slope_factor);
-
-export enum class CompareOp 
-{
-    never = 0,
-    less = 1,
-    equal = 2,
-    less_or_equal = 3,
-    greater = 4,
-    not_equal = 5,
-    greater_or_equal = 6,
-    always = 7,
-};
-REFLECT_ENUM(CompareOp,
-    never, less, equal, less_or_equal, greater, not_equal, greater_or_equal, always);
-
-
-export enum class FrontFace
-{
-    CW, CCW,
-};
-REFLECT_ENUM(FrontFace,
-    CW, CCW);
-
-struct VertexAttributeInfo
-{
-    Name variable_name;
-    uint16_t location;
-    uint32_t offset;
-};
-
 export
 {
-    constexpr uint8_t ShaderStage_index(ShaderStage stage)
-    {
-        return std::bit_width(static_cast<uint16_t>(stage)) - 1;
-    }
-
-    constexpr uint8_t MAX_STAGES = ShaderStage_index(ShaderStage::all) + 1;
-
+    
     enum class DescriptorType
     {
         UniformBuffer,
@@ -137,17 +59,31 @@ export
         uint32_t size;
     };
 
+    
+    struct ResourceBinding
+    {
+        MatModel_Parameter parameter;
+        std::optional<uint32_t> binding_index;
+        std::optional<RBSampler> sampler;
+        ShaderStage stages;
+        
+        bool is_descriptor() const
+        {
+            return parameter.is_descriptor();
+        }
+    };
+    
     struct DescriptorSetLayoutDesc
     {
         uint32_t set_index;
-        std::vector<DescriptorBinding> bindings;
+        std::vector<ResourceBinding> bindings;
         Name debug_name;
 
-        std::tuple<uint32_t, const DescriptorBinding&> get_binding(Name name) const
+        std::tuple<uint32_t, const ResourceBinding&> get_binding(Name name) const
         {
             for (uint32_t index = 0; auto& binding : bindings)
             {
-                if (binding.name == name)
+                if (*binding.parameter.variable == name)
                     return {index, binding};
                 index++;
             }
@@ -182,18 +118,22 @@ export
         std::vector<VertexLayoutData> layouts;
     };
     
+    
     struct GraphicsPipelineResourceInfo
     {
+        Name name;
         RenderResource* resource;
         uint16_t set;
-        std::vector<uint32_t> resource_variable_bindings;
+        std::vector<ResourceBinding> resource_variable_bindings;
     };
 
     struct PipelineLayoutDesc
     {
+        Name pass;
         VertexLayout vertex_layout;
         std::vector<GraphicsPipelineResourceInfo> resources;
         std::vector<PushConstantRange> push_constants;
+        RBPipelineLayout pipeline_layout;
         
         const GraphicsPipelineResourceInfo* get_graphics_pipeline_resource_info(RenderResource* rr) const
         {

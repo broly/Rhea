@@ -1,22 +1,30 @@
 {
     "model_name": "wireframe",
 
-    "usage_type": "frame",
-
     "ubo_access": "none",
 
-    "parameters": {
-    },
+	"enums": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+
 
     "passes": [
         {
 			"set": "SET_WIREFRAME",
             "name": "wireframe",
-            "shaders": {
-                "vertex": "wireframe.vert",
-                "fragment": "wireframe.frag"
-            },
-			"resources": ["camera"],
+			"stages": {
+				"vertex": {
+					"shader": "wireframe.vert",
+					"resources": ["camera"]
+				},
+				"fragment": {
+					"shader": "wireframe.frag",
+					"resources": [],
+				}
+			},
+			"requirements": "",
 
             "depth_test": true,
             "depth_write": false,

@@ -1,8 +1,6 @@
 {
 	"model_name": "IBL_Irradiance",
 	
-	"usage_type": "frame",
-	
 	"enums": {},
 	"uniform_buffers": {},
 	
@@ -24,14 +22,19 @@
 			"name": "IBL_Irradiance",
 			"set": "SET_IBL",
 			"requirements": "",
-			"shaders": {
-				"vertex": "fullscreen.vert",
-				"fragment": "ibl_irradiance.frag"
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "ibl_irradiance.frag",
+					"resources": [],
+				}
 			},
 			"cull_mode": "none",
 			"front_face": "CW",
 			"compare_op": "greater",
-			"resources": [],
 			"translucent": false,
 			"depth_test": false,
 			"depth_write": false,

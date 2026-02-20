@@ -28,18 +28,23 @@ public:
     ShaderKey make_shader_key(std::shared_ptr<const Material> material, Name pass_name) const;
 
     PipelineObject* request_pipeline(ShaderKey key);
+    
+    RBPipelineLayout get_pipeline_layout() const;
 
 private:
 
     void decode_key_to_defines(ShaderKey key, DefinitionMap& out_defines) const;
     std::filesystem::path request_permutation(const std::string& shader_name, ShaderKey key, const DefinitionMap& defines);
     
-    PipelineLayoutDesc layout;
+    PipelineLayoutDesc layout_desc;
+
 private:
     std::shared_ptr<RenderBackend> backend;
     std::shared_ptr<Renderer> renderer;
     std::shared_ptr<MaterialModel> model;
     const MatModel_Pass* pass = nullptr;
+    
+    RBPipelineLayout pipeline_layout;
     
     // PSO cache
     std::unordered_map<uint64_t, PipelineObject*> pipelines;

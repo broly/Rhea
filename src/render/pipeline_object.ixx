@@ -1,13 +1,15 @@
 ﻿export module render:pipeline_object;
 
 import :handle_types;
-import :render_resource;
+import name;
+import <cstdint>;
 
 export class PipelineObject
 {
 public:
-    virtual RenderResourceInstance* query_unique_resource_instance(RenderResource* resource, uint32_t instance_id = 0) = 0;
-    virtual RenderResourceInstance* create_resource_instance(RenderResource* resource) = 0;
+    virtual ~PipelineObject() = default;
+    
+    virtual RBPipelineLayout get_layout() const = 0;
     
     Name debug_name;
     uint64_t permutation_value;

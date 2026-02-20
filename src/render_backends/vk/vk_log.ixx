@@ -5,7 +5,7 @@ import log;
 
 DEFINE_LOGGER(LogRB, Warning);
 DEFINE_LOGGER(LogRBRenderPass, DisplayFn);
-DEFINE_LOGGER(LogVkPipeline, Warning);
+DEFINE_LOGGER(LogVkPipeline, DisplayFn);
 DEFINE_LOGGER(LogVkDescriptors, DisplayFn);
 DEFINE_LOGGER(LogVkSwapchain, DisplayFn);
 DEFINE_LOGGER(LogVkSamplerManager, DisplayFn);

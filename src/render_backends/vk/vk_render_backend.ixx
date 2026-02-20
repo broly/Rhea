@@ -21,6 +21,7 @@ import :framebuffer_mgr;
 import :render_resource;
 import :debug;
 import :vertex_buffer_mgr;
+import :pipeline_manager;
 
 
 struct RenderPassAttachmentInfo
@@ -105,6 +106,7 @@ public:   /// API Section
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) override;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) override;
     void destroy_render_pass_cache() override;
+    virtual RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc) override;
     virtual Extent get_swapchain_extent() const override;
     virtual void transition_image(
         RBCommandList cmd,
@@ -119,8 +121,8 @@ public:   /// API Section
         std::optional<RBSampler> sampler, 
         uint32_t array_index = 0,
         bool cubemap = false) override;
-    virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) override;
-    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) override;
+    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, 
+        RBPipelineLayout pipeline_handle, Name debug_name) override;
     virtual RBFrameHandle get_current_frame() const override;
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;
@@ -131,7 +133,7 @@ public:   /// API Section
     virtual void bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame) override;
     virtual ImageReadback readback_image(RBImageHandle img) const override;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
-    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) override;
+    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) override;
@@ -179,6 +181,7 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
     vk::MeshManager mesh_manager{instance};
     vk::VertexBufferManager vertex_buffer_manager{instance.device, instance.physical_device};
+    vk::PipelineManager pipeline_manager{instance, swapchain, image_manager, resource_manager};
     
     std::vector<std::unique_ptr<VkRenderResource>> resources;
     
@@ -188,14 +191,6 @@ public:   /// cache and state section:
     vk::CommandContext command_context = {};
     vk::PipelineContext pipeline_context = {};
     
-    // currently working pipelines (moving from pending_pipelines)
-    std::unordered_map<RBPipelineHandle, std::unique_ptr<VkPipelineObject>> pipelines;
-    
-    RBPipelineHandle current_pipeline_handle{};
-    VkDescriptorSet current_descriptor_set = {};
-    
-    // pipelines objects that only have layouts, but not real pipelines yet
-    std::vector<std::unique_ptr<VkPipelineObject>> pending_pipelines;
     
     
     GLFWwindow* window = nullptr;

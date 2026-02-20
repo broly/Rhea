@@ -13,20 +13,12 @@ import rhmath;
 
 #include "common/reflect_macros.h"
 #include "common/type_macros.h"
-
+import :material_model;
 import <map>;
 import type_utils;
 import enum_helpers;
 
 
-
-export enum class ResourceUsageType
-{
-    frame,      // per-frame (camera, per-frame UBOs)
-    persistent  // materials, textures etc.
-};
-REFLECT_ENUM(ResourceUsageType,
-    frame, persistent);
 
 
 export enum class RBImageLayout
@@ -54,24 +46,6 @@ REFLECT_ENUM(RBImageLayout,
     preinitialized,
     transfer_present);
 
-
-export enum RBBufferTopology
-{
-    point_list,
-    line_list,
-    line_strip,
-    triangle_list,
-    triangle_strip,
-    triangle_fan,
-    line_list_with_adjacency,
-    line_strip_with_adjacency,
-    triangle_list_with_adjacency,
-    triangle_strip_with_adjacency,
-    patch_list,
-};
-REFLECT_ENUM(RBBufferTopology, 
-    point_list, line_list, line_strip, triangle_list, triangle_strip, triangle_fan, line_list_with_adjacency, 
-    line_strip_with_adjacency, triangle_list_with_adjacency, triangle_strip_with_adjacency, patch_list)
 
 
 export enum class RBImageUsage
@@ -287,6 +261,8 @@ export
     using RBFrameHandle = uint32_t;
     
     using RBVertexBufferHandle = RBHandle<uint32_t>;
+    
+    using RBPipelineLayout = RBHandle<VkPipelineLayout>;
 
 
     enum class TextureDimension

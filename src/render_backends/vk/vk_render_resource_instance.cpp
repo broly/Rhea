@@ -5,24 +5,27 @@ import profile;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
-VkRenderResourceInstance::VkRenderResourceInstance(vk::BufferManager& buffer_manager, const VkRenderResource& in_resource, ResourceUsageType in_usage)
+VkRenderResourceInstance::VkRenderResourceInstance(
+    vk::BufferManager& buffer_manager, 
+    const VkRenderResource* in_resource, 
+    ResourceUsageType in_usage, 
+    RBPipelineLayout in_pipeline_layout)
     : buffer_manager(buffer_manager)
     , resource(in_resource)
     , usage(in_usage)
+    , pipeline_layout(in_pipeline_layout.as<VkPipelineLayout>())
 {}
 
-void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeline_object,
-                                                          Name buffer_name, size_t size, void* data, RBFrameHandle frame)
-{
-    auto* vk_pipeline    = static_cast<VkPipelineObject*>(pipeline_object);
+void VkRenderResourceInstance::update_uniform_buffer_impl(Name buffer_name, size_t size, void* data, RBFrameHandle frame)
+{    
+    auto inst_info = resource->backend.pipeline_manager.instance_pipeline_data.at(this);
     
-    auto inst_info = vk_pipeline->instance_pipeline_data.at(this);
-    auto& pipe_info = vk_pipeline->resources_pipeline_info.at((VkRenderResource*)&resource);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({resource, RBPipelineLayout(pipeline_layout)});
 
     auto [binding_index, binding] =
         pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
 
-    checkf(binding.type == DescriptorType::UniformBuffer, "Type mismatch");
+    checkf(binding.parameter.type == MaterialParamType::uniform, "Type mismatch");
 
     uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
 
@@ -32,28 +35,28 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(PipelineObject* pipeli
     buffer_manager.update_uniform_buffer(buffer, size, data, frame);
 }
 
-void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_object, Name buffer_name,
+void VkRenderResourceInstance::update_image(Name buffer_name,
                                             RBImageHandle image_handle, RBFrameHandle frame, uint32_t array_index, bool cubemap)
 {
     PROFILE("VkRenderResourceInstance::update_image");
     
-    auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
     
-    auto inst_info = vk_pipeline->instance_pipeline_data.at(this);
-    auto& pipe_info = vk_pipeline->resources_pipeline_info.at((VkRenderResource*)&resource);
+    
+    auto inst_info = resource->backend.pipeline_manager.instance_pipeline_data.at(this);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({resource, RBPipelineLayout(pipeline_layout)});
 
     auto [binding_index, binding] =
         pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
 
-    checkf(binding.type == DescriptorType::CombinedImageSampler, "Type mismatch");
+    checkf(binding.parameter.type == MaterialParamType::sampler, "Type mismatch");
 
     uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
 
     RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
 
-    resource.backend.update_sampled_image(
+    resource->backend.update_sampled_image(
         set,
-        binding.binding_index,
+        *binding.binding_index,
         image_handle,
         usage,
         binding.sampler,
@@ -61,21 +64,24 @@ void VkRenderResourceInstance::update_image(class PipelineObject* pipeline_objec
         cubemap);
 }
 
-void VkRenderResourceInstance::bind(class PipelineObject* pipeline_object, RBCommandList command_list, RBFrameHandle frame)
+void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle frame)
 {
     PROFILE("VkRenderResourceInstance::bind");
-    auto* vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
     
-    auto inst_info = vk_pipeline->instance_pipeline_data.at(this);
-    auto& pipe_info = vk_pipeline->resources_pipeline_info.at((VkRenderResource*)&resource);
+    
+    
+    auto inst_info = resource->backend.pipeline_manager.instance_pipeline_data.at(this);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({resource, RBPipelineLayout(pipeline_layout)});
 
     uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
 
     RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
+    
 
-    resource.backend.bind_descriptor_set(
+    resource->backend.bind_descriptor_set(
         command_list,
         pipe_info.descritor_set_layout_desc.set_index,
         set,
-        vk_pipeline->get_pipeline_handle());
+        pipeline_layout,
+        resource->desc.name);
 }

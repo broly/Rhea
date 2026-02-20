@@ -1,14 +1,15 @@
 {
-	"name": "camera",
-	"stages": ["vertex", "fragment"],
-	"usage": "frame",
-	"variables": [
-		{
-			"type": "uniform",
-			"ubo": "CameraUBO",
-			"binding": "BINDING_UBO_CAMERA",
-			"variable": "camera_ubo"
-		}
-	],
-	"set": "SET_CAMERA"
+	"resource": {
+		"name": "camera",
+		"usage": "frame",
+		"parameters": {
+			"camera": {
+				"type": "uniform",
+				"ubo": "CameraUBO",
+				"binding": "BINDING_UBO_CAMERA",
+				"variable": "camera_ubo"
+			}
+		},
+		"set": "SET_CAMERA"
+	}
 }

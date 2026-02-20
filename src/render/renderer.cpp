@@ -156,26 +156,21 @@ void Renderer::load_resources()
     for (auto& file : files)
     {
         if (auto obj = json_object::load_object<RenderResourceInfo>(file))
-            resources_info.insert({obj->name, obj});
+            resources_info.insert({obj->resource.name, obj});
     }
     
     for (const auto& [_, resource_info] : resources_info)
     {
         RenderResourceDesc desc;
-        desc.name = resource_info->name;
-        desc.set = resource_info->set;
-        desc.stages = ShaderStage::none;
-        for (ShaderStage stage : resource_info->stages)
-            desc.stages |= stage;
+        auto& res = resource_info->resource;
+        desc.name = res.name;
+        desc.set = res.set;
         
-        desc.usage_type = resource_info->usage;
-        for (const MatModel_Parameter& variable : resource_info->variables)
+        desc.usage_type = res.usage;
+        for (const auto& [param_name, variable] : res.parameters)
         {
-            checkf(variable.type != MaterialParamType::definition, "Resource variable type could not be definition");
             RenderResourceVariableDesc var_desc;
-            var_desc.name = *variable.variable;
-            var_desc.binding = *variable.binding;
-            var_desc.set = resource_info->set;
+            var_desc.parameter = variable;
             if (variable.type == MaterialParamType::uniform)
             {
                 const reflect::RuntimeReflectionInfo* ubo_info = reflect::find_runtime_info(*variable.ubo);
@@ -190,9 +185,12 @@ void Renderer::load_resources()
                 var_desc.sampler = found_sampler->second;
                 var_desc.size = -1;
             }
-            else
+            else if (variable.type == MaterialParamType::definition) // skip definitions
             {
                 continue;
+            } else
+            {
+                continue;  // skip all everything
             }
             desc.variables.push_back(var_desc);
         }
@@ -275,7 +273,7 @@ std::shared_ptr<PipelineFamily> Renderer::query_pipeline_family(Name pass_name, 
 }
 
 
-RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, Name pass_name)
+RenderResource* Renderer::query_material_resource(std::shared_ptr<MaterialModel> model, Name pass_name)
 {
     if (material_resources.contains({pass_name, model}))
         return material_resources.at({pass_name, model});
@@ -283,13 +281,19 @@ RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, N
     const MatModel_Pass* pass = model->get_pass_info(pass_name);
     checkf(pass, "MaterialModel has no pass");
 
+    
+    checkf(model->material_resource != std::nullopt, "material resource should provide 'material_resource' field");
+    const Name material_resource_name = *model->material_resource;
+    
+    auto material_resource_info = find_resource_info(material_resource_name);
+    
     RenderResourceDesc desc{};
     desc.name = model->model_name;
-    desc.usage_type = model->usage_type;
-    desc.set = pass->set;
+    desc.usage_type = material_resource_info->resource.usage;
+    desc.set = material_resource_info->resource.set;
 
     // UBOs
-    for (const auto& [name, param] : model->parameters)
+    for (const auto& [name, param] : material_resource_info->resource.parameters)
     {
         // if (param.type == MaterialParamType::uniform || param.type == MaterialParamType::sampler)
         //     if (!param.passes.contains(pass_name))
@@ -300,19 +304,19 @@ RenderResource* Renderer::query_resource(std::shared_ptr<MaterialModel> model, N
             auto info = reflect::find_runtime_info(cpp_ubo_name);
             checkf(info, "Could not find type");
             desc.variables.push_back(RenderResourceVariableDesc{
-                .name = *param.variable,
+                .parameter = param,
                 .size = info->size,
             });
         } else if (param.type == MaterialParamType::sampler)
         {
             desc.variables.push_back(RenderResourceVariableDesc{
-                .name = *param.variable,
+                .parameter = param,
                 .sampler = samplers[*param.sampler],
             });
         }
     }
     
-    auto resource =  render_backend->create_resource(desc);
+    auto resource =  find_resource(material_resource_name);
     
     material_resources.insert({std::pair{pass_name, model}, resource});
     
@@ -329,8 +333,13 @@ RenderResource* Renderer::find_resource(Name resource_name) const
     return resource_it->second;
 }
 
+std::shared_ptr<RenderResourceInfo> Renderer::find_resource_info(Name resource_name) const
+{
+    return resources_info.at(resource_name);
+}
+
 std::shared_ptr<MaterialInstance> Renderer::query_material_instance(std::shared_ptr<Material> material,
-    Name pass_name)
+                                                                    Name pass_name)
 {
     auto it = material_instances.find({material, pass_name});
     if (it != material_instances.end())
@@ -338,7 +347,11 @@ std::shared_ptr<MaterialInstance> Renderer::query_material_instance(std::shared_
 
     auto ptr = std::static_pointer_cast<Renderer>(shared_from_this());
     
-    auto instance = std::make_shared<MaterialInstance>(material, shared_from_this(), pass_name);
+    auto model = find_model(material->model);
+    
+    auto pipeline_family = query_pipeline_family(pass_name, model);
+    
+    auto instance = std::make_shared<MaterialInstance>(material, shared_from_this(), pass_name, pipeline_family);
 
     material_instances.emplace(std::pair{material, pass_name}, instance);
     return instance;
@@ -351,6 +364,11 @@ std::shared_ptr<MaterialModel> Renderer::find_model(Name model_name) const
     if (model_it == models.end())
         return nullptr;
     return model_it->second;
+}
+
+RBSampler Renderer::get_sampler(Name sampler_name) const
+{
+    return samplers.at(sampler_name);
 }
 
 bool Renderer::get_render_flag(Name flag) const

@@ -7,6 +7,7 @@ import <algorithm>;
 import <span>;
 
 #include "vk_macro.h"
+#include "common/assertion_macros.h"
 #include "logging/log_macro.h"
 #include "profiling/profile.h"
 
@@ -33,6 +34,41 @@ void VkRenderBackend::destroy_render_pass_cache()
 }
 
 
+
+DescriptorType TEMP_CONVERT_DESCRIPTOR_TYPE_CRUTCH(VkDescriptorType descriptor_type)
+{
+    switch (descriptor_type)
+    {
+    case VK_DESCRIPTOR_TYPE_SAMPLER:
+        return DescriptorType::Sampler;
+    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+        return DescriptorType::CombinedImageSampler;
+    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+        return DescriptorType::SampledImage;
+    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+        return DescriptorType::UniformBuffer;
+    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+        return DescriptorType::StorageBuffer;
+    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+    case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+    case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+    case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+    default: 
+        break;
+    }
+    assert(false);
+    __assume(false);
+}
+
+
+RBPipelineLayout VkRenderBackend::create_pipeline_layout(const PipelineLayoutDesc& desc)
+{    
+    return pipeline_manager.create_layout(desc);
+}
+
+
 Extent VkRenderBackend::get_swapchain_extent() const
 {
     return swapchain.get_extent();
@@ -54,7 +90,7 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding
     ResourceUsageType usage, std::optional<RBSampler> sampler, uint32_t array_index, bool cubemap)
 {
     // VkDescriptorSet set = get_descriptor_set(layout, usage);
-
+    LogRB.Log("update_sampled_image: %p", set);
 
     VkDescriptorImageInfo info{};
     info.imageView   = cubemap ? get_cubemap_image_view(image) : get_image_view(image, array_index);
@@ -210,45 +246,15 @@ uint32_t VkRenderBackend::get_num_images_in_flight() const
     return vk::MAX_FRAMES_IN_FLIGHT;
 }
 
-
-RBDescriptorSetLayout VkRenderBackend::create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout)
-{
-    return resource_manager.create_descriptor_set_layout(descriptor_set_layout);
-}
-
 void VkRenderBackend::create_descriptor_pool()
 {
     resource_manager.create_descriptor_pool();
 }
 
-void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle)
+void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors, 
+    RBPipelineLayout pipeline_handle, Name debug_name)
 {
-    PROFILE("bind_descriptor_set");
-    
-    VkDescriptorSet vk_set = rb_descriptors.as<VkDescriptorSet>();
-    
-    if (vk_set == current_descriptor_set && current_pipeline_handle == pipeline_handle)
-        return;
-    
-    current_descriptor_set = vk_set;
-    current_pipeline_handle = pipeline_handle;
-    
-    auto& pipeline = pipelines[pipeline_handle];
-    VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    
-    
-    {
-        PROFILE("vkCmdBindDescriptorSets");
-        vkCmdBindDescriptorSets(
-            cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipeline->get_pipeline_layout(),
-            set_index, 
-            1, 
-            &vk_set,
-            0, nullptr
-        );
-    }
+    return pipeline_manager.bind_descriptor_set(cmd_list, set_index, rb_descriptors, pipeline_handle, debug_name);
 }
 
 RBFrameHandle VkRenderBackend::get_current_frame() const
@@ -580,31 +586,9 @@ void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, R
     mesh_manager.bind(cmd, mesh);
 }
 
-void VkRenderBackend::push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object)
+void VkRenderBackend::push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout)
 {
-    PROFILE(__FUNCTION__);
-    
-    auto pipeline = (VkPipelineObject*)pipeline_object;
-    
-    uint32_t stage_bits = 0;
-    
-    for (auto& stage : pipeline->pipeline_desc->layout.push_constants)
-    {
-        if ((stage.stages & ShaderStage::fragment) != ShaderStage::none)
-            stage_bits |= VK_SHADER_STAGE_FRAGMENT_BIT;
-        if ((stage.stages & ShaderStage::vertex) != ShaderStage::none)
-            stage_bits |= VK_SHADER_STAGE_VERTEX_BIT;
-    }
-
-    auto as_vk_pipeline = static_cast<VkPipelineObject*>(pipeline_object);
-    vkCmdPushConstants(
-        cmd,
-        pipelines[as_vk_pipeline->get_pipeline_handle()]->get_pipeline_layout(),
-        VkShaderStageFlagBits(stage_bits), 
-        0, 
-        size,
-        data
-    );
+    pipeline_manager.push_constants(cmd, data, size, pipeline_layout);
 }
 
 void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)
@@ -786,30 +770,9 @@ void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
 
 void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object)
 {
-    PROFILE("VkRenderBackend::bind_pipeline");
-    LogRB.Log<Verbose>("bind_pipeline");
+    pipeline_manager.bind_pipeline(cmd_list, pipeline_object, current_render_pass);
     
-    auto vk_pipeline_object = static_cast<VkPipelineObject*>(pipeline_object);
     
-    VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    assert(current_render_pass != VK_NULL_HANDLE);
-    VkPipeline pipeline_vk = vk_pipeline_object->get_or_create_pipeline(current_render_pass);
-    RBPipelineHandle handle = pipeline_vk;
-    
-    for (auto it = pending_pipelines.begin(); it != pending_pipelines.end(); ++it)
-    {
-        if (it->get() == pipeline_object)
-        {
-            std::unique_ptr<VkPipelineObject> pipeline_ptr = std::move(*it);
-            pending_pipelines.erase(it);
-            pipelines.insert({handle, std::move(pipeline_ptr)});
-            break;
-        }
-    }
-
-    assert(pipeline_vk != VK_NULL_HANDLE);
-    
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_vk);
 }
 
 void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
@@ -842,10 +805,7 @@ bool VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
 
 PipelineObject* VkRenderBackend::create_pipeline(const GraphicsPipelineDesc& desc)
 {
-    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(instance, swapchain, resource_manager, desc);
-    PipelineObject* result = pipeline.get();
-    pending_pipelines.push_back(std::move(pipeline));
-    return result;
+    return pipeline_manager.create_pipeline(desc);
 }
 
 vk::DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(RBDescriptorSetLayout descriptor_set_layout)

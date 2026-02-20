@@ -28,6 +28,12 @@ export struct RenderObject_Mesh
     bool dirty;
 };
 
+export struct RenderPrimitivePassInfo
+{
+    std::shared_ptr<MaterialInstance> material_instance;
+    std::shared_ptr<PipelineFamily> pipeline_family;
+};
+
 export struct RenderPrimitive
 {
     RenderPrimitiveId id;
@@ -36,10 +42,23 @@ export struct RenderPrimitive
     const glm::mat4* world;
     AABB bounds;
 
-    std::map<Name, std::shared_ptr<MaterialInstance>> material_instance_by_pass;
     
-    std::map<Name, PipelineObject*> pipeline_by_pass;
-    std::map<Name, std::shared_ptr<PipelineFamily>> pipeline_family_by_pass;
+    std::set<Name> passes;
+    std::map<Name, RenderPrimitivePassInfo> info_by_pass;
+    
+    RBPipelineLayout get_pipeline_layout_by_pass(Name pass_name)
+    {
+        return info_by_pass.at(pass_name).pipeline_family->get_pipeline_layout();
+    }
+    
+    
+    const RenderPrimitivePassInfo* get_pass_info(Name pass_name)
+    {
+        auto it = info_by_pass.find(pass_name);
+        if (it != info_by_pass.end())
+            return &it->second;
+        return nullptr;
+    }
 
     uint8_t dirty;
 };

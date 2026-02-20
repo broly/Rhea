@@ -38,144 +38,14 @@ VkPipelineObject::~VkPipelineObject()
     if (vk_pipeline != nullptr)
         vkDestroyPipeline(instance.device, vk_pipeline, nullptr);
 
-    if (pipeline_layout != nullptr)
-        vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
-}
-
-
-DescriptorType TEMP_CONVERT_DESCRIPTOR_TYPE_CRUTCH(VkDescriptorType descriptor_type)
-{
-    switch (descriptor_type)
-    {
-    case VK_DESCRIPTOR_TYPE_SAMPLER:
-        return DescriptorType::Sampler;
-    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-        return DescriptorType::CombinedImageSampler;
-    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-        return DescriptorType::SampledImage;
-    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-        return DescriptorType::UniformBuffer;
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-        return DescriptorType::StorageBuffer;
-    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-    case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-    case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-    case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-    default: 
-        break;
-    }
-    assert(false);
-    __assume(false);
+    // if (pipeline_layout != nullptr)
+    //     vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
 }
 
 
 void VkPipelineObject::prepare()
 {
 
-    GraphicsPipelineDesc& desc = *pipeline_desc;
-    
-    
-    for (auto& stage : desc.stages)
-    {
-        checkf(stage.compiled_shader.has_value(), "shader not compiled!");
-        VkShader stage_shader(instance.device, *stage.compiled_shader);
-        reflect_shader(stage_shader, stage.stage);
-        shaders.push_back(std::move(stage_shader));
-    }
-    
-    std::vector<VkDescriptorSetLayout> vk_layouts;
-    const auto& reflection = get_reflection();
-    
-    for (auto& resource_info : desc.layout.resources)
-    {
-        RenderResource* resource = resource_info.resource;
-        checkf(resource, "NULL resource detected");
-        
-        
-        std::vector<DescriptorBinding> bindings;
-        std::set<size_t> handled_variable_indices;
-        DescriptorSetLayoutDesc layout_desc;
-        
-        std::set<int> occupied_variables;
-        for (const auto& [stage, refl] : reflection)
-        {
-            if ((resource->desc.stages & stage) != ShaderStage::none)
-            {
-                checkf(resource_info.resource_variable_bindings.size() == resource->desc.variables.size(),
-                    "Variables num is different with variable bindings num");
-                for (int variable_index = 0; variable_index < resource_info.resource->desc.variables.size(); ++variable_index)
-                {
-                    auto& variable = resource->desc.variables[variable_index];
-                    uint32_t variable_binding = resource_info.resource_variable_bindings[variable_index];
-                    
-                    auto it = refl.bindings.find(variable.name);
-                    if (it == refl.bindings.end())
-                        continue;
-                    occupied_variables.insert(variable_index);
-                    
-                    checkf(variable_binding == it->second.binding,
-                        "Variable binding is different: queried: %i and shader: %i", variable_binding, it->second.binding);
-                    checkf(resource_info.set == it->second.set,
-                        "Variable set is different: queried: %i and shader: %i", resource_info.set, it->second.set);
-                    // checkf(variable.size == it->second.size)
-                    
-                    if (handled_variable_indices.contains(variable_index))
-                        continue;
-                    
-                    
-                    DescriptorBinding binding{};
-                    binding.name          = variable.name;
-                    binding.binding_index = variable_binding;
-                    binding.sampler       = variable.sampler;
-                    binding.count         = it->second.count; // todo!
-                    binding.size          = variable.size;
-                    binding.stages        = resource->desc.stages;
-                    binding.type          = TEMP_CONVERT_DESCRIPTOR_TYPE_CRUTCH(it->second.descriptor_type);
-                    bindings.push_back(binding);
-                    handled_variable_indices.insert(variable_index);
-                }
-            }
-        }
-        if (occupied_variables.size() != resource->desc.variables.size())
-        {
-            for (int variable_index = 0; variable_index < resource->desc.variables.size(); ++variable_index)
-            {
-                // checkf(occupied_variables.contains(variable_index), "Variable %s declared, but not used in any shader",
-                //     resource->desc.variables[variable_index].name.to_string().c_str());
-            }
-        }
-        
-        layout_desc.bindings = bindings;
-        layout_desc.set_index = resource_info.set;
-        layout_desc.debug_name = resource->desc.name;
-            
-        VkRenderResourcePipelineInfo info{};
-        info.descritor_set_layout_desc = layout_desc;
-        info.layout = buffer_manager.create_descriptor_set_layout(layout_desc);
-            
-        resources_pipeline_info.insert({(VkRenderResource*)resource, std::move(info)});
-        
-        auto h = resources_pipeline_info[(VkRenderResource*)resource].layout;
-        vk_layouts.push_back(
-            buffer_manager.get_vk_descriptor_set_layout(h).vk_layout
-        );
-    }
-
-    VkPipelineLayoutCreateInfo plci{
-        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
-    };
-    plci.setLayoutCount = uint32_t(vk_layouts.size());
-    plci.pSetLayouts = vk_layouts.data();
-
-    // push constants
-    plci.pushConstantRangeCount = desc.layout.push_constants.size();
-    std::vector<VkPushConstantRange> push_constants = vk::to_vk_ranges(desc.layout.push_constants);
-    plci.pPushConstantRanges = push_constants.data();
-
-    vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
-    LogVkPipeline.Log("Created pipeline %s (%p)", desc.pass_name.to_string().c_str(), pipeline_layout);
 }
 
 
@@ -243,6 +113,14 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
 {
     if (vk_pipeline != nullptr)
         return vk_pipeline;
+    
+    for (auto& stage : pipeline_desc->stages)
+    {
+        checkf(stage.compiled_shader.has_value(), "shader not compiled!");
+        VkShader stage_shader(instance.device, *stage.compiled_shader);
+        reflect_shader(stage_shader, stage.stage);
+        shaders.push_back(std::move(stage_shader));
+    }    
 
     std::vector<VkPipelineShaderStageCreateInfo> vk_stages;
     
@@ -267,7 +145,7 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
                 
         for (const auto& attribute_info : layout.attributes)
         {
-            auto stage_reflection = pipeline_reflection[ShaderStage::vertex];
+            auto stage_reflection = pipeline_reflection.at(ShaderStage::vertex);
             assert(stage_reflection.input_variables.contains(attribute_info.variable_name));
 
             ReflectedInterfaceVariable& reflection_info = stage_reflection.input_variables[attribute_info.variable_name];
@@ -298,7 +176,7 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
             nullptr,
             0,
             STAGES_VK_BITS[ShaderStage_index(stage.stage)],
-            shaders[stage_index].get_module(),
+            shaders.at(stage_index).get_module(),
             "main"
         };
         vk_stages.push_back(vk_stage);
@@ -397,7 +275,8 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     pci.pRasterizationState = &raster;
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
-    pci.layout = pipeline_layout;
+    checkf(pipeline_desc->layout.pipeline_layout != 0, "Pipeline layout is null");
+    pci.layout = pipeline_desc->layout.pipeline_layout;
     pci.renderPass = render_pass;
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
@@ -417,8 +296,8 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         nullptr,
         &vk_pipeline));
     
-    LogVkPipeline.Log<DisplayFn>("Created graphics pipeline %p (pass: %s):",
-        vk_pipeline, pipeline_desc->pass_name.to_string().c_str());
+    LogVkPipeline.Log<DisplayFn>("Created graphics pipeline %p (pass: %s, pipeline_layout: %p):",
+        vk_pipeline, pipeline_desc->pass_name.to_string().c_str(), pipeline_desc->layout.pipeline_layout);
     for (auto& stage : pipeline_desc->stages)
     {
         LogVkPipeline.Log<DisplayFn>(" * stage '%s', shader: '%s'", 
@@ -427,82 +306,6 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
     }
     
     return vk_pipeline;
-}
-
-RenderResourceInstance* VkPipelineObject::query_unique_resource_instance(RenderResource* resource, uint32_t instance_id )
-{
-    UniqueResourcePair key = {(VkRenderResource*)resource, instance_id};
-    
-    if (unique_resource_instances.contains(key))
-        return unique_resource_instances.at(key);
-    
-    auto resource_instance = create_resource_instance(resource);
-    
-    update_buffers();
-    
-    unique_resource_instances.insert({key, (VkRenderResourceInstance*)resource_instance});
-    return resource_instance;
-}
-
-RenderResourceInstance* VkPipelineObject::create_resource_instance(RenderResource* resource)
-{
-    std::unique_ptr<VkRenderResourceInstance> instance = std::make_unique<VkRenderResourceInstance>(
-        buffer_manager, *(VkRenderResource*)resource, resource->desc.usage_type);
-    
-    instances.push_back(std::move(instance));
-    
-    update_buffers();
-    
-    return instances.back().get();
-}
-
-void VkPipelineObject::update_buffers()
-{
-    for (auto& instance : instances)
-    {
-        auto resource = &instance->resource;  // todo make getter
-        const auto& info = resources_pipeline_info.at((VkRenderResource*)&instance->resource);
-
-        if (instance_pipeline_data.contains(instance.get()))
-            continue;
-        
-        if (!instance_pipeline_data.contains(instance.get()))
-            instance_pipeline_data.insert({instance.get(), {}});
-        auto& inst = instance_pipeline_data.at(instance.get());
-
-        inst.sets_per_frame =
-            buffer_manager.allocate_descriptor_sets_for_layout(
-                info.layout, resource->desc.usage_type);
-
-        inst.buffers.resize(info.descritor_set_layout_desc.bindings.size());
-
-        for (size_t binding_index = 0;
-             binding_index < info.descritor_set_layout_desc.bindings.size();
-             ++binding_index)
-        {
-            const auto& binding =
-                info.descritor_set_layout_desc.bindings[binding_index];
-
-            if (binding.type != DescriptorType::UniformBuffer)
-                continue;
-
-            auto& buffers_per_frame = inst.buffers[binding_index];
-
-            for (size_t frame = 0; frame < inst.sets_per_frame.size(); ++frame)
-            {
-                RBBufferHandle buffer =
-                    buffer_manager.create_uniform_buffer(binding.size, resource->desc.usage_type);
-
-                buffer_manager.bind_buffer_to_descriptor(
-                    inst.sets_per_frame[frame],
-                    binding.binding_index,
-                    buffer,
-                    frame);
-
-                buffers_per_frame.push_back(buffer);
-            }
-        }
-    }
 }
 
 DescriptorType to_descriptor_type(SpvReflectDescriptorType type)

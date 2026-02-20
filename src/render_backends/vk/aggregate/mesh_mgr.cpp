@@ -4,6 +4,10 @@ import <cassert>;
 
 import :helpers;
 #include "common/assertion_macros.h"
+import :log;
+#include "logging/log_macro.h"
+
+DEFINE_LOGGER(LogVkMeshManager, Warning);
 
 void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle)
 {
@@ -65,6 +69,7 @@ void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle)
 
 void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
 {
+    LogVkMeshManager.Log("Bind mesh '%s', cmd=%p", mesh.mesh.get().name.c_str(), cmd);
     auto mesh_info_it = mesh_map.find(mesh);
     
     checkf(mesh_info_it != mesh_map.end(), "Could not find mesh info for '%s' (geom: %i, prim: %i)",

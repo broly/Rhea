@@ -28,22 +28,22 @@ struct DrawBatch
 
 struct PreparedPassResources
 {
-    RenderResourceInstance* camera = nullptr;
-    RenderResourceInstance* light  = nullptr;
-    RenderResourceInstance* shadow = nullptr;
-    RenderResourceInstance* reflection = nullptr;
+    std::shared_ptr<RenderResourceInstance> camera = nullptr;
+    std::shared_ptr<RenderResourceInstance> light  = nullptr;
+    std::shared_ptr<RenderResourceInstance> shadow = nullptr;
+    std::shared_ptr<RenderResourceInstance> reflection = nullptr;
 };
 
 struct PreparedWireframe
 {
-    RenderResourceInstance* camera = nullptr;
+    std::shared_ptr<RenderResourceInstance> camera = nullptr;
 };
 
 struct PreparedCloudsPass
 {
     PipelineObject* pipeline = nullptr;
-    RenderResourceInstance* camera = nullptr;
-    RenderResourceInstance* instance = nullptr;
+    std::shared_ptr<RenderResourceInstance> camera = nullptr;
+    std::shared_ptr<RenderResourceInstance> instance = nullptr;
 };
 
 struct ViewInfo
@@ -86,7 +86,7 @@ public:
     LightUBO build_light_ubo(glm::vec3 camera_position) const;
     void bind_shadow_globals(
         RenderGraphContext& ctx,
-        PipelineObject* pipeline);
+        RBPipelineLayout layout);
     
     RGTextureHandle shadow_map;
     RGTextureHandle depth_texture;
@@ -132,7 +132,7 @@ public:
 
     // pass_name -> [pass_instance_id] -> pipeline -> resources
     using PipelineResourceMap =
-        std::unordered_map<PipelineObject*, PreparedPassResources>;
+        std::unordered_map<RBPipelineLayout, PreparedPassResources>;
 
     std::unordered_map<
         Name,

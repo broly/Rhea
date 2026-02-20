@@ -3,16 +3,13 @@
 import <string>;
 import :graphics_pipeline_desc;
 import :render_resource_instance;
+import :pipeline_object;
 import name;
 
 struct RenderResourceVariableDesc
 {
-    Name name;
-    
-    Name set;
-    Name binding;
+    MatModel_Parameter parameter;
     RBSampler sampler;
-    
     size_t size;
 };
 
@@ -20,7 +17,6 @@ export struct RenderResourceDesc
 {
     Name name;
     
-    ShaderStage stages = ShaderStage::all;
     ResourceUsageType usage_type = ResourceUsageType::persistent;
     
     std::vector<RenderResourceVariableDesc> variables;
@@ -36,7 +32,9 @@ public:
         : desc(in_desc)
     {}
 
-    virtual RenderResourceInstance* query_single(PipelineObject* pipeline_object, uint32_t instance_id = 0);
+    virtual std::shared_ptr<RenderResourceInstance> query_single(RBPipelineLayout pipeline_layout, uint32_t instance_id = 0) = 0;
+    virtual std::shared_ptr<RenderResourceInstance> query_single(PipelineObject*, uint32_t instance_id = 0);
+    virtual std::shared_ptr<RenderResourceInstance> query_unique(RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id) = 0;
 
     const RenderResourceDesc desc;
 };

@@ -1,8 +1,10 @@
 module render:render_resource;
 
 import :pipeline_object;
+import :pipeline_family;
 
-RenderResourceInstance* RenderResource::query_single(PipelineObject* pipeline_object, uint32_t instance_id)
+std::shared_ptr<RenderResourceInstance> RenderResource::query_single(PipelineObject* object,
+    uint32_t instance_id)
 {
-    return pipeline_object->query_unique_resource_instance(this, instance_id);
+    return query_single(object->get_layout(), instance_id);
 }

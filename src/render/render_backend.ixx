@@ -80,6 +80,8 @@ public:
     }
     
     virtual void destroy_render_pass_cache() = 0;
+    
+    virtual RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc) = 0;
 
     virtual Extent get_swapchain_extent() const = 0;
 
@@ -109,26 +111,25 @@ public:
     
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) = 0;
     
-    virtual RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout) = 0;
-
     virtual bool acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
     
     virtual PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc) = 0;
 
 
-    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, RBPipelineHandle pipeline_handle) = 0;
+    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, 
+        RBDescriptorSet rb_descriptors, RBPipelineLayout pipeline_handle, Name debug_name) = 0;
     
     void push_constants(
         const RBCommandList& cmd, 
         const allowed_for_push_constant auto& value, 
-        PipelineObject* pipeline_object)
+        RBPipelineLayout pipeline_layout)
     {
-        push_constants_impl(cmd, &value, sizeof(value), pipeline_object);
+        push_constants_impl(cmd, &value, sizeof(value), pipeline_layout);
     }
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
-    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, PipelineObject* pipeline_object) = 0;
+    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_countaram) = 0;
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;

@@ -147,21 +147,18 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 auto shadow_debug_material_instance = 
                     renderer->query_material_instance(shadow_debug_material, ctx.pass_name);
                 
-                RenderResourceInstance* shadow_debug_instance =
+                auto shadow_debug_instance =
                     shadow_debug_material_instance->get_or_create_resource_instance(
-                        shadow_debug_pipeline,
                         ctx.frame
                     );
                 
-                    shadow_debug_instance->update_image(
-                        shadow_debug_pipeline,
-                        "u_shadow_depth",
-                        get_image(shadow_map),
-                        ctx.frame
-                    );
+                shadow_debug_instance->update_image(
+                    "u_shadow_depth",
+                    get_image(shadow_map),
+                    ctx.frame
+                );
                     
                 shadow_debug_instance->bind(
-                    shadow_debug_pipeline,
                     ctx.cmd,
                     ctx.frame
                 );
@@ -337,7 +334,7 @@ LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
 
 void GenericRenderGraph::bind_shadow_globals(
     RenderGraphContext& ctx,
-    PipelineObject* pipeline)
+    RBPipelineLayout layout)
 {
     auto& scene_view = engine->scene_view;
     auto cmd   = ctx.cmd;
@@ -362,15 +359,14 @@ void GenericRenderGraph::bind_shadow_globals(
         }
     }
 
-    auto light = light_resource->query_single(pipeline);
+    auto light = light_resource->query_single(layout);
 
     light->update_uniform_buffer(
-        pipeline,
         "light_ubo",
         light_ubo,
         frame);
 
-    light->bind(pipeline, cmd, frame);
+    light->bind(cmd, frame);
 }
 
 
@@ -389,7 +385,7 @@ void GenericRenderGraph::prepare_geometry_resources(
     // Collect unique pipelines
     // ----------------------------------------
 
-    std::map<PipelineObject*, Name> unique_pipelines;
+    std::map<RBPipelineLayout, Name> unique_pipelines;
     
     for (Name pass_name : 
         {
@@ -400,12 +396,8 @@ void GenericRenderGraph::prepare_geometry_resources(
     {
         for (auto& prim : mesh_processor.primitives)
         {
-            auto instance_it = prim.material_instance_by_pass.find(pass_name);
-            if (instance_it == prim.material_instance_by_pass.end())
-                continue;
-
-
-            unique_pipelines.insert({prim.pipeline_by_pass[pass_name], pass_name});
+            if (auto info = prim.get_pass_info(pass_name))
+                unique_pipelines.insert({info->pipeline_family->get_pipeline_layout(), pass_name});
         }
     }
     // ----------------------------------------
@@ -429,7 +421,6 @@ void GenericRenderGraph::prepare_geometry_resources(
                 0);
 
         cam->update_uniform_buffer(
-            pipeline,
             "camera_ubo",
             cam_ubo,
             frame);
@@ -454,7 +445,6 @@ void GenericRenderGraph::prepare_geometry_resources(
             if (reflection_capture)
             {
                 refl->update_image(
-                    pipeline,
                     "u_irradiance",
                     renderer->get_cubemap(reflection_capture->irradiance),
                     frame,
@@ -462,7 +452,6 @@ void GenericRenderGraph::prepare_geometry_resources(
                     true);
 
                 refl->update_image(
-                    pipeline,
                     "u_prefilter_map",
                     renderer->get_cubemap(reflection_capture->prefiltered_env),
                     frame,
@@ -470,7 +459,6 @@ void GenericRenderGraph::prepare_geometry_resources(
                     true);
 
                 refl->update_image(
-                    pipeline,
                     "u_brdf_lut",
                     get_image(brdf_lut),
                     frame);
@@ -487,7 +475,6 @@ void GenericRenderGraph::prepare_geometry_resources(
                 light_resource->query_single(pipeline);
 
             light->update_uniform_buffer(
-                pipeline,
                 "light_ubo",
                 light_ubo,
                 frame);
@@ -500,7 +487,6 @@ void GenericRenderGraph::prepare_geometry_resources(
                 shadow_resource->query_single(pipeline);
 
             shadow->update_image(
-                pipeline,
                 "u_shadow_depth",
                 get_image(shadow_map),
                 frame);
@@ -540,8 +526,7 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
             cloud_model
         );
 
-    PipelineObject* pipeline =
-        pipeline_family->request_pipeline({});
+    PipelineObject* pipeline = pipeline_family->request_pipeline({});
 
     prepared_clouds.pipeline = pipeline;
 
@@ -552,7 +537,6 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
         camera_resource->query_single(pipeline);
 
     cam->update_uniform_buffer(
-        pipeline,
         "camera_ubo",
         camera_ubo,
         frame
@@ -584,28 +568,24 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
             "Clouds"
         );
 
-    auto* instance =
+    auto instance =
         material_instance->get_or_create_resource_instance(
-            pipeline,
             frame
         );
 
     instance->update_uniform_buffer(
-        pipeline,
         "clouds_ubo",
         clouds_ubo,
         frame
     );
 
     instance->update_image(
-        pipeline,
         "u_depth",
         get_image(depth_texture),
         frame
     );
 
     instance->update_image(
-        pipeline,
         "u_noise",
         get_image(noise_texture),
         frame
@@ -623,7 +603,6 @@ void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
     auto cam = camera_resource->query_single(wireframe_pipeline);
 
     cam->update_uniform_buffer(
-        wireframe_pipeline,
         "camera_ubo",
         cam_ubo,
         frame
@@ -700,8 +679,8 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 
     auto& pass_preps =
         pass_preps_by_level[ctx.level];
-
-    PipelineObject* current_pipeline = nullptr;
+    
+    RBPipelineLayout current_pipeline_layout {};
 
     ctx.backend.update_viewport(
         ctx.cmd,
@@ -709,10 +688,6 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         use_swapchain_extent);
     
     bool is_depth_prepass = (ctx.pass_name == Name("DepthPrepass"));
-
-    // -------------------------------------------------
-    // 1️⃣ Gather visible + build sort keys
-    // -------------------------------------------------
 
     std::vector<ViewRenderItem> items;
     
@@ -724,9 +699,6 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         ctx.pass_name,
         items);
 
-    // -------------------------------------------------
-    // 2️⃣ Sort
-    // -------------------------------------------------
     if (ctx.pass_name == Name("DepthPrepass"))
     {
         PROFILE("draw_scene - sort");
@@ -737,57 +709,54 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
                 return a.sort_key < b.sort_key;
             });
     }
+    
+    
+    auto pbr = renderer->find_model("pbr");
+    std::shared_ptr<PipelineFamily> family = renderer->query_pipeline_family(ctx.pass_name, pbr);
 
-    // -------------------------------------------------
-    // 3️⃣ Draw
-    // -------------------------------------------------
     PROFILE("GenericRenderGraph::draw_scene - items");
     for (auto& item : items)
     {
         RenderPrimitive& prim = *item.primitive;
 
-        auto instance_it =
-            prim.material_instance_by_pass.find(ctx.pass_name);
-
-        if (instance_it ==
-            prim.material_instance_by_pass.end())
+        const RenderPrimitivePassInfo* info = prim.get_pass_info(ctx.pass_name);
+        
+        if (!info)
             continue;
+        
+        auto pipeline = info->pipeline_family->request_pipeline(info->pipeline_family->make_shader_key(info->material_instance->material, ctx.pass_name));
+        auto pipeline_layout = info->pipeline_family->get_pipeline_layout();
 
-        const auto& instance = instance_it->second;
+        const auto& instance = info->material_instance;
 
-        auto pipeline =
-            prim.pipeline_by_pass[ctx.pass_name];
+        
 
-        if (pipeline != current_pipeline)
+        if (pipeline_layout != current_pipeline_layout)
         {
-            current_pipeline = pipeline;
+            current_pipeline_layout = pipeline_layout;
 
             ctx.backend.bind_pipeline(
                 ctx.cmd,
                 pipeline);
 
             auto& prep =
-                pass_preps.at(pipeline);
+                pass_preps.at(pipeline_layout);
 
             prep.camera->bind(
-                pipeline,
                 ctx.cmd,
                 ctx.frame);
             
             if (!is_depth_prepass)
             {
                 prep.light->bind(
-                    pipeline,
                     ctx.cmd,
                     ctx.frame);
 
                 prep.shadow->bind(
-                    pipeline,
                     ctx.cmd,
                     ctx.frame);
 
                 prep.reflection->bind(
-                    pipeline,
                     ctx.cmd,
                     ctx.frame);
             }
@@ -795,7 +764,6 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         if (!is_depth_prepass)
         {
             instance->bind(
-               pipeline,
                ctx.cmd,
                ctx.frame);
         }
@@ -808,7 +776,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         ctx.backend.push_constants(
             ctx.cmd,
             *prim.world,
-            pipeline);
+            pipeline_layout);
 
         ctx.backend.draw_indexed(
             ctx.cmd,
@@ -823,143 +791,33 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
     
     auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
 
-    PipelineObject* current_pipeline = nullptr;
+    RBPipelineLayout current_pipeline_layout {};
     ctx.backend.update_viewport(ctx.cmd, Constants::shadowmap_extent);
 
     for (auto& prim : mesh_processor.primitives)
     {
-        auto instance_it = prim.material_instance_by_pass.find(ctx.pass_name);
-        if (instance_it == prim.material_instance_by_pass.end())
+        const RenderPrimitivePassInfo* info = prim.get_pass_info(ctx.pass_name);  // todo: temp crutch (provide shadow pass instead)
+        if (!info)
             continue;
+        auto pipeline = info->pipeline_family->request_pipeline(info->pipeline_family->make_shader_key(info->material_instance->material, ctx.pass_name));
+        
 
-        auto pipeline = prim.pipeline_by_pass[ctx.pass_name];
-        if (pipeline != current_pipeline)
+        RBPipelineLayout pipeline_layout = prim.get_pipeline_layout_by_pass(ctx.pass_name);
+        if (pipeline_layout != current_pipeline_layout)
         {
-            current_pipeline = pipeline;
+            current_pipeline_layout = pipeline_layout;
             ctx.backend.bind_pipeline(ctx.cmd, pipeline);
 
-            bind_shadow_globals(ctx, pipeline);
+            bind_shadow_globals(ctx, pipeline_layout);
         }
 
         ctx.backend.bind_mesh(ctx.cmd, prim.mesh, ctx.frame);
-        ctx.backend.push_constants(ctx.cmd, *prim.world, pipeline);
+        ctx.backend.push_constants(ctx.cmd, *prim.world, pipeline_layout);
         
         ctx.backend.draw_indexed(
             ctx.cmd,
             prim.mesh.get().indices.size());
     }
-    // auto& scene_view = engine->scene_view;
-    // auto cmd = ctx.cmd;
-    // auto frame = ctx.frame;
-    //
-    // PipelineObject* current_pipeline = nullptr;
-    //
-    // auto bind_light = [&](PipelineObject* pipeline)
-    // {
-    //     if (pipeline == current_pipeline)
-    //         return;
-    //
-    //     current_pipeline = pipeline;
-    //
-    //     auto& light_processor =
-    //         scene_view->get_processor<SceneViewProcessor_Light>();
-    //
-    //     LightUBO light_ubo{};
-    //     light_ubo.has_dir_light = 0;
-    //
-    //     for (auto& l : light_processor.lights)
-    //     {
-    //         if (l.type == LightType::directional)
-    //         {
-    //             light_ubo.has_dir_light = 1;
-    //             light_ubo.dir_light.direction = glm::vec4(glm::normalize(l.direction), 0.0f);
-    //             light_ubo.dir_light.color     = l.color;
-    //
-    //             auto& camera_processor = scene_view->get_processor<SceneViewProcessor_Camera>();
-    //             const RenderObject_Camera* cam_ro = camera_processor.get_active_camera();
-    //
-    //             light_ubo.dir_light.light_vp = build_dir_light_vp();
-    //
-    //             break; 
-    //         }
-    //
-    //     }
-    //
-    //     auto light = light_resource_shadow->query_single(pipeline);
-    //     light->update_uniform_buffer(
-    //         pipeline, "shadow_light_ubo", light_ubo, frame);
-    //     light->bind(pipeline, cmd, frame);
-    // };
-    //
-    // // =======================
-    // // Collect draw items
-    // // =======================
-    //
-    // struct DrawItem
-    // {
-    //     MeshPrimHandle mesh;
-    //     glm::mat4 world;
-    // };
-    //
-    // std::vector<DrawItem> items;
-    //
-    // auto& mesh_processor =
-    //     scene_view->get_processor<SceneViewProcessor_Mesh>();
-    //
-    // for (const auto& ro : mesh_processor.meshes)
-    // {
-    //     for (uint32_t geom = 0; geom < ro.mesh.get().mesh_geometry.size(); ++geom)
-    //     {
-    //         for (uint32_t prim = 0;
-    //              prim < ro.mesh.get().mesh_geometry[geom].primitives.size();
-    //              ++prim)
-    //         {
-    //             uint32_t mat_index =
-    //                 ro.mesh.get().mesh_geometry[geom]
-    //                     .primitives[prim].material_index.value_or(0);
-    //
-    //             auto material = ro.materials[mat_index];
-    //             Name blend_mode =
-    //                 material->get_enum_parameter(Names::blend_mode);
-    //
-    //             if (blend_mode != Names::blend_mode_opaque)
-    //                 continue;
-    //
-    //             items.push_back({
-    //                 .mesh = MeshPrimHandle{ro.mesh, geom, prim},
-    //                 .world = ro.world
-    //             });
-    //         }
-    //     }
-    // }
-    //
-    // // =======================
-    // // Draw
-    // // =======================
-    //
-    // auto pipeline_family =
-    //     renderer->query_pipeline_family(
-    //         "ShadowMap",
-    //         renderer->find_model("Shadow")
-    //         );
-    //
-    // PipelineObject* pipeline =
-    //     pipeline_family->request_pipeline({});
-    //
-    // ctx.backend.bind_pipeline(cmd, pipeline);
-    // bind_light(pipeline);
-    //
-    // for (auto& item : items)
-    // {
-    //
-    //     ctx.backend.get_or_create_mesh_buffers(item.mesh);
-    //     ctx.backend.bind_mesh(cmd, item.mesh, frame);
-    //
-    //     ctx.backend.push_constants(cmd, item.world, pipeline);
-    //
-    //     
-    // }
-    
 }
 
 void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture)
@@ -976,13 +834,11 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
     );
 
     prepared_clouds.camera->bind(
-        prepared_clouds.pipeline,
         cmd,
         frame
     );
 
     prepared_clouds.instance->bind(
-        prepared_clouds.pipeline,
         cmd,
         frame
     );
@@ -1030,7 +886,7 @@ void GenericRenderGraph::draw_wireframe(RenderGraphContext& ctx)
         ctx.cmd,
         wireframe_pipeline);
     
-    prepared_wireframe.camera->bind(wireframe_pipeline, ctx.cmd, frame);
+    prepared_wireframe.camera->bind(ctx.cmd, frame);
 
     const auto& primitives = debug_processor.primitives; 
     

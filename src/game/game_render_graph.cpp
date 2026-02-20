@@ -64,21 +64,18 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 std::shared_ptr<MaterialInstance> material_instance =
                     renderer->query_material_instance(tonemap_material, ctx.pass_name);
                  
-                auto* tonemap_instance =
+                auto tonemap_instance =
                     material_instance->get_or_create_resource_instance(
-                        tonemap_pipeline,
                         ctx.frame
                     );
                          
                 tonemap_instance->update_image(
-                    tonemap_pipeline,
                     "u_hdr_color",
                     get_image(hdr_color),
                     ctx.frame
                 );
                          
                 tonemap_instance->bind(
-                    tonemap_pipeline,
                     ctx.cmd,
                     ctx.frame
                 );
@@ -101,21 +98,18 @@ void GameRenderGraph::pass_shadow_debug(RenderGraphContext& ctx)
             
     auto shadow_debug_material_instance = renderer->query_material_instance(shadow_debug_material, ctx.pass_name);
     
-    RenderResourceInstance* shadow_debug_instance =
+    auto shadow_debug_instance =
         shadow_debug_material_instance->get_or_create_resource_instance(
-            shadow_debug_pipeline,
             ctx.frame
         );
     
-        shadow_debug_instance->update_image(
-            shadow_debug_pipeline,
-            "u_shadow_depth",
-            get_image(shadow_map),
-            ctx.frame
-        );
+    shadow_debug_instance->update_image(
+        "u_shadow_depth",
+        get_image(shadow_map),
+        ctx.frame
+    );
         
     shadow_debug_instance->bind(
-        shadow_debug_pipeline,
         ctx.cmd,
         ctx.frame
     );

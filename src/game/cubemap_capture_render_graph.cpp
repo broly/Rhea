@@ -108,22 +108,22 @@ void CubemapCaptureRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     {
         auto mat_inst = renderer->query_material_instance(irradiance_material, "IBL_Irradiance");
-        auto* inst = mat_inst->get_or_create_resource_instance(irradiance_pipeline, ctx.frame);
+        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
     
-        inst->update_image(irradiance_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+        inst->update_image("u_env_map", get_image(hdr_color), ctx.frame, 0, true);
     }
     {
         auto mat_inst = renderer->query_material_instance(prefilter_material, "IBL_Prefilter");
-        auto* inst = mat_inst->get_or_create_resource_instance(prefilter_pipeline, ctx.frame);
+        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
 
-        inst->update_image(prefilter_pipeline, "u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+        inst->update_image("u_env_map", get_image(hdr_color), ctx.frame, 0, true);
     } 
     
     {
         
    
         auto mat_inst = renderer->query_material_instance(brdf_lut_material, "IBL_BRDF_LUT");
-        auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
+        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
    
     }
 }

@@ -332,8 +332,8 @@ export namespace reflect::json
             const std::string name = std::string(Name); // todo: inefficient
             Json::Value const* json_value = json_object.find(std::string(name));
             
-            // if (is_optional_v<std::decay_t<decltype(struct_ref.*PtrToField)>> && !json_value)
-            //     return;
+            if (is_optional_v<std::decay_t<decltype(struct_ref.*PtrToField)>> && !json_value)
+                return;
             
             // checkf(json_value, "Required field %s is missing", name.c_str());
             if (!json_value)

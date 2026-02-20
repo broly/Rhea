@@ -2,6 +2,7 @@
 import <vulkan/vulkan_core.h>;
 import :helpers;
 import :log;
+import reflect;
 #include "render_backends/vk/vk_macro.h"
 
 void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame)
@@ -48,7 +49,7 @@ vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size
     return persistent_ubos[buffer_handle.get_identifier()];
 }
 
-std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type)
+std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type, Name debug_name)
 {
     auto& layout_data = descriptor_set_layouts.at(layout_handle);
     
@@ -71,6 +72,9 @@ std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_lay
                 &set
             ));
             
+            LogVkBufferManager.Log("allocate_descriptor_sets_for_layout. DescriptorSetLayout=%p, VkDescritorSet=%p (%s)",
+                layout_data.vk_layout, set, debug_name.to_string().c_str());
+            
             result.push_back(set);
         }
         return result;
@@ -89,6 +93,9 @@ std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_lay
             &alloc,
             &set
         ));
+        
+        LogVkBufferManager.Log("allocate_descriptor_sets_for_layout. DescriptorSetLayout=%p, VkDescritorSet=%p (%s)",
+            layout_handle, set, debug_name.to_string().c_str());
         
         return {set};
     }
@@ -139,17 +146,17 @@ RBDescriptorSetLayout vk::BufferManager::allocate_descriptor_layout_handle()
 }
 
 RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
-    const DescriptorSetLayoutDesc& descriptor_set_layout)
+    const DescriptorSetLayoutDesc& descriptor_set_layout, Name from_pass)
 {
     std::vector<VkDescriptorSetLayoutBinding> vk_bindings;
     vk_bindings.reserve(descriptor_set_layout.bindings.size());
 
-    for (const DescriptorBinding& b : descriptor_set_layout.bindings)
+    for (const ResourceBinding& b : descriptor_set_layout.bindings)
     {
         VkDescriptorSetLayoutBinding vk{};
-        vk.binding = b.binding_index;
-        vk.descriptorType = vk::to_vk_descriptor_type(b.type);
-        vk.descriptorCount = b.count;
+        vk.binding = *b.binding_index;
+        vk.descriptorType = vk::to_vk_descriptor_type(b.parameter.type);
+        vk.descriptorCount = 1; // b.count;
         vk.stageFlags = vk::to_vk_shader_stage_flags(b.stages);
         vk.pImmutableSamplers = nullptr;
 
@@ -175,16 +182,18 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
     };
     
     
-    LogVkBufferManager.Log("created descriptor set layout (debug_name=%s, set_index=%i), identifier: %p, num bindings: %i",
-        descriptor_set_layout.debug_name.to_string().c_str(), descriptor_set_layout.set_index, layout, vk_bindings.size());
-    for (const DescriptorBinding& b : descriptor_set_layout.bindings)
-    {
-        LogVkBufferManager.Log("  * binding %i, type %s, stages mask: %i ",
-            b.binding_index, to_string(b.type), b.stages);
-    }
-    
     RBDescriptorSetLayout handle = allocate_descriptor_layout_handle();
     descriptor_set_layouts[handle] = layout_data;
+    
+    
+    LogVkBufferManager.Log("created descriptor set layout (debug_name=%s, set_index=%i), identifier: %p, num bindings: %i. DescriptorSetLayout: %p, from pass: %s",
+        descriptor_set_layout.debug_name.to_string().c_str(), descriptor_set_layout.set_index, layout, vk_bindings.size(), handle, from_pass.to_string().c_str());
+    for (const ResourceBinding& b : descriptor_set_layout.bindings)
+    {
+        LogVkBufferManager.Log("  * binding %i, type %s, name: %s, stages mask: %i ",
+            b.binding_index, reflect::enum_name(b.parameter.type).to_string().c_str(), b.parameter.variable->to_string().c_str(), b.stages);
+    }
+    
 
     return handle;
 }

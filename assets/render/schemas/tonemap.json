@@ -1,20 +1,11 @@
 {
 	"model_name": "Tonemap",
 	
-	"usage_type": "frame",
-	
 	"enums": {},
 	"uniform_buffers": {},
 	
-	"parameters": {
-		"hdr_color": {
-			"type": "sampler",
-			"sampler": "default",
-			"variable": "u_hdr_color",
-			"binding": "BINDING_SAMPLER_HDR_COLOR",
-			"passes": ["ToneMapping"]
-		}
-	},	
+	"material_resource": "hdr_color",
+		
 	"permutations": {
 		"flags": {},
 		"enums": {}
@@ -22,16 +13,22 @@
 	"passes": [
 		{
 			"name": "ToneMapping",
-			"set": "SET_TONEMAP",
 			"requirements": "",
-			"shaders": {
-				"vertex": "fullscreen.vert",
-				"fragment": "tonemap.frag"
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "tonemap.frag",
+					"resources": ["hdr_color"]
+				}
 			},
 			"cull_mode": "none",
 			"front_face": "CW",
 			"compare_op": "greater",
 			"resources": [],
+			"push_constants": [],
 			"translucent": false,
 			"depth_test": false,
 			"depth_write": false,

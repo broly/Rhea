@@ -263,7 +263,33 @@ export namespace vk
         return extent;
     }
 
+    
+    inline VkDescriptorType to_vk_descriptor_type(MaterialParamType type)
+    {
+        switch (type)
+        {
+        case MaterialParamType::uniform:
+            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
+        // case MaterialParamType::storage_buffer:
+        //     return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+        case MaterialParamType::sampler:
+            return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+        // case DescriptorType::SampledImage:
+        //     return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+
+        // case DescriptorType::CombinedImageSampler:
+        //     return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+        default:
+            assert(false);
+            return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+        }
+    }
+
+    [[deprecated]]
     inline VkDescriptorType to_vk_descriptor_type(DescriptorType type)
     {
         switch (type)

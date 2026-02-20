@@ -14,4 +14,10 @@
     </DisplayString>
   </Type>
 
+  <Type Name="TextureHandle">
+    <DisplayString>
+      {TextureHandleDebugResolve(id)}
+    </DisplayString>
+  </Type>
+
 </AutoVisualizer>

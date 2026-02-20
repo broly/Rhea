@@ -45,7 +45,7 @@ void BrdfLutCaptureRenderGraph::prepare_resources(RenderGraphContext& ctx)
 
     {
         auto mat_inst = renderer->query_material_instance(brdf_lut_material, "IBL_BRDF_LUT");
-        auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
+        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
     }
 }
 
@@ -61,9 +61,9 @@ void BrdfLutCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
            ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);
    
            auto mat_inst = renderer->query_material_instance(brdf_lut_material, ctx.pass_name);
-           auto* inst = mat_inst->get_or_create_resource_instance(brdf_lut_pipeline, ctx.frame);
+           auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
    
-           inst->bind(brdf_lut_pipeline, ctx.cmd, ctx.frame);
+           inst->bind(ctx.cmd, ctx.frame);
            ctx.backend.update_viewport(ctx.cmd, {512, 512});
            ctx.backend.draw_fullscreen(ctx.cmd);
        }

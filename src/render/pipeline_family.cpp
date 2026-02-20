@@ -11,6 +11,7 @@ import string_helpers;
 import expr;
 import assets;
 import :renderer;
+import :material_model;
 
 import log;
 #include "logging/log_macro.h"
@@ -53,8 +54,89 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
                 .offset = (uint32_t)field_info->offset,
             });
         }
-        layout.vertex_layout.layouts.push_back(std::move(data));
+        layout_desc.vertex_layout.layouts.push_back(std::move(data));
     }
+    layout_desc.pass = in_pass_name;
+    
+    
+    
+    int set_index = 0;
+    std::map<Name, uint32_t> processed_resources;
+    for (const auto& [stage, stage_info] : pass->stages)
+    {
+        for (auto resource_name : stage_info.resources)
+        {
+            if (processed_resources.contains(resource_name))
+            {
+                const size_t index = processed_resources.at(resource_name);
+                for (ResourceBinding& var : layout_desc.resources[index].resource_variable_bindings)
+                {
+                    var.stages |= stage;
+                }
+                continue;
+            }
+            
+            GraphicsPipelineResourceInfo resource_info;
+            auto resource = renderer->find_resource(resource_name);
+            checkf(resource, "could not find resource named %s", resource_name.to_string().c_str());
+        
+            resource_info.resource = resource;
+        
+            auto& resource_desc = resource->desc;
+        
+            resource_info.set = set_index;
+            resource_info.name = resource_name;
+        
+            uint32_t binding_index = 0;
+            for (auto variable : resource_desc.variables)
+            {
+                std::optional<RBSampler> sampler;
+                if (variable.parameter.sampler.has_value())
+                     sampler.emplace(renderer->get_sampler(*variable.parameter.sampler));
+                resource_info.resource_variable_bindings.push_back(ResourceBinding{
+                    variable.parameter, 
+                    binding_index,
+                    sampler,
+                    stage
+                    });
+                binding_index++;
+            }
+        
+            set_index++;
+            
+            
+                        
+            layout_desc.resources.push_back(resource_info);
+            const size_t index = layout_desc.resources.size() - 1;
+            processed_resources.insert({resource_name, index});
+            
+        }
+    }
+    
+    
+    size_t cur_offset = 0;
+    layout_desc.push_constants.clear();
+    for (auto& push_constant_info : pass->push_constants)
+    {
+        size_t pc_size = 0;
+        if (push_constant_info.type == "uint32_t")
+        {
+            pc_size = sizeof(uint32_t);
+        } else
+        {
+            const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(push_constant_info.type);
+            pc_size = info->size;
+        }
+        PushConstantRange pcr;
+        pcr.size = pc_size;
+        pcr.offset = cur_offset;
+        pcr.stages = make_shader_stages_mask(push_constant_info.stages);
+        cur_offset += pc_size;
+        layout_desc.push_constants.push_back(pcr);
+    }
+    
+    pipeline_layout = backend->create_pipeline_layout(layout_desc);
+    
 }
 
 ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> material, Name pass_name) const
@@ -65,13 +147,17 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> materi
     uint64_t bits = 0;
     uint8_t bit_index = 0;
     
+    checkf(model->material_resource.has_value(), "Model should provide material resource");
+    auto resource_info = renderer->find_resource_info(*model->material_resource);
+    
     std::vector<Name> provided_options;
 
     std::set<Name> consumed;
     
+    
     expr::Context ctx;
     
-    for (const auto& [param_name, param_info] : model->parameters)
+    for (const auto& [param_name, param_info] : resource_info->resource.parameters)
     {
         if (param_info.type == MaterialParamType::sampler)
         {
@@ -142,11 +228,13 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     desc.is_translucent = pass->translucent;
     desc.cull_mode = pass->cull_mode;
     desc.front_face = pass->front_face;
-    desc.no_color_attachments = pass->no_color_attachments;
+    desc.no_color_attachments = pass->no_color_attachments.has_value() ? *pass->no_color_attachments : false;
     desc.compare_op = pass->compare_op;
     desc.depth_bias = pass->depth_bias ? *pass->depth_bias : DepthBiasInfo{};
     desc.topology = pass->topology;
-    desc.layout = layout;
+    desc.layout = layout_desc;
+    desc.layout.pipeline_layout = pipeline_layout;
+    
     
     // add attributes support for vertex shader
     int location = 0;
@@ -159,89 +247,39 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         }
     }
     
-    int set_index = 0;
-    for (auto resource_name : pass->resources)
+    for (auto& resource : layout_desc.resources)
     {
-        GraphicsPipelineResourceInfo resource_info;
-        auto resource = renderer->find_resource(resource_name);
-        checkf(resource, "could not find resource named %s", resource_name.to_string().c_str());
+        const Name resource_set_name = resource.resource->desc.set;
+        const uint16_t resource_set = resource.set;
+        defines.insert({resource_set_name, resource_set});
         
-        resource_info.resource = resource;
-        
-        auto& resource_desc = resource->desc;
-        
-        defines.insert({resource_desc.set, set_index});
-        resource_info.set = set_index;
-        
-        int binding_index = 0;
-        for (auto variable : resource_desc.variables)
+        for (auto& variable_binding : resource.resource_variable_bindings)
         {
-            defines.insert({variable.binding, binding_index});
-            resource_info.resource_variable_bindings.push_back(binding_index);
-            binding_index++;
+            const Name binding_name = *variable_binding.parameter.binding;
+            const uint16_t binding = *variable_binding.binding_index;
+            defines.insert({binding_name, binding});
         }
-        
-        set_index++;
-        
-        desc.layout.resources.push_back(resource_info);
     }
-
-    {
-        defines.insert({pass->set, set_index});
-        int binding_index = 0;
-        GraphicsPipelineResourceInfo material_resource_info;
-        material_resource_info.set = set_index;
-        for (const auto& [name, param] : model->parameters)
-        {
-            if (param.type == MaterialParamType::sampler || param.type == MaterialParamType::uniform)
-            {
-                // if (!param.passes.contains(pass->name))
-                //     continue;
-                checkf(param.binding, "Binding definition must be set");
-                defines.insert({*param.binding, binding_index});
-                material_resource_info.resource_variable_bindings.push_back(binding_index);
-                binding_index++;
-            }
-        }
-        
-        RenderResource* material_resource = renderer->query_resource(model, pass->name);
-        material_resource_info.resource = material_resource;
     
-        desc.layout.resources.push_back(material_resource_info);
-    }
-    for (const auto& [stage_enum, shader_name] : pass->shaders)
+    for (const auto& [shader_stage, stage_info] : pass->stages)
     {
         GraphicsPipelineStage stage;
-        stage.stage = stage_enum;
-        stage.compiled_shader = request_permutation(shader_name, key, defines).string();
+        stage.stage = shader_stage;
+        stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines).string();
         desc.stages.push_back(stage);
     }
+    
 
     
-    size_t cur_offset = 0;
-    desc.layout.push_constants.clear();
-    for (auto& push_constant_info : pass->push_constants)
-    {
-        size_t pc_size = 0;
-        if (push_constant_info.type == "uint32_t")
-        {
-            pc_size = sizeof(uint32_t);
-        } else
-        {
-            const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(push_constant_info.type);
-            pc_size = info->size;
-        }
-        PushConstantRange pcr;
-        pcr.size = pc_size;
-        pcr.offset = cur_offset;
-        pcr.stages = make_shader_stages_mask(push_constant_info.stages);
-        cur_offset += pc_size;
-        desc.layout.push_constants.push_back(pcr);
-    }
     auto pipeline = backend->create_pipeline(desc);
     pipelines[key.key] = pipeline;
 
     return pipeline;
+}
+
+RBPipelineLayout PipelineFamily::get_pipeline_layout() const
+{
+    return pipeline_layout;
 }
 
 

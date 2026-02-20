@@ -107,15 +107,19 @@ void SceneViewProcessor_Mesh::process()
                         auto geom_pipeline_family =
                             renderer.query_pipeline_family(pass_name, model);
 
-                        auto pipeline =
-                            geom_pipeline_family->request_pipeline(
-                                geom_pipeline_family->make_shader_key(
-                                    instance->material,
-                                    pass_name));
+                        // auto pipeline =
+                        //     geom_pipeline_family->request_pipeline(
+                        //         geom_pipeline_family->make_shader_key(
+                        //             instance->material,
+                        //             pass_name));
                     
-                        rp.pipeline_by_pass[pass_name] = pipeline;
-                        rp.pipeline_family_by_pass[pass_name] = geom_pipeline_family;
-                        rp.material_instance_by_pass[pass_name] = instance;
+                        // rp.pipeline_by_pass[pass_name] = pipeline;
+                        rp.passes.emplace(pass_name);
+                        auto& info = rp.info_by_pass[pass_name];
+                        info.pipeline_family = geom_pipeline_family;
+                        info.material_instance = instance;
+                        if (pass_name != "shadowmap")
+                            instance->get_or_create_resource_instance(0 /* material is persistent */);
                     
                         primitives.push_back(rp);
                         ro.primitives.push_back(primitives.size() - 1);
@@ -187,13 +191,13 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
         if (!frustum.test_aabb_world(prim.bounds))
             continue;
         
-        auto pipeline_family_it = prim.pipeline_family_by_pass.find(pass_name);
+        auto info_it = prim.info_by_pass.find(pass_name);
         
-        if (pipeline_family_it == prim.pipeline_family_by_pass.end())
+        if (info_it == prim.info_by_pass.end())
             continue;
 
-        auto pipeline_family = pipeline_family_it->second;
-        auto material_instancce = prim.material_instance_by_pass[pass_name];
+        auto pipeline_family = info_it->second.pipeline_family;
+        auto material_instancce = info_it->second.material_instance;
 
         float depth =
             compute_view_depth(view_matrix, *prim.world);

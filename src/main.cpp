@@ -25,6 +25,11 @@ extern "C" const char* MeshHandleDebugResolve(uint32_t id)
     return AssetManager::get().get_mesh(MeshHandle{id}).name.c_str();
 }
 
+extern "C" const char* TextureHandleDebugResolve(uint32_t id)
+{
+    return AssetManager::get().get_texture(TextureHandle{id}).name.c_str();
+}
+
 int main() 
 {
     LogMain.Log("Engine init");

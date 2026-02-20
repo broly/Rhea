@@ -3,6 +3,10 @@ module vk:vertex_buffer_mgr;
 import :helpers;
 import <vulkan/vulkan_core.h>;
 #include "render_backends/vk/vk_macro.h"
+#include "logging/log_macro.h"
+import log;
+
+DEFINE_LOGGER(LogVertexBufferMgr, Log);
 
 RBVertexBufferHandle vk::VertexBufferManager::create_vertex_buffer(const VertexBufferDesc& desc)
 {
@@ -10,10 +14,6 @@ RBVertexBufferHandle vk::VertexBufferManager::create_vertex_buffer(const VertexB
     info.per_frame_size = desc.frame_size;
     info.total_size = desc.frame_size * vk::MAX_FRAMES_IN_FLIGHT;
     info.dynamic = desc.dynamic;
-
-    // -------------------------------------------------
-    // 1️⃣ Create VkBuffer
-    // -------------------------------------------------
 
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -26,10 +26,6 @@ RBVertexBufferHandle vk::VertexBufferManager::create_vertex_buffer(const VertexB
         &bufferInfo,
         nullptr,
         &info.buffer));
-
-    // -------------------------------------------------
-    // 2️⃣ Memory requirements
-    // -------------------------------------------------
 
     VkMemoryRequirements memReq{};
     vkGetBufferMemoryRequirements(device, info.buffer, &memReq);
@@ -50,10 +46,6 @@ RBVertexBufferHandle vk::VertexBufferManager::create_vertex_buffer(const VertexB
     uint32_t memoryTypeIndex =
         find_memory_type(physical_device, memReq.memoryTypeBits, properties);
 
-    // -------------------------------------------------
-    // 3️⃣ Allocate memory
-    // -------------------------------------------------
-
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize  = memReq.size;
@@ -70,10 +62,6 @@ RBVertexBufferHandle vk::VertexBufferManager::create_vertex_buffer(const VertexB
         info.buffer,
         info.memory,
         0));
-
-    // -------------------------------------------------
-    // 4️⃣ Persistent map (if dynamic)
-    // -------------------------------------------------
 
     if (desc.dynamic)
     {
@@ -106,6 +94,7 @@ void* vk::VertexBufferManager::get_mapped_pointer(RBVertexBufferHandle handle, R
 
 void vk::VertexBufferManager::bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame)
 {
+    LogVertexBufferMgr.Log("Bind vertex buffer handle=%p, cmd=%p", handle, cmd);
     const VertexBufferInfo& info = vertex_buffers[handle.as<uint32_t>()];
 
     VkDeviceSize offset = info.dynamic ? frame * info.per_frame_size : 0;

@@ -47,10 +47,10 @@ namespace vk
         
         void bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame);
         vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index);
-        std::vector<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type);
+        std::vector<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type, Name debug_name);
         void create_descriptor_pool();
         RBDescriptorSetLayout allocate_descriptor_layout_handle();
-        RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout);
+        RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout, Name from_pass);
         DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
         RBBufferHandle create_uniform_buffer(size_t size, ResourceUsageType resource_usage);
         
