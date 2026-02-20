@@ -17,8 +17,6 @@ namespace vk
 
         VkSemaphore image_available = VK_NULL_HANDLE;
         VkFence in_flight = VK_NULL_HANDLE;
-        
-        VkSemaphore render_finished;
     };
     
     class SwapchainControl
@@ -78,5 +76,6 @@ namespace vk
         
         bool framebuffer_resized = false;
         std::vector<VkFence> images_in_flight;
+        std::vector<VkSemaphore> render_finished_per_image;
     };
 }

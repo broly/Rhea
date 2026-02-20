@@ -117,6 +117,19 @@ void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
     }
     
     images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+    
+    render_finished_per_image.resize(swapchain_image_handles.size());
+
+    VkSemaphoreCreateInfo sem_ci{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+
+    for (size_t i = 0; i < render_finished_per_image.size(); ++i)
+    {
+        VK_CHECK(vkCreateSemaphore(
+            instance.device,
+            &sem_ci,
+            nullptr,
+            &render_finished_per_image[i]));
+    }
 }
 
 void vk::SwapchainControl::recreate_swapchain()
@@ -222,7 +235,8 @@ bool vk::SwapchainControl::submit_frame(
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &f.render_finished;
+    VkSemaphore render_finished = render_finished_per_image[current_swapchain_index];
+    submit.pSignalSemaphores = &render_finished;
 
     VK_CHECK(vkQueueSubmit(
         instance.graphics_queue,
@@ -234,7 +248,7 @@ bool vk::SwapchainControl::submit_frame(
         VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
 
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &f.render_finished;
+    present.pWaitSemaphores = &render_finished;
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain;
     present.pImageIndices = &current_swapchain_index;
@@ -295,6 +309,13 @@ void vk::SwapchainControl::cleanup()
     }
     // images_in_flight.clear();
     // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+    for (auto sem : render_finished_per_image)
+    {
+        if (sem != VK_NULL_HANDLE)
+            vkDestroySemaphore(instance.device, sem, nullptr);
+    }
+
+    render_finished_per_image.clear();
 }
 
 void vk::SwapchainControl::create_sync_objects()
@@ -309,10 +330,6 @@ void vk::SwapchainControl::create_sync_objects()
         VK_CHECK(vkCreateSemaphore(
             instance.device, &sem_ci, nullptr,
             &frames[i].image_available));
-
-        VK_CHECK(vkCreateSemaphore(
-            instance.device, &sem_ci, nullptr,
-            &frames[i].render_finished));
 
         VK_CHECK(vkCreateFence(
             instance.device, &fence_ci, nullptr,
