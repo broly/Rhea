@@ -308,11 +308,11 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         nullptr,
         &vk_pipeline));
     
-    LogVkPipeline.Log<DisplayFn>("Created graphics pipeline %p (pass: %s, pipeline_layout: %p):",
+    LogVkPipeline.Log<Display>("Created graphics pipeline %p (pass: %s, pipeline_layout: %p):",
         vk_pipeline, pipeline_desc->pass_name.to_string().c_str(), pipeline_desc->layout.pipeline_layout);
     for (auto& stage : pipeline_desc->stages)
     {
-        LogVkPipeline.Log<DisplayFn>(" * stage '%s', shader: '%s'", 
+        LogVkPipeline.Log<Display>(" * stage '%s', shader: '%s'", 
             reflect::enum_name(stage.stage).to_string().c_str(),
             stage.compiled_shader->c_str());
     }

@@ -59,7 +59,7 @@ struct FixedString
 template<size_t Num>
 FixedString(char const (&)[Num]) -> FixedString<Num - 1>;
 
-template<FixedString FS>
+export template<FixedString FS>
 constexpr auto operator"" _fixed ()
 {
     return FS;

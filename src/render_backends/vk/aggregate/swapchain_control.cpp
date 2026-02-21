@@ -16,8 +16,6 @@ void vk::SwapchainControl::create()
     init(VK_NULL_HANDLE);
     
     create_sync_objects();
-
-    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 }
 
 void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
@@ -307,8 +305,7 @@ void vk::SwapchainControl::cleanup()
         vkDestroySwapchainKHR(instance.device, swapchain, nullptr);
         swapchain = VK_NULL_HANDLE;
     }
-    // images_in_flight.clear();
-    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+
     for (auto sem : render_finished_per_image)
     {
         if (sem != VK_NULL_HANDLE)

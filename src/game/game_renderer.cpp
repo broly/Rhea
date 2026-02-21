@@ -24,7 +24,7 @@ import :brdf_lut_capture_render_graph;
 import log;
 #include "logging/log_macro.h"
 
-DEFINE_LOGGER(LogGameRenderer, DisplayFn);
+DEFINE_LOGGER(LogGameRenderer, Display);
 
 void GameRenderer::set_engine(const std::shared_ptr<Engine>& in_engine)
 {

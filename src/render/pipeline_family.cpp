@@ -20,7 +20,7 @@ import log;
 #include "common/projection.h"
 #include "profiling/profile.h"
 
-DEFINE_LOGGER(LogPipelineFamily, DisplayFn);
+DEFINE_LOGGER(LogPipelineFamily, Display);
 
 
 void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend,

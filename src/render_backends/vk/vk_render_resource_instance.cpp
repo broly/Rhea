@@ -2,6 +2,7 @@
 import :render_resource;
 import :render_backend;
 import profile;
+import array_helpers;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -68,17 +69,35 @@ void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle fr
 {
     PROFILE("VkRenderResourceInstance::bind");
     
-    auto inst_info = resource->backend.pipeline_manager.instance_pipeline_data.at(this);
-    auto& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({resource, RBPipelineLayout(pipeline_layout)});
+    if (!has_set_per_frame)
+    {
+        vk::PipelineManager::ResorceInstancePipelineData inst_info = resource->backend.pipeline_manager.
+                                                                               instance_pipeline_data.at(this);
+        checkf(array_size(set_per_frame) >= inst_info.sets_per_frame.size(),
+            "Array too large");
+        for (int i = 0; i < inst_info.sets_per_frame.size(); ++i)
+        {
+            set_per_frame[i] = inst_info.sets_per_frame[i];
+        }
+        has_set_per_frame = true;
+    }
+    if (!set_index.has_value())
+    {
+        vk::VkRenderResourcePipelineInfo& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({
+            resource, RBPipelineLayout(pipeline_layout)
+        });
+        
+        set_index = pipe_info.descritor_set_layout_desc.set_index;
+    }
 
     const uint32_t frame_index = usage.frame_index(frame);
 
-    const RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
+    const RBDescriptorSet set = set_per_frame[frame_index];
     
 
     resource->backend.bind_descriptor_set(
         command_list,
-        pipe_info.descritor_set_layout_desc.set_index,
+        *set_index,
         set,
         pipeline_layout,
         resource->desc.name);

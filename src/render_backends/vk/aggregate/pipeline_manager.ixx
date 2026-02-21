@@ -5,6 +5,8 @@ import <map>;
 import :render_resource;
 import :pipeline;
 import render;
+import hash_utils;
+import <type_traits>;
 
 namespace vk
 {
@@ -20,10 +22,36 @@ namespace vk
         frame_list<RBDescriptorSet> sets_per_frame;
         std::vector<frame_list<RBBufferHandle>> buffers;
     };
-
-    export using UniqueResourcePair = std::tuple<const VkRenderResource*, RBPipelineLayout>;
-    export using UniqueResourceTrio = std::tuple<const VkRenderResource*, RBPipelineLayout, uint32_t>;
     
+    struct UniqueResourcePair
+    {
+        const VkRenderResource* resource;
+        RBPipelineLayout pipeline_layout;
+        
+        bool operator==(const UniqueResourcePair& other) const
+        {
+            return resource == other.resource && pipeline_layout == other.pipeline_layout;
+        }
+    };
+
+    export using UniqueResourceTrio = std::tuple<const VkRenderResource*, RBPipelineLayout, uint32_t>;
+}
+
+export template<>
+struct std::hash<vk::UniqueResourcePair>
+{
+    size_t operator()(const vk::UniqueResourcePair& h) const noexcept
+    {
+        size_t seed = 0;
+        hash_combine(seed, (size_t)h.resource);
+        hash_combine(seed, (size_t)h.pipeline_layout);
+        return seed;
+    }
+};
+    
+
+namespace vk
+{
     export class PipelineManager
     {
     public:
@@ -84,8 +112,9 @@ namespace vk
             std::vector<std::vector<RBBufferHandle>> buffers = {}; // [binding][frame]
         };
     
-        std::map<VkRenderResourceInstance*, ResorceInstancePipelineData> instance_pipeline_data;
+        std::unordered_map<VkRenderResourceInstance*, ResorceInstancePipelineData> instance_pipeline_data;
 
-        std::map<UniqueResourcePair, VkRenderResourcePipelineInfo> resources_pipeline_info;
+        std::unordered_map<UniqueResourcePair, VkRenderResourcePipelineInfo> resources_pipeline_info;
     };
 }
+

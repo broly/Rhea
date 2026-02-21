@@ -12,7 +12,7 @@ import <vulkan/vulkan_core.h>;
 		VkResult err = x;                                           \
 		if (err)                                                    \
 		{                                                           \
-			std::cout <<"Detected Vulkan error: " << err << std::endl; \
+			std::cout <<"Detected Vulkan error at " << __FILE__ << ":" << __LINE__ << ": " << err << std::endl; \
 			abort();                                                \
 		}                                                           \
 	} while (0)

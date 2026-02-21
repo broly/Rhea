@@ -21,7 +21,7 @@ import :pipeline;
 import profile;
 import reflect;
 
-DEFINE_LOGGER(LogVkCommands, DisplayFn);
+DEFINE_LOGGER(LogVkCommands, Display);
 
 void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
 {
@@ -494,10 +494,10 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     VkRenderPass rp;
     VK_CHECK(vkCreateRenderPass(instance.get_device(), &rpci, nullptr, &rp));
     
-    LogRBRenderPass.Log<DisplayFn>("Render pass %p created (%s)", rp, fb.pass.to_string().c_str());
+    LogRBRenderPass.Log<Display>("Render pass %p created (%s)", rp, fb.pass.to_string().c_str());
     for (int i = 0; auto& attachment : attachments)
     {
-        LogRBRenderPass.Log<DisplayFn>(" * attachment %i. rp=%p, format=%s, initialLayout=%s, finalLayout=%s, loadOp=%s, storeOp=%s", 
+        LogRBRenderPass.Log<Display>(" * attachment %i. rp=%p, format=%s, initialLayout=%s, finalLayout=%s, loadOp=%s, storeOp=%s", 
             i, rp, 
             vk::enum_to_string(attachment.format).data(),
             vk::enum_to_string(attachment.initialLayout).data(),

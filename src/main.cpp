@@ -13,7 +13,7 @@ import assets;
 
 #include "logging/log_macro.h"
 
-DEFINE_LOGGER(LogMain, DisplayFn);
+DEFINE_LOGGER(LogMain, Display);
 
 extern "C" const char* NameDebugResolve(uint32_t id)
 {

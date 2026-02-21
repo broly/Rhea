@@ -23,6 +23,10 @@ public:
     const VkRenderResource* resource;
     ResourceUsage usage;
     VkPipelineLayout pipeline_layout;
+    
+    bool has_set_per_frame = false;
+    RBDescriptorSet set_per_frame[5];
+    std::optional<uint32_t> set_index;
 
     // std::map<VkPipelineObject*, PerPipelineData> per_pipeline;
 };

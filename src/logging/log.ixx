@@ -55,31 +55,31 @@ struct LogVerbosityLevelTraits
 
 
 
-#define DEFAULT_GLOBAL_VERBOSITY DisplayFn
+#define DEFAULT_GLOBAL_VERBOSITY Display
 
 DEFINE_VERBOSITY(Critical, 0, file | line | function, print_error);
 DEFINE_VERBOSITY(Error, 1, file | line | function, print_error);
 DEFINE_VERBOSITY(Warning, 2, no_detail, print_error);
-DEFINE_VERBOSITY(DisplayFn, 3, function, print_text);
+DEFINE_VERBOSITY(Display, 3, function, print_text);
 DEFINE_VERBOSITY(Log, 4, no_detail, print_text);
 DEFINE_VERBOSITY(Verbose, 5, no_detail, print_text);
 DEFINE_VERBOSITY(VeryVerbose, 6, no_detail, print_text);
 
 
-export template<size_t LogNameSize>
+export template<LogVerbosity compile_time_verbosity, auto log_name>
 struct Logger
 {
-    constexpr Logger(FixedString<LogNameSize> in_name, LogVerbosity in_default_verbosity) noexcept
-        : name(in_name)
-        , default_verbosity_level(in_default_verbosity.verbosity_level)
-    {
-        
-    }
+    // constexpr Logger(FixedString<LogNameSize> in_name) noexcept
+    //     : name(in_name)
+    //     // , default_verbosity_level(in_default_verbosity.verbosity_level)
+    // {
+    //     
+    // }
     
     template<LogVerbosity verbosity = DEFAULT_GLOBAL_VERBOSITY, typename Fmt, typename... Args>
     void Log(Fmt&& fmt, Args&&... args) const
     {
-        if (verbosity.verbosity_level <= default_verbosity_level)
+        if constexpr (verbosity.verbosity_level <= compile_time_verbosity.verbosity_level)
         {
             char const buffer[1024] = {};
             sprintf_s(
@@ -94,19 +94,16 @@ struct Logger
                 (char* const)buffer2, 
                 1024, 
                 "%s: %s", 
-                name.buffer, buffer);
+                log_name.buffer, buffer);
             
             verbosity.output(buffer2);
         }
     }
-    
-    FixedString<LogNameSize> name;
-    size_t default_verbosity_level;
 };
 
 
-export template<size_t Num>
-Logger(char const (&)[Num], LogVerbosity DefaultVerbosity) -> Logger<Num - 1>;
+export template<LogVerbosity compile_time_verbosity, size_t Num>
+Logger(char const (&)[Num]) -> Logger<compile_time_verbosity, Num - 1>;
 
 
-export DEFINE_LOGGER(LogTemp, DisplayFn);
+export DEFINE_LOGGER(LogTemp, Display);

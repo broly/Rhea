@@ -11,7 +11,7 @@ import <cassert>;
 import log;
 #include "logging/log_macro.h"
 
-DEFINE_LOGGER(LogVkInstance, DisplayFn);
+DEFINE_LOGGER(LogVkInstance, Display);
 
 constexpr const char* VALIDATION_LAYERS[] = {
     "VK_LAYER_KHRONOS_validation"
