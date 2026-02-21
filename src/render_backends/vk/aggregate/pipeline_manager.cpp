@@ -80,7 +80,8 @@ RBPipelineLayout vk::PipelineManager::create_layout(const PipelineLayoutDesc& de
     return result;
 }
 
-std::shared_ptr<VkRenderResourceInstance> vk::PipelineManager::query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsageType usage)
+std::shared_ptr<VkRenderResourceInstance> vk::PipelineManager::query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsage
+    usage)
 {
     auto& instances_list = unique_resource_instances[{resource, pipeline_layout, unique_id}];
     
@@ -222,7 +223,7 @@ void vk::PipelineManager::update_buffers()
 
             inst.sets_per_frame =
                 buffer_manager.allocate_descriptor_sets_for_layout(
-                    info.layout, resource->desc.usage_type, resource->desc.name);
+                    info.layout, resource->desc.usage, resource->desc.name);
 
             inst.buffers.resize(info.descritor_set_layout_desc.bindings.size());
 
@@ -240,7 +241,7 @@ void vk::PipelineManager::update_buffers()
 
                 for (size_t frame = 0; frame < inst.sets_per_frame.size(); ++frame)
                 {
-                    RBBufferHandle buffer = buffer_manager.create_uniform_buffer(*binding.parameter.size, resource->desc.usage_type);
+                    RBBufferHandle buffer = buffer_manager.create_uniform_buffer(*binding.parameter.size, resource->desc.usage);
 
                     buffer_manager.bind_buffer_to_descriptor(
                         inst.sets_per_frame[frame],

@@ -219,12 +219,12 @@ export
         RBBufferHandle(uint64_t in_handle = 0) 
             : handle(in_handle) {}
         
-        RBBufferHandle(uint32_t identifier, ResourceUsageType usage_type)
+        RBBufferHandle(uint32_t identifier, ResourceUsage usage_type)
             : identifier(identifier), usage_type(usage_type) {}
         
         AUTO_SPACESHIP(RBBufferHandle, handle);
         
-        ResourceUsageType get_usage_type() const
+        ResourceUsage get_usage_type() const
         {
             return usage_type;
         }
@@ -240,7 +240,7 @@ export
             struct
             {
                 uint32_t identifier;
-                ResourceUsageType usage_type;
+                ResourceUsage usage_type;
             };
             uint64_t handle = 0;
         };

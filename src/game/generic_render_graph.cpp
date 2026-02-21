@@ -711,7 +711,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         ctx.pass_name,
         items);
 
-    if (ctx.pass_name == Name("DepthPrepass"))
+    // if (ctx.pass_name == Name("DepthPrepass"))
     {
         PROFILE("draw_scene - sort");
         std::sort(items.begin(), items.end(),
@@ -725,6 +725,15 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     
     auto pbr = renderer->find_model("pbr");
     std::shared_ptr<PipelineFamily> family = renderer->query_pipeline_family(ctx.pass_name, pbr);
+    
+    camera_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
+    
+    if (!is_depth_prepass)
+    {
+        shadow_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
+        light_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
+        reflection_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
+    }
 
     PROFILE("GenericRenderGraph::draw_scene - items");
     for (auto& item : items)
@@ -736,12 +745,10 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         if (!info)
             continue;
         
-        auto pipeline = info->pipeline_family->request_pipeline(info->pipeline_family->make_shader_key(info->material_instance->material, ctx.pass_name));
+        auto pipeline = info->pipeline;
         auto pipeline_layout = info->pipeline_family->get_pipeline_layout();
 
         const auto& instance = info->material_instance;
-
-        
 
         if (pipeline_layout != current_pipeline_layout)
         {
@@ -750,28 +757,6 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
             ctx.backend.bind_pipeline(
                 ctx.cmd,
                 pipeline);
-
-            auto& prep =
-                pass_preps.at(pipeline_layout);
-
-            prep.camera->bind(
-                ctx.cmd,
-                ctx.frame);
-            
-            if (!is_depth_prepass)
-            {
-                prep.light->bind(
-                    ctx.cmd,
-                    ctx.frame);
-
-                prep.shadow->bind(
-                    ctx.cmd,
-                    ctx.frame);
-
-                prep.reflection->bind(
-                    ctx.cmd,
-                    ctx.frame);
-            }
         }
         if (!is_depth_prepass)
         {
@@ -811,7 +796,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         const RenderPrimitivePassInfo* info = prim.get_pass_info(ctx.pass_name);  // todo: temp crutch (provide shadow pass instead)
         if (!info)
             continue;
-        auto pipeline = info->pipeline_family->request_pipeline(info->pipeline_family->make_shader_key(info->material_instance->material, ctx.pass_name));
+        auto pipeline = info->pipeline;
         
 
         RBPipelineLayout pipeline_layout = prim.get_pipeline_layout_by_pass(ctx.pass_name);

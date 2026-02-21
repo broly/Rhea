@@ -9,7 +9,7 @@ void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t 
 {
     vk::BufferInfo* buf = nullptr;
 
-    if (buffer.get_usage_type() == ResourceUsageType::frame)
+    if (buffer.get_usage_type().is_frame_based())
     {
         buf = &frames_ubos
             .at(buffer.get_identifier())
@@ -41,7 +41,7 @@ void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t 
 
 vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size_t frame_index)
 {
-    if (buffer_handle.get_usage_type() == ResourceUsageType::frame)
+    if (buffer_handle.get_usage_type().is_frame_based())
     {
         size_t index = buffer_handle.get_identifier();
         return frames_ubos.at(index).at(frame_index);
@@ -49,11 +49,11 @@ vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size
     return persistent_ubos[buffer_handle.get_identifier()];
 }
 
-std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsageType usage_type, Name debug_name)
+std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsage usage_type, Name debug_name)
 {
     auto& layout_data = descriptor_set_layouts.at(layout_handle);
     
-    if (usage_type == ResourceUsageType::frame)
+    if (usage_type.is_frame_based())
     {
         std::vector<RBDescriptorSet> result;
         for (size_t frame_index = 0; frame_index < vk::MAX_FRAMES_IN_FLIGHT; frame_index++)
@@ -203,13 +203,13 @@ vk::DescriptorSetLayoutData vk::BufferManager::get_vk_descriptor_set_layout(RBDe
     return descriptor_set_layouts[rb_handle];
 }
 
-RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
+RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type)
 {
-    if (usage_type == ResourceUsageType::frame)
+    if (usage_type.is_frame_based())
     {
         frames_ubo_counter++;
         
-        const RBBufferHandle handle {frames_ubo_counter, ResourceUsageType::frame};
+        const RBBufferHandle handle {frames_ubo_counter, usage_type};
         std::array<vk::BufferInfo, vk::MAX_FRAMES_IN_FLIGHT> buffers;
         for (int32_t index = 0; auto& _ : buffers)
         {
@@ -231,7 +231,7 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
     } else
     {
         persistent_ubo_counter++;
-        const RBBufferHandle handle {persistent_ubo_counter, ResourceUsageType::persistent};
+        const RBBufferHandle handle {persistent_ubo_counter, usage_type};
         
         vk::BufferInfo buffer_info;
         

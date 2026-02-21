@@ -17,7 +17,7 @@ export struct RenderResourceDesc
 {
     Name name;
     
-    ResourceUsageType usage_type = ResourceUsageType::persistent;
+    ResourceUsage usage = ResourceUsageType::persistent;
     
     std::vector<RenderResourceVariableDesc> variables;
     Name set;

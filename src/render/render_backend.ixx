@@ -71,7 +71,7 @@ public:
     virtual void bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame) = 0;
     
     
-    virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type) = 0;
+    virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type) = 0;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) = 0;
     template<typename T>
     void update_uniform_buffer(RBBufferHandle buffer_handle, const T& data, RBFrameHandle frame)
@@ -153,8 +153,8 @@ public:
         RBDescriptorSet set,
         uint32_t binding,
         RBImageHandle image,
-        ResourceUsageType usage,
-        std::optional<RBSampler> sampler, 
+        ResourceUsage usage,
+        std::optional<RBSampler> sampler,
         uint32_t array_index = 0,
         bool cubemap = false) = 0;
     

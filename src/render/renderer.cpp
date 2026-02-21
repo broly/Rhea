@@ -166,7 +166,7 @@ void Renderer::load_resources()
         desc.name = res.name;
         desc.set = res.set;
         
-        desc.usage_type = res.usage;
+        desc.usage = res.usage;
         for (const auto& [param_name, variable] : res.parameters)
         {
             RenderResourceVariableDesc var_desc;
@@ -289,7 +289,7 @@ RenderResource* Renderer::query_material_resource(std::shared_ptr<MaterialModel>
     
     RenderResourceDesc desc{};
     desc.name = model->model_name;
-    desc.usage_type = material_resource_info->resource.usage;
+    desc.usage = material_resource_info->resource.usage;
     desc.set = material_resource_info->resource.set;
 
     // UBOs

@@ -26,11 +26,6 @@ MaterialInstance::MaterialInstance(const std::shared_ptr<const Material>& in_mat
 
 void MaterialInstance::bind(RBCommandList cmd, RBFrameHandle frame)
 {
-    if (material->parameters.contains("base_color"))
-    {
-        LogMaterialInstance.Log("bind material instance. BaseColor: %s", 
-            material->parameters.at("base_color").as<TextureHandle>().get().name.c_str());
-    }
     std::shared_ptr<RenderResourceInstance> instance = get_or_create_resource_instance(frame);
 
     instance->bind(cmd, frame);

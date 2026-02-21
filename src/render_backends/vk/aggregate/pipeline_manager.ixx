@@ -41,7 +41,8 @@ namespace vk
         PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
         RBPipelineLayout create_layout(const PipelineLayoutDesc& desc);
         
-        std::shared_ptr<VkRenderResourceInstance> query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsageType usage);
+        std::shared_ptr<VkRenderResourceInstance> query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsage
+            usage);
         
         void push_constants(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout);
         void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, 

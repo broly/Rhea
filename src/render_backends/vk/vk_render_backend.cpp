@@ -87,7 +87,7 @@ void VkRenderBackend::transition_image(
 
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
-    ResourceUsageType usage, std::optional<RBSampler> sampler, uint32_t array_index, bool cubemap)
+                                           ResourceUsage usage, std::optional<RBSampler> sampler, uint32_t array_index, bool cubemap)
 {
     // VkDescriptorSet set = get_descriptor_set(layout, usage);
     LogRB.Log("update_sampled_image: %p", set);
@@ -789,7 +789,7 @@ vk::DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(RBDesc
     return resource_manager.get_vk_descriptor_set_layout(descriptor_set_layout);
 }
 
-RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, ResourceUsageType usage_type)
+RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type)
 {
     return resource_manager.create_uniform_buffer(buffer_size, usage_type);
 }

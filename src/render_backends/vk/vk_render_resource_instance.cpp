@@ -8,7 +8,7 @@ import profile;
 VkRenderResourceInstance::VkRenderResourceInstance(
     vk::BufferManager& buffer_manager, 
     const VkRenderResource* in_resource, 
-    ResourceUsageType in_usage, 
+    ResourceUsage in_usage, 
     RBPipelineLayout in_pipeline_layout)
     : buffer_manager(buffer_manager)
     , resource(in_resource)
@@ -27,7 +27,7 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(Name buffer_name, size
 
     checkf(binding.parameter.type == MaterialParamType::uniform, "Type mismatch");
 
-    uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
+    uint32_t frame_index = usage.frame_index(frame);
 
     RBBufferHandle buffer =
         inst_info.buffers[binding_index][frame_index];
@@ -50,7 +50,7 @@ void VkRenderResourceInstance::update_image(Name buffer_name,
 
     checkf(binding.parameter.type == MaterialParamType::sampler, "Type mismatch");
 
-    uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
+    uint32_t frame_index = usage.frame_index(frame);
 
     RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
 
@@ -68,14 +68,12 @@ void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle fr
 {
     PROFILE("VkRenderResourceInstance::bind");
     
-    
-    
     auto inst_info = resource->backend.pipeline_manager.instance_pipeline_data.at(this);
     auto& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({resource, RBPipelineLayout(pipeline_layout)});
 
-    uint32_t frame_index = usage == ResourceUsageType::frame ? frame : 0;
+    const uint32_t frame_index = usage.frame_index(frame);
 
-    RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
+    const RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
     
 
     resource->backend.bind_descriptor_set(

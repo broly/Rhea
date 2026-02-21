@@ -45,3 +45,18 @@ import <compare>;
             ~static_cast<std::underlying_type_t<Enum>>(a) \
         ); \
     } 
+
+#define ENUM_WRAPPER_STRUCT(s, e, f) \
+    s(e v) \
+        : f(v) \
+    {}\
+    s& operator=(e in_v) \
+    { \
+        f = in_v; \
+        return *this;\
+    }
+
+    // operator e() const \
+    // { \
+    //     return f; \
+    // } \

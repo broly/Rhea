@@ -52,7 +52,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },
             .reads = {
-                { normal_color, RBImageUsage::SampledFragment },
+                { hdr_color, RBImageUsage::SampledFragment },
             },
             .writes = {
                 { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
@@ -71,7 +71,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                          
                 tonemap_instance->update_image(
                     "u_hdr_color",
-                    get_image(normal_color),
+                    get_image(hdr_color),
                     ctx.frame
                 );
                          

@@ -10,7 +10,7 @@ class VkRenderResourceInstance : public RenderResourceInstance
 {
 public:
     
-    VkRenderResourceInstance(vk::BufferManager& buffer_manager, const class VkRenderResource* in_resource, ResourceUsageType in_usage, RBPipelineLayout in_pipeline_layout);
+    VkRenderResourceInstance(vk::BufferManager& buffer_manager, const class VkRenderResource* in_resource, ResourceUsage in_usage, RBPipelineLayout in_pipeline_layout);
 
     virtual void update_uniform_buffer_impl(Name buffer_name, size_t size, void* data, RBFrameHandle frame);
     
@@ -21,7 +21,7 @@ public:
 
     vk::BufferManager& buffer_manager;
     const VkRenderResource* resource;
-    ResourceUsageType usage;
+    ResourceUsage usage;
     VkPipelineLayout pipeline_layout;
 
     // std::map<VkPipelineObject*, PerPipelineData> per_pipeline;

@@ -32,6 +32,7 @@ export struct RenderPrimitivePassInfo
 {
     std::shared_ptr<MaterialInstance> material_instance;
     std::shared_ptr<PipelineFamily> pipeline_family;
+    PipelineObject* pipeline;
 };
 
 export struct RenderPrimitive

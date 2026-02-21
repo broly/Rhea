@@ -7,6 +7,7 @@
 #include "resources/light.glsl"
 #include "resources/shadow.glsl"
 #include "resources/reflection.glsl"
+#include "resources/pbr_material.glsl"
 
 // ================== INPUTS ==================
 layout(location = 0) in vec3 v_world_pos;
@@ -21,76 +22,7 @@ layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 out_normal;
 #endif 
 
-// ================== MATERIAL ==================
-layout(set = SET_PBR, binding = BINDING_MATERIAL) uniform MaterialUBO
-{
-    float base_color_factor;
-    float emissive_factor;
-    float occlusion_factor;
-    float roughness_factor;
-    float metallic_factor;
-} material_ubo;
 
-layout(set = SET_PBR, binding = BINDING_SAMPLER_ALBEDO) uniform sampler2D u_base_color;
-layout(set = SET_PBR, binding = BINDING_SAMPLER_EMISSIVE) uniform sampler2D u_emissive;
-layout(set = SET_PBR, binding = BINDING_SAMPLER_NORMAL) uniform sampler2D u_normal_map;
-layout(set = SET_PBR, binding = BINDING_SAMPLER_ORM) uniform sampler2D u_orm;
-
-
-
-// ================== SHADOW ==================
-
-
-
-float hash12(vec2 p)
-{
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-}
-
-mat2 rot2(float a)
-{
-    float s = sin(a), c = cos(a);
-    return mat2(c, -s, s, c);
-}
-
-float shadow_factor(vec3 world_pos, vec3 Ng)
-{
-    vec3 shadow_pos = world_pos + Ng * 0.003;
-
-    vec4 light_clip = light_ubo.dir_light.light_vp * vec4(shadow_pos, 1.0);
-    vec3 proj = light_clip.xyz / light_clip.w;
-
-    if (proj.x < -1.0 || proj.x > 1.0 ||
-    proj.y < -1.0 || proj.y > 1.0 ||
-    proj.z <  0.0 || proj.z > 1.0)
-    return 1.0;
-
-    vec2 uv = proj.xy * 0.5 + 0.5;
-
-    float ndotl = max(dot(Ng, -light_ubo.dir_light.direction.xyz), 0.0);
-    float bias = mix(0.0005, 0.0025, 1.0 - ndotl);
-
-    float shadow = texture(
-        u_shadow_depth,
-        vec3(uv, proj.z - bias)
-    );
-
-    return shadow;
-}
-
-
-// ============= reflection =================
-
-
-vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
-{
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) *
-    pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-
-// ================== MAIN ==================
 void main()
 {
     vec4 base_tx = texture(u_base_color, v_uv);

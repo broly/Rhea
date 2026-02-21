@@ -207,6 +207,23 @@ export enum class ResourceUsageType
 REFLECT_ENUM(ResourceUsageType,
     frame, persistent);
 
+export struct ResourceUsage
+{
+    ResourceUsageType type;
+    
+    ENUM_WRAPPER_STRUCT(ResourceUsage, ResourceUsageType, type);
+    
+    bool is_frame_based() const
+    {
+        return type == ResourceUsageType::frame;
+    }
+    
+    uint32_t frame_index(uint32_t frame) const
+    {
+        return type == ResourceUsageType::frame ? frame : 0;
+    }
+};
+
 export struct MatModel_Resource
 {
     Name name;
