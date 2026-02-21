@@ -52,7 +52,7 @@
 				{
 					"write_mask": ["R", "G", "B", "A"],
 					"translucent": false
-				},
+				}
 			],
 	
 			"cull_mode": "back",
