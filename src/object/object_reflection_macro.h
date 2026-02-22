@@ -39,11 +39,11 @@ import dependency_collector;
         const bool cls##_registered = \
             reflect::register_object_class<cls>(\
                 #cls, \
-                    [] (const Json::Value& json_object, RhObject* ObjPtr, bool is_loading, DependencyCollector* collector) -> bool { \
+                    [] (const Json::Value& json_object, RhObject* ObjPtr, const SerializationContext& context) -> bool { \
                         using Class = cls;\
                         auto CastedObjPtr = reinterpret_cast<cls*>(ObjPtr); \
-                        reflect::json::visit_serialize(json_object, *CastedObjPtr, is_loading, collector); \
-                        CastedObjPtr->on_serialize(collector); \
+                        reflect::json::visit_serialize(json_object, *CastedObjPtr, context); \
+                        CastedObjPtr->on_serialize(context); \
                         return true; \
                     }\
                 ); \

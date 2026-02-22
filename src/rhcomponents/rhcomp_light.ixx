@@ -36,7 +36,7 @@ public:
 
     void update_scene_proxy();
     
-    void on_serialize(DependencyCollector* dc) override;
+    void on_serialize(const SerializationContext& context) override;
     
     vec4 color;
     float intensity;

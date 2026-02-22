@@ -10,7 +10,7 @@ import <string>;
 #include "common/assertion_macros.h"
 
 std::shared_ptr<RhObject> json_object::load_object_impl(std::filesystem::path path,
-                                                   const reflect::ObjectReflectionInfo* reflection_info, DependencyCollector* collector)
+                                                   const reflect::ObjectReflectionInfo* reflection_info, const SerializationContext& context)
 {
         
     std::ifstream file(path.string());
@@ -36,7 +36,7 @@ std::shared_ptr<RhObject> json_object::load_object_impl(std::filesystem::path pa
     {
         ensure(root.isObject());                
         {
-            std::invoke(reflection_info->serializer.value(), root, obj.get(), true, collector);
+            std::invoke(reflection_info->serializer.value(), root, obj.get(), context);
         }
     }
     return obj;

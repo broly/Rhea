@@ -8,6 +8,7 @@ import :asset;
 import dependency_collector;
 import rhmath;
 import hash_utils;
+import rhobject;
 
 #include "common/type_macros.h"
 
@@ -94,4 +95,4 @@ struct std::hash<MeshPrimHandle>
     }
 };
 
-export void serialize_json_value(MeshHandle& target, const Json::Value& value, DependencyCollector* dc);
+export void serialize_json_value(MeshHandle& target, const Json::Value& value, const SerializationContext& context);

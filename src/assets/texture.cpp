@@ -2,7 +2,7 @@
 
 import stb_image;
 import <json/value.h>;
-
+import rhobject;
 import globals;
 import engine;
 import :asset_manager;
@@ -83,7 +83,7 @@ bool Texture::save_to_file(const std::filesystem::path& path) const
     return result != 0;
 }
 
-void serialize_json_value(TextureHandle& target, const Json::Value& value, DependencyCollector* dc)
+void serialize_json_value(TextureHandle& target, const Json::Value& value, const SerializationContext& context)
 {
     if (!value.isString())
         return;
@@ -93,7 +93,7 @@ void serialize_json_value(TextureHandle& target, const Json::Value& value, Depen
     
     auto texture_future = AssetManager::get().load_texture_async(path);
     
-    dc->push(std::async(
+    context.dc->push(std::async(
         std::launch::async,
         [&target, texture_future]() mutable
         {

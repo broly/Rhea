@@ -289,7 +289,7 @@ public:
     
     const MatModel_Pass* get_pass_info(Name pass_name) const;
     
-    void on_serialize(DependencyCollector* dc) override;
+    void on_serialize(const SerializationContext& context) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
                       model_name, enums, permutations, passes, material_resource);
@@ -300,7 +300,7 @@ REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
 export class RenderResourceInfo : public RhObject
 {
 public:
-    void on_serialize(DependencyCollector* dc) override;
+    void on_serialize(const SerializationContext& context) override;
     
     MatModel_Resource resource;
     

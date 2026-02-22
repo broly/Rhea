@@ -14,7 +14,7 @@ import assets;
 class RhComp_GltfScene : public RhComponent
 {
 public:
-    void on_serialize(DependencyCollector* dc) override;
+    void on_serialize(const SerializationContext& context) override;
     std::string asset_path;
     std::string textures_dir;
     

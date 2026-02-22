@@ -85,7 +85,7 @@ void RhComp_StaticMesh::finish()
     RhComp_Renderable::finish();
     RhGlobals::engine->scene_view->unregister_scene_view_proxy(scene_proxy, render_info.type_id);
 }
-void RhComp_StaticMesh::on_serialize(DependencyCollector* dc)
+void RhComp_StaticMesh::on_serialize(const SerializationContext& context)
 {
 
 }

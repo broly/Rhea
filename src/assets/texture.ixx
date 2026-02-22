@@ -8,7 +8,7 @@ import <json/value.h>;
 import texture_format;
 import dependency_collector;
 import rhmath;
-
+import rhobject;
 import :asset;
 
 export struct Texture;
@@ -57,4 +57,4 @@ export struct Texture
 };
 
 
-export void serialize_json_value(TextureHandle& target, const Json::Value& value, DependencyCollector* dc);
+export void serialize_json_value(TextureHandle& target, const Json::Value& value, const SerializationContext& context);

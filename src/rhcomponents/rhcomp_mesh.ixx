@@ -26,7 +26,7 @@ public:
     void on_init() override;
     void start() override;
     void finish() override;
-    void on_serialize(DependencyCollector* dc) override;
+    void on_serialize(const SerializationContext& context) override;
     
     AABB get_aabb() const override;
     

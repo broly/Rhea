@@ -11,7 +11,7 @@ import <future>;
 
 DEFINE_LOGGER(LogImportGltf, Log);
 
-void RhComp_GltfScene::on_serialize(DependencyCollector* dc)
+void RhComp_GltfScene::on_serialize(const SerializationContext& context)
 {
     AssetSceneInfo scene = AssetManager::get().load_scene(asset_path, textures_dir);
     
@@ -58,9 +58,9 @@ void RhComp_GltfScene::on_serialize(DependencyCollector* dc)
         }
     });
     for (auto fut : futures)
-        dc->push(std::async(std::launch::async, [fut]() { fut.wait(); }));
+        context.dc->push(std::async(std::launch::async, [fut]() { fut.wait(); }));
     
-    dc->push(std::move(materials_task));
+    context.dc->push(std::move(materials_task));
     // auto base_color_fut = AssetManager::get().load_texture_async(base_color_path);
     // auto normal_fut     = AssetManager::get().load_texture_async(normal_path);
     // auto orm_fut        = AssetManager::get().load_texture_async(orm_path);

@@ -42,7 +42,7 @@ void RhComp_Light::update_scene_proxy()
     scene_proxy.light_type = type;
 }
 
-void RhComp_Light::on_serialize(DependencyCollector* dc)
+void RhComp_Light::on_serialize(const SerializationContext& context)
 {
-    RhComp_Renderable::on_serialize(dc);
+    RhComp_Renderable::on_serialize(context);
 }

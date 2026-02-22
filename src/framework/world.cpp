@@ -44,6 +44,8 @@ bool World::load_level(std::string level_path)
 {
     std::optional<Json::Value> root_opt = json_utils::load_json_asset(level_path);
     
+    world_load_serialization_context = { &collector, true };
+    
     
     std::vector<std::shared_ptr<RhActor>> pending_actors;
     
@@ -106,7 +108,7 @@ bool World::load_level(std::string level_path)
                 {
                     if (reflection_info->serializer != std::nullopt)
                     {
-                        std::invoke(reflection_info->serializer.value(), *ref_fields_object, obj.get(), true, &collector);
+                        std::invoke(reflection_info->serializer.value(), *ref_fields_object, obj.get(), world_load_serialization_context);
                     }
                 }
             }
@@ -116,7 +118,7 @@ bool World::load_level(std::string level_path)
             {
                 if (reflection_info->serializer != std::nullopt)
                 {
-                    std::invoke(reflection_info->serializer.value(), *level_actor_fields_object, obj.get(), true, &collector);
+                    std::invoke(reflection_info->serializer.value(), *level_actor_fields_object, obj.get(), world_load_serialization_context);
                 }
             }
             
@@ -125,8 +127,8 @@ bool World::load_level(std::string level_path)
                 auto actor = std::static_pointer_cast<RhActor>(obj);
                 
                 ref_json_value_opt.has_value() ?
-                    actor->import_from_json_object(*ref_json_value_opt, &level_actor_json_value, &collector) :
-                    actor->import_from_json_object(level_actor_json_value, nullptr, &collector);
+                    actor->import_from_json_object(*ref_json_value_opt, &level_actor_json_value, world_load_serialization_context) :
+                    actor->import_from_json_object(level_actor_json_value, nullptr, world_load_serialization_context);
                 pending_actors.push_back(actor);
             }
         }

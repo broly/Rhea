@@ -39,15 +39,15 @@ const MatModel_Pass* MaterialModel::get_pass_info(Name pass_name) const
     return nullptr;
 }
 
-void MaterialModel::on_serialize(DependencyCollector* dc)
+void MaterialModel::on_serialize(const SerializationContext& context)
 {
-    RhObject::on_serialize(dc);
+    RhObject::on_serialize(context);
     
 }
 
-void RenderResourceInfo::on_serialize(DependencyCollector* dc)
+void RenderResourceInfo::on_serialize(const SerializationContext& context)
 {
-    RhObject::on_serialize(dc);
+    RhObject::on_serialize(context);
     
     for (auto& [param_name, param] : resource.parameters)
     {

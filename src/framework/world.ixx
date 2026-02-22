@@ -6,6 +6,7 @@ import :engine_clock;
 import :core;
 import dependency_collector;
 import rhmath;
+import rhobject;
 // import :scene_extractor;
 
 
@@ -50,4 +51,5 @@ public:
     std::shared_ptr<EngineClock> clock;
     std::vector<std::shared_ptr<RhActor>> actors;
     DependencyCollector collector;
+    SerializationContext world_load_serialization_context;
 };

@@ -92,7 +92,7 @@ const Primitive& MeshPrimHandle::get() const
     return mesh.get().mesh_geometry[geom_index].primitives[prim_index];
 }
 
-void serialize_json_value(MeshHandle& target, const Json::Value& value, DependencyCollector* dc)
+void serialize_json_value(MeshHandle& target, const Json::Value& value, const SerializationContext& context)
 {
     if (value.isString())
     {

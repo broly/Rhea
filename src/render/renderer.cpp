@@ -132,9 +132,11 @@ void Renderer::load_schemas()
         }
     }
     
+    SerializationContext ctx;
+    
     for (auto& file : files)
     {
-        if (auto obj = json_object::load_object<MaterialModel>(file))
+        if (auto obj = json_object::load_object<MaterialModel>(file, ctx))
             models.insert({obj->model_name, obj});
     }
 }
@@ -153,9 +155,11 @@ void Renderer::load_resources()
         }
     }
     
+    SerializationContext ctx;
+    
     for (auto& file : files)
     {
-        if (auto obj = json_object::load_object<RenderResourceInfo>(file))
+        if (auto obj = json_object::load_object<RenderResourceInfo>(file, ctx))
             resources_info.insert({obj->resource.name, obj});
     }
     

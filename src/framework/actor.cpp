@@ -36,7 +36,7 @@ void RhActor::internal_tick(double dt)
     tick(dt);
 }
 
-void RhActor::import_from_json_object(const Json::Value& object, const Json::Value* overrides, DependencyCollector* collector)
+void RhActor::import_from_json_object(const Json::Value& object, const Json::Value* overrides, const SerializationContext& context)
 {
     auto pthis = std::static_pointer_cast<RhActor>(shared_from_this());
 
@@ -92,8 +92,7 @@ void RhActor::import_from_json_object(const Json::Value& object, const Json::Val
                         reflection_info->serializer.value(),
                         *fields_object,
                         component.get(),
-                        true,
-                        collector
+                        context
                     );
                 }
             }

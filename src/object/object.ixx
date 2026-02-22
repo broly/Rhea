@@ -4,6 +4,7 @@ import dependency_collector;
 import <memory>;
 import <string>;
 import <optional>;
+import reflect;
 import static_name;
 import name;
 
@@ -16,6 +17,7 @@ export struct ObjectInitData
     bool is_default = false;
 };
 
+export struct SerializationContext;
 
 export class RhObject : public std::enable_shared_from_this<RhObject>
 {
@@ -53,7 +55,7 @@ public:
     
     static uint32_t next_id(RhObject* obj);
     
-    virtual void on_serialize(DependencyCollector* dc) {}
+    virtual void on_serialize(const SerializationContext& context) {}
     
     Name type_name;
     Name name;

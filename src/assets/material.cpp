@@ -25,7 +25,7 @@ static std::optional<std::string> parse_texture_string(const std::string& str)
     return path;
 }
 
-void serialize_json_value(MaterialParameterType& target, const Json::Value& value, DependencyCollector* dc)
+void serialize_json_value(MaterialParameterType& target, const Json::Value& value, const SerializationContext& context)
 {
     if (value.isNumeric())
     {
@@ -44,7 +44,7 @@ void serialize_json_value(MaterialParameterType& target, const Json::Value& valu
     
             auto texture_future = AssetManager::get().load_texture_async(path);
     
-            dc->push(std::async(
+            context.dc->push(std::async(
                 std::launch::async,
                 [&target, texture_future, &texture_handle]() mutable
                 {
@@ -58,7 +58,7 @@ void serialize_json_value(MaterialParameterType& target, const Json::Value& valu
     {
         target.data = LinearColor();
         auto& color = std::get<LinearColor>(target.data);
-        reflect::json::do_serialize_json_value(color, value, true, dc);
+        reflect::json::do_serialize_json_value(color, value, context);
     }
 }
 

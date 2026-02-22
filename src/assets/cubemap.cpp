@@ -260,7 +260,7 @@ const Cubemap& CubemapHandle::get() const
     return AssetManager::get().get_cubemap(*this);
 }
 
-void serialize_json_value(CubemapHandle& target, const Json::Value& value, DependencyCollector* dc)
+void serialize_json_value(CubemapHandle& target, const Json::Value& value, const SerializationContext& context)
 {
     if (!value.isString())
         return;
@@ -270,7 +270,7 @@ void serialize_json_value(CubemapHandle& target, const Json::Value& value, Depen
     
     auto cubemap_future = AssetManager::get().load_cubemap_async(path);
     
-    dc->push(std::async(
+    context.dc->push(std::async(
         std::launch::async,
         [&target, cubemap_future]() mutable
         {

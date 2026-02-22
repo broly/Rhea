@@ -11,7 +11,7 @@ import rhobject;
 
 export using ShaderOptionValue = std::variant<bool, Name>;
 
-export void serialize_json_value(MaterialParameterType& target, const Json::Value& value, DependencyCollector* dc);
+export void serialize_json_value(MaterialParameterType& target, const Json::Value& value, const SerializationContext& context);
 
 export enum class BlendMode
 {

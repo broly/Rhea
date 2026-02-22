@@ -10,6 +10,7 @@ import <json/value.h>;
 import texture_format;
 import dependency_collector;
 import name;
+import rhobject;
 
 export struct Cubemap
 {
@@ -52,4 +53,4 @@ private:
     }
 };
 
-export void serialize_json_value(CubemapHandle& target, const Json::Value& value, DependencyCollector* dc);
+export void serialize_json_value(CubemapHandle& target, const Json::Value& value, const SerializationContext& context);

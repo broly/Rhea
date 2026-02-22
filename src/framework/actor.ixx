@@ -28,7 +28,7 @@ public:
     void internal_finish();
     void internal_tick(double dt);
     
-    void import_from_json_object(const Json::Value& object, const Json::Value* overrides = nullptr, DependencyCollector* collector = nullptr);
+    void import_from_json_object(const Json::Value& object, const Json::Value* overrides, const SerializationContext& context);
     void finish_importing();
     
     virtual void start() {}
