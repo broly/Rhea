@@ -226,7 +226,6 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     desc.depth_test = pass->depth_test;
     desc.depth_write = pass->depth_write;
     desc.color_attachments = pass->color_attachments;
-    desc.num_color_passes = pass->num_color_passes;
     desc.cull_mode = pass->cull_mode;
     desc.front_face = pass->front_face;
     desc.no_color_attachments = pass->no_color_attachments.has_value() ? *pass->no_color_attachments : false;

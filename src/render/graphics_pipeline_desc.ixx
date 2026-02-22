@@ -180,7 +180,6 @@ export
         CompareOp compare_op;
         DepthBiasInfo depth_bias;
         RBBufferTopology topology;
-        uint32_t num_color_passes;
         std::vector<MatModel_ColorAttachmentInfo> color_attachments;
         
 

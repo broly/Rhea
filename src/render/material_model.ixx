@@ -267,10 +267,9 @@ export struct MatModel_Pass
     CompareOp compare_op;
     std::optional<DepthBiasInfo> depth_bias;
     RBBufferTopology topology;
-    uint32_t num_color_passes;
 };
 REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts, num_color_passes);
+    name, requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
 

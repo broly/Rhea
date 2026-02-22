@@ -1,6 +1,5 @@
 export module texture_format;
 import <exception>;
-#include <glm/fwd.hpp>
 
 #include "assertion_macros.h"
 

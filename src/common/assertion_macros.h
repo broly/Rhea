@@ -37,7 +37,7 @@ import <source_location>;
 
 #define todo(...) \
     {\
-        print_error(std::source_location::current(), "todo: " ##__VA_ARGS__); \
+        print_error(std::source_location::current(), "todo: " __VA_ARGS__); \
         __debugbreak(); \
         std::terminate(); \
     }

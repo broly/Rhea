@@ -23,7 +23,9 @@ import <set>;
 export struct SerializationContext
 {
     DependencyCollector* dc = nullptr;
-    bool is_loading;
+    bool is_loading = true;
+    bool strict_checking_enabled = false;
+    std::optional<std::string> current_file = std::nullopt;
 };
     
 export inline void serialize_json_value(Json::Int& target, const Json::Value& value, const SerializationContext& context)
@@ -350,7 +352,13 @@ export namespace reflect::json
             if (is_optional_v<std::decay_t<decltype(struct_ref.*PtrToField)>> && !json_value)
                 return;
             
-            // checkf(json_value, "Required field %s is missing", name.c_str());
+            if (context.strict_checking_enabled)
+            {
+                checkf(context.current_file.has_value(), "Strict checking mode not supported for non-file serialization");
+                checkf(json_value, "During parsing '%s', required field '%s' is missing", 
+                    context.current_file->c_str(), 
+                    name.c_str());
+            }
             if (!json_value)
                 return;
             auto& field_ref = struct_ref.*PtrToField;

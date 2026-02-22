@@ -133,6 +133,7 @@ void Renderer::load_schemas()
     }
     
     SerializationContext ctx;
+    ctx.strict_checking_enabled = true;
     
     for (auto& file : files)
     {
@@ -156,6 +157,7 @@ void Renderer::load_resources()
     }
     
     SerializationContext ctx;
+    ctx.strict_checking_enabled = true;
     
     for (auto& file : files)
     {
