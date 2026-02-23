@@ -165,12 +165,16 @@ void Renderer::load_resources()
             resources_info.insert({obj->resource.name, obj});
     }
     
+    uint32_t set_index = 0;
+    
     for (const auto& [_, resource_info] : resources_info)
     {
         RenderResourceDesc desc;
         auto& res = resource_info->resource;
         desc.name = res.name;
         desc.set = res.set;
+        res.set_index = set_index++;
+        desc.set_index = res.set_index;
         
         desc.usage = res.usage;
         for (const auto& [param_name, variable] : res.parameters)

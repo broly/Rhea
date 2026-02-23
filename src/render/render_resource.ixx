@@ -21,6 +21,8 @@ export struct RenderResourceDesc
     
     std::vector<RenderResourceVariableDesc> variables;
     Name set;
+    
+    uint32_t set_index;  // assigned at runtime
 };
 
 export class RenderResource

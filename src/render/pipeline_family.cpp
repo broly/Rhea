@@ -59,8 +59,6 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     layout_desc.pass = in_pass_name;
     
     
-    
-    int set_index = 0;
     std::map<Name, uint32_t> processed_resources;
     for (const auto& [stage, stage_info] : pass->stages)
     {
@@ -84,7 +82,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
         
             auto& resource_desc = resource->desc;
         
-            resource_info.set = set_index;
+            resource_info.set = resource->desc.set_index;
             resource_info.name = resource_name;
         
             uint32_t binding_index = 0;
@@ -101,8 +99,6 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
                     });
                 binding_index++;
             }
-        
-            set_index++;
             
             
                         

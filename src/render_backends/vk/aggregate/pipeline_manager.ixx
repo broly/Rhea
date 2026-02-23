@@ -69,6 +69,8 @@ namespace vk
         PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
         RBPipelineLayout create_layout(const PipelineLayoutDesc& desc);
         
+        VkDescriptorSetLayout get_empty_descriptor_set();
+        
         std::shared_ptr<VkRenderResourceInstance> query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsage
             usage);
         
@@ -115,6 +117,8 @@ namespace vk
         std::unordered_map<VkRenderResourceInstance*, ResorceInstancePipelineData> instance_pipeline_data;
 
         std::unordered_map<UniqueResourcePair, VkRenderResourcePipelineInfo> resources_pipeline_info;
+        
+        std::optional<VkDescriptorSetLayout> empty_descriptor_set;
     };
 }
 

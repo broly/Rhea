@@ -6,6 +6,7 @@ import <vulkan/vulkan_core.h>;
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
 #include "profiling/profile.h"
+#include "render_backends/vk/vk_macro.h"
 
 DEFINE_LOGGER(LogVkPipelineManager, Warning);
 
@@ -26,6 +27,14 @@ RBPipelineLayout vk::PipelineManager::create_layout(const PipelineLayoutDesc& de
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
     std::vector<VkRenderResourcePipelineInfo> prepared_info;
+    
+    uint16_t max_index = 0;
+    for (auto& resource_info : desc.resources)
+        max_index = std::max(max_index, resource_info.set);
+    
+    for (uint16_t index = 0; index <= max_index; index++)
+        vk_layouts.push_back(get_empty_descriptor_set());
+    
     for (auto& resource_info : desc.resources)
     {
         DescriptorSetLayoutDesc layout_desc;
@@ -44,7 +53,7 @@ RBPipelineLayout vk::PipelineManager::create_layout(const PipelineLayoutDesc& de
         info.descritor_set_layout_desc = layout_desc;
         layout_desc.debug_name = resource_desc.name;
         info.layout = buffer_manager.create_descriptor_set_layout(layout_desc, desc.pass);
-        vk_layouts.push_back(buffer_manager.get_vk_descriptor_set_layout(info.layout).vk_layout);
+        vk_layouts[resource_info.set] = buffer_manager.get_vk_descriptor_set_layout(info.layout).vk_layout;
         prepared_info.push_back(info);
     }
     
@@ -65,10 +74,13 @@ RBPipelineLayout vk::PipelineManager::create_layout(const PipelineLayoutDesc& de
     
     RBPipelineLayout result {pipeline_layout};
     
+    
+    
     for (int index = 0; auto& resource_info : desc.resources)
     {
         
-        LogVkPipeline.Log(" * resource %s", resource_info.name.to_string().c_str());
+        LogVkPipeline.Log(" * resource %s, set: %i", 
+            resource_info.name.to_string().c_str(), resource_info.set);
         UniqueResourcePair pair = {(VkRenderResource*)resource_info.resource, result};
         resources_pipeline_info.insert({pair, prepared_info.at(index)});
         index++;
@@ -80,8 +92,31 @@ RBPipelineLayout vk::PipelineManager::create_layout(const PipelineLayoutDesc& de
     return result;
 }
 
+VkDescriptorSetLayout vk::PipelineManager::get_empty_descriptor_set()
+{
+    if (empty_descriptor_set.has_value())
+        return *empty_descriptor_set;
+    
+    VkDescriptorSetLayoutCreateInfo ci{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
+    };
+    ci.bindingCount = 0;
+    ci.pBindings = nullptr;
+
+    VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+    VK_CHECK(vkCreateDescriptorSetLayout(
+        instance.device,
+        &ci,
+        nullptr,
+        &layout
+    ));
+    empty_descriptor_set = layout;
+    
+    return layout;
+}
+
 std::shared_ptr<VkRenderResourceInstance> vk::PipelineManager::query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsage
-    usage)
+                                                                                              usage)
 {
     auto& instances_list = unique_resource_instances[{resource, pipeline_layout, unique_id}];
     

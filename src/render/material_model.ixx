@@ -230,6 +230,8 @@ export struct MatModel_Resource
     ResourceUsageType usage;
     std::map<Name, MatModel_Parameter> parameters;
     Name set;
+    
+    uint32_t set_index; // not serialized
 };
 REFLECT_STRUCT(MatModel_Resource,
     name, usage, parameters, set);
@@ -300,6 +302,11 @@ export class RenderResourceInfo : public RhObject
 {
 public:
     void on_serialize(const SerializationContext& context) override;
+    
+    void update_set(uint32_t set_index)
+    {
+        resource.set_index = set_index;
+    }
     
     MatModel_Resource resource;
     
