@@ -549,9 +549,9 @@ void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, R
     mesh_manager.bind(cmd, mesh);
 }
 
-void VkRenderBackend::push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout)
+void VkRenderBackend::push_constants_impl(const RBCommandList& cmd, const void* data, size_t size)
 {
-    pipeline_manager.push_constants(cmd, data, size, pipeline_layout);
+    pipeline_manager.push_constants(cmd, data, size);
 }
 
 void VkRenderBackend::draw_indexed(const RBCommandList& cmd, uint32_t index_count)

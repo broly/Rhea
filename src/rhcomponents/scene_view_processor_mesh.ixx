@@ -13,6 +13,7 @@ import rhmath;
 import render;
 import <unordered_map>;
 
+#include "common/assertion_macros.h"
 #include "object/object_reflection_macro.h"
 
 

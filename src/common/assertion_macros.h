@@ -28,6 +28,17 @@ import <source_location>;
         }\
     } while (false)
 
+#define check(assertion) \
+    do \
+    { \
+        if (!(assertion)) \
+        { \
+            print_error(std::source_location::current(), "assertion failed"); \
+            __debugbreak(); \
+            std::terminate(); \
+        }\
+    } while (false)
+
 #define unreachable(text, ...) \
     {\
         print_error(std::source_location::current(), text, ##__VA_ARGS__); \

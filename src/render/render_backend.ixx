@@ -121,15 +121,14 @@ public:
     
     void push_constants(
         const RBCommandList& cmd, 
-        const allowed_for_push_constant auto& value, 
-        RBPipelineLayout pipeline_layout)
+        const allowed_for_push_constant auto& value)
     {
-        push_constants_impl(cmd, &value, sizeof(value), pipeline_layout);
+        push_constants_impl(cmd, &value, sizeof(value));
     }
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
-    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout) = 0;
-    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_countaram) = 0;
+    virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size) = 0;
+    virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
     virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;

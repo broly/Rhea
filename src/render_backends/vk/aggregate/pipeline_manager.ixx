@@ -53,7 +53,7 @@ namespace vk
         
         RBDescriptorSetLayout get_or_create_resource_descriptor_set_layout(VkRenderResource* resource);
         
-        void push_constants(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout);
+        void push_constants(const RBCommandList& cmd, const void* data, size_t size);
         void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors,  Name debug_name);
         void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object, VkRenderPass current_render_pass);
         

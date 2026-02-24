@@ -345,8 +345,7 @@ LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
 }
 
 void GenericRenderGraph::bind_shadow_globals(
-    RenderGraphContext& ctx,
-    RBPipelineLayout layout)
+    RenderGraphContext& ctx)
 {
     auto& scene_view = engine->scene_view;
     auto cmd   = ctx.cmd;
@@ -712,69 +711,45 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     auto pbr = renderer->find_model("pbr");
     std::shared_ptr<PipelineFamily> family = renderer->query_pipeline_family(ctx.pass_name, pbr);
     
-    bool globals_bound = false;
     
     PROFILE("GenericRenderGraph::draw_scene - items");
     for (auto& item : items)
     {
         RenderPrimitive& prim = *item.primitive;
 
-        const RenderPrimitivePassInfo* info = prim.get_pass_info(ctx.pass_name);
+        const RenderPrimitivePassInfo* prim_info = prim.get_pass_info(ctx.pass_name);
         
-        if (!info)
+        if (!prim_info)
             continue;
+
+        PipelineObject* pipeline = prim_info->pipeline;
         
-        auto pipeline = info->pipeline;
-        auto pipeline_layout = info->pipeline_family->get_pipeline_layout();
-
-        const auto& instance = info->material_instance;
-
-        if (pipeline_layout != current_pipeline_layout)
+        if (ctx.bind_pipeline(pipeline))
         {
-            current_pipeline_layout = pipeline_layout;
-
-            ctx.backend.bind_pipeline(
-                ctx.cmd,
-                pipeline);
+            ctx.bind(camera_resource);
             
-            globals_bound = false;
-            
-        }
-        
-        if (!globals_bound)
-        {
-            camera_resource->query_single()->bind(ctx.cmd, ctx.frame);
-    
             if (!is_depth_prepass)
             {
-                shadow_resource->query_single()->bind(ctx.cmd, ctx.frame);
-                light_resource->query_single()->bind(ctx.cmd, ctx.frame);
-                reflection_resource->query_single()->bind(ctx.cmd, ctx.frame);
+                ctx.bind(shadow_resource);
+                ctx.bind(light_resource);
+                ctx.bind(reflection_resource);
             }
-            globals_bound = true;
         }
 
-        
+        const auto& instance = prim_info->material_instance;
+
         if (!is_depth_prepass)
         {
             instance->bind(
                ctx.cmd,
                ctx.frame);
         }
+        
+        ctx.bind_mesh(prim.mesh);
 
-        ctx.backend.bind_mesh(
-            ctx.cmd,
-            prim.mesh,
-            ctx.frame);
-
-        ctx.backend.push_constants(
-            ctx.cmd,
-            *prim.world,
-            pipeline_layout);
-
-        ctx.backend.draw_indexed(
-            ctx.cmd,
-            prim.mesh.get().indices.size());
+        ctx.push_constants(*prim.world);
+        
+        ctx.draw_indexed(prim.mesh.get().indices.size());
     }
 }
 
@@ -785,32 +760,27 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
     
     auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
 
-    RBPipelineLayout current_pipeline_layout {};
     ctx.backend.update_viewport(ctx.cmd, Constants::shadowmap_extent);
 
     for (auto& prim : mesh_processor.primitives)
     {
         const RenderPrimitivePassInfo* info = prim.get_pass_info(ctx.pass_name);  // todo: temp crutch (provide shadow pass instead)
+        
         if (!info)
             continue;
+        
         auto pipeline = info->pipeline;
         
-
-        RBPipelineLayout pipeline_layout = prim.get_pipeline_layout_by_pass(ctx.pass_name);
-        if (pipeline_layout != current_pipeline_layout)
+        if (ctx.bind_pipeline(pipeline))
         {
-            current_pipeline_layout = pipeline_layout;
-            ctx.backend.bind_pipeline(ctx.cmd, pipeline);
-
-            bind_shadow_globals(ctx, pipeline_layout);
+            bind_shadow_globals(ctx);
         }
-
-        ctx.backend.bind_mesh(ctx.cmd, prim.mesh, ctx.frame);
-        ctx.backend.push_constants(ctx.cmd, *prim.world, pipeline_layout);
         
-        ctx.backend.draw_indexed(
-            ctx.cmd,
-            prim.mesh.get().indices.size());
+        ctx.bind_mesh(prim.mesh);
+        
+        ctx.push_constants(*prim.world);
+        
+        ctx.draw_indexed(prim.mesh.get().indices.size());
     }
 }
 
@@ -818,26 +788,12 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
 {
     PROFILE("Clouds");
     
-    
-    auto cmd   = ctx.cmd;
-    auto frame = ctx.frame;
-
-    ctx.backend.bind_pipeline(
-        cmd,
-        prepared_clouds.pipeline
-    );
-
-    prepared_clouds.camera->bind(
-        cmd,
-        frame
-    );
-
-    prepared_clouds.instance->bind(
-        cmd,
-        frame
-    );
-
-    ctx.backend.draw_fullscreen(cmd);
+    if (ctx.bind_pipeline(prepared_clouds.pipeline))
+    {
+        ctx.bind(prepared_clouds.camera);
+        ctx.bind(prepared_clouds.instance);
+    }
+    ctx.draw_fullscreen();
 
 }
 

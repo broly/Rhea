@@ -85,8 +85,7 @@ public:
     virtual CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false, uint32_t face_index = 0) const;
     LightUBO build_light_ubo(glm::vec3 camera_position) const;
     void bind_shadow_globals(
-        RenderGraphContext& ctx,
-        RBPipelineLayout layout);
+        RenderGraphContext& ctx);
     
     RGTextureHandle shadow_map;
     RGTextureHandle depth_texture;

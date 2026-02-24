@@ -66,16 +66,9 @@ DEFINE_VERBOSITY(Verbose, 5, no_detail, print_text);
 DEFINE_VERBOSITY(VeryVerbose, 6, no_detail, print_text);
 
 
-export template<LogVerbosity compile_time_verbosity, auto log_name>
+export template<LogVerbosity compile_time_verbosity, FixedString log_name>
 struct Logger
-{
-    // constexpr Logger(FixedString<LogNameSize> in_name) noexcept
-    //     : name(in_name)
-    //     // , default_verbosity_level(in_default_verbosity.verbosity_level)
-    // {
-    //     
-    // }
-    
+{    
     template<LogVerbosity verbosity = DEFAULT_GLOBAL_VERBOSITY, typename Fmt, typename... Args>
     void Log(Fmt&& fmt, Args&&... args) const
     {

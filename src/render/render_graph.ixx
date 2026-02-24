@@ -9,6 +9,7 @@ import name;
 import :pipeline_family;
 import :common;
 import :rg_params;
+#include "common/assertion_macros.h"
 #include "object/object_reflection_macro.h"
 
 
@@ -100,6 +101,51 @@ public:
     uint32_t level;
     uint32_t mip;
     bool is_preparing;
+    
+    mutable PipelineObject* current_pipeline = nullptr;
+    
+    void bind(RenderResource* resource) const
+    {
+        checkf(current_pipeline, "Could not bind resource while no any pipeline bound");
+        resource->query_single(level)->bind(cmd, frame);
+    }
+    
+    
+    void bind(const std::shared_ptr<RenderResourceInstance>& instance) const
+    {
+        checkf(current_pipeline, "Could not bind resource while no any pipeline bound");
+        instance->bind(cmd, frame);
+    }
+    
+    bool bind_pipeline(PipelineObject* pipeline) const
+    {
+        const bool pipeline_changed = current_pipeline != pipeline;
+        current_pipeline = pipeline;
+        backend.bind_pipeline(cmd, pipeline);
+        
+        return pipeline_changed;
+    }
+    
+    template<typename T>
+    void push_constants(T&& value) const
+    {
+        backend.push_constants(cmd, std::forward<T>(value));
+    }
+    
+    void draw_indexed(size_t size) const
+    {
+        backend.draw_indexed(cmd, size);
+    }
+    
+    void bind_mesh(MeshPrimHandle mesh) const
+    {
+        backend.bind_mesh(cmd, mesh, frame);
+    }
+    
+    void draw_fullscreen() const
+    {
+        backend.draw_fullscreen(cmd);
+    }
 };
 
 

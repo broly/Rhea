@@ -141,8 +141,7 @@ RBDescriptorSetLayout vk::PipelineManager::get_or_create_resource_descriptor_set
     return info.layout;
 }
 
-void vk::PipelineManager::push_constants(const RBCommandList& cmd, const void* data, size_t size,
-                                         RBPipelineLayout pipeline_layout)
+void vk::PipelineManager::push_constants(const RBCommandList& cmd, const void* data, size_t size)
 {
     PROFILE("vk::PipelineManager::push_constants");
 
@@ -158,7 +157,7 @@ void vk::PipelineManager::push_constants(const RBCommandList& cmd, const void* d
             stage_bits |= VK_SHADER_STAGE_VERTEX_BIT;
     }
     
-    auto vk_pipeline_layout = pipeline_layout.as<VkPipelineLayout>();
+    auto vk_pipeline_layout = current_pipeline_layout.as<VkPipelineLayout>();
     
     {
         PROFILE("vkCmdPushConstants");
