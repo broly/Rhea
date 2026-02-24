@@ -2,6 +2,7 @@
 	"resource": {
 		"name": "shadow",
 		"usage": "frame",
+		"allowed_stages": ["fragment"],
 		"parameters": {
 			"shadow_depth": {
 				"variable": "u_shadow_depth",

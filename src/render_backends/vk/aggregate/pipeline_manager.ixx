@@ -15,40 +15,17 @@ namespace vk
         PipelineLayoutDesc desc;
     };
     
-    struct VkRenderResourcePipelineInfo
+    struct VkRenderResourceInfo
     {
         DescriptorSetLayoutDesc descritor_set_layout_desc;
         RBDescriptorSetLayout layout;
         frame_list<RBDescriptorSet> sets_per_frame;
         std::vector<frame_list<RBBufferHandle>> buffers;
     };
-    
-    struct UniqueResourcePair
-    {
-        const VkRenderResource* resource;
-        RBPipelineLayout pipeline_layout;
-        
-        bool operator==(const UniqueResourcePair& other) const
-        {
-            return resource == other.resource && pipeline_layout == other.pipeline_layout;
-        }
-    };
 
-    export using UniqueResourceTrio = std::tuple<const VkRenderResource*, RBPipelineLayout, uint32_t>;
+    export using UniqueResourcePair = std::tuple<const VkRenderResource*, uint32_t>;
 }
 
-export template<>
-struct std::hash<vk::UniqueResourcePair>
-{
-    size_t operator()(const vk::UniqueResourcePair& h) const noexcept
-    {
-        size_t seed = 0;
-        hash_combine(seed, (size_t)h.resource);
-        hash_combine(seed, (size_t)h.pipeline_layout);
-        return seed;
-    }
-};
-    
 
 namespace vk
 {
@@ -67,23 +44,29 @@ namespace vk
         {}
         
         PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
-        RBPipelineLayout create_layout(const PipelineLayoutDesc& desc);
+        RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc);
         
         VkDescriptorSetLayout get_empty_descriptor_set();
         
-        std::shared_ptr<VkRenderResourceInstance> query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsage
-            usage);
+        std::shared_ptr<VkRenderResourceInstance> query_single_resource_instance(VkRenderResource* resource, 
+            uint32_t unique_id, uint32_t instance_id, ResourceUsage usage);
+        
+        RBDescriptorSetLayout get_or_create_resource_descriptor_set_layout(VkRenderResource* resource);
         
         void push_constants(const RBCommandList& cmd, const void* data, size_t size, RBPipelineLayout pipeline_layout);
-        void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, 
-            RBPipelineLayout pipeline_layout, Name debug_name);
+        void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors,  Name debug_name);
         void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object, VkRenderPass current_render_pass);
         
-        const PipelineLayoutDesc& get_pipeline_layout_desc(RBPipelineLayout layout);
+        void invalidate_pipeline_layout();
+        
+        inline const PipelineLayoutDesc& get_pipeline_layout_desc(RBPipelineLayout layout)
+        {
+            return instance_data.at(layout).desc;
+        }
         
         void update_buffers();
         
-        std::map<VkPipelineLayout, PipelineLayoutInstanceData> instance_data;
+        std::unordered_map<VkPipelineLayout, PipelineLayoutInstanceData> instance_data;
         
         vk::Instance& instance;
         vk::SwapchainControl& swapchain;
@@ -103,22 +86,24 @@ namespace vk
         
         
         std::map<
-            UniqueResourceTrio,
+            UniqueResourcePair,
             std::vector<std::shared_ptr<VkRenderResourceInstance>> 
         > unique_resource_instances;
     
     
-        struct ResorceInstancePipelineData
+        struct ResourceInstanceData
         {
             std::vector<RBDescriptorSet> sets_per_frame = {};
             std::vector<std::vector<RBBufferHandle>> buffers = {}; // [binding][frame]
         };
     
-        std::unordered_map<VkRenderResourceInstance*, ResorceInstancePipelineData> instance_pipeline_data;
+        std::unordered_map<VkRenderResourceInstance*, ResourceInstanceData> resource_instance_data;
 
-        std::unordered_map<UniqueResourcePair, VkRenderResourcePipelineInfo> resources_pipeline_info;
+        std::unordered_map<const VkRenderResource*, VkRenderResourceInfo> resources_info;
         
         std::optional<VkDescriptorSetLayout> empty_descriptor_set;
+        
+        
     };
 }
 

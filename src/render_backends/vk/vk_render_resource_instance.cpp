@@ -9,22 +9,20 @@ import array_helpers;
 VkRenderResourceInstance::VkRenderResourceInstance(
     vk::BufferManager& buffer_manager, 
     const VkRenderResource* in_resource, 
-    ResourceUsage in_usage, 
-    RBPipelineLayout in_pipeline_layout)
+    ResourceUsage in_usage)
     : buffer_manager(buffer_manager)
     , resource(in_resource)
     , usage(in_usage)
-    , pipeline_layout(in_pipeline_layout.as<VkPipelineLayout>())
 {}
 
 void VkRenderResourceInstance::update_uniform_buffer_impl(Name buffer_name, size_t size, void* data, RBFrameHandle frame)
 {    
-    auto inst_info = resource->backend.pipeline_manager.instance_pipeline_data.at(this);
-    
-    auto& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({resource, RBPipelineLayout(pipeline_layout)});
+    auto inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
+
+    vk::VkRenderResourceInfo& resource_info = resource->backend.pipeline_manager.resources_info.at(resource);
 
     auto [binding_index, binding] =
-        pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
+        resource_info.descritor_set_layout_desc.get_binding(buffer_name);
 
     checkf(binding.parameter.type == MaterialParamType::uniform, "Type mismatch");
 
@@ -43,8 +41,8 @@ void VkRenderResourceInstance::update_image(Name buffer_name,
     
     
     
-    auto inst_info = resource->backend.pipeline_manager.instance_pipeline_data.at(this);
-    auto& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({resource, RBPipelineLayout(pipeline_layout)});
+    auto inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
 
     auto [binding_index, binding] =
         pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
@@ -71,8 +69,8 @@ void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle fr
     
     if (!has_set_per_frame)
     {
-        vk::PipelineManager::ResorceInstancePipelineData inst_info = resource->backend.pipeline_manager.
-                                                                               instance_pipeline_data.at(this);
+        vk::PipelineManager::ResourceInstanceData inst_info = resource->backend.pipeline_manager.
+                                                                               resource_instance_data.at(this);
         checkf(array_size(set_per_frame) >= inst_info.sets_per_frame.size(),
             "Array too large");
         for (int i = 0; i < inst_info.sets_per_frame.size(); ++i)
@@ -83,9 +81,7 @@ void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle fr
     }
     if (!set_index.has_value())
     {
-        vk::VkRenderResourcePipelineInfo& pipe_info = resource->backend.pipeline_manager.resources_pipeline_info.at({
-            resource, RBPipelineLayout(pipeline_layout)
-        });
+        vk::VkRenderResourceInfo& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
         
         set_index = pipe_info.descritor_set_layout_desc.set_index;
     }
@@ -99,6 +95,5 @@ void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle fr
         command_list,
         *set_index,
         set,
-        pipeline_layout,
         resource->desc.name);
 }

@@ -7,6 +7,7 @@ import <filesystem>;
 import reflect;
 import :render_graph;
 import json_utils;
+import enum_helpers;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -173,19 +174,27 @@ void Renderer::load_resources()
         auto& res = resource_info->resource;
         desc.name = res.name;
         desc.set = res.set;
+        desc.allowed_stages = res.allowed_stages;
         res.set_index = set_index++;
         desc.set_index = res.set_index;
         
         desc.usage = res.usage;
+        
+        uint32_t binding = 0;
+        
         for (const auto& [param_name, variable] : res.parameters)
         {
             RenderResourceVariableDesc var_desc;
             var_desc.parameter = variable;
+            
+            uint32_t current_binding = variable.is_descriptor() ? binding++ : -1;
+            
             if (variable.type == MaterialParamType::uniform)
             {
                 const reflect::RuntimeReflectionInfo* ubo_info = reflect::find_runtime_info(*variable.ubo);
                 checkf(ubo_info, "could not find runtime type %s, please add runtime reflection", variable.ubo->to_string().c_str());
                 var_desc.size = ubo_info->size;
+                var_desc.binding = current_binding;
             }
             else if (variable.type == MaterialParamType::sampler)
             {
@@ -194,6 +203,7 @@ void Renderer::load_resources()
                     variable.sampler->to_string().c_str());
                 var_desc.sampler = found_sampler->second;
                 var_desc.size = -1;
+                var_desc.binding = current_binding;
             }
             else if (variable.type == MaterialParamType::definition) // skip definitions
             {

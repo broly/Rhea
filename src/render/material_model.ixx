@@ -8,6 +8,7 @@ import <string>;
 #include "common/reflect_macros.h"
 #include "object/object_reflection_macro.h"
 #include "common/type_macros.h"
+import enum_helpers;
 import <bit>;
 
 #include "common/assertion_macros.h"
@@ -230,11 +231,12 @@ export struct MatModel_Resource
     ResourceUsageType usage;
     std::map<Name, MatModel_Parameter> parameters;
     Name set;
+    Mask<ShaderStage> allowed_stages;
     
     uint32_t set_index; // not serialized
 };
 REFLECT_STRUCT(MatModel_Resource,
-    name, usage, parameters, set);
+    name, usage, parameters, set, allowed_stages);
 
 
 export enum class MatModel_WriteMaskEnum

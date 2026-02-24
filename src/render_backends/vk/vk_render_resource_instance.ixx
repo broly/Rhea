@@ -10,7 +10,7 @@ class VkRenderResourceInstance : public RenderResourceInstance
 {
 public:
     
-    VkRenderResourceInstance(vk::BufferManager& buffer_manager, const class VkRenderResource* in_resource, ResourceUsage in_usage, RBPipelineLayout in_pipeline_layout);
+    VkRenderResourceInstance(vk::BufferManager& buffer_manager, const class VkRenderResource* in_resource, ResourceUsage in_usage);
 
     virtual void update_uniform_buffer_impl(Name buffer_name, size_t size, void* data, RBFrameHandle frame);
     
@@ -22,7 +22,6 @@ public:
     vk::BufferManager& buffer_manager;
     const VkRenderResource* resource;
     ResourceUsage usage;
-    VkPipelineLayout pipeline_layout;
     
     bool has_set_per_frame = false;
     RBDescriptorSet set_per_frame[5];

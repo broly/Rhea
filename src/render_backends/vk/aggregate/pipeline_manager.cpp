@@ -19,42 +19,27 @@ PipelineObject* vk::PipelineManager::create_pipeline(const GraphicsPipelineDesc&
     return result;
 }
 
-RBPipelineLayout vk::PipelineManager::create_layout(const PipelineLayoutDesc& desc)
+RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayoutDesc& desc)
 {
     
     VkPipelineLayout pipeline_layout;
     
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
-    std::vector<VkRenderResourcePipelineInfo> prepared_info;
+    std::vector<VkRenderResourceInfo> prepared_info;
     
-    uint16_t max_index = 0;
+    uint32_t max_index = 0;
     for (auto& resource_info : desc.resources)
-        max_index = std::max(max_index, resource_info.set);
+        max_index = std::max(max_index, resource_info.resource->desc.set_index);
     
-    for (uint16_t index = 0; index <= max_index; index++)
+    for (uint32_t index = 0; index <= max_index; index++)
         vk_layouts.push_back(get_empty_descriptor_set());
     
     for (auto& resource_info : desc.resources)
     {
-        DescriptorSetLayoutDesc layout_desc;
-        const RenderResourceDesc& resource_desc = resource_info.resource->desc;
-        layout_desc.debug_name = resource_info.name;
-        layout_desc.set_index = resource_info.set;
-        for (auto& binding :  resource_info.resource_variable_bindings)
-        {
-            if (binding.is_descriptor())
-                layout_desc.bindings.push_back(binding);
-            
-        }
-        
-    
-        VkRenderResourcePipelineInfo info{};
-        info.descritor_set_layout_desc = layout_desc;
-        layout_desc.debug_name = resource_desc.name;
-        info.layout = buffer_manager.create_descriptor_set_layout(layout_desc, desc.pass);
-        vk_layouts[resource_info.set] = buffer_manager.get_vk_descriptor_set_layout(info.layout).vk_layout;
-        prepared_info.push_back(info);
+        RBDescriptorSetLayout layout_id = get_or_create_resource_descriptor_set_layout(
+            (VkRenderResource*)resource_info.resource);
+        vk_layouts[resource_info.resource->desc.set_index] = buffer_manager.get_vk_descriptor_set_layout(layout_id).vk_layout;
     }
     
     VkPipelineLayoutCreateInfo plci{
@@ -71,23 +56,9 @@ RBPipelineLayout vk::PipelineManager::create_layout(const PipelineLayoutDesc& de
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
     LogVkPipeline.Log("Created pipeline layout %s (%p)", desc.pass.to_string().c_str(), pipeline_layout);
     
+    instance_data[pipeline_layout] = {desc};
     
     RBPipelineLayout result {pipeline_layout};
-    
-    
-    
-    for (int index = 0; auto& resource_info : desc.resources)
-    {
-        
-        LogVkPipeline.Log(" * resource %s, set: %i", 
-            resource_info.name.to_string().c_str(), resource_info.set);
-        UniqueResourcePair pair = {(VkRenderResource*)resource_info.resource, result};
-        resources_pipeline_info.insert({pair, prepared_info.at(index)});
-        index++;
-    }
-    
-    instance_data.insert({result, {desc}});
-    
     
     return result;
 }
@@ -115,10 +86,10 @@ VkDescriptorSetLayout vk::PipelineManager::get_empty_descriptor_set()
     return layout;
 }
 
-std::shared_ptr<VkRenderResourceInstance> vk::PipelineManager::query_single_resource_instance(VkRenderResource* resource, RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id, ResourceUsage
-                                                                                              usage)
+std::shared_ptr<VkRenderResourceInstance> vk::PipelineManager::query_single_resource_instance(
+    VkRenderResource* resource, uint32_t unique_id, uint32_t instance_id, ResourceUsage usage)
 {
-    auto& instances_list = unique_resource_instances[{resource, pipeline_layout, unique_id}];
+    auto& instances_list = unique_resource_instances[{resource, unique_id}];
     
     if (instance_id >= instances_list.size())
         instances_list.resize(instance_id + 1, nullptr);
@@ -127,20 +98,55 @@ std::shared_ptr<VkRenderResourceInstance> vk::PipelineManager::query_single_reso
         return instances_list[instance_id];
     
     std::shared_ptr<VkRenderResourceInstance> resource_instance = 
-        std::make_shared<VkRenderResourceInstance>(buffer_manager, resource, usage, pipeline_layout);
+        std::make_shared<VkRenderResourceInstance>(buffer_manager, resource, usage);
     instances_list[instance_id] = resource_instance;
+
+    get_or_create_resource_descriptor_set_layout(resource);
     
     update_buffers();
     
     return instances_list[instance_id];
 }
 
+RBDescriptorSetLayout vk::PipelineManager::get_or_create_resource_descriptor_set_layout(VkRenderResource* resource)
+{
+    if (resources_info.contains(resource))
+        return resources_info.at(resource).layout;
+    
+    DescriptorSetLayoutDesc layout_desc;
+    const RenderResourceDesc& resource_desc = resource->desc;
+    layout_desc.debug_name = resource->desc.name;
+    layout_desc.set_index = resource_desc.set_index;
+    
+    for (auto& var_desc : resource->desc.variables)
+    {
+        if (var_desc.parameter.is_descriptor())
+        {
+            ResourceBinding rr_var_desc;
+            rr_var_desc.parameter = var_desc.parameter;
+            rr_var_desc.binding_index = var_desc.binding;
+            rr_var_desc.sampler = var_desc.sampler;
+            rr_var_desc.stages = resource->desc.allowed_stages;
+            layout_desc.bindings.push_back(rr_var_desc);
+        }
+    }
+    
+    
+
+    VkRenderResourceInfo info;
+    info.descritor_set_layout_desc = layout_desc;
+    info.layout = buffer_manager.create_descriptor_set_layout(layout_desc, resource->desc.name);
+    resources_info.insert({resource, info});
+    
+    return info.layout;
+}
+
 void vk::PipelineManager::push_constants(const RBCommandList& cmd, const void* data, size_t size,
                                          RBPipelineLayout pipeline_layout)
 {
-    PROFILE(__FUNCTION__);
+    PROFILE("vk::PipelineManager::push_constants");
 
-    const PipelineLayoutDesc& pipeline_layout_desc = get_pipeline_layout_desc(pipeline_layout);
+    const PipelineLayoutDesc& pipeline_layout_desc = get_pipeline_layout_desc(current_pipeline_layout);
     
     uint32_t stage_bits = 0;
     
@@ -153,38 +159,40 @@ void vk::PipelineManager::push_constants(const RBCommandList& cmd, const void* d
     }
     
     auto vk_pipeline_layout = pipeline_layout.as<VkPipelineLayout>();
-
-    vkCmdPushConstants(
-        cmd,
-        vk_pipeline_layout,
-        VkShaderStageFlagBits(stage_bits), 
-        0, 
-        size,
-        data
-    );
+    
+    {
+        PROFILE("vkCmdPushConstants");
+        vkCmdPushConstants(
+            cmd,
+            vk_pipeline_layout,
+            VkShaderStageFlagBits(stage_bits), 
+            0, 
+            size,
+            data
+        );
+    }
     
 }
 
 void vk::PipelineManager::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors,
-                                              RBPipelineLayout pipeline_layout, Name debug_name)
+                                              Name debug_name)
 {
     
     PROFILE("bind_descriptor_set");
     
     VkDescriptorSet vk_set = rb_descriptors.as<VkDescriptorSet>();
     
-    if (vk_set == current_descriptor_set && current_pipeline_layout == pipeline_layout)
+    if (vk_set == current_descriptor_set)
         return;
     
     LogVkPipelineManager.Log("bind_descriptor_set. cmd: %p, descriptor_set: %p, pipeline_layout: %p (%s)",
-        cmd_list, rb_descriptors, pipeline_layout, debug_name.to_string().c_str());
+        cmd_list, rb_descriptors, current_pipeline_layout, debug_name.to_string().c_str());
     
     current_descriptor_set = vk_set;
-    current_pipeline_layout = pipeline_layout;
     
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     
-    auto vk_pipeline_layout = pipeline_layout.as<VkPipelineLayout>();
+    auto vk_pipeline_layout = current_pipeline_layout.as<VkPipelineLayout>();
     
     {
         PROFILE("vkCmdBindDescriptorSets");
@@ -227,34 +235,36 @@ void vk::PipelineManager::bind_pipeline(RBCommandList cmd_list, PipelineObject* 
     checkf(pipeline_vk != VK_NULL_HANDLE, "pipeline not created");
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_vk);
+    
+    current_pipeline_layout = ((VkPipelineObject*)pipeline_object)->get_layout();
 }
 
-const PipelineLayoutDesc& vk::PipelineManager::get_pipeline_layout_desc(RBPipelineLayout layout)
+void vk::PipelineManager::invalidate_pipeline_layout()
 {
-    return instance_data.at(layout).desc;
+    current_pipeline_layout = RBPipelineLayout();
 }
 
 void vk::PipelineManager::update_buffers()
 {
-    for (const auto& [resource_layout_id, instances] : unique_resource_instances)
+    for (const auto& [resource_and_id, instances] : unique_resource_instances)
     {
-        auto [resource, layout, unique_id] = resource_layout_id;
+        auto [resource, unique_id] = resource_and_id;
         for (std::shared_ptr<VkRenderResourceInstance> instance : instances)
         {
             VkRenderResourceInstance* instance_raw = instance.get();
-            const auto info_it = resources_pipeline_info.find({resource, layout});
+            const auto info_it = resources_info.find(resource);
             
-            checkf(info_it != resources_pipeline_info.end(), "Resource pair (%s, %p) not found",
-                resource->desc.name.to_string().c_str(), (void*)layout.handle );
+            checkf(info_it != resources_info.end(), "Resource (%s) not found",
+                resource->desc.name.to_string().c_str() );
             
             auto info = info_it->second;
 
-            if (instance_pipeline_data.contains(instance.get()))
+            if (resource_instance_data.contains(instance.get()))
                 continue;
         
-            if (!instance_pipeline_data.contains(instance_raw))
-                instance_pipeline_data.insert({instance_raw, {}});
-            auto& inst = instance_pipeline_data.at(instance_raw);
+            if (!resource_instance_data.contains(instance_raw))
+                resource_instance_data.insert({instance_raw, {}});
+            auto& inst = resource_instance_data.at(instance_raw);
 
             inst.sets_per_frame =
                 buffer_manager.allocate_descriptor_sets_for_layout(

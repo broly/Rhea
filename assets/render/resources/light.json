@@ -3,6 +3,7 @@
 		"name": "light",
 		"stages": ["vertex", "fragment"],
 		"usage": "frame",
+		"allowed_stages": ["vertex", "fragment"],
 		"parameters": {
 			"light": {
 				"variable": "light_ubo",

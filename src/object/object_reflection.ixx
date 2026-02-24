@@ -9,6 +9,7 @@ import <json/value.h>;
 import <set>;
 import reflect;
 import fixed_string;
+import enum_helpers;
 
 import :object;
 import dependency_collector;
@@ -205,6 +206,27 @@ template<typename T>
 constexpr bool is_set_v = is_set<T>::value;
 
 
+
+
+template<typename>
+struct is_mask
+{
+    static bool constexpr value = false;
+};
+
+
+
+template<typename... Ts>
+struct is_mask<Mask<Ts...> > 
+{
+    static bool constexpr value = true;
+};
+
+template<typename T>
+constexpr bool is_mask_v = is_mask<T>::value;
+
+
+
 template<typename>
 struct is_shared_ptr 
 {
@@ -278,6 +300,18 @@ export namespace reflect::json
                     serialize_json_value(set_item, json_item, context);
                 }
                 target.emplace(set_item);
+            }
+        } else if constexpr (is_mask_v<std::decay_t<T>>)
+        {
+            assert(value.isArray());
+            target = 0;
+            for (auto& json_item : value)
+            {
+                using value_type = typename T::enum_type;
+                value_type enum_value;
+                static_assert(std::is_enum_v<value_type> && is_reflected_v<value_type>);
+                enum_value = reflect::ReflectionInfo<value_type>::template enum_name_to_value(json_item.asString());
+                target |= enum_value;
             }
         }else if constexpr (is_optional_v<std::decay_t<T>>)
         {

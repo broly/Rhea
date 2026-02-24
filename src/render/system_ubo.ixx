@@ -27,7 +27,7 @@ export struct DirectionalLight
     glm::vec4 color;     // rgb * intensity
 };
 
-export struct LightUBO
+export struct alignas(16) LightUBO
 {
     PointLight lights[8];
     int light_count;

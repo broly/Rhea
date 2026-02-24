@@ -2,6 +2,7 @@
 	"resource": {
 		"name": "camera",
 		"usage": "frame",
+		"allowed_stages": ["vertex", "fragment"],
 		"parameters": {
 			"camera": {
 				"type": "uniform",

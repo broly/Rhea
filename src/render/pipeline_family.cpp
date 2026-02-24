@@ -81,8 +81,6 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
             resource_info.resource = resource;
         
             auto& resource_desc = resource->desc;
-        
-            resource_info.set = resource->desc.set_index;
             resource_info.name = resource_name;
         
             uint32_t binding_index = 0;
@@ -246,7 +244,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     for (auto& resource : layout_desc.resources)
     {
         const Name resource_set_name = resource.resource->desc.set;
-        const uint16_t resource_set = resource.set;
+        const uint16_t resource_set = resource.resource->desc.set_index;
         defines.insert({resource_set_name, resource_set});
         
         for (auto& variable_binding : resource.resource_variable_bindings)

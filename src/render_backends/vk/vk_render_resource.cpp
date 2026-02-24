@@ -15,18 +15,18 @@ VkRenderResource::VkRenderResource(const RenderResourceDesc& desc, vk::BufferMan
     , backend(in_backend)
 {}
 
-std::shared_ptr<RenderResourceInstance> VkRenderResource::query_unique(RBPipelineLayout pipeline_layout,
+std::shared_ptr<RenderResourceInstance> VkRenderResource::query_unique(
     uint32_t unique_id, uint32_t instance_id)
 {
     return std::static_pointer_cast<RenderResourceInstance>(
-        backend.pipeline_manager.query_single_resource_instance(this, pipeline_layout, unique_id, instance_id, desc.usage)
+        backend.pipeline_manager.query_single_resource_instance(this, unique_id, instance_id, desc.usage)
     );
 }
 
-std::shared_ptr<RenderResourceInstance> VkRenderResource::query_single(RBPipelineLayout pipeline_layout, uint32_t instance_id)
+std::shared_ptr<RenderResourceInstance> VkRenderResource::query_single(uint32_t instance_id)
 {
     return std::static_pointer_cast<RenderResourceInstance>(
-        backend.pipeline_manager.query_single_resource_instance(this, pipeline_layout, 0, instance_id, desc.usage)
+        backend.pipeline_manager.query_single_resource_instance(this, 0, instance_id, desc.usage)
     );
 }
 

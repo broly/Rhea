@@ -65,7 +65,7 @@ DescriptorType TEMP_CONVERT_DESCRIPTOR_TYPE_CRUTCH(VkDescriptorType descriptor_t
 
 RBPipelineLayout VkRenderBackend::create_pipeline_layout(const PipelineLayoutDesc& desc)
 {    
-    return pipeline_manager.create_layout(desc);
+    return pipeline_manager.create_pipeline_layout(desc);
 }
 
 
@@ -252,9 +252,9 @@ void VkRenderBackend::create_descriptor_pool()
 }
 
 void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors, 
-    RBPipelineLayout pipeline_handle, Name debug_name)
+    Name debug_name)
 {
-    return pipeline_manager.bind_descriptor_set(cmd_list, set_index, rb_descriptors, pipeline_handle, debug_name);
+    return pipeline_manager.bind_descriptor_set(cmd_list, set_index, rb_descriptors, debug_name);
 }
 
 RBFrameHandle VkRenderBackend::get_current_frame() const
@@ -741,6 +741,7 @@ void VkRenderBackend::end_render_pass(RBCommandList cmd_list)
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdEndRenderPass(cmd);
     current_render_pass = VK_NULL_HANDLE;
+    pipeline_manager.invalidate_pipeline_layout();
 }
 
 

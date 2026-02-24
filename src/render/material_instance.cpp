@@ -112,7 +112,7 @@ std::shared_ptr<RenderResourceInstance> MaterialInstance::get_or_create_resource
     if (render_resource_instance != nullptr)
         return render_resource_instance;
     
-    render_resource_instance = render_resource->query_unique(pipeline_family->get_pipeline_layout(), material->unique_id, 0);
+    render_resource_instance = render_resource->query_unique(material->unique_id, 0);
 
     // auto instance = pipeline->create_resource_instance(render_resource);
     apply_material_parameters(render_resource_instance, frame);

@@ -34,6 +34,7 @@ void main()
     if (alpha <= 0.001)
         discard;
 #endif
+    
 
     // ----- Albedo (linear) -----
     vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * material_ubo.base_color_factor;
@@ -52,6 +53,14 @@ void main()
     // ----- Normals -----
     vec3 Ng = normalize(v_world_normal);
     vec3 N  = Ng;
+
+    float variance = max(
+        dot(dFdx(N), dFdx(N)),
+        dot(dFdy(N), dFdy(N))
+    );
+
+    roughness = sqrt(roughness * roughness + variance);
+    roughness = clamp(roughness, 0.05, 1.0);
 
 #if !BLEND_MODE_TRANSLUCENT
     vec3 T = normalize(v_world_tangent);
@@ -166,19 +175,26 @@ void main()
     // ---- Specular IBL ----
     vec3 R = reflect(-V, N);
 
-    const float MAX_REFLECTION_LOD = 5.0;
+    const float MAX_REFLECTION_LOD = 6.0;
+
+
+    float dist = length(camera_ubo.camera_pos.xyz - v_world_pos);
+
+    float lod = roughness * MAX_REFLECTION_LOD;
+    lod += 1.0;
+    lod += clamp(dist * 0.01, 0.0, 2.0);  // distance bias  
+
     vec3 prefilteredColor =
-    textureLod(u_prefilter_map, R, roughness * MAX_REFLECTION_LOD).rgb;
+    textureLod(u_prefilter_map, R, lod).rgb;
 
     vec2 brdf = texture(
         u_brdf_lut,
         vec2(max(dot(N, V), 0.0), roughness)
     ).rg;
 
-    vec3 specularIBL =
-    prefilteredColor * (kS * brdf.x + brdf.y);
+    vec3 specularIBL = prefilteredColor * (kS * brdf.x + brdf.y);
 
-    vec3 ibl = (kD * diffuseIBL + specularIBL) * ao;
+    vec3 ibl = (kD * diffuseIBL + specularIBL) * (1);
 #endif
     
 #if BLEND_MODE_TRANSLUCENT

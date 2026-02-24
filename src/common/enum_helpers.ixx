@@ -8,6 +8,7 @@ concept enum_compatible = std::is_same_v<E, T> || std::is_integral_v<T>;
 export template<typename Enum>
 struct Mask
 {
+    using enum_type = Enum;
     using underlying = std::underlying_type_t<Enum>;
     
     constexpr Mask()
@@ -35,6 +36,13 @@ struct Mask
     constexpr friend Mask operator&(Mask lhs, T rhs)
     {
         return static_cast<Mask>(static_cast<underlying>(lhs.value) & static_cast<underlying>(rhs));
+    }
+    
+    template<enum_compatible<Enum> T>
+    Mask operator|=(T rhs)
+    {
+        value = static_cast<enum_type>(static_cast<underlying>(value) | static_cast<underlying>(rhs));
+        return *this;
     }
     
     constexpr operator underlying() const

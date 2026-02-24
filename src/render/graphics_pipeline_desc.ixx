@@ -123,7 +123,6 @@ export
     {
         Name name;
         RenderResource* resource;
-        uint16_t set;
         std::vector<ResourceBinding> resource_variable_bindings;
     };
 

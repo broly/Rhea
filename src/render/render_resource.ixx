@@ -6,11 +6,12 @@ import :render_resource_instance;
 import :pipeline_object;
 import name;
 
-struct RenderResourceVariableDesc
+export struct RenderResourceVariableDesc
 {
     MatModel_Parameter parameter;
     RBSampler sampler;
     size_t size;
+    uint32_t binding;
 };
 
 export struct RenderResourceDesc
@@ -21,6 +22,7 @@ export struct RenderResourceDesc
     
     std::vector<RenderResourceVariableDesc> variables;
     Name set;
+    Mask<ShaderStage> allowed_stages;
     
     uint32_t set_index;  // assigned at runtime
 };
@@ -34,9 +36,8 @@ public:
         : desc(in_desc)
     {}
 
-    virtual std::shared_ptr<RenderResourceInstance> query_single(RBPipelineLayout pipeline_layout, uint32_t instance_id = 0) = 0;
-    virtual std::shared_ptr<RenderResourceInstance> query_single(PipelineObject*, uint32_t instance_id = 0);
-    virtual std::shared_ptr<RenderResourceInstance> query_unique(RBPipelineLayout pipeline_layout, uint32_t unique_id, uint32_t instance_id) = 0;
+    virtual std::shared_ptr<RenderResourceInstance> query_single(uint32_t instance_id = 0) = 0;
+    virtual std::shared_ptr<RenderResourceInstance> query_unique(uint32_t unique_id, uint32_t instance_id) = 0;
 
     const RenderResourceDesc desc;
 };

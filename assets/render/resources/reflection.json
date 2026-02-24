@@ -2,6 +2,7 @@
 	"resource": {
 		"name": "reflection",
 		"usage": "frame",
+		"allowed_stages": ["fragment"],
 		"parameters": {
 			"irradiance": {
 				"variable": "u_irradiance",

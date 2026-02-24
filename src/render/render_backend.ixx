@@ -117,8 +117,7 @@ public:
     virtual PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc) = 0;
 
 
-    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, 
-        RBDescriptorSet rb_descriptors, RBPipelineLayout pipeline_handle, Name debug_name) = 0;
+    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors,Name debug_name) = 0;
     
     void push_constants(
         const RBCommandList& cmd, 

@@ -2,6 +2,7 @@
 
 import :instance;
 import assets;
+import <unordered_map>;
 import <vulkan/vulkan_core.h>;
 
 export struct MeshGPUData {
@@ -30,6 +31,6 @@ namespace vk
         void bind(const RBCommandList& cmd, MeshPrimHandle mesh);
 
 
-        std::map<MeshPrimHandle, MeshGPUData> mesh_map;
+        std::unordered_map<MeshPrimHandle, MeshGPUData> mesh_map;
     };
 }

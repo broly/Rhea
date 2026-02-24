@@ -6,6 +6,7 @@ import :helpers;
 #include "common/assertion_macros.h"
 import :log;
 #include "logging/log_macro.h"
+#include "profiling/profile.h"
 
 DEFINE_LOGGER(LogVkMeshManager, Warning);
 
@@ -70,6 +71,7 @@ void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle)
 void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
 {
     LogVkMeshManager.Log("Bind mesh '%s', cmd=%p", mesh.mesh.get().name.c_str(), cmd);
+    PROFILE("vk::MeshManager::bind");
     auto mesh_info_it = mesh_map.find(mesh);
     
     checkf(mesh_info_it != mesh_map.end(), "Could not find mesh info for '%s' (geom: %i, prim: %i)",
@@ -89,6 +91,12 @@ void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
     }
     
     VkDeviceSize offsets[] = { 0 };
-    vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffers, offsets);
-    vkCmdBindIndexBuffer(cmd, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    {
+        PROFILE("vkCmdBindVertexBuffers");
+        vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffers, offsets);
+    }
+    {
+        PROFILE("vkCmdBindIndexBuffer");
+        vkCmdBindIndexBuffer(cmd, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    }
 }

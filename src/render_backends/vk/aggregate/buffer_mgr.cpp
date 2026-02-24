@@ -200,7 +200,7 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
 
 vk::DescriptorSetLayoutData vk::BufferManager::get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle)
 {
-    return descriptor_set_layouts[rb_handle];
+    return descriptor_set_layouts.at(rb_handle);
 }
 
 RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type)

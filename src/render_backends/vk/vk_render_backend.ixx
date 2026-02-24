@@ -110,8 +110,7 @@ public:   /// API Section
         std::optional<RBSampler> sampler,
         uint32_t array_index = 0,
         bool cubemap = false) override;
-    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, 
-        RBPipelineLayout pipeline_handle, Name debug_name) override;
+    virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, Name debug_name) override;
     virtual RBFrameHandle get_current_frame() const override;
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;

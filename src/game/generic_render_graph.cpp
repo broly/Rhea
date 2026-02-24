@@ -352,26 +352,14 @@ void GenericRenderGraph::bind_shadow_globals(
     auto cmd   = ctx.cmd;
     auto frame = ctx.frame;
 
-    auto& light_processor =
-        scene_view->get_processor<SceneViewProcessor_Light>();
+    
+    
+    auto& camera_processor =
+        scene_view->get_processor<SceneViewProcessor_Camera>();
+    
+    auto light_ubo = build_light_ubo(camera_processor.get_active_camera()->position);
 
-    LightUBO light_ubo{};
-    light_ubo.has_dir_light = 0;
-
-    for (auto& l : light_processor.lights)
-    {
-        if (l.type == LightType::directional)
-        {
-            light_ubo.has_dir_light = 1;
-            light_ubo.dir_light.direction =
-                glm::vec4(glm::normalize(l.direction), 0.0f);
-            light_ubo.dir_light.color = l.color;
-            light_ubo.dir_light.light_vp = build_dir_light_vp();
-            break;
-        }
-    }
-
-    auto light = light_resource->query_single(layout);
+    auto light = light_resource->query_single();
 
     light->update_uniform_buffer(
         "light_ubo",
@@ -428,9 +416,7 @@ void GenericRenderGraph::prepare_geometry_resources(
             make_camera_ubo(ctx, false, 0);
 
         auto cam =
-            camera_resource->query_single(
-                pipeline,
-                0);
+            camera_resource->query_single(0);
 
         cam->update_uniform_buffer(
             "camera_ubo",
@@ -444,7 +430,7 @@ void GenericRenderGraph::prepare_geometry_resources(
             // ---------- Reflection ----------
 
             auto refl =
-                reflection_resource->query_single(pipeline);
+                reflection_resource->query_single();
 
             auto& reflection_capture_processor =
                 engine->scene_view
@@ -484,7 +470,7 @@ void GenericRenderGraph::prepare_geometry_resources(
                 build_light_ubo(cam_ubo.camera_pos);
 
             auto light =
-                light_resource->query_single(pipeline);
+                light_resource->query_single();
 
             light->update_uniform_buffer(
                 "light_ubo",
@@ -496,7 +482,7 @@ void GenericRenderGraph::prepare_geometry_resources(
             // ---------- Shadow ----------
 
             auto shadow =
-                shadow_resource->query_single(pipeline);
+                shadow_resource->query_single();
 
             shadow->update_image(
                 "u_shadow_depth",
@@ -546,7 +532,7 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
     CameraUBO camera_ubo = make_camera_ubo(ctx);
 
     auto cam =
-        camera_resource->query_single(pipeline);
+        camera_resource->query_single();
 
     cam->update_uniform_buffer(
         "camera_ubo",
@@ -612,7 +598,7 @@ void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
 
     CameraUBO cam_ubo = make_camera_ubo(ctx);
 
-    auto cam = camera_resource->query_single(wireframe_pipeline);
+    auto cam = camera_resource->query_single();
 
     cam->update_uniform_buffer(
         "camera_ubo",
@@ -726,15 +712,8 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     auto pbr = renderer->find_model("pbr");
     std::shared_ptr<PipelineFamily> family = renderer->query_pipeline_family(ctx.pass_name, pbr);
     
-    camera_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
+    bool globals_bound = false;
     
-    if (!is_depth_prepass)
-    {
-        shadow_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
-        light_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
-        reflection_resource->query_single(family->get_pipeline_layout())->bind(ctx.cmd, ctx.frame);
-    }
-
     PROFILE("GenericRenderGraph::draw_scene - items");
     for (auto& item : items)
     {
@@ -757,7 +736,25 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
             ctx.backend.bind_pipeline(
                 ctx.cmd,
                 pipeline);
+            
+            globals_bound = false;
+            
         }
+        
+        if (!globals_bound)
+        {
+            camera_resource->query_single()->bind(ctx.cmd, ctx.frame);
+    
+            if (!is_depth_prepass)
+            {
+                shadow_resource->query_single()->bind(ctx.cmd, ctx.frame);
+                light_resource->query_single()->bind(ctx.cmd, ctx.frame);
+                reflection_resource->query_single()->bind(ctx.cmd, ctx.frame);
+            }
+            globals_bound = true;
+        }
+
+        
         if (!is_depth_prepass)
         {
             instance->bind(
