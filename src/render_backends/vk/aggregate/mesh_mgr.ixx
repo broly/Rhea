@@ -1,6 +1,7 @@
 ﻿export module vk:mesh_mgr;
 
 import :instance;
+import :immediate_commands;
 import assets;
 import <unordered_map>;
 import <vulkan/vulkan_core.h>;
@@ -20,15 +21,24 @@ namespace vk
     class MeshManager
     {
     public:
-        MeshManager(vk::Instance& in_instance)
+        MeshManager(vk::Instance& in_instance, vk::ImmediateCommandPool& in_command_pool)
             : instance(in_instance)
+            , command_pool(in_command_pool)
         {}
         vk::Instance& instance;
+        vk::ImmediateCommandPool& command_pool;
         
         
         void get_or_create_mesh_buffers(MeshPrimHandle handle);
         
         void bind(const RBCommandList& cmd, MeshPrimHandle mesh);
+        
+        void create_device_local_buffer_with_data(
+            const void* src_data,
+            VkDeviceSize size,
+            VkBufferUsageFlags usage,
+            VkBuffer& out_buffer,
+            VkDeviceMemory& out_memory);
 
 
         std::unordered_map<MeshPrimHandle, MeshGPUData> mesh_map;
