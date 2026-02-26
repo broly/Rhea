@@ -19,7 +19,7 @@ import type_id;
         using Fields = detail::NamedFieldList<\
             RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_FIELD,__VA_ARGS__) \
         >;\
-        static constexpr bool reflected = true; \
+        static constexpr detail::reflection_tag reflected {}; \
         static constexpr void iter(auto Func) \
         {\
             Fields::iter(Func); \
@@ -43,19 +43,13 @@ import type_id;
         using Fields = detail::NamedFieldList<\
             RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_FIELD,__VA_ARGS__) \
         >;\
-        static constexpr bool reflected = true; \
+        static constexpr detail::reflection_tag reflected {}; \
         static constexpr std::string_view name = #T; \
         static constexpr void iter(auto Func) \
         {\
             Fields::iter(Func); \
         }\
-        static inline auto __dummy = reflect::register_type(\
-            get_type_id<T>(), \
-            sizeof(T), \
-            [] (void* ptr) { new (ptr) T(); },\
-            {\
-                RHEA_FOR_EACH_COLON(__PRIVATE_RUNTIME_FIELD,__VA_ARGS__) \
-            });\
+        static inline auto __dummy = reflect::register_type_runtime_info<T>(false); \
     }
 
 #define REFLECT_STRUCT_RUNTIME_OPAQUE(T) \
@@ -64,18 +58,12 @@ import type_id;
     { \
         using Type = T; \
         using Fields = detail::NamedFieldList<>;\
-        static constexpr bool reflected = true; \
+        static constexpr detail::reflection_tag reflected {}; \
         static constexpr std::string_view name = #T; \
         static constexpr void iter(auto Func) \
         {\
         }\
-        static inline auto __dummy = reflect::register_type(\
-            get_type_id<T>(), \
-            sizeof(T), \
-            [] (void* ptr) { new (ptr) T(); },\
-            {\
-                 \
-            });\
+        static inline auto __dummy = reflect::register_type_runtime_info<T>(true); \
     }
 
 #define __PRIVATE_NAMED_ENUM_MEMBER_VALUE_TO_NAME(x) {underlying(type::x), #x}
@@ -108,7 +96,7 @@ import type_id;
         {\
             return names[(int)value]; \
         }\
-        static constexpr bool reflected = true; \
+        static constexpr detail::reflection_tag reflected {}; \
     };
 
 #define __REGISTER_TYPE_COMBINE_INNER(A,B) A##B

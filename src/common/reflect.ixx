@@ -13,7 +13,7 @@ export namespace reflect
     {
         template<auto PtrToMember, FixedString Name>
         struct NamedField
-        {            
+        {
             static constexpr void iter(auto func)
             {
                 func.template operator()<PtrToMember, Name>();
@@ -29,7 +29,10 @@ export namespace reflect
                 (Types::iter(func), ...);
             }
         };
+        
+        enum reflection_tag {};
     }
+    
     
     template<typename>
     struct ReflectionInfo;
@@ -43,8 +46,6 @@ export namespace reflect
     
     template<typename T>
     constexpr bool is_reflected_v = requires { ReflectionInfo<T>::reflected; };
-    
-    // bool register_struct(std::string_view struct_name, size_t size);
     
     
     using type_initializer = std::function<void(void* value_ptr)>;
@@ -82,6 +83,7 @@ export namespace reflect
         const std::vector<FieldRuntimeReflectionInfo>& fields);
     bool register_basic_type(TypeId type_id, size_t size, type_initializer initializer);
     
+    
     const RuntimeReflectionInfo* find_runtime_info(TypeId type_id);
     
     
@@ -93,31 +95,64 @@ export namespace reflect
     template<typename E>
     Name enum_name(E value)
     {
-        static_assert(requires {reflect::ReflectionInfo<E>::reflected; }, "enum not reflected");
+        static_assert(is_reflected_v<E>, "enum not reflected");
         return reflect::ReflectionInfo<E>::enum_value_to_name(value);
     }
     
     template<typename E>
     E name_to_enum(Name name)
     {
-        static_assert(requires {reflect::ReflectionInfo<E>::reflected; }, "enum not reflected");
+        static_assert(is_reflected_v<E>, "enum not reflected");
         return reflect::ReflectionInfo<E>::enum_name_to_value(name);
     }
     
     template<typename E>
     bool is_valid_enum_name(Name name)
     {
-        static_assert(requires {reflect::ReflectionInfo<E>::reflected; }, "enum not reflected");
+        static_assert(is_reflected_v<E>, "enum not reflected");
         return reflect::ReflectionInfo<E>::is_valid_enum_name(name);
     }
     
     template<typename T>
     Name get_name()
     {
-        static_assert(requires {reflect::ReflectionInfo<T>::reflected; }, "enum not reflected");
+        static_assert(is_reflected_v<T>, "enum not reflected");
         return reflect::ReflectionInfo<T>::name;
     }
     
+    template<typename T, typename U>
+    constexpr size_t get_offset(U T::* member_ptr) 
+    {
+        return (size_t)&(((T*)nullptr)->*member_ptr);
+    }
+    
+    template<typename T, auto FieldPtr>
+    using field_type_t = decltype(T{}.*FieldPtr);
+    
+    template<typename T>
+    bool register_type_runtime_info(bool opaque)
+    {
+        std::vector<FieldRuntimeReflectionInfo> fields;
+        
+        if (!opaque)
+        {
+            visit<T>([&fields] <auto PtrToField, FixedString name> () {
+                FieldRuntimeReflectionInfo field( 
+                    (const char*)name, 
+                    get_type_id<field_type_t<T, PtrToField>>(), 
+                    get_offset(PtrToField)
+                );
+                fields.push_back(field);
+            });
+        }
+        
+        return reflect::register_type(
+            get_type_id<T>(),
+            sizeof(T),
+            [] (void* ptr) { new (ptr) T(); },
+            fields
+            );
+    }
 }
 
 
