@@ -124,7 +124,7 @@ public:   /// API Section
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
-    virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) override;
+    virtual void get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) override;
     virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) override;
@@ -141,6 +141,7 @@ public:   /// API Section
     
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) override;
     virtual uint32_t get_num_images_in_flight() const override;
+    RBDeviceAddress get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const override;
     // Initialization section
     void create_frame_sync_objects();
     void create_descriptor_pool();
@@ -167,7 +168,7 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::SwapchainControl swapchain {instance, image_manager, sampler_manager, debug};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
     vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
-    vk::MeshManager mesh_manager{instance, immediate_command_pool};
+    vk::MeshManager mesh_manager{instance, immediate_command_pool, resource_manager};
     vk::VertexBufferManager vertex_buffer_manager{instance.device, instance.physical_device};
     vk::PipelineManager pipeline_manager{instance, swapchain, image_manager, resource_manager};
     

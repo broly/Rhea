@@ -91,6 +91,8 @@ public:
 
     virtual uint32_t get_num_images_in_flight() const = 0;
     
+    virtual RBDeviceAddress get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const = 0;
+    
     template<RenderBackendType T>
     static std::shared_ptr<RenderBackend> create(RBWindowHandle window_handle)
     {
@@ -130,7 +132,7 @@ public:
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
-    virtual void get_or_create_mesh_buffers(MeshPrimHandle handle) = 0;
+    virtual void get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) = 0;

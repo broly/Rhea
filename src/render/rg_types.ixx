@@ -9,7 +9,11 @@ import enum_helpers;
 
 export 
 {
-
+    enum class RTBuildMode
+    {
+        none,
+        build_blas,
+    };
     
     enum class RGResourceType {
         SwapchainColor,
@@ -117,6 +121,8 @@ export
         RBLoadOp load_op = RBLoadOp::Load;
         RBStoreOp store_op = RBStoreOp::Store;
     };
+    
+    using RBDeviceAddress = RBHandle<VkDeviceAddress>;
 
     using RBFormat = RBHandle<VkFormat>;
     

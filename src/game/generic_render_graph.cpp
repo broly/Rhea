@@ -376,9 +376,7 @@ void GenericRenderGraph::prepare_geometry_resources(
 
     auto frame = ctx.frame;
 
-    auto& mesh_processor =
-        engine->scene_view
-            ->get_processor<SceneViewProcessor_Mesh>();
+    auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
     
     // ----------------------------------------
     // Collect unique pipelines

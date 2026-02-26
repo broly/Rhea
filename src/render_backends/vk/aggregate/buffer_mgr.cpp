@@ -5,6 +5,24 @@ import :log;
 import reflect;
 #include "render_backends/vk/vk_macro.h"
 
+RBDeviceAddress vk::BufferManager::get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const
+{
+    
+    const auto& buf = get_buffer(buffer_handle, frame);
+
+    return get_buffer_device_address(buf.buffer);
+}
+
+RBDeviceAddress vk::BufferManager::get_buffer_device_address(VkBuffer vk_buffer) const
+{
+    
+    VkBufferDeviceAddressInfo info{
+        VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO
+    };
+    info.buffer = vk_buffer;
+    return vkGetBufferDeviceAddress(device, &info);
+}
+
 void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame)
 {
     vk::BufferInfo* buf = nullptr;
@@ -47,6 +65,16 @@ vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size
         return frames_ubos.at(index).at(frame_index);
     }
     return persistent_ubos[buffer_handle.get_identifier()];
+}
+
+const vk::BufferInfo& vk::BufferManager::get_buffer(RBBufferHandle buffer_handle, size_t frame_index) const
+{
+    if (buffer_handle.get_usage_type().is_frame_based())
+    {
+        size_t index = buffer_handle.get_identifier();
+        return frames_ubos.at(index).at(frame_index);
+    }
+    return persistent_ubos.at(buffer_handle.get_identifier());
 }
 
 std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsage usage_type, Name debug_name)

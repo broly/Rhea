@@ -39,6 +39,9 @@ namespace vk
         VkDescriptorPool frame_pool = VK_NULL_HANDLE;
         VkDescriptorPool persistent_pool = VK_NULL_HANDLE;
         
+        RBDeviceAddress get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame = 0) const;
+        RBDeviceAddress get_buffer_device_address(VkBuffer vk_buffer) const;
+        
         
         std::map<RBDescriptorSetLayout, DescriptorSetLayoutData> descriptor_set_layouts;
 
@@ -47,6 +50,7 @@ namespace vk
         
         void bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame);
         vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index);
+        const vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index) const;
         std::vector<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsage usage_type, Name debug_name);
         void create_descriptor_pool();
         RBDescriptorSetLayout allocate_descriptor_layout_handle();

@@ -26,15 +26,6 @@ import type_id;
         }\
     }
 
-
-#define __PRIVATE_RUNTIME_FIELD(x) \
-    FieldRuntimeReflectionInfo( \
-        #x, \
-        get_type_id<decltype(Type{}.x)>(), \
-        offsetof(Type, x)\
-    )
-
-
 #define REFLECT_STRUCT_RUNTIME(T, ...) \
     export template<> \
     struct reflect::ReflectionInfo<T> \
@@ -94,7 +85,7 @@ import type_id;
         }\
         static Name enum_value_to_name(T value) \
         {\
-            return names[(int)value]; \
+            return names.at((int)value); \
         }\
         static constexpr detail::reflection_tag reflected {}; \
     };

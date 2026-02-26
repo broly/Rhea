@@ -246,6 +246,11 @@ uint32_t VkRenderBackend::get_num_images_in_flight() const
     return vk::MAX_FRAMES_IN_FLIGHT;
 }
 
+RBDeviceAddress VkRenderBackend::get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const
+{
+    return resource_manager.get_buffer_device_address(buffer_handle);
+}
+
 void VkRenderBackend::create_descriptor_pool()
 {
     resource_manager.create_descriptor_pool();
@@ -304,10 +309,10 @@ ImageReadback VkRenderBackend::readback_image(RBImageHandle img) const
     return image_manager.readback(img);
 }
 
-void VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle)
+void VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode)
 {
     PROFILE(__FUNCTION__);
-    mesh_manager.get_or_create_mesh_buffers(handle);
+    mesh_manager.get_or_create_mesh_buffers(handle, rt_build_mode);
 }
 
 TextureFormat VkRenderBackend::get_swapchain_format() const

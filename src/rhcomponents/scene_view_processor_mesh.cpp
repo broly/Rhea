@@ -125,7 +125,7 @@ void SceneViewProcessor_Mesh::process()
                         primitives.push_back(rp);
                         ro.primitives.push_back(primitives.size() - 1);
                     
-                        renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh);
+                        renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::none);
                     }
                 }
             }

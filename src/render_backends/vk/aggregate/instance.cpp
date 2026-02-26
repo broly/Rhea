@@ -2,11 +2,12 @@
 
 import <set>;
 import <vulkan/vulkan_core.h>;
-
+import array_helpers;
 import :helpers;
 
 #include "render_backends/vk/vk_macro.h"
 import <cassert>;
+import :device_extension_api;
 
 import log;
 #include "logging/log_macro.h"
@@ -16,6 +17,7 @@ DEFINE_LOGGER(LogVkInstance, Display);
 constexpr const char* VALIDATION_LAYERS[] = {
     "VK_LAYER_KHRONOS_validation"
 };
+
 
 void vk::Instance::init(GLFWwindow* in_window)
 {
@@ -80,7 +82,11 @@ void vk::Instance::init(GLFWwindow* in_window)
     }
     
     const char* device_extensions[] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
     };
     
     
@@ -90,12 +96,33 @@ void vk::Instance::init(GLFWwindow* in_window)
     dci.queueCreateInfoCount = static_cast<uint32_t>(queue_infos.size());
     dci.pQueueCreateInfos = queue_infos.data();
     dci.pEnabledFeatures = &features;
-    dci.enabledExtensionCount = 1;
+    dci.enabledExtensionCount = array_size(device_extensions);
     dci.ppEnabledExtensionNames = device_extensions;
+    
+    VkPhysicalDeviceBufferDeviceAddressFeatures bufferAddress{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES
+    };
+    bufferAddress.bufferDeviceAddress = VK_TRUE;
+
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeatures{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
+    };
+    accelFeatures.accelerationStructure = VK_TRUE;
+    accelFeatures.pNext = &bufferAddress;
+
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR
+    };
+    rtFeatures.rayTracingPipeline = VK_TRUE;
+    rtFeatures.pNext = &accelFeatures;
+
+    dci.pNext = &rtFeatures;
 
     VK_CHECK(
         vkCreateDevice(physical_device, &dci, nullptr, &device)
     );
+    
+    vk_ext::load_functions(device);
 }
 
 void vk::Instance::match_queue_families()
