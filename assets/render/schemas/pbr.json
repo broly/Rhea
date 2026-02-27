@@ -52,6 +52,10 @@
 				{
 					"write_mask": ["R", "G", "B", "A"],
 					"translucent": false
+				},
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
 				}
 			],
 	
@@ -60,8 +64,8 @@
 			"compare_op": "less_or_equal",
 			"push_constants": [
 				{
-					"type": "mat4",
-					"name": "camera",
+					"type": "ModelPushConstants",
+					"name": "model",
 					"stages": ["vertex"]
 				}
 			],
@@ -121,8 +125,8 @@
 			],
 			"push_constants": [
 				{
-					"type": "mat4",
-					"name": "camera",
+					"type": "ModelPushConstants",
+					"name": "model",
 					"stages": ["vertex"]
 				}
 			],
@@ -182,8 +186,8 @@
 			],
 			"push_constants": [
 				{
-					"type": "mat4",
-					"name": "camera",
+					"type": "ModelPushConstants",
+					"name": "model",
 					"stages": ["vertex"]
 				}
 			],

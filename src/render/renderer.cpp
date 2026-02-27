@@ -54,7 +54,6 @@ void Renderer::execute()
         rg_once_jobs.clear();
     }
     
-    execute_graph(main_render_graph);
 }
 
 void Renderer::execute_graph(
@@ -81,6 +80,8 @@ void Renderer::execute_graph(
 
     backend.reset_frame_fence(frame);
 
+    
+    // render graph execution
     rg->execute(cmd, frame, params, callback);
 
     backend.end_commands(cmd);

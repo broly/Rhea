@@ -14,12 +14,14 @@ layout(location = 1) out vec3 v_world_normal;
 layout(location = 2) out vec2 v_uv;
 layout(location = 3) out vec3 v_world_tangent;
 layout(location = 4) out vec3 v_world_bitangent;
-
+layout(location = 5) out vec4 v_curr_clip;
+layout(location = 6) out vec4 v_prev_clip;
 
 // ---------- Push constants ----------
-layout(push_constant) uniform PushConstants
+layout(push_constant) uniform ModelPushConstants
 {
     mat4 model;
+    mat4 prev_model;
 } pc;
 
 
@@ -27,23 +29,23 @@ void main()
 {
     v_uv = in_uv;
 
-    // --- World position ---
-    vec4 world_pos = pc.model * vec4(in_position, 1.0);
-    v_world_pos = world_pos.xyz;
-    
+    vec4 world_curr = pc.model * vec4(in_position, 1.0);
+    vec4 world_prev = pc.prev_model * vec4(in_position, 1.0);
 
-    // --- Normal matrix ---
+    v_world_pos = world_curr.xyz;
+
     mat3 normal_matrix = transpose(inverse(mat3(pc.model)));
 
-    // --- Correct TBN (glTF spec) ---
     vec3 N = normalize(normal_matrix * in_normal);
     vec3 T = normalize(normal_matrix * in_tangent.xyz);
     vec3 B = cross(N, T) * in_tangent.w;
 
-    v_world_normal   = N;
-    v_world_tangent  = T;
+    v_world_normal = N;
+    v_world_tangent = T;
     v_world_bitangent = B;
 
-    gl_Position = camera_ubo.proj * camera_ubo.view * world_pos;
-    // gl_Position.y = -gl_Position.y;
+    v_curr_clip = (camera_ubo.proj * camera_ubo.view) * world_curr;
+    v_prev_clip = (camera_ubo.prev_proj * camera_ubo.prev_view) * world_curr;
+
+    gl_Position = v_curr_clip;
 }

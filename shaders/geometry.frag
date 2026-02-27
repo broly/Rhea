@@ -15,11 +15,14 @@ layout(location = 1) in vec3 v_world_normal;
 layout(location = 2) in vec2 v_uv;
 layout(location = 3) in vec3 v_world_tangent;
 layout(location = 4) in vec3 v_world_bitangent;
+layout(location = 5) in vec4 v_curr_clip;
+layout(location = 6) in vec4 v_prev_clip;
 
 // ================== OUTPUT ==================
 layout(location = 0) out vec4 out_color;
 #if !BLEND_MODE_TRANSLUCENT
 layout(location = 1) out vec4 out_normal;
+layout(location = 2) out vec2 out_velocity;
 #endif 
 
 
@@ -218,8 +221,13 @@ void main()
 
     vec3 N_view = normalize((camera_ubo.view * vec4(N, 0.0)).xyz);
     out_normal = vec4(N_view * 0.5 + 0.5, roughness);
+
+    vec2 curr_ndc = v_curr_clip.xy / v_curr_clip.w;
+    vec2 prev_ndc = v_prev_clip.xy / v_prev_clip.w;
+
+
+    out_velocity = curr_ndc - prev_ndc;
     
 #endif
-    
     
 }

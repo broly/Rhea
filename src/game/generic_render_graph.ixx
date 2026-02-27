@@ -62,6 +62,8 @@ public:
     void init_resources(const std::map<Name, bool>& parameters) override;
     void build_passes(const std::map<Name, bool>& parameters) override;
     void prepare_resources(RenderGraphContext& ctx) override;
+    
+    void rebuild_camera_ubo(RenderGraphContext& ctx);
 
     void prepare_geometry_resources(RenderGraphContext& ctx);
     void prepare_shadow_pass(RenderGraphContext& ctx);
@@ -92,6 +94,7 @@ public:
     RGTextureHandle noise_texture;
     RGTextureHandle hdr_color;
     RGTextureHandle normal_color;
+    RGTextureHandle motion_vectors_color;
     RGTextureHandle swapchain_color;
     
     RGTextureHandle brdf_lut;
@@ -107,6 +110,8 @@ public:
     TextureDimension capture_dimension;
     uint32_t num_pass_instances;
     bool allow_shadow_debug;
+    
+    CameraUBO current_camera_ubo;
     
 
     

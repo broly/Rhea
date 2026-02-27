@@ -24,7 +24,12 @@ import <algorithm>;
 #include "profiling/profile.h"
 
 #include "common/assertion_macros.h"
+#include "logging/log_macro.h"
 #include "profiling/profile.h"
+
+import log;
+
+DEFINE_LOGGER(LogGenericRG, Display);
 
 
 GenericRenderGraph::GenericRenderGraph()
@@ -80,8 +85,19 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .dimension = capture_dimension
     };
     
+    
+    RGTextureDesc motion_color_desc{
+        .name = "motion_color",
+        .extent = resolution,
+        .format = TextureFormat::RG16F,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension
+    };
+    
     hdr_color = create_texture(hdr_color_desc);
     normal_color = create_texture(normal_color_desc);
+    motion_vectors_color = create_texture(motion_color_desc);
     
     
     tonemap_pipeline_family = renderer->query_pipeline_family("ToneMapping", tonemap_model);
@@ -216,6 +232,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
             { normal_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { motion_vectors_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -287,6 +304,8 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
 {
     RenderGraph::prepare_resources(ctx);
     
+    rebuild_camera_ubo(ctx);
+    
     prepared_batches.clear();
     prepared_pass_resources.clear();
 
@@ -296,6 +315,16 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     prepare_clouds_pass(ctx);
     prepare_wireframe_pass(ctx);
+}
+
+void GenericRenderGraph::rebuild_camera_ubo(RenderGraphContext& ctx)
+{
+    auto prev_proj = current_camera_ubo.proj;
+    auto prev_view = current_camera_ubo.view;
+    
+    current_camera_ubo = make_camera_ubo(ctx, false, 0);
+    current_camera_ubo.prev_proj = prev_proj;
+    current_camera_ubo.prev_view = prev_view;
 }
 
 LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
@@ -409,15 +438,12 @@ void GenericRenderGraph::prepare_geometry_resources(
 
         // ---------- Camera ----------
 
-        CameraUBO cam_ubo =
-            make_camera_ubo(ctx, false, 0);
-
         auto cam =
             camera_resource->query_single(0);
 
         cam->update_uniform_buffer(
             "camera_ubo",
-            cam_ubo,
+            current_camera_ubo,
             frame);
 
         prep.camera = cam;
@@ -435,7 +461,7 @@ void GenericRenderGraph::prepare_geometry_resources(
 
             auto reflection_capture =
                 reflection_capture_processor.query_nearest(
-                    cam_ubo.camera_pos);
+                    current_camera_ubo.camera_pos);
 
             if (reflection_capture)
             {
@@ -464,7 +490,7 @@ void GenericRenderGraph::prepare_geometry_resources(
             // ---------- Lights ----------
 
             LightUBO light_ubo =
-                build_light_ubo(cam_ubo.camera_pos);
+                build_light_ubo(current_camera_ubo.camera_pos);
 
             auto light =
                 light_resource->query_single();
@@ -526,14 +552,13 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
     prepared_clouds.pipeline = pipeline;
 
     // ---------- Camera ----------
-    CameraUBO camera_ubo = make_camera_ubo(ctx);
 
     auto cam =
         camera_resource->query_single();
 
     cam->update_uniform_buffer(
         "camera_ubo",
-        camera_ubo,
+        current_camera_ubo,
         frame
     );
 
@@ -593,13 +618,12 @@ void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
 {
     auto frame = ctx.frame;
 
-    CameraUBO cam_ubo = make_camera_ubo(ctx);
 
     auto cam = camera_resource->query_single();
 
     cam->update_uniform_buffer(
         "camera_ubo",
-        cam_ubo,
+        current_camera_ubo,
         frame
     );
 
@@ -744,8 +768,12 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         }
         
         ctx.bind_mesh(prim.mesh);
+        
+        ModelPushConstants pc;
+        pc.model = *prim.world;
+        pc.prev_model = *prim.world;
 
-        ctx.push_constants(*prim.world);
+        ctx.push_constants(pc);
         
         ctx.draw_indexed(prim.mesh.get().indices.size());
     }
@@ -776,7 +804,10 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         
         ctx.bind_mesh(prim.mesh);
         
-        ctx.push_constants(*prim.world);
+        ModelPushConstants pc;
+        pc.model = *prim.world;
+        pc.prev_model = *prim.world;
+        ctx.push_constants(pc);
         
         ctx.draw_indexed(prim.mesh.get().indices.size());
     }
@@ -943,8 +974,7 @@ CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero
 {
     auto& scene_view = engine->scene_view;
     CameraUBO camera_ubo;
-    vec3 camera_position;
-    
+
     // ---------- Camera ----------
     auto& camera_processor =
         scene_view->get_processor<SceneViewProcessor_Camera>();
@@ -952,12 +982,11 @@ CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero
     const RenderObject_Camera* cam_ro =
         camera_processor.get_active_camera();
 
-    auto [width, height] = ctx.backend.get_viewport_extent();
+    auto [width, height] = backend->get_viewport_extent();
         
     auto aspect = float(width) / float(height);
     auto proj = cam_ro->get_projection(aspect);
     auto view = cam_ro->view;
-    auto fov = cam_ro->fov;
         
     if (zero_pos)
     {
@@ -969,7 +998,6 @@ CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero
     camera_ubo.proj = proj;
     camera_ubo.view = view;
     camera_ubo.camera_pos = cam_ro->position;
-    camera_position = cam_ro->position;
 
     return camera_ubo;
 }
