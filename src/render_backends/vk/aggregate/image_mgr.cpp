@@ -187,7 +187,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
         image_info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     }
     image_info.mipLevels = desc.mip_levels;
-    image_info.arrayLayers = desc.is_cubemap ? 6 : 1;
+    image_info.arrayLayers = desc.get_array_layers();
     image_info.format = vk::to_vk_format(desc.format);
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -221,11 +221,12 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     
     
     
-    LogVkImageManager.Log("Created image%s %p (view[0]=%p) '%s'", 
+    LogVkImageManager.Log("Created image%s %p (view[0]=%p) '%s' (array_layers=%i)", 
         desc.is_cubemap ? " [CUBEMAP]" : "",
         res.image, 
         res.get_img_view(0), 
-        desc.name.to_string().c_str());
+        desc.name.to_string().c_str(),
+        desc.get_array_layers());
     
     
     debug.register_vk_image_name(res.image, desc.name);
@@ -500,6 +501,7 @@ RBImageHandle vk::ImageManager::create_cubemap(
     desc.format     = format;
     desc.mip_levels = mip_levels;
     desc.is_cubemap = true;
+    desc.array_layers = 6;
     
     desc.usage =
         RenderTextureUsage::Sampled |
@@ -621,8 +623,8 @@ RBImageHandle vk::ImageManager::create_cubemap(
     return image;
 }
 
-void vk::ImageManager::transition_image(
-RBCommandList cmd, RBImageHandle image, RBImageLayout before, RBImageLayout after, bool log ) const
+void vk::ImageManager::transition_image(RBCommandList cmd, RBImageHandle image, RBImageLayout before, 
+    RBImageLayout after, bool log ) const
 {
     auto& image_res = get_image_resource(image);
     auto vk_img = image_res.image;

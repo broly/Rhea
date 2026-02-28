@@ -53,6 +53,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .condition = [this] () { return !is_debugging(); },
             .reads = {
                 { hdr_color, RBImageUsage::SampledFragment },
+                { history_hdr, RBImageUsage::SampledFragment }
             },
             .writes = {
                 { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
@@ -60,8 +61,8 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .execute = [this] (RenderGraphContext& ctx)
             {
                 ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
-                
-                std::shared_ptr<MaterialInstance> material_instance =
+    
+                auto material_instance =
                     renderer->query_material_instance(tonemap_material, ctx.pass_name);
                  
                 auto tonemap_instance =
@@ -73,6 +74,15 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                     "u_hdr_color",
                     get_image(hdr_color),
                     ctx.frame
+                );
+
+                uint32_t prev_layer = history_index ^ 1;
+
+                tonemap_instance->update_image(
+                    "u_history",
+                    get_image(history_hdr),
+                    ctx.frame,
+                    prev_layer
                 );
                          
                 tonemap_instance->bind(

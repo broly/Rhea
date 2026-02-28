@@ -55,6 +55,8 @@ export
         
         TextureDimension dimension = TextureDimension::Tex2D;
         uint32_t mip_levels = 1;
+        uint32_t array_layers = 1;
+        uint8_t num_frames = 1;
     };
 
 

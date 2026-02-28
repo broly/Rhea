@@ -1,0 +1,45 @@
+{
+	"model_name": "Copy",
+	
+	"enums": {},
+	"uniform_buffers": {},
+	
+	"material_resource": "copy",
+		
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"passes": [
+		{
+			"name": "HistoryStore",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "copy.frag",
+					"resources": ["copy"]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "greater",
+			"resources": [],
+			"push_constants": [],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false,
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		}
+	]
+}

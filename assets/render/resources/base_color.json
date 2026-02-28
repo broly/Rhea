@@ -1,0 +1,16 @@
+{
+	"resource": {
+		"name": "base_color",
+		"usage": "frame",
+		"set": "SET_BASE_COLOR",
+		"allowed_stages": ["fragment"],
+		"parameters": {
+			"base_color": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_base_color",
+				"binding": "BINDING_SAMPLER_BASE_COLOR"
+			}
+		}
+	}
+}

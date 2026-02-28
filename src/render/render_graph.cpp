@@ -30,16 +30,23 @@ void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImag
     checkf(next != RBImageLayout::undefined, "wrong state");
     RBImageHandle img_handle = desc.swapchain_image ? backend.get_swapchain_image(frame) : *image;
     
-    auto cur_layout = current_layout ? *current_layout : RBImageLayout::undefined;
+    auto& current_layout_ref = current_layout_per_frame[frame];
+    
+    auto cur_layout = current_layout_ref;
     backend.transition_image(cmd, img_handle, cur_layout, next);
-    current_layout = next;
+    current_layout_ref = next;
 }
 
 void RGTexture::reset_layout()
 {
-    if (is_swapchain())
-        return (void)(current_layout = RBImageLayout::transfer_present);
-    current_layout = RBImageLayout::undefined;
+    for (uint8_t frame = 0; frame < desc.num_frames; frame++)
+    {
+        auto& current_layout = current_layout_per_frame[frame];
+        if (is_swapchain())
+            current_layout = RBImageLayout::transfer_present;
+        else
+            current_layout = RBImageLayout::undefined;
+    }
 }
 
 
@@ -47,6 +54,8 @@ void RenderGraph::setup(const std::shared_ptr<RenderBackend>& in_backend, const 
 {
     backend = in_backend;
     renderer = in_renderer;
+
+    num_frames_in_flight = backend->get_num_images_in_flight();
 }
 
 RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
@@ -54,8 +63,10 @@ RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
     RGTextureHandle handle;
     handle.id = uint32_t(textures.size());
     handle.name = desc.name;
+    
+    RGTexture tex {desc};
 
-    textures.push_back({ desc, {} });
+    textures.push_back(std::move(tex));
     return handle;
 }
 
@@ -76,6 +87,7 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     desc.extent = data.extent;
     desc.name = data.name;
     desc.usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst;
+    desc.num_frames = 1;
     
     RBImageHandle image = backend->create_texture_2d(
         data, TextureCreationInfo {
@@ -87,7 +99,10 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
         }
     );
 
-    textures.push_back({ desc, image });
+    RGTexture tex {desc};
+    tex.image = image;
+    
+    textures.push_back(std::move(tex));
     return handle;
 }
 
@@ -141,7 +156,7 @@ static RBImageLayout final_layout_from_usage(RBImageUsage usage)
 void RenderGraph::compile()
 {
     assert(!graph_compiled);
-
+    
     // Create images
     for (auto& tex : textures)
     {
@@ -158,6 +173,7 @@ void RenderGraph::compile()
                 .format = tex.desc.format,
                 .usage  = tex.desc.usage,
                 .mip_levels = tex.desc.mip_levels,
+                .array_layers = tex.desc.array_layers,
                 .is_cubemap = tex.desc.dimension == TextureDimension::Cube,
             };
             tex.image = backend->create_image(desc);
@@ -306,7 +322,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         for (const auto& [tex, barrier] : pass.pass_barriers)
         {
             auto& texture = textures[tex.id];
-            if (barrier.before_pass && texture.allows_barrier())
+            if (barrier.before_pass && texture.allows_barrier(ctx.frame))
                 texture.memory_barrier(cmd, *backend, barrier.before_pass->layout, frame);
         }
         
@@ -347,15 +363,6 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
                     
                     fb_desc.attachments.push_back(attachment_desc);
 
-                    // if ()
-                    // {
-                    //     fb_desc.depth_attachment = { tex.desc.name, image, write.load_op, write.store_op, write.usage, layer_id, mip_map_id };
-                    // }
-                    // else
-                    // {
-                    //     fb_desc.color_attachments.push_back({ tex.desc.name, image, write.load_op, RBStoreOp::Store, write.usage, layer_id, mip_map_id });
-                    //     
-                    // }
                 }
 
                 ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
@@ -392,6 +399,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         ctx.pass_name = "";
         callback(ctx);
     }
+    
+    end_frame();
 }
 
 

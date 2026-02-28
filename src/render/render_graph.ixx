@@ -13,6 +13,8 @@ import :rg_params;
 #include "object/object_reflection_macro.h"
 
 
+constexpr uint8_t MAX_ALLOWED_FRAMES_IN_FLIGHT = 5;
+
 export struct RenderGraphPass
 {
     Name name;
@@ -34,10 +36,19 @@ export struct RenderGraphPass
 
 struct RGTexture
 {
+    RGTexture(const RGTextureDesc& in_desc)
+        : desc(in_desc)
+    {
+        checkf(desc.num_frames <= MAX_ALLOWED_FRAMES_IN_FLIGHT, "Provided num frames in flight is too high");
+        if (desc.dimension == TextureDimension::Cube)
+            checkf(desc.array_layers == 6, "Cubemap texture array layers should be always 6");
+    }
+    
     RGTextureDesc desc;
-    std::optional<RBImageHandle> image;
+    std::optional<RBImageHandle> image = std::nullopt;
         
-    std::optional<RBImageLayout> current_layout;
+    // std::optional<RBImageLayout> current_layout;
+    std::array<RBImageLayout, MAX_ALLOWED_FRAMES_IN_FLIGHT> current_layout_per_frame = {RBImageLayout::undefined};
     
     RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
     RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
@@ -48,10 +59,10 @@ struct RGTexture
         return !desc.swapchain_image && !desc.imported;
     }
     
-    bool allows_barrier() const
+    bool allows_barrier(RBFrameHandle frame) const
     {
         if (is_imported())
-            return current_layout.has_value();
+            return current_layout_per_frame[frame] != RBImageLayout::undefined;
         return true;
     }
     
@@ -69,7 +80,7 @@ struct RGTexture
     
     uint32_t get_layers_count() const
     {
-        return desc.dimension == TextureDimension::Cube ? 6 : 1;
+        return desc.array_layers;
     }
     
     void reset_layout();
@@ -158,6 +169,7 @@ public:
     
     virtual void init_resources(const std::map<Name, bool>& parameters) = 0;
     virtual void build_passes(const std::map<Name, bool>& parameters) = 0;
+    virtual void end_frame() {};
     virtual void prepare_resources(RenderGraphContext& ctx) {};
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
@@ -231,6 +243,8 @@ public:
     bool get_render_flag(Name name) const;
     
 
+    uint8_t num_frames_in_flight;
+    
     bool graph_compiled = false;
     
 protected: // dynamic info

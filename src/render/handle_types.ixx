@@ -11,6 +11,7 @@ import name;
 import texture_format;
 import rhmath;
 
+#include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 #include "common/type_macros.h"
 import :material_model;
@@ -294,11 +295,14 @@ export
         TextureFormat format;
         Mask<RenderTextureUsage::Type> usage;
         uint32_t mip_levels = 1;
+        uint32_t array_layers = 1;
         bool is_cubemap = false;
         
         uint32_t get_array_layers() const
         {
-            return is_cubemap ? 6 : 1;
+            if (is_cubemap)
+                checkf(array_layers == 6, "cubemap texture array_layers must be 6");
+            return array_layers;
         }
     };
 

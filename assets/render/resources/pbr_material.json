@@ -1,0 +1,66 @@
+{
+	"resource": {
+		"name": "pbr_material",
+		"usage": "persistent",
+		"set": "SET_PBR",
+		"allowed_stages": ["fragment"],
+		
+			
+		"parameters": {
+			"blend_mode": {
+				"type": "definition",
+				"definition": "blend_mode"
+			},
+			"base_color": {
+				"type": "sampler",
+				"sampler": "surface",
+				"variable": "u_base_color",
+				"binding": "BINDING_SAMPLER_ALBEDO"
+			},
+			"emissive": {
+				"type": "sampler",
+				"sampler": "surface",
+				"variable": "u_emissive",
+				"binding": "BINDING_SAMPLER_EMISSIVE"
+			},
+			"normal": {
+				"type": "sampler",
+				"sampler": "surface",
+				"variable": "u_normal_map",
+				"binding": "BINDING_SAMPLER_NORMAL"
+			},
+			"orm": {
+				"type": "sampler",
+				"sampler": "surface",
+				"variable": "u_orm",
+				"binding": "BINDING_SAMPLER_ORM"
+			},
+			"material": {
+				"type": "uniform",
+				"ubo": "MaterialUBO",
+				"binding": "BINDING_MATERIAL",
+				"variable": "material_ubo"
+			},
+			"base_color_factor": {
+				"type": "vec4",
+				"storage": "material"
+			},
+			"emissive_factor": {
+				"type": "vec4",
+				"storage": "material"
+			},
+			"occlusion_factor": {
+				"type": "vec4",
+				"storage": "material"
+			},
+			"metallic_factor": {
+				"type": "vec4",
+				"storage": "material"
+			},
+			"roughness_factor": {
+				"type": "vec4",
+				"storage": "material"
+			}
+		}
+	}
+}

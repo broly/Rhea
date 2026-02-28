@@ -1,0 +1,28 @@
+{
+	"resource": {
+		"name": "clouds",
+		"usage": "frame",
+		"allowed_stages": ["vertex", "fragment"],
+		"parameters": {
+			"clouds": {
+				"type": "sampler",
+				"variable": "u_noise",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_NOISE"
+			},
+			"depth": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_depth",
+				"binding": "BINDING_SAMPLER_DEPTH"
+			},
+			"material": {
+				"type": "uniform",
+				"ubo": "CloudsUBO",
+				"binding": "BINDING_UBO_CLOUDS",
+				"variable": "clouds_ubo"
+			}
+		},
+		"set": "SET_CLOUDS"
+	}
+}

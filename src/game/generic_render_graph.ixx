@@ -62,6 +62,7 @@ public:
     void init_resources(const std::map<Name, bool>& parameters) override;
     void build_passes(const std::map<Name, bool>& parameters) override;
     void prepare_resources(RenderGraphContext& ctx) override;
+    void end_frame() override;
     
     void rebuild_camera_ubo(RenderGraphContext& ctx);
 
@@ -69,6 +70,10 @@ public:
     void prepare_shadow_pass(RenderGraphContext& ctx);
     void prepare_clouds_pass(RenderGraphContext& ctx);
     void prepare_wireframe_pass(RenderGraphContext& ctx);
+    
+    void draw_fullscreen_copy(
+        RenderGraphContext& ctx,
+        RGTextureHandle source);
     
     
     void draw_scene(RenderGraphContext& ctx);
@@ -97,6 +102,9 @@ public:
     RGTextureHandle motion_vectors_color;
     RGTextureHandle swapchain_color;
     
+    RGTextureHandle history_hdr;
+    uint32_t history_index = 0;
+    
     RGTextureHandle brdf_lut;
     
     RenderResource* camera_resource = nullptr;
@@ -119,13 +127,16 @@ public:
     std::shared_ptr<Material> shadow_debug_material;
     std::shared_ptr<Material> cloud_material;
     std::shared_ptr<Material> wireframe_material;
+    std::shared_ptr<Material> copy_material;
     
     
+    PipelineObject* copy_pipeline;
     PipelineObject* shadow_debug_pipeline;
     PipelineObject* clouds_pipeline;
     PipelineObject* tonemap_pipeline;
     PipelineObject* wireframe_pipeline;
     
+    std::shared_ptr<PipelineFamily> copy_pipeline_family;
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
     std::shared_ptr<PipelineFamily> shadow_debug_pipeline_family;
     std::shared_ptr<PipelineFamily> wireframe_pipeline_family;

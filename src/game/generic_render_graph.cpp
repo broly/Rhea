@@ -61,6 +61,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     auto tonemap_model = renderer->find_model("tonemap");
     auto shadow_debug_model = renderer->find_model("shadow_debug");
     auto wireframe_model = renderer->find_model("wireframe");
+    auto copy_model = renderer->find_model("copy");
     
     
     swapchain_extent = backend->get_swapchain_extent();
@@ -99,6 +100,20 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     normal_color = create_texture(normal_color_desc);
     motion_vectors_color = create_texture(motion_color_desc);
     
+    RGTextureDesc history_desc{
+        .name = "history_hdr",
+        .extent = resolution,
+        .format = TextureFormat::RGBA16F,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+        .external = false,
+        .dimension = TextureDimension::Tex2D,
+        .array_layers = 2,
+    };
+
+    history_hdr = create_texture(history_desc);
+    
+    copy_pipeline_family = renderer->query_pipeline_family("HistoryStore", copy_model);
+    copy_pipeline = request_pipeline(copy_pipeline_family, {});
     
     tonemap_pipeline_family = renderer->query_pipeline_family("ToneMapping", tonemap_model);
     tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
@@ -135,6 +150,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     tonemap_material = std::make_shared<Material>();
     tonemap_material->model = "Tonemap";
     
+    copy_material = std::make_shared<Material>();
+    copy_material->model = "copy";
+    
     
     
     debug_line_buffer = backend->create_vertex_buffer(VertexBufferDesc {
@@ -144,7 +162,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
 }
 
 void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
-{
+{    
     add_pass({
         .name = "ShadowMap",
         .writes = {
@@ -283,6 +301,24 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         
     });
     
+    add_pass({
+        .name = "HistoryStore",
+        .reads = {
+            { hdr_color, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.level != history_index)
+                return;
+
+            draw_fullscreen_copy(ctx, hdr_color);
+        },
+        .num_layers = 2,
+    });
+    
     // add_pass({
     //     .name = "Wireframe",
     //     .reads = {
@@ -315,6 +351,13 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     prepare_clouds_pass(ctx);
     prepare_wireframe_pass(ctx);
+}
+
+void GenericRenderGraph::end_frame()
+{
+    RenderGraph::end_frame();
+    
+    history_index ^= 1;
 }
 
 void GenericRenderGraph::rebuild_camera_ubo(RenderGraphContext& ctx)
@@ -628,6 +671,29 @@ void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
     );
 
     prepared_wireframe.camera = cam;
+}
+
+void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTextureHandle source)
+{
+    ctx.bind_pipeline(copy_pipeline);
+    
+    auto material_instance =
+        renderer->query_material_instance(copy_material, ctx.pass_name);
+     
+    auto instance =
+        material_instance->get_or_create_resource_instance(
+            ctx.frame
+        );
+             
+    instance->update_image(
+        "u_source",
+        get_image(source),
+        ctx.frame
+    );
+    
+    ctx.bind(instance);
+             
+    ctx.backend.draw_fullscreen(ctx.cmd);
 }
 
 

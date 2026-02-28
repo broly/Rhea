@@ -1,0 +1,22 @@
+{
+	"resource": {
+		"name": "hdr_color",
+		"usage": "frame",
+		"set": "SET_TONEMAP",
+		"allowed_stages": ["fragment"],
+		"parameters": {
+			"hdr_color": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_hdr_color",
+				"binding": "BINDING_SAMPLER_HDR_COLOR"
+			},
+			"history": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_history",
+				"binding": "BINDING_SAMPLER_HISTORY"
+			},
+		}
+	}
+}
