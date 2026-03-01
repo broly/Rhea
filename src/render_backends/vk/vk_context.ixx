@@ -65,6 +65,7 @@ namespace vk
         std::vector<VkImageView> views = {};
         bool destroyed = false;
         
+        
         uint32_t get_array_index(uint32_t layer_index = 0, uint32_t mip_index = 0) const
         {
             checkf(!destroyed, "Image has been destroyed");
@@ -126,9 +127,31 @@ namespace vk
             return cubemap_view;
         }
         
-        void set_layout(VkImageLayout in_layout) const
+        VkImageLayout get_layout(uint32_t layer, uint32_t mip) const
         {
-            layout = in_layout;
+            return subresource_layouts[layer][mip];
+        }
+        
+        void set_layout(VkImageLayout in_layout, 
+            uint32_t in_layer = 0, uint32_t in_num_layers = 0, 
+            uint32_t in_mip = 0, uint32_t in_num_mips = 0) const
+        {
+            
+            if (in_num_layers == 0)
+                in_num_layers = num_layers;
+            
+            if (in_num_mips == 0)
+                in_num_mips = mip_levels;
+            
+            
+            
+            for (uint32_t layer_index = in_layer; layer_index < in_num_layers; ++layer_index)
+            {
+                for (uint32_t mip_index = in_mip; mip_index < in_num_mips; ++mip_index)
+                {
+                    subresource_layouts[layer_index][mip_index] = in_layout;
+                }
+            }
         }
         
         void mark_destroyed()
@@ -142,6 +165,7 @@ namespace vk
         uint32_t mip_levels = 1; 
         uint32_t num_layers = 1;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
-        mutable VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        
+        mutable std::vector<std::vector<VkImageLayout>> subresource_layouts;
     };
 }

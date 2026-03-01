@@ -144,10 +144,7 @@ public:
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) = 0;
     
     virtual void transition_image(
-        RBCommandList cmd,
-        RBImageHandle image,
-        RBImageLayout before,
-        RBImageLayout after) = 0;
+        RBCommandList cmd, const ImageBarrierParams& params) = 0;
     
     virtual void update_sampled_image(
         RBDescriptorSet set,

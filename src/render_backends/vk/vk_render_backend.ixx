@@ -97,11 +97,7 @@ public:   /// API Section
     void destroy_render_pass_cache() override;
     virtual RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc) override;
     virtual Extent get_swapchain_extent() const override;
-    virtual void transition_image(
-        RBCommandList cmd,
-        RBImageHandle image,
-        RBImageLayout before,
-        RBImageLayout after) override;
+    virtual void transition_image(RBCommandList cmd, const ImageBarrierParams& params) override;
     virtual void update_sampled_image(
         RBDescriptorSet set,
         uint32_t binding,

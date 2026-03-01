@@ -10,6 +10,25 @@ import profile;
 #include "common/assertion_macros.h"
 
 
+RGTexture::RGTexture(const RGTextureDesc& in_desc)
+    : desc(in_desc)
+{
+    checkf(desc.num_frames <= MAX_ALLOWED_FRAMES_IN_FLIGHT, "Provided num frames in flight is too high");
+
+    if (desc.dimension == TextureDimension::Cube)
+        checkf(desc.array_layers == 6, "Cubemap texture array layers should be always 6");
+
+    for (uint32_t f = 0; f < MAX_ALLOWED_FRAMES_IN_FLIGHT; ++f)
+    {
+        current_layouts[f].resize(desc.array_layers);
+
+        for (uint32_t l = 0; l < desc.array_layers; ++l)
+        {
+            current_layouts[f][l].resize(desc.mip_levels, RBImageLayout::undefined);
+        }
+    }
+}
+
 RBImageHandle RGTexture::get_image(RenderBackend& backend, RBFrameHandle frame) const
 {
     return is_swapchain() ? backend.get_swapchain_image(frame) : *image;
@@ -22,33 +41,59 @@ RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle fram
     return backend.get_image_view(get_image(backend, frame), array_index, mip_index);
 }
 
-void RGTexture::memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImageLayout next, RBFrameHandle frame)
+void RGTexture::memory_barrier(
+    RBCommandList cmd,
+    RenderBackend& backend,
+    RBImageLayout next,
+    RBFrameHandle frame,
+    uint32_t layer,
+    uint32_t mip)
 {
     if (is_swapchain())
         return;
-    
+
     checkf(next != RBImageLayout::undefined, "wrong state");
-    RBImageHandle img_handle = desc.swapchain_image ? backend.get_swapchain_image(frame) : *image;
+
+    RBImageHandle img_handle =
+        desc.swapchain_image
+        ? backend.get_swapchain_image(frame)
+        : *image;
+
+    auto& current_layout = current_layouts[frame][layer][mip];
+
+    if (current_layout == next)
+        return;
     
-    auto& current_layout_ref = current_layout_per_frame[frame];
-    
-    auto cur_layout = current_layout_ref;
-    backend.transition_image(cmd, img_handle, cur_layout, next);
-    current_layout_ref = next;
+    ImageBarrierParams params;
+    params.image = img_handle;
+    params.before = current_layout;
+    params.after = next;
+    params.base_layer = layer;
+    params.base_mip = mip;
+    params.mip_count = 1;
+    params.layer_count = 1;
+
+    backend.transition_image(cmd, params);
+
+    current_layout = next;
 }
 
 void RGTexture::reset_layout()
 {
     for (uint8_t frame = 0; frame < desc.num_frames; frame++)
     {
-        auto& current_layout = current_layout_per_frame[frame];
-        if (is_swapchain())
-            current_layout = RBImageLayout::transfer_present;
-        else
-            current_layout = RBImageLayout::undefined;
+        for (uint32_t layer = 0; layer < desc.array_layers; ++layer)
+        {
+            for (uint32_t mip = 0; mip < desc.mip_levels; ++mip)
+            {
+                if (is_swapchain())
+                    current_layouts[frame][layer][mip] = RBImageLayout::transfer_present;
+                else
+                    current_layouts[frame][layer][mip] = RBImageLayout::undefined;
+            }
+        }
     }
 }
-
 
 void RenderGraph::setup(const std::shared_ptr<RenderBackend>& in_backend, const std::shared_ptr<Renderer>& in_renderer)
 {

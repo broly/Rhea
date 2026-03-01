@@ -36,19 +36,16 @@ export struct RenderGraphPass
 
 struct RGTexture
 {
-    RGTexture(const RGTextureDesc& in_desc)
-        : desc(in_desc)
-    {
-        checkf(desc.num_frames <= MAX_ALLOWED_FRAMES_IN_FLIGHT, "Provided num frames in flight is too high");
-        if (desc.dimension == TextureDimension::Cube)
-            checkf(desc.array_layers == 6, "Cubemap texture array layers should be always 6");
-    }
-    
+    RGTexture(const RGTextureDesc& in_desc);
+
     RGTextureDesc desc;
     std::optional<RBImageHandle> image = std::nullopt;
         
-    // std::optional<RBImageLayout> current_layout;
-    std::array<RBImageLayout, MAX_ALLOWED_FRAMES_IN_FLIGHT> current_layout_per_frame = {RBImageLayout::undefined};
+    // current_layouts[frame][layer][mip]
+    std::array<
+        std::vector<std::vector<RBImageLayout>>,
+        MAX_ALLOWED_FRAMES_IN_FLIGHT
+    > current_layouts;
     
     RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
     RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
@@ -62,7 +59,7 @@ struct RGTexture
     bool allows_barrier(RBFrameHandle frame) const
     {
         if (is_imported())
-            return current_layout_per_frame[frame] != RBImageLayout::undefined;
+            return current_layouts[frame][0][0] != RBImageLayout::undefined;
         return true;
     }
     
@@ -71,7 +68,13 @@ struct RGTexture
         return desc.imported;
     }
 
-    void memory_barrier(RBCommandList cmd, RenderBackend& backend, RBImageLayout next, RBFrameHandle frame);
+    void memory_barrier(
+        RBCommandList cmd,
+        RenderBackend& backend,
+        RBImageLayout next,
+        RBFrameHandle frame,
+        uint32_t layer = 0,
+        uint32_t mip = 0);
     
     bool is_swapchain() const
     {

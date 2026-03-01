@@ -369,5 +369,15 @@ export
     };
     
     
-    
+    struct ImageBarrierParams
+    {
+        RBImageHandle image = {};
+        RBImageLayout before = RBImageLayout::undefined;
+        RBImageLayout after = RBImageLayout::undefined;
+        uint32_t base_layer = 0;
+        uint32_t base_mip = 0;
+        uint32_t layer_count = 0;
+        uint32_t mip_count = 0;
+        bool log = false;
+    };
 }

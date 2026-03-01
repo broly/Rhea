@@ -57,13 +57,10 @@ namespace vk
         RBImageHandle create_cubemap(const Cubemap& tex, const TextureCreationInfo& texture_creation_info);
         
         void transition_image(
-            RBCommandList cmd,
-            RBImageHandle image,
-            RBImageLayout before,
-            RBImageLayout after,
-            bool log = false) const;
+            RBCommandList cmd, 
+            const ImageBarrierParams& params) const;
         
-        VkImageLayout get_image_layout(RBImageHandle image);
+        VkImageLayout get_image_layout(RBImageHandle image, uint32_t layer = 0, uint32_t mip = 0);
         
         void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& out_format, Extent extent);
         

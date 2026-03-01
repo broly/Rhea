@@ -76,13 +76,9 @@ Extent VkRenderBackend::get_swapchain_extent() const
 
 
 
-void VkRenderBackend::transition_image(
-        RBCommandList cmd,
-        RBImageHandle image,
-        RBImageLayout before,
-        RBImageLayout after)
+void VkRenderBackend::transition_image(RBCommandList cmd, const ImageBarrierParams& params)
 {
-    image_manager.transition_image(cmd, image, before, after, true);
+    image_manager.transition_image(cmd, params);
 }
 
 
