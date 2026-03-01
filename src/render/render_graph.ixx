@@ -50,6 +50,8 @@ struct RGTexture
     RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
     RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
     
+    RBImageLayout get_layout( uint32_t frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
+    
     
     bool should_create_image() const
     {

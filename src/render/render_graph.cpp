@@ -41,6 +41,11 @@ RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle fram
     return backend.get_image_view(get_image(backend, frame), array_index, mip_index);
 }
 
+RBImageLayout RGTexture::get_layout(uint32_t frame, uint32_t array_index, uint32_t mip_index) const
+{
+    return current_layouts[frame][array_index][mip_index];
+}
+
 void RGTexture::memory_barrier(
     RBCommandList cmd,
     RenderBackend& backend,
@@ -368,7 +373,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         {
             auto& texture = textures[tex.id];
             if (barrier.before_pass && texture.allows_barrier(ctx.frame))
-                texture.memory_barrier(cmd, *backend, barrier.before_pass->layout, frame);
+                for (uint32_t layer = 0; layer < texture.get_layers_count(); layer++)
+                    texture.memory_barrier(cmd, *backend, barrier.before_pass->layout, frame, layer);
         }
         
         
