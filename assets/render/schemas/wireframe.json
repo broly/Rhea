@@ -10,7 +10,7 @@
 	},
 
 
-    "passes": [
+    "pipelines": [
         {
 			"__type__": "PipelineInfo_Graphics",
 			"set": "SET_WIREFRAME",

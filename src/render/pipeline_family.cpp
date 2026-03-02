@@ -29,7 +29,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     backend = in_backend;
     renderer = in_renderer;
     this->model = model;
-    pass = model->get_pass_info(in_pass_name);
+    pass = model->get_pipeline_by_pass(in_pass_name);
     checkf(pass, "MaterialModel has no pass '%s'", in_pass_name.to_string().c_str());
     
     for (uint32_t index = 0; auto& vertex_layout : pass->vertex_layouts)

@@ -299,7 +299,7 @@ RenderResource* Renderer::query_material_resource(std::shared_ptr<MaterialModel>
     if (material_resources.contains({pass_name, model}))
         return material_resources.at({pass_name, model});
     
-    const PipelineInfo_Graphics* pass = model->get_pass_info(pass_name);
+    const PipelineInfo_Graphics* pass = model->get_pipeline_by_pass(pass_name);
     checkf(pass, "MaterialModel has no pass");
 
     

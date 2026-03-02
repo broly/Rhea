@@ -11,7 +11,7 @@
 	
 	"material_resource": "clouds",
 
-    "passes": [
+    "pipelines": [
         {
 			"__type__": "PipelineInfo_Graphics",
 			"set": "SET_CLOUDS",

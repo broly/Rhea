@@ -27,7 +27,7 @@
 	},
 
 	
-	"passes": [
+	"pipelines": [
 		{
 			"__type__": "PipelineInfo_Graphics",
 			"pass": "GeometryBase",

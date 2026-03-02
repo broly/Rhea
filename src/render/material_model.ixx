@@ -283,7 +283,7 @@ REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
     requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
-using MatModel_PassVariant = std::variant<PipelineInfo_Graphics>;
+using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics>;
 
 export class MaterialModel : public RhObject
 {
@@ -291,18 +291,18 @@ public:
     Name model_name;
     std::map<Name, std::vector<Name>> enums;
     MatModel_Permutations permutations;
-    std::vector<MatModel_PassVariant> passes;
+    std::vector<MatModel_PipelineVariant> pipelines;
     
     std::optional<Name> material_resource;
     
     Name set;
     
-    const PipelineInfo_Graphics* get_pass_info(Name pass_name) const;
+    const PipelineInfo_Graphics* get_pipeline_by_pass(Name pass_name) const;
     
     void on_serialize(const SerializationContext& context) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, permutations, passes, material_resource);
+                      model_name, enums, permutations, pipelines, material_resource);
 
 
 

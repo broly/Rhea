@@ -29,9 +29,9 @@ void MatModel_Parameter::validate()
     }
 }
 
-const PipelineInfo_Graphics* MaterialModel::get_pass_info(Name pass_name) const
+const PipelineInfo_Graphics* MaterialModel::get_pipeline_by_pass(Name pass_name) const
 {
-    for (auto& pass : passes)
+    for (auto& pass : pipelines)
     {
         if (std::get<PipelineInfo_Graphics>(pass).pass == pass_name)
             return &std::get<PipelineInfo_Graphics>(pass);

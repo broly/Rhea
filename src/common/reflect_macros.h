@@ -32,9 +32,12 @@ import type_id;
     struct reflect::ReflectionInfo<T> \
     { \
         using Type = T; \
-        using Fields = typename detail::ConcatNamedFieldList<typename reflect::ReflectionInfo<Parent>::Fields, detail::NamedFieldList<\
-            RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_FIELD,__VA_ARGS__) \
-        >>::type;\
+        using Fields = typename detail::ConcatNamedFieldList<\
+            /* A */ typename reflect::ReflectionInfo<Parent>::Fields, \
+            /* B */ detail::NamedFieldList<\
+                        RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_FIELD,__VA_ARGS__) \
+                    > \
+        >::type;\
         static constexpr std::string_view name = #T; \
         static constexpr detail::reflection_tag reflected {}; \
         static constexpr void iter(auto Func) \
