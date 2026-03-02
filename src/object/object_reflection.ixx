@@ -15,6 +15,9 @@ import :object;
 import dependency_collector;
 import name;
 import static_name;
+import container_traits;
+import type_utils;
+import <variant>;
 import <set>;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
@@ -137,112 +140,6 @@ export namespace reflect
     extern const ObjectReflectionInfo* find_object_reflection_info(Name name);
 }
 
-template<typename T>
-struct is_vector
-{
-    static bool constexpr value = false;
-};
-
-template<typename T>
-struct is_vector<std::vector<T> > 
-{
-    static bool constexpr value = true;
-};
-
-template<typename T>
-constexpr bool is_vector_v = is_vector<T>::value;
-
-
-
-
-template<typename T>
-struct is_optional
-{
-    static bool constexpr value = false;
-};
-
-template<typename T>
-struct is_optional<std::optional<T>> 
-{
-    static bool constexpr value = true;
-};
-
-template<typename T>
-constexpr bool is_optional_v = is_optional<T>::value;
-
-
-template<typename>
-struct is_map 
-{
-    static bool constexpr value = false;
-};
-
-template<typename K, typename V>
-struct is_map<std::map<K, V> > 
-{
-    static bool constexpr value = true;
-};
-
-template<typename T>
-constexpr bool is_map_v = is_map<T>::value;
-
-
-
-template<typename>
-struct is_set
-{
-    static bool constexpr value = false;
-};
-
-
-
-template<typename... Ts>
-struct is_set<std::set<Ts...> > 
-{
-    static bool constexpr value = true;
-};
-
-template<typename T>
-constexpr bool is_set_v = is_set<T>::value;
-
-
-
-
-template<typename>
-struct is_mask
-{
-    static bool constexpr value = false;
-};
-
-
-
-template<typename... Ts>
-struct is_mask<Mask<Ts...> > 
-{
-    static bool constexpr value = true;
-};
-
-template<typename T>
-constexpr bool is_mask_v = is_mask<T>::value;
-
-
-
-template<typename>
-struct is_shared_ptr 
-{
-    static bool constexpr value = false;
-};
-
-template<typename T>
-struct is_shared_ptr<std::shared_ptr<T> > 
-{
-    static bool constexpr value = true;
-};
-
-template<typename T>
-constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
-
-
     
 export namespace reflect::json
 {
@@ -266,6 +163,23 @@ export namespace reflect::json
             auto info = reflect::find_object_reflection_info(type_id);
             target = info->template instantiate<typename T::element_type>();
             do_serialize_json_value(*target, value, context);
+        } else if constexpr (is_variant_v<T>)
+        {
+            checkf(value.isObject(), "Variant supports only JSON objects");
+
+            Json::Value const* type_name_ptr = value.find("__type__");
+            checkf(type_name_ptr != nullptr, "__type__ should be provided for variant fields");
+            checkf(type_name_ptr->isString(), "__type__ must be string");
+            
+            const Name type_name = type_name_ptr->asString();
+            
+            visit_variant_types(target, [&] <typename U> () {
+                if (type_name == reflect::get_name<U>())
+                {
+                    auto& variant_target_value = target.template emplace<U>(U{});
+                    do_serialize_json_value(variant_target_value, value, context);
+                }
+            });
         }
         else if constexpr (reflect::is_reflected_v<T>)
         {

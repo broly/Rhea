@@ -12,6 +12,7 @@
 
     "passes": [
         {
+			"__type__": "MatModel_Pass",
 			"set": "SET_WIREFRAME",
             "name": "wireframe",
 			"stages": {

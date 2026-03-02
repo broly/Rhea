@@ -29,6 +29,7 @@
 	
 	"passes": [
 		{
+			"__type__": "MatModel_Pass",
 			"name": "GeometryBase",
 			"requirements": "blend_mode != translucent",
 			"stages": {
@@ -99,6 +100,7 @@
 			]
 		},
 		{
+			"__type__": "MatModel_Pass",
 			"name": "GeometryTranslucent",
 			"requirements": "blend_mode == translucent",
 			"stages": {
@@ -160,6 +162,7 @@
 			]
 		},
 		{
+			"__type__": "MatModel_Pass",
 			"name": "shadowmap",
 			"requirements": "blend_mode != translucent",
 			"stages": {

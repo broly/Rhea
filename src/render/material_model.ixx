@@ -5,6 +5,7 @@ import rhobject;
 import <map>;
 import <vector>;
 import <string>;
+import <variant>;
 #include "common/reflect_macros.h"
 #include "object/object_reflection_macro.h"
 #include "common/type_macros.h"
@@ -276,7 +277,7 @@ REFLECT_STRUCT(MatModel_Pass,
     name, requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
-
+using MatModel_PassVariant = std::variant<MatModel_Pass>;
 
 export class MaterialModel : public RhObject
 {
@@ -284,7 +285,7 @@ public:
     Name model_name;
     std::map<Name, std::vector<Name>> enums;
     MatModel_Permutations permutations;
-    std::vector<MatModel_Pass> passes;
+    std::vector<MatModel_PassVariant> passes;
     
     std::optional<Name> material_resource;
     

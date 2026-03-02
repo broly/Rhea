@@ -77,7 +77,6 @@ void RGTexture::memory_barrier(
     params.base_mip = mip;
     params.mip_count = 1;
     params.layer_count = 1;
-    params.log = true;
 
     backend.transition_image(cmd, params);
 

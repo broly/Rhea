@@ -691,7 +691,7 @@ void vk::ImageManager::transition_image(RBCommandList cmd, const ImageBarrierPar
 
     if (log)
     {
-        LogVkImageManager.Log<Display>(
+        LogVkImageManager.Log<Verbose>(
             "Transition '%s' (%p): %s -> %s | layers [%u..%u] mips [%u..%u]",
             debug.get_vk_image_name(vk_img).to_string().c_str(),
             vk_img,

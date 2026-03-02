@@ -20,6 +20,7 @@
 	},
 	"passes": [
 		{
+			"__type__": "MatModel_Pass",
 			"set": "SET_SHADOWDEBUG",
 			"name": "ShadowDebug",
 			"requirements": "",

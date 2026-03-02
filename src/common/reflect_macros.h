@@ -19,6 +19,7 @@ import type_id;
         using Fields = detail::NamedFieldList<\
             RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_FIELD,__VA_ARGS__) \
         >;\
+        static constexpr std::string_view name = #T; \
         static constexpr detail::reflection_tag reflected {}; \
         static constexpr void iter(auto Func) \
         {\

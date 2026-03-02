@@ -13,6 +13,7 @@
 
     "passes": [
         {
+			"__type__": "MatModel_Pass",
 			"set": "SET_CLOUDS",
             "name": "Clouds",
 			"requirements": "",

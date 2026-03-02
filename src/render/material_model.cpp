@@ -33,8 +33,8 @@ const MatModel_Pass* MaterialModel::get_pass_info(Name pass_name) const
 {
     for (auto& pass : passes)
     {
-        if (pass.name == pass_name)
-            return &pass;
+        if (std::get<MatModel_Pass>(pass).name == pass_name)
+            return &std::get<MatModel_Pass>(pass);
     }
     return nullptr;
 }

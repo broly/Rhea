@@ -19,6 +19,7 @@
 	},
 	"passes": [
 		{
+			"__type__": "MatModel_Pass",
 			"name": "IBL_Irradiance",
 			"set": "SET_IBL",
 			"requirements": "",

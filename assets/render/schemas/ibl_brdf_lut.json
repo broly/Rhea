@@ -11,6 +11,7 @@
 	},
 	"passes": [
 		{
+			"__type__": "MatModel_Pass",
 			"name": "IBL_BRDF_LUT",
 			"set": "SET_IBL",
 			"requirements": "",

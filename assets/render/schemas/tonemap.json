@@ -12,6 +12,7 @@
 	},
 	"passes": [
 		{
+			"__type__": "MatModel_Pass",
 			"name": "ToneMapping",
 			"requirements": "",
 			"stages": {

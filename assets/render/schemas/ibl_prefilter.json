@@ -25,6 +25,7 @@
 	},
 	"passes": [
 		{
+			"__type__": "MatModel_Pass",
 			"name": "IBL_Prefilter",
 			"set": "SET_IBL",
 			"requirements": "",
