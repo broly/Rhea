@@ -299,7 +299,7 @@ RenderResource* Renderer::query_material_resource(std::shared_ptr<MaterialModel>
     if (material_resources.contains({pass_name, model}))
         return material_resources.at({pass_name, model});
     
-    const PipelineInfo_Graphics* pipeline_config = model->get_pipeline_config_by_pass(pass_name);
+    const MatModel_PipelineVariant* pipeline_config = model->get_pipeline_config_by_pass(pass_name);
     checkf(pipeline_config, "MaterialModel has no pipeline config that related to pass %s", pass_name.to_string().c_str());
 
     

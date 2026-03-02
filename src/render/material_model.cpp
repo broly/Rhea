@@ -29,12 +29,18 @@ void MatModel_Parameter::validate()
     }
 }
 
-const PipelineInfo_Graphics* MaterialModel::get_pipeline_config_by_pass(Name pass_name) const
+const MatModel_PipelineVariant* MaterialModel::get_pipeline_config_by_pass(Name pass_name) const
 {
-    for (auto& pass : pipelines)
+    for (auto& pipeline_conf : pipelines)
     {
-        if (std::get<PipelineInfo_Graphics>(pass).pass == pass_name)
-            return &std::get<PipelineInfo_Graphics>(pass);
+        bool found = false;
+        std::visit([&](const auto& pconf) {
+            if (pconf.pass == pass_name)
+                found = true;
+        }, pipeline_conf);
+        
+        if (found)
+            return &pipeline_conf;
     }
     return nullptr;
 }

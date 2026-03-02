@@ -283,6 +283,20 @@ REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
     requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
+export struct PipelineInfo_Compute : public PipelineInfo
+{
+    bool dummy;
+};
+REFLECT_STRUCT_DERIVED(PipelineInfo_Compute, PipelineInfo,
+    dummy);
+
+export struct PipelineInfo_Raytrace : public PipelineInfo
+{
+    bool dummy;
+};
+REFLECT_STRUCT_DERIVED(PipelineInfo_Raytrace, PipelineInfo,
+    dummy);
+
 using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics>;
 
 export class MaterialModel : public RhObject
@@ -297,7 +311,7 @@ public:
     
     Name set;
     
-    const PipelineInfo_Graphics* get_pipeline_config_by_pass(Name pass_name) const;
+    const MatModel_PipelineVariant* get_pipeline_config_by_pass(Name pass_name) const;
     
     void on_serialize(const SerializationContext& context) override;
 };
