@@ -256,9 +256,15 @@ REFLECT_STRUCT(MatModel_ColorAttachmentInfo,
     write_mask, translucent);
 
 
-export struct MatModel_Pass
+export struct PipelineInfo
 {
-    Name name;
+    Name pass;
+};
+REFLECT_STRUCT(PipelineInfo,
+    pass);
+
+export struct PipelineInfo_Graphics : public PipelineInfo
+{
     std::string requirements;
     std::vector<MatModel_AttributesLayout> vertex_layouts;
     std::map<ShaderStage, MatModel_PassStage> stages;
@@ -273,11 +279,11 @@ export struct MatModel_Pass
     std::optional<DepthBiasInfo> depth_bias;
     RBBufferTopology topology;
 };
-REFLECT_STRUCT(MatModel_Pass,
-    name, requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
+    requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
-using MatModel_PassVariant = std::variant<MatModel_Pass>;
+using MatModel_PassVariant = std::variant<PipelineInfo_Graphics>;
 
 export class MaterialModel : public RhObject
 {
@@ -291,7 +297,7 @@ public:
     
     Name set;
     
-    const MatModel_Pass* get_pass_info(Name pass_name) const;
+    const PipelineInfo_Graphics* get_pass_info(Name pass_name) const;
     
     void on_serialize(const SerializationContext& context) override;
 };

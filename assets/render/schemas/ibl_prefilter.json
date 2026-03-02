@@ -25,8 +25,8 @@
 	},
 	"passes": [
 		{
-			"__type__": "MatModel_Pass",
-			"name": "IBL_Prefilter",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "IBL_Prefilter",
 			"set": "SET_IBL",
 			"requirements": "",
 			"stages": {

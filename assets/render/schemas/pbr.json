@@ -29,8 +29,8 @@
 	
 	"passes": [
 		{
-			"__type__": "MatModel_Pass",
-			"name": "GeometryBase",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "GeometryBase",
 			"requirements": "blend_mode != translucent",
 			"stages": {
 				"vertex": {
@@ -100,8 +100,8 @@
 			]
 		},
 		{
-			"__type__": "MatModel_Pass",
-			"name": "GeometryTranslucent",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "GeometryTranslucent",
 			"requirements": "blend_mode == translucent",
 			"stages": {
 				"vertex": {
@@ -162,8 +162,8 @@
 			]
 		},
 		{
-			"__type__": "MatModel_Pass",
-			"name": "shadowmap",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "shadowmap",
 			"requirements": "blend_mode != translucent",
 			"stages": {
 				"vertex": {

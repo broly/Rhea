@@ -30,6 +30,15 @@ export namespace reflect
             }
         };
         
+        template<typename A, typename B>
+        struct ConcatNamedFieldList;
+        
+        template<typename... TypesA, typename... TypesB>
+        struct ConcatNamedFieldList<NamedFieldList<TypesA...>, NamedFieldList<TypesB...>>
+        {
+            using type = NamedFieldList<TypesA..., TypesB...>;
+        };
+        
         enum reflection_tag {};
     }
     

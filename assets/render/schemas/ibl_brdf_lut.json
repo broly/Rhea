@@ -11,8 +11,8 @@
 	},
 	"passes": [
 		{
-			"__type__": "MatModel_Pass",
-			"name": "IBL_BRDF_LUT",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "IBL_BRDF_LUT",
 			"set": "SET_IBL",
 			"requirements": "",
 			"stages": {

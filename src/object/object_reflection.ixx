@@ -173,7 +173,7 @@ export namespace reflect::json
             
             const Name type_name = type_name_ptr->asString();
             
-            visit_variant_types(target, [&] <typename U> () {
+            visit_variadic_types(target, [&] <typename U> () {
                 if (type_name == reflect::get_name<U>())
                 {
                     auto& variant_target_value = target.template emplace<U>(U{});

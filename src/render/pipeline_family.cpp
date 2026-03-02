@@ -215,7 +215,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     decode_key_to_defines(key, defines);
 
     GraphicsPipelineDesc desc;
-    desc.pass_name = pass->name;
+    desc.pass_name = pass->pass;
     desc.permutation_value = key.key;
     desc.depth_test = pass->depth_test;
     desc.depth_write = pass->depth_write;

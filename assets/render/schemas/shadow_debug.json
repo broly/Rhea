@@ -20,9 +20,9 @@
 	},
 	"passes": [
 		{
-			"__type__": "MatModel_Pass",
+			"__type__": "PipelineInfo_Graphics",
 			"set": "SET_SHADOWDEBUG",
-			"name": "ShadowDebug",
+			"pass": "ShadowDebug",
 			"requirements": "",
 			"enum_white_list": {
 			},

@@ -13,9 +13,9 @@
 
     "passes": [
         {
-			"__type__": "MatModel_Pass",
+			"__type__": "PipelineInfo_Graphics",
 			"set": "SET_CLOUDS",
-            "name": "Clouds",
+            "pass": "Clouds",
 			"requirements": "",
 			"stages": {
 				"vertex": {

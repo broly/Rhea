@@ -12,9 +12,9 @@
 
     "passes": [
         {
-			"__type__": "MatModel_Pass",
+			"__type__": "PipelineInfo_Graphics",
 			"set": "SET_WIREFRAME",
-            "name": "wireframe",
+            "pass": "wireframe",
 			"stages": {
 				"vertex": {
 					"shader": "wireframe.vert",

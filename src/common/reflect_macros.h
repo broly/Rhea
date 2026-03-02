@@ -27,6 +27,22 @@ import type_id;
         }\
     }
 
+#define REFLECT_STRUCT_DERIVED(T, Parent, ...) \
+    export template<> \
+    struct reflect::ReflectionInfo<T> \
+    { \
+        using Type = T; \
+        using Fields = typename detail::ConcatNamedFieldList<typename reflect::ReflectionInfo<Parent>::Fields, detail::NamedFieldList<\
+            RHEA_FOR_EACH_COLON(__PRIVATE_NAMED_FIELD,__VA_ARGS__) \
+        >>::type;\
+        static constexpr std::string_view name = #T; \
+        static constexpr detail::reflection_tag reflected {}; \
+        static constexpr void iter(auto Func) \
+        {\
+            Fields::iter(Func); \
+        }\
+    }
+
 #define REFLECT_STRUCT_RUNTIME(T, ...) \
     export template<> \
     struct reflect::ReflectionInfo<T> \

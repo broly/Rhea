@@ -10,8 +10,8 @@ struct TypeList
     static constexpr bool contains = (std::is_same_v<T, Ts> || ...);
 };
 
-export template<typename... Ts, typename F>
-void visit_variant_types(const std::variant<Ts...>&, F&& func)
+export template<template<typename...> typename T, typename... Ts, typename F>
+constexpr void visit_variadic_types(const T<Ts...>&, F&& func)
 {
     (func.template operator()<Ts>(), ...);
 }

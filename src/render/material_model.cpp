@@ -29,12 +29,12 @@ void MatModel_Parameter::validate()
     }
 }
 
-const MatModel_Pass* MaterialModel::get_pass_info(Name pass_name) const
+const PipelineInfo_Graphics* MaterialModel::get_pass_info(Name pass_name) const
 {
     for (auto& pass : passes)
     {
-        if (std::get<MatModel_Pass>(pass).name == pass_name)
-            return &std::get<MatModel_Pass>(pass);
+        if (std::get<PipelineInfo_Graphics>(pass).pass == pass_name)
+            return &std::get<PipelineInfo_Graphics>(pass);
     }
     return nullptr;
 }

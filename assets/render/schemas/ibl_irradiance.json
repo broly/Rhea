@@ -19,8 +19,8 @@
 	},
 	"passes": [
 		{
-			"__type__": "MatModel_Pass",
-			"name": "IBL_Irradiance",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "IBL_Irradiance",
 			"set": "SET_IBL",
 			"requirements": "",
 			"stages": {

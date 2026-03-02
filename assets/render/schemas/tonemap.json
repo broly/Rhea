@@ -12,8 +12,8 @@
 	},
 	"passes": [
 		{
-			"__type__": "MatModel_Pass",
-			"name": "ToneMapping",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "ToneMapping",
 			"requirements": "",
 			"stages": {
 				"vertex": {

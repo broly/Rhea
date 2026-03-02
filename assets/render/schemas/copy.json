@@ -12,8 +12,8 @@
 	},
 	"passes": [
 		{
-			"__type__": "MatModel_Pass",
-			"name": "HistoryStore",
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "HistoryStore",
 			"requirements": "",
 			"stages": {
 				"vertex": {
