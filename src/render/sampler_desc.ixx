@@ -131,7 +131,7 @@ export namespace samplers
         surface_sampler.max_lod      = 1000.0f;
 
         surface_sampler.anisotropy     = true;
-        surface_sampler.max_anisotropy = 8.0f; 
+        surface_sampler.max_anisotropy = 16.0f; 
 
         surface_sampler.comparison = false;
 

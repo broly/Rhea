@@ -88,6 +88,11 @@ struct RGTexture
         return desc.array_layers;
     }
     
+    uint32_t get_mip_levels_count() const
+    {
+        return desc.mip_levels;
+    }
+    
     void reset_layout();
 };
 

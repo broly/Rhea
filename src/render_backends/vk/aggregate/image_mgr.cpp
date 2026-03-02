@@ -79,7 +79,7 @@ void vk::ImageManager::unregister_swapchain_image(RBImageHandle image_handle)
     res.mark_destroyed();
 }
 
-RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handle, uint32_t layer_index, uint32_t mip_level, bool is_cubemap)
+RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handle, uint32_t layer_index, uint32_t mip_level, uint32_t num_mips,  bool is_cubemap)
 {
     checkf(image_handle.id < image_resources.size(), "Unknown image id %i", image_handle.id);
     
@@ -113,6 +113,11 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
     view_info.subresourceRange.layerCount = is_cubemap ? 6 : 1;
     view_info.subresourceRange.baseArrayLayer = is_cubemap ? 0 : layer_index;
     view_info.subresourceRange.baseMipLevel = mip_level;
+    view_info.subresourceRange.levelCount = num_mips == 0 ? image_resource.mip_levels : num_mips;
+    if (is_cubemap)
+    {
+        view_info.subresourceRange.levelCount = 1;
+    }
     
 
     VkImageView view;
@@ -144,7 +149,7 @@ VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t arra
 
 VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)
 {
-    return fetch_image_view_generic(image_handle, 0, 0, true);
+    return fetch_image_view_generic(image_handle, 0, 0, 0, true);
 }
 
 RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
@@ -154,9 +159,14 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
         extent = default_extent;
     
     assert(extent.is_not_zero());
+    
+    const bool use_existing_image = desc.old_image_handle.has_value();
 
-    image_resources.push_back({});
-    auto& res = image_resources.back();
+    if (!use_existing_image)
+    {
+        image_resources.push_back({});
+    }
+    auto& res = use_existing_image ? image_resources[desc.old_image_handle.value().id] : image_resources.back();
     res.debug_name = desc.name;
     res.extent = extent;
     res.format = vk::to_vk_format(desc.format);
@@ -219,13 +229,19 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     VK_CHECK(vkAllocateMemory(instance.device, &alloc_info, nullptr, &res.memory));
     VK_CHECK(vkBindImageMemory(instance.device, res.image, res.memory, 0));
     
-    
-    
-    uint32_t id = static_cast<uint32_t>(image_resources.size() - 1);
+    uint32_t id;
+    if (desc.old_image_handle.has_value())
+    {
+        id = desc.old_image_handle.value().id;
+    }
+    else
+    {
+        id = static_cast<uint32_t>(image_resources.size() - 1);
+    }
     
     RBImageHandle img_handle { id };
     
-    fetch_image_view_generic(img_handle, 0, 0);
+    fetch_image_view_generic(img_handle, 0, 0, desc.use_mip_levels_for_image_view ? desc.mip_levels : 1);
     
     
     
@@ -390,6 +406,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         RenderTextureUsage::Sampled |
         RenderTextureUsage::TransferDst |
         RenderTextureUsage::TransferSrc;
+    desc.use_mip_levels_for_image_view = true;
     
     // 1. GPU image
     RBImageHandle image = create_image(desc);
@@ -870,6 +887,9 @@ void vk::ImageManager::generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image
                                         uint32_t width, uint32_t height, uint32_t mip_levels)
 {
     auto& res = get_image_resource(image);
+    
+    res.mip_levels = mip_levels;
+    
     VkImage img = res.image;
 
     int32_t mipWidth  = static_cast<int32_t>(width);
@@ -943,7 +963,10 @@ void vk::ImageManager::generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image
                              VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
+    
+        res.set_layout(barrier.newLayout, 0, 1, i, 1);
     }
+    
 }
 
 

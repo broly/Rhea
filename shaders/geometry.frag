@@ -30,7 +30,6 @@ void main()
 {
     vec4 base_tx = texture(u_base_color, v_uv);
 
-
 #if BLEND_MODE_TRANSLUCENT
     float alpha = base_tx.a;
     

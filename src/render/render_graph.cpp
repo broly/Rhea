@@ -477,7 +477,10 @@ void RenderGraph::rebuild_resources()
             .name = std::string("RG_") + tex.desc.name.to_string(),
             .extent  = tex.desc.extent,
             .format = tex.desc.format,
-            .usage  = tex.desc.usage
+            .usage  = tex.desc.usage,
+            .mip_levels = tex.get_mip_levels_count(),
+            .array_layers = tex.get_layers_count(),
+            //.old_image_handle = tex.image,
         };
         tex.image = backend->create_image(desc);
     }

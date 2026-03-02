@@ -287,6 +287,14 @@ export
             Present         = 1 << 6
         };
     }
+    
+    
+    struct RBImageHandle
+    {
+        uint32_t id = 0;
+
+        bool operator==(const RBImageHandle&) const = default;
+    };
 
     struct RBImageDesc
     {
@@ -297,6 +305,9 @@ export
         uint32_t mip_levels = 1;
         uint32_t array_layers = 1;
         bool is_cubemap = false;
+        std::optional<RBImageHandle> old_image_handle;
+        bool use_mip_levels_for_image_view = false;
+        
         
         uint32_t get_array_layers() const
         {
@@ -306,12 +317,6 @@ export
         }
     };
 
-    struct RBImageHandle
-    {
-        uint32_t id = 0;
-
-        bool operator==(const RBImageHandle&) const = default;
-    };
 
     using RBImageView = RBHandle<VkImageView>;
 
