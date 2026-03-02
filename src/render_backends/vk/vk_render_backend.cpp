@@ -462,27 +462,41 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     if (depth_ref.has_value())
         subpass.pDepthStencilAttachment = &depth_ref.value();
     
-    VkSubpassDependency dep{};
-    dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dep.dstSubpass = 0;
+    VkSubpassDependency deps[2]{};
 
-    dep.srcStageMask =
+    // EXTERNAL -> SUBPASS
+    deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    deps[0].dstSubpass = 0;
+    deps[0].srcStageMask =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-
-    dep.dstStageMask =
+    deps[0].dstStageMask =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-
-    dep.srcAccessMask = 0;
-
-    dep.dstAccessMask =
+    deps[0].srcAccessMask = 0;
+    deps[0].dstAccessMask =
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    
+
+
+    deps[1].srcSubpass = 0;
+    deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    deps[1].srcStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    deps[1].dstStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    deps[1].srcAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    deps[1].dstAccessMask =
+        VK_ACCESS_SHADER_READ_BIT |
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     
     VkRenderPassCreateInfo rpci{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     rpci.attachmentCount = uint32_t(attachments.size());
@@ -490,7 +504,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
     rpci.dependencyCount = 1;
-    rpci.pDependencies = &dep;
+    rpci.pDependencies = deps;
 
     VkRenderPass rp;
     VK_CHECK(vkCreateRenderPass(instance.get_device(), &rpci, nullptr, &rp));

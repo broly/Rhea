@@ -77,6 +77,7 @@ void RGTexture::memory_barrier(
     params.base_mip = mip;
     params.mip_count = 1;
     params.layer_count = 1;
+    params.log = true;
 
     backend.transition_image(cmd, params);
 
@@ -355,8 +356,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     ctx.frame = frame;
 
     // Initialize external images (swapchain)
-    for (auto& tex : textures)
-        tex.reset_layout();  // for swapchain: transfer_present
+    // for (auto& tex : textures)
+    //     tex.reset_layout();  // for swapchain: transfer_present
     
     ctx.is_preparing = true;
     prepare_resources(ctx);

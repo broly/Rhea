@@ -303,94 +303,10 @@ bool vk::ImageManager::is_swapchain_image(RBImageHandle image)
 
 RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info)
 {
-    const TextureFormat format =
-        texture_creation_info.format_override.value_or(tex.format);
-    
-
-    // =========================
-    // STATIC BLACK TEXTURE (FALLBACK)
-    // =========================
-    static std::unordered_map<TextureFormat, RBImageHandle> black_textures;
 
     if (tex.extent.is_zero())
     {
-        auto it = black_textures.find(format);
-        if (it != black_textures.end())
-            return it->second;
-
-        // --- create 1x1 black texture ---
-        RBImageDesc desc;
-        desc.name = std::string("TEX_B_") + tex.name;
-        desc.extent.width  = 1;
-        desc.extent.height = 1;
-        desc.format = format;
-        desc.usage =
-            RenderTextureUsage::Sampled |
-            RenderTextureUsage::TransferDst;
-
-        RBImageHandle image = create_image(desc);
-        auto& res = get_image_resource(image);
-
-        const size_t pixel_size =
-            format == TextureFormat::RGB8 ? 3 : 4;
-
-        uint8_t black_pixel[4] = { 0, 0, 0, 255 };
-
-        VkBuffer staging_buffer;
-        VkDeviceMemory staging_memory;
-
-        vk::create_buffer(
-            instance.device,
-            instance.physical_device,
-            pixel_size,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            staging_buffer,
-            staging_memory);
-
-        vk::update_buffer(
-            instance.device,
-            staging_memory,
-            black_pixel,
-            pixel_size);
-
-        immediate_command_pool.submit([&](VkCommandBuffer cmd)
-        {
-            ImageBarrierParams params_before_copy;
-            params_before_copy.image = image;
-            params_before_copy.before = RBImageLayout::undefined;
-            params_before_copy.after = RBImageLayout::transfer_dst_optimal;
-            transition_image(cmd, params_before_copy);
-
-            VkBufferImageCopy copy{};
-            copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            copy.imageSubresource.layerCount = 1;
-            copy.imageExtent = { 1, 1, 1 };
-
-            vkCmdCopyBufferToImage(
-                cmd,
-                staging_buffer,
-                res.image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1,
-                &copy);
-            
-            ImageBarrierParams params_after_copy;
-            params_after_copy.image = image;
-            params_after_copy.before = RBImageLayout::transfer_dst_optimal;
-            params_after_copy.after = RBImageLayout::shader_read_only_optimal;
-
-            transition_image(cmd, params_after_copy); 
-        });
-
-        vk::destroy_buffer(
-            instance.device,
-            staging_buffer,
-            staging_memory);
-
-        black_textures[format] = image;
-        return image;
+        return create_fallback_texture(tex, texture_creation_info);
     }
     
     uint32_t mip_levels = texture_creation_info.generate_mips ? 
@@ -485,8 +401,6 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
             params_after_gen.image = image;
             params_after_gen.before = RBImageLayout::transfer_dst_optimal;
             params_after_gen.after = texture_creation_info.current_layout;
-            transition_image(cmd, params_before_copy);
-            
             transition_image(cmd, params_after_gen);
         }
         // transition_image(
@@ -501,6 +415,98 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     
     LogVkImageManager.Log<Verbose>("Allocated GPU texture: %s", tex.name.c_str());
     
+    return image;
+}
+
+RBImageHandle vk::ImageManager::create_fallback_texture(const Texture& tex,
+    const TextureCreationInfo& texture_creation_info)
+{
+    
+    const TextureFormat format =
+        texture_creation_info.format_override.value_or(tex.format);
+    
+
+    // =========================
+    // STATIC BLACK TEXTURE (FALLBACK)
+    // =========================
+    static std::unordered_map<TextureFormat, RBImageHandle> black_textures;
+    
+    auto it = black_textures.find(format);
+    if (it != black_textures.end())
+        return it->second;
+
+    // --- create 1x1 black texture ---
+    RBImageDesc desc;
+    desc.name = std::string("TEX_B_") + tex.name;
+    desc.extent.width  = 1;
+    desc.extent.height = 1;
+    desc.format = format;
+    desc.usage =
+        RenderTextureUsage::Sampled |
+        RenderTextureUsage::TransferDst;
+
+    RBImageHandle image = create_image(desc);
+    auto& res = get_image_resource(image);
+
+    const size_t pixel_size =
+        format == TextureFormat::RGB8 ? 3 : 4;
+
+    uint8_t black_pixel[4] = { 0, 0, 0, 255 };
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+
+    vk::create_buffer(
+        instance.device,
+        instance.physical_device,
+        pixel_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buffer,
+        staging_memory);
+
+    vk::update_buffer(
+        instance.device,
+        staging_memory,
+        black_pixel,
+        pixel_size);
+
+    immediate_command_pool.submit([&](VkCommandBuffer cmd)
+    {
+        ImageBarrierParams params_before_copy;
+        params_before_copy.image = image;
+        params_before_copy.before = RBImageLayout::undefined;
+        params_before_copy.after = RBImageLayout::transfer_dst_optimal;
+        transition_image(cmd, params_before_copy);
+
+        VkBufferImageCopy copy{};
+        copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copy.imageSubresource.layerCount = 1;
+        copy.imageExtent = { 1, 1, 1 };
+
+        vkCmdCopyBufferToImage(
+            cmd,
+            staging_buffer,
+            res.image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &copy);
+            
+        ImageBarrierParams params_after_copy;
+        params_after_copy.image = image;
+        params_after_copy.before = RBImageLayout::transfer_dst_optimal;
+        params_after_copy.after = RBImageLayout::shader_read_only_optimal;
+
+        transition_image(cmd, params_after_copy); 
+    });
+
+    vk::destroy_buffer(
+        instance.device,
+        staging_buffer,
+        staging_memory);
+
+    black_textures[format] = image;
     return image;
 }
 
@@ -685,7 +691,7 @@ void vk::ImageManager::transition_image(RBCommandList cmd, const ImageBarrierPar
 
     if (log)
     {
-        LogVkImageManager.Log<VeryVerbose>(
+        LogVkImageManager.Log<Display>(
             "Transition '%s' (%p): %s -> %s | layers [%u..%u] mips [%u..%u]",
             debug.get_vk_image_name(vk_img).to_string().c_str(),
             vk_img,
