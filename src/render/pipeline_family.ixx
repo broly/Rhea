@@ -42,7 +42,7 @@ private:
     std::shared_ptr<RenderBackend> backend;
     std::shared_ptr<Renderer> renderer;
     std::shared_ptr<MaterialModel> model;
-    const PipelineInfo_Graphics* pass = nullptr;
+    const PipelineInfo_Graphics* pipeline_config = nullptr;
     
     RBPipelineLayout pipeline_layout;
     

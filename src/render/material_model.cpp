@@ -29,7 +29,7 @@ void MatModel_Parameter::validate()
     }
 }
 
-const PipelineInfo_Graphics* MaterialModel::get_pipeline_by_pass(Name pass_name) const
+const PipelineInfo_Graphics* MaterialModel::get_pipeline_config_by_pass(Name pass_name) const
 {
     for (auto& pass : pipelines)
     {

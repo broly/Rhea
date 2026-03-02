@@ -297,7 +297,7 @@ public:
     
     Name set;
     
-    const PipelineInfo_Graphics* get_pipeline_by_pass(Name pass_name) const;
+    const PipelineInfo_Graphics* get_pipeline_config_by_pass(Name pass_name) const;
     
     void on_serialize(const SerializationContext& context) override;
 };

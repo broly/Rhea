@@ -29,10 +29,10 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     backend = in_backend;
     renderer = in_renderer;
     this->model = model;
-    pass = model->get_pipeline_by_pass(in_pass_name);
-    checkf(pass, "MaterialModel has no pass '%s'", in_pass_name.to_string().c_str());
+    pipeline_config = model->get_pipeline_config_by_pass(in_pass_name);
+    checkf(pipeline_config, "MaterialModel has no pipeline config that relates to pass '%s'", in_pass_name.to_string().c_str());
     
-    for (uint32_t index = 0; auto& vertex_layout : pass->vertex_layouts)
+    for (uint32_t index = 0; auto& vertex_layout : pipeline_config->vertex_layouts)
     {
         const Name vertex_type_name = vertex_layout.vertex_type;
         auto runtime_info = reflect::find_runtime_info(vertex_type_name);
@@ -60,7 +60,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     
     
     std::map<Name, uint32_t> processed_resources;
-    for (const auto& [stage, stage_info] : pass->stages)
+    for (const auto& [stage, stage_info] : pipeline_config->stages)
     {
         for (auto resource_name : stage_info.resources)
         {
@@ -110,7 +110,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     
     size_t cur_offset = 0;
     layout_desc.push_constants.clear();
-    for (auto& push_constant_info : pass->push_constants)
+    for (auto& push_constant_info : pipeline_config->push_constants)
     {
         size_t pc_size = 0;
         if (push_constant_info.type == "uint32_t")
@@ -215,24 +215,24 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     decode_key_to_defines(key, defines);
 
     GraphicsPipelineDesc desc;
-    desc.pass_name = pass->pass;
+    desc.pass_name = pipeline_config->pass;
     desc.permutation_value = key.key;
-    desc.depth_test = pass->depth_test;
-    desc.depth_write = pass->depth_write;
-    desc.color_attachments = pass->color_attachments;
-    desc.cull_mode = pass->cull_mode;
-    desc.front_face = pass->front_face;
-    desc.no_color_attachments = pass->no_color_attachments.has_value() ? *pass->no_color_attachments : false;
-    desc.compare_op = pass->compare_op;
-    desc.depth_bias = pass->depth_bias ? *pass->depth_bias : DepthBiasInfo{};
-    desc.topology = pass->topology;
+    desc.depth_test = pipeline_config->depth_test;
+    desc.depth_write = pipeline_config->depth_write;
+    desc.color_attachments = pipeline_config->color_attachments;
+    desc.cull_mode = pipeline_config->cull_mode;
+    desc.front_face = pipeline_config->front_face;
+    desc.no_color_attachments = pipeline_config->no_color_attachments.has_value() ? *pipeline_config->no_color_attachments : false;
+    desc.compare_op = pipeline_config->compare_op;
+    desc.depth_bias = pipeline_config->depth_bias ? *pipeline_config->depth_bias : DepthBiasInfo{};
+    desc.topology = pipeline_config->topology;
     desc.layout = layout_desc;
     desc.layout.pipeline_layout = pipeline_layout;
     
     
     // add attributes support for vertex shader
     int location = 0;
-    for (auto& attr_layout : pass->vertex_layouts)
+    for (auto& attr_layout : pipeline_config->vertex_layouts)
     {
         for (auto& attr : attr_layout.attributes)
         {
@@ -255,7 +255,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         }
     }
     
-    for (const auto& [shader_stage, stage_info] : pass->stages)
+    for (const auto& [shader_stage, stage_info] : pipeline_config->stages)
     {
         GraphicsPipelineStage stage;
         stage.stage = shader_stage;
