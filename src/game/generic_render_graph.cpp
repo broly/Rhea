@@ -24,6 +24,7 @@ import <algorithm>;
 #include "profiling/profile.h"
 
 #include "common/assertion_macros.h"
+#include "common/name_helpers.h"
 #include "logging/log_macro.h"
 #include "profiling/profile.h"
 
@@ -48,6 +49,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     light_resource = renderer->find_resource("light");
     shadow_resource = renderer->find_resource("shadow");
     reflection_resource = renderer->find_resource("reflection");
+    gbuffer_resource = renderer->find_resource("gbuffer");
     
     
     
@@ -66,51 +68,69 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     swapchain_extent = backend->get_swapchain_extent();
     
-    
-    RGTextureDesc hdr_color_desc{
-        .name = "hdr_color",
+    hdr_color = create_texture({
+        .name = NAME(hdr_color),
         .extent = resolution,
         .format = TextureFormat::RGBA16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false,
         .dimension = capture_dimension
-    };
+    });
     
-    
-    RGTextureDesc normal_color_desc{
-        .name = "normal_color",
+    g_normal = create_texture({
+        .name = NAME(g_normal),
         .extent = resolution,
         .format = TextureFormat::RGBA8_UNORM,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false,
         .dimension = capture_dimension
-    };
+    });
     
-    
-    RGTextureDesc motion_color_desc{
-        .name = "motion_color",
+    g_motion_vectors = create_texture({
+        .name = NAME(g_motion_vectors),
         .extent = resolution,
         .format = TextureFormat::RG16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false,
         .dimension = capture_dimension
-    };
+    });
     
-    hdr_color = create_texture(hdr_color_desc);
-    normal_color = create_texture(normal_color_desc);
-    motion_vectors_color = create_texture(motion_color_desc);
+    g_roughness = create_texture({
+        .name = NAME(g_roughness),
+        .extent = resolution,
+        .format = TextureFormat::R16F,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension
+    });
     
-    RGTextureDesc history_desc{
-        .name = "history_hdr",
+    
+    g_depth = create_texture({
+        .name = NAME(g_depth),
+        .extent = resolution,
+        .format = TextureFormat::Depth24Stencil8,
+        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
+        .dimension = capture_dimension
+    });
+    
+
+    history_hdr = create_texture({
+        .name = NAME(history_hdr),
         .extent = resolution,
         .format = TextureFormat::RGBA16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
         .external = false,
         .dimension = TextureDimension::Tex2D,
         .array_layers = 2,
-    };
-
-    history_hdr = create_texture(history_desc);
+    });
+    
+    ssr_texture = create_texture({
+        .name = NAME(ssr_texture),
+        .extent = resolution,
+        .format = TextureFormat::RGBA16F,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+        .dimension = capture_dimension
+    });
     
     copy_pipeline_family = renderer->query_pipeline_family("HistoryStore", copy_model);
     copy_pipeline = request_pipeline(copy_pipeline_family, {});
@@ -128,18 +148,24 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     shadow_debug_material = std::make_shared<Material>();
     shadow_debug_material->model = "shadow_debug";
     
-    
-    depth_texture = create_texture({
-        .name = "depth",
-        .extent = resolution,
-        .format = TextureFormat::Depth24Stencil8,
-        .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
-        .dimension = capture_dimension
-    });
+    auto ssr_model = renderer->find_model("ssr");
+
+    ssr_pipeline_family =
+        renderer->query_pipeline_family("SSR", ssr_model);
+    ssr_pipeline =
+        ssr_pipeline_family->request_pipeline({});
+
+    ssr_composite_pipeline_family =
+        renderer->query_pipeline_family("SSRComposite", ssr_model);
+    ssr_composite_pipeline =
+        ssr_composite_pipeline_family->request_pipeline({});
+
+    ssr_material = std::make_shared<Material>();
+    ssr_material->model = "ssr";
     
     
     shadow_map = create_texture({
-        .name = "shadow_map",
+        .name = NAME(shadow_map),
         .extent = Constants::shadowmap_extent,
         .format = TextureFormat::Depth32F,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
@@ -248,9 +274,10 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .writes = { 
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
-            { normal_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { motion_vectors_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { g_depth, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
+            { g_normal, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { g_motion_vectors, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { g_roughness, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -261,6 +288,39 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
+    add_pass({
+        .name = "SSR",
+        .reads = {
+            { hdr_color, RBImageUsage::SampledFragment },
+            { g_depth, RBImageUsage::SampledFragment },
+            { g_normal, RBImageUsage::SampledFragment },
+            { g_roughness, RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { ssr_texture, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_ssr(ctx);
+        },
+    });
+    
+    add_pass({
+        .name = "SSRComposite",
+        .reads = {
+            { hdr_color, RBImageUsage::SampledFragment },
+            { ssr_texture, RBImageUsage::SampledFragment },
+            { g_roughness, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_ssr_composite(ctx);
+        },
+    });
+    
     
     add_pass({
         .name = Names::pass_geometry_translucent,
@@ -269,7 +329,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .writes = { 
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },  
-             { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
+             { g_depth, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -285,7 +345,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = "Clouds",
         .reads = {
-            { depth_texture, RBImageUsage::SampledFragment },
+            { g_depth, RBImageUsage::SampledFragment },
             { noise_texture, RBImageUsage::SampledFragment }
         },
         .writes = {
@@ -295,29 +355,29 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         {
             PROFILE("Clouds");
             
-            draw_clouds(ctx, depth_texture, noise_texture);
+            draw_clouds(ctx, g_depth, noise_texture);
         },
         .num_layers = num_pass_instances
         
     });
     
-    add_pass({
-        .name = "HistoryStore",
-        .reads = {
-            { hdr_color, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.level != history_index)
-                return;
+    // add_pass({
+    //     .name = "HistoryStore",
+    //     .reads = {
+    //         { hdr_color, RBImageUsage::SampledFragment }
+    //     },
+    //     .writes = {
+    //         { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+    //     },
+    //     .execute = [this](RenderGraphContext& ctx)
+    //     {
+    //         if (ctx.level != history_index)
+    //             return;
+    //
+    //         draw_fullscreen_copy(ctx, hdr_color);
+    //     },
 
-            draw_fullscreen_copy(ctx, hdr_color);
-        },
-        .num_layers = 2,
-    });
+    // });
     
     // add_pass({
     //     .name = "Wireframe",
@@ -644,7 +704,7 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
 
     instance->update_image(
         "u_depth",
-        get_image(depth_texture),
+        get_image(g_depth),
         frame
     );
 
@@ -996,6 +1056,100 @@ void GenericRenderGraph::draw_wireframe(RenderGraphContext& ctx)
         vertex_count);
 }
 
+void GenericRenderGraph::draw_ssr(RenderGraphContext& ctx)
+{
+    PROFILE("GenericRenderGraph::draw_ssr");
+
+    ctx.backend.update_viewport(
+        ctx.cmd,
+        resolution,
+        use_swapchain_extent);
+
+    auto material_instance =
+        renderer->query_material_instance(
+            ssr_material,
+            ctx.pass_name);
+
+    auto instance =
+        material_instance->get_or_create_resource_instance(
+            ctx.frame);
+
+
+    instance->update_image(
+        "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame);
+
+    
+    auto res = renderer->find_resource("gbuffer");
+    auto rinst = res->query_single();
+    rinst->update_image("u_depth", get_image(g_depth), ctx.frame);
+    rinst->update_image("u_normal", get_image(g_normal), ctx.frame);
+    rinst->update_image("u_roughness", get_image(g_roughness), ctx.frame);
+    
+    if (ctx.bind_pipeline(ssr_pipeline))
+    {
+        
+
+        instance->bind(
+            ctx.cmd,
+            ctx.frame);
+        
+
+        ctx.bind(camera_resource);
+
+        // GBuffer (depth, normal, roughness)
+        ctx.bind(gbuffer_resource);
+    }
+
+
+    ctx.backend.draw_fullscreen(ctx.cmd);
+}
+
+void GenericRenderGraph::draw_ssr_composite(RenderGraphContext& ctx)
+{
+    PROFILE("GenericRenderGraph::draw_ssr_composite");
+
+    ctx.backend.update_viewport(
+        ctx.cmd,
+        resolution,
+        use_swapchain_extent);
+
+    if (ctx.bind_pipeline(ssr_composite_pipeline))
+    {
+        ctx.bind(renderer->find_resource("gbuffer"));
+    }
+
+    auto ssr_resource = renderer->find_resource("ssr");
+    auto hdr_color_resource = renderer->find_resource("hdr_color");
+    
+    auto ssr_instance = ssr_resource->query_single();
+    auto hdr_color_instance = hdr_color_resource->query_single();
+    // auto material_instance =
+    //     renderer->query_material_instance(
+    //         ssr_material,
+    //         ctx.pass_name);
+
+    // auto instance =
+    //     material_instance->get_or_create_resource_instance(
+    //         ctx.frame);
+
+    hdr_color_instance->update_image(
+        "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame);
+
+    ssr_instance->update_image(
+        "u_ssr",
+        get_image(ssr_texture),
+        ctx.frame);
+
+    ctx.bind(hdr_color_instance);
+    ctx.bind(ssr_instance);
+
+    ctx.backend.draw_fullscreen(ctx.cmd);
+}
+
 
 ViewInfo GenericRenderGraph::build_view_info(RenderGraphContext& ctx, bool zero_pos) const
 {
@@ -1064,6 +1218,8 @@ CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero
     camera_ubo.proj = proj;
     camera_ubo.view = view;
     camera_ubo.camera_pos = cam_ro->position;
+    camera_ubo.far = cam_ro->far;
+    camera_ubo.near = cam_ro->near;
 
     return camera_ubo;
 }

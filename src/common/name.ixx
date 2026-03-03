@@ -93,3 +93,10 @@ struct std::hash<Name>
         return n.get_id();
     }
 };
+
+export template<FixedString string>
+Name get_static_name()
+{
+    static Name name = string.buffer;
+    return name;
+}

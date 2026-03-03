@@ -12,6 +12,9 @@ uniform CameraUBO
     
     vec4 camera_pos;
     
+    float near;
+    float far;
+    
 } camera_ubo;
 
 #endif // RESOURCES_CAMERA

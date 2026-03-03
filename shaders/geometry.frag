@@ -21,8 +21,9 @@ layout(location = 6) in vec4 v_prev_clip;
 // ================== OUTPUT ==================
 layout(location = 0) out vec4 out_color;
 #if !BLEND_MODE_TRANSLUCENT
-layout(location = 1) out vec4 out_normal;
-layout(location = 2) out vec2 out_velocity;
+layout(location = 1) out vec4 out_g_normal;
+layout(location = 2) out vec2 out_g_motion_vectors;
+layout(location = 3) out float out_g_roughness;
 #endif 
 
 
@@ -46,6 +47,9 @@ void main()
     float ao        = orm.r * material_ubo.occlusion_factor;
     float roughness = orm.g * material_ubo.roughness_factor;
     float metallic  = orm.b * material_ubo.metallic_factor;
+    
+    vec3 emissive_tx = texture(u_emissive, v_uv).rgb;
+    vec3 emissive = pow(emissive_tx, vec3(2.2)) * material_ubo.emissive_factor;
 
 #if BLEND_MODE_TRANSLUCENT
     metallic  = 0.0;
@@ -202,7 +206,7 @@ void main()
 #if BLEND_MODE_TRANSLUCENT
     vec3 ambient = vec3(0.01) * albedo * ao;
 #else
-    vec3 ambient = ibl;
+    vec3 ambient = albedo * ao; // ibl;
 #endif
 
 
@@ -210,7 +214,7 @@ void main()
     ambient *= shadow;
 #endif
 
-    vec3 color = ambient + Lo;
+    vec3 color = ambient + Lo + emissive;
 
 #if BLEND_MODE_TRANSLUCENT
     out_color = vec4(color, alpha);
@@ -219,14 +223,14 @@ void main()
 
 
     vec3 N_view = normalize((camera_ubo.view * vec4(N, 0.0)).xyz);
-    out_normal = vec4(N_view * 0.5 + 0.5, roughness);
+    out_g_normal = vec4(N_view * 0.5 + 0.5, roughness);
 
     vec2 curr_ndc = v_curr_clip.xy / v_curr_clip.w;
     vec2 prev_ndc = v_prev_clip.xy / v_prev_clip.w;
 
 
-    out_velocity = curr_ndc - prev_ndc;
-    
+    out_g_motion_vectors = curr_ndc - prev_ndc;
+    out_g_roughness = roughness;
 #endif
     
 }

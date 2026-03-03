@@ -55,7 +55,11 @@
 					"translucent": false
 				},
 				{
-					"write_mask": ["R", "G", "B", "A"],
+					"write_mask": ["R", "G"],
+					"translucent": false
+				},
+				{
+					"write_mask": ["R"],
 					"translucent": false
 				}
 			],

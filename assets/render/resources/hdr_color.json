@@ -2,7 +2,7 @@
 	"resource": {
 		"name": "hdr_color",
 		"usage": "frame",
-		"set": "SET_TONEMAP",
+		"set": "SET_HDR_COLOR",
 		"allowed_stages": ["fragment"],
 		"parameters": {
 			"hdr_color": {

@@ -80,6 +80,8 @@ public:
     void draw_scene_shadow(RenderGraphContext& ctx);
     void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
     void draw_wireframe(RenderGraphContext& ctx);
+    void draw_ssr(RenderGraphContext& ctx);
+    void draw_ssr_composite(RenderGraphContext& ctx);
     
     ViewInfo  build_view_info(
         RenderGraphContext& ctx,
@@ -95,19 +97,25 @@ public:
         RenderGraphContext& ctx);
     
     RGTextureHandle shadow_map;
-    RGTextureHandle depth_texture;
     RGTextureHandle noise_texture;
-    RGTextureHandle hdr_color;
-    RGTextureHandle normal_color;
-    RGTextureHandle motion_vectors_color;
     RGTextureHandle swapchain_color;
     
+    RGTextureHandle hdr_color;
+    
+    RGTextureHandle g_depth;
+    RGTextureHandle g_normal;
+    RGTextureHandle g_motion_vectors;
+    RGTextureHandle g_roughness;
+    
+    
     RGTextureHandle history_hdr;
+    RGTextureHandle ssr_texture;
     uint32_t history_index = 0;
     
     RGTextureHandle brdf_lut;
     
     RenderResource* camera_resource = nullptr;
+    RenderResource* gbuffer_resource = nullptr;
     RenderResource* light_resource = nullptr;
     RenderResource* shadow_resource = nullptr;
     RenderResource* reflection_resource = nullptr;
@@ -128,6 +136,7 @@ public:
     std::shared_ptr<Material> cloud_material;
     std::shared_ptr<Material> wireframe_material;
     std::shared_ptr<Material> copy_material;
+    std::shared_ptr<Material> ssr_material;
     
     
     PipelineObject* copy_pipeline;
@@ -135,11 +144,16 @@ public:
     PipelineObject* clouds_pipeline;
     PipelineObject* tonemap_pipeline;
     PipelineObject* wireframe_pipeline;
+    PipelineObject* ssr_pipeline;
+    PipelineObject* ssr_composite_pipeline;
+
     
     std::shared_ptr<PipelineFamily> copy_pipeline_family;
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
     std::shared_ptr<PipelineFamily> shadow_debug_pipeline_family;
     std::shared_ptr<PipelineFamily> wireframe_pipeline_family;
+    std::shared_ptr<PipelineFamily> ssr_pipeline_family;
+    std::shared_ptr<PipelineFamily> ssr_composite_pipeline_family;
     
     bool use_swapchain_extent;
     

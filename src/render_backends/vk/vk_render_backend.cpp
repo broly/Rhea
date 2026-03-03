@@ -503,7 +503,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     rpci.pAttachments = attachments.data();
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
-    rpci.dependencyCount = 1;
+    rpci.dependencyCount = 2;
     rpci.pDependencies = deps;
 
     VkRenderPass rp;
@@ -731,7 +731,7 @@ void VkRenderBackend::begin_render_pass(RBCommandList cmd_list, RBFramebufferId 
         }
         else
         {
-            clears[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+            clears[index].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
         }
         index++;
     }

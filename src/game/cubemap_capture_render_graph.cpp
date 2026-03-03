@@ -251,6 +251,8 @@ CameraUBO CubemapCaptureRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bo
     camera_ubo.proj = proj;
     camera_ubo.view = view;
     camera_ubo.camera_pos = position;
+    camera_ubo.far = 1000.f;
+    camera_ubo.near = 0.1;
     camera_position = position;
     
     return camera_ubo;

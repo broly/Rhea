@@ -78,12 +78,12 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
 
                 uint32_t prev_layer = history_index ^ 1;
 
-                tonemap_instance->update_image(
-                    "u_history",
-                    get_image(history_hdr),
-                    ctx.frame,
-                    prev_layer
-                );
+                // tonemap_instance->update_image(
+                //     "u_history",
+                //     get_image(history_hdr),
+                //     ctx.frame,
+                //     prev_layer
+                // );
                          
                 tonemap_instance->bind(
                     ctx.cmd,
@@ -136,7 +136,7 @@ void GameRenderGraph::pass_translucent(RenderGraphContext& ctx)
 
 void GameRenderGraph::pass_clouds(RenderGraphContext& ctx)
 {
-    draw_clouds(ctx, depth_texture, noise_texture);
+    draw_clouds(ctx, g_depth, noise_texture);
 }
 
 void GameRenderGraph::pass_tonemapping(RenderGraphContext& ctx)
