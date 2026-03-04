@@ -50,6 +50,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     shadow_resource = renderer->find_resource("shadow");
     reflection_resource = renderer->find_resource("reflection");
     gbuffer_resource = renderer->find_resource("gbuffer");
+    ssr_resource = renderer->find_resource("ssr");
+    hdr_color_resource = renderer->find_resource("hdr_color");
     
     
     
@@ -288,38 +290,6 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
-    add_pass({
-        .name = "SSR",
-        .reads = {
-            { hdr_color, RBImageUsage::SampledFragment },
-            { g_depth, RBImageUsage::SampledFragment },
-            { g_normal, RBImageUsage::SampledFragment },
-            { g_roughness, RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { ssr_texture, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            draw_ssr(ctx);
-        },
-    });
-    
-    add_pass({
-        .name = "SSRComposite",
-        .reads = {
-            { hdr_color, RBImageUsage::SampledFragment },
-            { ssr_texture, RBImageUsage::SampledFragment },
-            { g_roughness, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            draw_ssr_composite(ctx);
-        },
-    });
     
     
     add_pass({
@@ -359,6 +329,40 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .num_layers = num_pass_instances
         
+    });
+    
+    
+    add_pass({
+        .name = "SSR",
+        .reads = {
+            { hdr_color, RBImageUsage::SampledFragment },
+            { g_depth, RBImageUsage::SampledFragment },
+            { g_normal, RBImageUsage::SampledFragment },
+            { g_roughness, RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { ssr_texture, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_ssr(ctx);
+        },
+    });
+    
+    add_pass({
+        .name = "SSRComposite",
+        .reads = {
+            { hdr_color, RBImageUsage::SampledFragment },
+            { ssr_texture, RBImageUsage::SampledFragment },
+            { g_roughness, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_ssr_composite(ctx);
+        },
     });
     
     // add_pass({
@@ -411,6 +415,7 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     prepare_clouds_pass(ctx);
     prepare_wireframe_pass(ctx);
+    prepare_ssr(ctx);
 }
 
 void GenericRenderGraph::end_frame()
@@ -731,6 +736,46 @@ void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
     );
 
     prepared_wireframe.camera = cam;
+}
+
+void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
+{
+    auto material_instance =
+    renderer->query_material_instance(
+        ssr_material,
+        "SSR");
+
+    auto instance =
+        material_instance->get_or_create_resource_instance(
+            ctx.frame);
+
+
+    instance->update_image(
+        "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame);
+
+    
+    auto res = renderer->find_resource("gbuffer");
+    auto rinst = res->query_single();
+    rinst->update_image("u_depth", get_image(g_depth), ctx.frame);
+    rinst->update_image("u_normal", get_image(g_normal), ctx.frame);
+    rinst->update_image("u_roughness", get_image(g_roughness), ctx.frame);
+    
+    
+    auto ssr_instance = ssr_resource->query_single();
+    auto hdr_color_instance = hdr_color_resource->query_single();
+
+    hdr_color_instance->update_image(
+        "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame);
+
+    ssr_instance->update_image(
+        "u_ssr",
+        get_image(ssr_texture),
+        ctx.frame);
+    
 }
 
 void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTextureHandle source)
@@ -1064,42 +1109,12 @@ void GenericRenderGraph::draw_ssr(RenderGraphContext& ctx)
         ctx.cmd,
         resolution,
         use_swapchain_extent);
-
-    auto material_instance =
-        renderer->query_material_instance(
-            ssr_material,
-            ctx.pass_name);
-
-    auto instance =
-        material_instance->get_or_create_resource_instance(
-            ctx.frame);
-
-
-    instance->update_image(
-        "u_hdr_color",
-        get_image(hdr_color),
-        ctx.frame);
-
-    
-    auto res = renderer->find_resource("gbuffer");
-    auto rinst = res->query_single();
-    rinst->update_image("u_depth", get_image(g_depth), ctx.frame);
-    rinst->update_image("u_normal", get_image(g_normal), ctx.frame);
-    rinst->update_image("u_roughness", get_image(g_roughness), ctx.frame);
     
     if (ctx.bind_pipeline(ssr_pipeline))
     {
-        
-
-        instance->bind(
-            ctx.cmd,
-            ctx.frame);
-        
-
         ctx.bind(camera_resource);
-
-        // GBuffer (depth, normal, roughness)
         ctx.bind(gbuffer_resource);
+        ctx.bind(hdr_color_resource);
     }
 
 
@@ -1117,36 +1132,10 @@ void GenericRenderGraph::draw_ssr_composite(RenderGraphContext& ctx)
 
     if (ctx.bind_pipeline(ssr_composite_pipeline))
     {
-        ctx.bind(renderer->find_resource("gbuffer"));
+        ctx.bind(gbuffer_resource);
+        ctx.bind(hdr_color_resource);
+        ctx.bind(ssr_resource);
     }
-
-    auto ssr_resource = renderer->find_resource("ssr");
-    auto hdr_color_resource = renderer->find_resource("hdr_color");
-    
-    auto ssr_instance = ssr_resource->query_single();
-    auto hdr_color_instance = hdr_color_resource->query_single();
-    // auto material_instance =
-    //     renderer->query_material_instance(
-    //         ssr_material,
-    //         ctx.pass_name);
-
-    // auto instance =
-    //     material_instance->get_or_create_resource_instance(
-    //         ctx.frame);
-
-    hdr_color_instance->update_image(
-        "u_hdr_color",
-        get_image(hdr_color),
-        ctx.frame);
-
-    ssr_instance->update_image(
-        "u_ssr",
-        get_image(ssr_texture),
-        ctx.frame);
-
-    ctx.bind(hdr_color_instance);
-    ctx.bind(ssr_instance);
-
     ctx.backend.draw_fullscreen(ctx.cmd);
 }
 

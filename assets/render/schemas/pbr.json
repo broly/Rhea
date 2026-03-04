@@ -55,11 +55,11 @@
 					"translucent": false
 				},
 				{
-					"write_mask": ["R", "G"],
+					"write_mask": ["R", "G", "B", "A"],
 					"translucent": false
 				},
 				{
-					"write_mask": ["R"],
+					"write_mask": ["R", "G", "B", "A"],
 					"translucent": false
 				}
 			],

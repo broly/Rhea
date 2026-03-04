@@ -56,6 +56,31 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
     LogVkPipeline.Log("Created pipeline layout %s (%p)", desc.pass.to_string().c_str(), pipeline_layout);
     
+    uint32_t index = 0;
+    for (auto& vk_layout : vk_layouts)
+    {
+        bool found_res = false;
+        for (auto& resource_info : desc.resources)
+        {
+            if (resource_info.resource->desc.set_index == index)
+            {
+                found_res = true;
+                LogVkPipeline.Log(" * set %i: %s - %p", 
+                    index, resource_info.resource->desc.set.to_string().c_str(), vk_layout);
+            }
+        }
+        if (!found_res)
+        {
+            LogVkPipeline.Log(" * set %i: %s - %p", index, "[PLACEHOLDER]", vk_layout);
+        }
+        index++;
+    }
+    
+    //for (auto& resource_info : desc.resources)
+    //{
+    //    LogVkPipeline.Log(" * set %i: %s", resource_info.resource->desc.set_index, resource_info.resource->desc.set.to_string().c_str());
+    //}
+    
     instance_data[pipeline_layout] = {desc};
     
     RBPipelineLayout result {pipeline_layout};

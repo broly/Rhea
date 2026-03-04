@@ -70,6 +70,7 @@ public:
     void prepare_shadow_pass(RenderGraphContext& ctx);
     void prepare_clouds_pass(RenderGraphContext& ctx);
     void prepare_wireframe_pass(RenderGraphContext& ctx);
+    void prepare_ssr(RenderGraphContext& ctx);
     
     void draw_fullscreen_copy(
         RenderGraphContext& ctx,
@@ -119,6 +120,8 @@ public:
     RenderResource* light_resource = nullptr;
     RenderResource* shadow_resource = nullptr;
     RenderResource* reflection_resource = nullptr;
+    RenderResource* ssr_resource = nullptr;
+    RenderResource* hdr_color_resource = nullptr;
     
     Extent resolution;
     Extent swapchain_extent;
