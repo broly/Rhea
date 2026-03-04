@@ -152,15 +152,11 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     auto ssr_model = renderer->find_model("ssr");
 
-    ssr_pipeline_family =
-        renderer->query_pipeline_family("SSR", ssr_model);
-    ssr_pipeline =
-        ssr_pipeline_family->request_pipeline({});
+    ssr_pipeline_family = renderer->query_pipeline_family("SSR", ssr_model);
+    ssr_pipeline = ssr_pipeline_family->request_pipeline({});
 
-    ssr_composite_pipeline_family =
-        renderer->query_pipeline_family("SSRComposite", ssr_model);
-    ssr_composite_pipeline =
-        ssr_composite_pipeline_family->request_pipeline({});
+    ssr_composite_pipeline_family = renderer->query_pipeline_family("SSRComposite", ssr_model);
+    ssr_composite_pipeline = ssr_composite_pipeline_family->request_pipeline({});
 
     ssr_material = std::make_shared<Material>();
     ssr_material->model = "ssr";

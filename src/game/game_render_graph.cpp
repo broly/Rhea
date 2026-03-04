@@ -33,14 +33,8 @@ GameRenderGraph::GameRenderGraph()
 
 void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
 {
-
-    
     set_flag(Names::debug_shadow2, false);
-    
     GenericRenderGraph::init_resources(init_params);
-
-
-
 }
 
 void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
@@ -60,40 +54,48 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
-                ctx.backend.bind_pipeline(ctx.cmd, tonemap_pipeline);
-    
-                auto material_instance =
-                    renderer->query_material_instance(tonemap_material, ctx.pass_name);
-                 
-                auto tonemap_instance =
-                    material_instance->get_or_create_resource_instance(
-                        ctx.frame
-                    );
-                         
-                tonemap_instance->update_image(
-                    "u_hdr_color",
-                    get_image(hdr_color),
-                    ctx.frame
-                );
-
-                uint32_t prev_layer = history_index ^ 1;
-
-                // tonemap_instance->update_image(
-                //     "u_history",
-                //     get_image(history_hdr),
-                //     ctx.frame,
-                //     prev_layer
-                // );
-                         
-                tonemap_instance->bind(
-                    ctx.cmd,
-                    ctx.frame
-                );
+                if (ctx.bind_pipeline(tonemap_pipeline))
+                {
+                    ctx.bind(hdr_color_resource);
+                }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);
                 
             },
     });
+}
+
+void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
+{
+    GenericRenderGraph::prepare_resources(ctx);
+    
+    auto hdr_color_instance = hdr_color_resource->query_single();
+           
+    hdr_color_instance->update_image(
+        "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame
+    );
+
+    uint32_t prev_layer = history_index ^ 1;
+
+    // hdr_color_instance->update_image(
+    //     "u_history",
+    //     get_image(history_hdr),
+    //     ctx.frame,
+    //     prev_layer
+    // );
+    
+    
+    
+    
+    auto shadow_debug_instance = shadow_resource->query_single();
+    
+    shadow_debug_instance->update_image(
+        "u_shadow_depth",
+        get_image(shadow_map),
+        ctx.frame
+    );
 }
 
 void GameRenderGraph::pass_shadow_map(RenderGraphContext& ctx)
@@ -103,26 +105,10 @@ void GameRenderGraph::pass_shadow_map(RenderGraphContext& ctx)
 
 void GameRenderGraph::pass_shadow_debug(RenderGraphContext& ctx)
 {
-    
-    ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
-            
-    auto shadow_debug_material_instance = renderer->query_material_instance(shadow_debug_material, ctx.pass_name);
-    
-    auto shadow_debug_instance =
-        shadow_debug_material_instance->get_or_create_resource_instance(
-            ctx.frame
-        );
-    
-    shadow_debug_instance->update_image(
-        "u_shadow_depth",
-        get_image(shadow_map),
-        ctx.frame
-    );
-        
-    shadow_debug_instance->bind(
-        ctx.cmd,
-        ctx.frame
-    );
+    if (ctx.bind_pipeline(shadow_debug_pipeline))
+    {
+        ctx.bind(shadow_resource);
+    }
     
     ctx.backend.draw_fullscreen(ctx.cmd);
 }

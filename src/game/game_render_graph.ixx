@@ -17,6 +17,7 @@ public:
     GameRenderGraph();
     void init_resources(const std::map<Name, bool>& init_params) override;
     void build_passes(const std::map<Name, bool>& parameters) override;
+    void prepare_resources(RenderGraphContext& ctx) override;
     
     
     void pass_shadow_map(RenderGraphContext& ctx);
