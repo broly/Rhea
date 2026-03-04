@@ -346,9 +346,27 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
     
     add_pass({
+        .name = "HistoryStore",
+        .reads = {
+            { hdr_color, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.level != history_index)
+                return;
+    
+            draw_fullscreen_copy(ctx, hdr_color);
+        },
+        .num_layers = 2,
+    });
+    
+    add_pass({
         .name = "SSRComposite",
         .reads = {
-            { hdr_color, RBImageUsage::SampledFragment },
+            { history_hdr, RBImageUsage::SampledFragment },
             { ssr_texture, RBImageUsage::SampledFragment },
             { g_roughness, RBImageUsage::SampledFragment }
         },
@@ -361,23 +379,6 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
     });
     
-    // add_pass({
-    //     .name = "HistoryStore",
-    //     .reads = {
-    //         { hdr_color, RBImageUsage::SampledFragment }
-    //     },
-    //     .writes = {
-    //         { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
-    //     },
-    //     .execute = [this](RenderGraphContext& ctx)
-    //     {
-    //         if (ctx.level != history_index)
-    //             return;
-    //
-    //         draw_fullscreen_copy(ctx, hdr_color);
-    //     },
-
-    // });
     
     // add_pass({
     //     .name = "Wireframe",
@@ -748,7 +749,7 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
 
     instance->update_image(
         "u_hdr_color",
-        get_image(hdr_color),
+        get_image(history_hdr),
         ctx.frame);
 
     
@@ -764,6 +765,12 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
 
     hdr_color_instance->update_image(
         "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame);
+    
+    
+    hdr_color_instance->update_image(
+        "u_history",
         get_image(hdr_color),
         ctx.frame);
 

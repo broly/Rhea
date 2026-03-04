@@ -144,7 +144,7 @@ const vk::ImageResource& vk::ImageManager::get_image_resource(RBImageHandle imag
 
 VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t array_index, uint32_t mip_index)
 {
-    return get_image_resource(image_handle).get_img_view(array_index, mip_index);
+    return fetch_image_view_generic(image_handle, array_index, mip_index);
 }
 
 VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)

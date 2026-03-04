@@ -79,12 +79,12 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
 
     uint32_t prev_layer = history_index ^ 1;
 
-    // hdr_color_instance->update_image(
-    //     "u_history",
-    //     get_image(history_hdr),
-    //     ctx.frame,
-    //     prev_layer
-    // );
+    hdr_color_instance->update_image(
+        "u_history",
+        get_image(history_hdr),
+        ctx.frame,
+        prev_layer
+    );
     
     
     

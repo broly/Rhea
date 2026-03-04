@@ -432,13 +432,17 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
                 backend->end_render_pass(cmd);
         
+        
             }
         
-            for (auto& [tex, barrier] : pass.pass_barriers)
-            {
-                if (barrier.after_pass)
-                    textures[tex.id].memory_barrier(cmd, *backend, barrier.after_pass->layout, frame);
-            }
+        }
+        
+        
+        for (auto& [tex, barrier] : pass.pass_barriers)
+        {
+            if (barrier.after_pass)
+                for (uint32_t layer = 0; layer < textures[tex.id].get_layers_count(); layer++)
+                    textures[tex.id].memory_barrier(cmd, *backend, barrier.after_pass->layout, frame, layer);
         }
     }
 

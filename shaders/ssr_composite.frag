@@ -8,9 +8,9 @@ layout(location = 0) out vec4 out_color;
 
 void main()
 {
-    vec2 uv = gl_FragCoord.xy / textureSize(u_hdr_color, 0);
+    vec2 uv = gl_FragCoord.xy / textureSize(u_history, 0);
 
-    vec3 base = texture(u_hdr_color, uv).rgb;
+    vec3 base = texture(u_history, uv).rgb;
 
     vec4 ssr_sample = texture(u_ssr, uv);
 
