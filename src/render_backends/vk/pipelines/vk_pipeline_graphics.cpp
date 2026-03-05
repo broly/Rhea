@@ -24,19 +24,15 @@ VkPipelineObject_Graphics::VkPipelineObject_Graphics(
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
     vk::BufferManager& in_buffer_manager,
-    const GraphicsPipelineDesc& desc)
-        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager)
+    RBPipelineLayout pipeline_layout,
+    const PipelineCreateDesc_Graphics& desc)
+        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager, pipeline_layout)
         , pipeline_desc(desc)
 {
     debug_name = desc.pass_name;
     permutation_value = desc.permutation_value;
 }
 
-VkPipelineObject_Graphics::~VkPipelineObject_Graphics()
-{
-    if (vk_pipeline != nullptr)
-        vkDestroyPipeline(instance.device, vk_pipeline, nullptr);
-}
 
 
 VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
@@ -217,8 +213,8 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     pci.pRasterizationState = &raster;
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
-    checkf(pipeline_desc.layout.pipeline_layout != 0, "Pipeline layout is null");
-    pci.layout = pipeline_desc.layout.pipeline_layout;
+    checkf(pipeline_layout != 0, "Pipeline layout is null");
+    pci.layout = pipeline_layout;
     pci.renderPass = render_pass;
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
@@ -239,7 +235,7 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
         &vk_pipeline));
     
     LogVkPipeline.Log<Display>("Created graphics pipeline %p (pass: %s, pipeline_layout: %p):",
-        vk_pipeline, pipeline_desc.pass_name.to_string().c_str(), pipeline_desc.layout.pipeline_layout);
+        vk_pipeline, pipeline_desc.pass_name.to_string().c_str(), pipeline_layout);
     for (auto& stage : pipeline_desc.stages)
     {
         LogVkPipeline.Log<Display>(" * stage '%s', shader: '%s'", 

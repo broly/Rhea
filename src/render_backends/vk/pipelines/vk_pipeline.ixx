@@ -16,12 +16,19 @@ public:
     VkPipelineObject(
         vk::Instance& in_instance,
         vk::SwapchainControl& in_swapchain,
-        vk::BufferManager& in_buffer_manager)
+        vk::BufferManager& in_buffer_manager,
+        RBPipelineLayout in_pipeline_layout)
             : instance(in_instance)
             , swapchain(in_swapchain)
             , buffer_manager(in_buffer_manager)
+            , pipeline_layout(in_pipeline_layout)
     {
         
+    }
+    virtual ~VkPipelineObject() override
+    {
+        if (vk_pipeline != nullptr)
+            vkDestroyPipeline(instance.device, vk_pipeline, nullptr);
     }
     
     
@@ -33,7 +40,10 @@ public:
         return create_pipeline(render_pass);
     }
     
-    
+    RBPipelineLayout get_layout() const override
+    {
+        return pipeline_layout;
+    }
     
     virtual VkPipeline create_pipeline(VkRenderPass render_pass) pure;
     
@@ -69,4 +79,6 @@ public:
     std::vector<VkShader> shaders;
     
     std::map<ShaderStage, PipelineReflection> pipeline_reflection;
+    
+    RBPipelineLayout pipeline_layout {};
 };

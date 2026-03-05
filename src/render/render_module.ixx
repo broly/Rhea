@@ -5,7 +5,7 @@ export import :render_graph;
 export import :render_backend;
 export import :handle_types;
 export import :pipeline_object;
-export import :graphics_pipeline_desc;
+export import :pipeline_desc;
 export import :rg_types;
 export import :ubos;
 export import :render_resource;

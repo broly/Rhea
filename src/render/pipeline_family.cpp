@@ -197,7 +197,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         decode_key_to_defines(key, defines);
         
 
-        GraphicsPipelineDesc desc;
+        PipelineCreateDesc_Graphics desc;
         desc.pass_name = config.pass;
         desc.permutation_value = key.key;
         desc.depth_test = config.depth_test;
@@ -210,7 +210,6 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         desc.depth_bias = config.depth_bias ? *config.depth_bias : DepthBiasInfo{};
         desc.topology = config.topology;
         desc.layout = layout_desc;
-        desc.layout.pipeline_layout = pipeline_layout;
         
         
         
@@ -275,7 +274,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     
 
     
-        auto pipeline = backend->create_graphics_pipeline(desc);
+        auto pipeline = backend->create_graphics_pipeline(desc, pipeline_layout);
         pipelines[key.key] = pipeline;
 
         return pipeline;

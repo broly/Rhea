@@ -3,6 +3,7 @@ import :helpers;
 import <vector>;
 import :log;
 import :pipeline_graphics;
+import :pipeline_compute;
 import <vulkan/vulkan_core.h>;
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -12,9 +13,17 @@ import <vulkan/vulkan_core.h>;
 DEFINE_LOGGER(LogVkPipelineManager, Warning);
 
 
-PipelineObject* vk::PipelineManager::create_graphics_pipeline(const GraphicsPipelineDesc& desc)
+PipelineObject* vk::PipelineManager::create_graphics_pipeline(const PipelineCreateDesc_Graphics& desc, RBPipelineLayout pipeline_layout)
 {
-    std::unique_ptr<VkPipelineObject_Graphics> pipeline = std::make_unique<VkPipelineObject_Graphics>(instance, swapchain, buffer_manager, desc);
+    std::unique_ptr<VkPipelineObject_Graphics> pipeline = std::make_unique<VkPipelineObject_Graphics>(instance, swapchain, buffer_manager, pipeline_layout, desc);
+    PipelineObject* result = pipeline.get();
+    pending_pipelines.push_back(std::move(pipeline));
+    return result;
+}
+
+PipelineObject* vk::PipelineManager::create_compute_pipeline(const PipelineCreateDesc_Compute& desc, RBPipelineLayout pipeline_layout)
+{
+    std::unique_ptr<VkPipelineObject_Compute> pipeline = std::make_unique<VkPipelineObject_Compute>(instance, swapchain, buffer_manager, pipeline_layout, desc);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;

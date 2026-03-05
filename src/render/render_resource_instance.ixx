@@ -1,7 +1,7 @@
 ﻿export module render:render_resource_instance;
 
 import <string>;
-import :graphics_pipeline_desc;
+import :pipeline_desc;
 import name;
 
 export class RenderResourceInstance

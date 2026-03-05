@@ -1,4 +1,4 @@
-﻿export module render:graphics_pipeline_desc;
+﻿export module render:pipeline_desc;
 import <string>;
 import <unordered_map>;
 import <vector>;
@@ -28,18 +28,6 @@ export
         CombinedImageSampler,
     };
 
-    const char* to_string(DescriptorType e)
-    {
-        switch (e)
-        {
-        case DescriptorType::UniformBuffer: return "UniformBuffer";
-        case DescriptorType::StorageBuffer: return "StorageBuffer";
-        case DescriptorType::Sampler: return "Sampler";
-        case DescriptorType::SampledImage: return "SampledImage";
-        case DescriptorType::CombinedImageSampler: return "CombinedImageSampler";
-        default: return "unknown";
-        }
-    }
 
     struct DescriptorBinding
     {
@@ -91,21 +79,6 @@ export
         }
     };
 
-    struct PipelineRenderTargetDesc
-    {
-        uint32_t color_attachment_count = 0;
-        bool has_depth = false;
-    };
-
-    struct VertexComponentLayoutData_DEPRECATED
-    {
-        uint8_t location;
-        uint16_t offset;
-        uint8_t binding;
-        uint8_t num_components;
-        uint8_t component_size;
-    };
-
     struct VertexLayoutData
     {
         uint32_t binding_index;
@@ -131,7 +104,6 @@ export
         Name pass;
         std::vector<PipelineResourceInfo> resources;
         std::vector<PushConstantRange> push_constants;
-        RBPipelineLayout pipeline_layout;
     };
 
 
@@ -154,13 +126,17 @@ export
     };
 
     using ShaderFeature = std::variant<ShaderFeatureEnum, ShaderFeatureFlag>;
-
-    struct GraphicsPipelineDesc
+    
+    struct PipelineCreateDesc_Base
     {
         Name pass_name;
         uint64_t permutation_value;
         std::vector<GraphicsPipelineStage> stages;
         PipelineLayoutDesc layout;
+    };
+
+    struct PipelineCreateDesc_Graphics : public PipelineCreateDesc_Base
+    {
         bool depth_test;
         bool depth_write;
         bool no_color_attachments;
@@ -171,11 +147,12 @@ export
         RBBufferTopology topology;
         std::vector<MatModel_ColorAttachmentInfo> color_attachments;
         VertexLayout vertex_layout;
-        
-
-        PipelineRenderTargetDesc rt_compat;
-        
-        
+    };
+    
+    
+    struct PipelineCreateDesc_Compute : public PipelineCreateDesc_Base
+    {
+        // Compute shader has no any specific parameters
     };
 
 
