@@ -6,7 +6,6 @@ import <vulkan/vulkan_core.h>;
 import :shader;
 import :reflection;
 import render;
-#include <cassert>
 
 #include "common/assertion_macros.h"
 
@@ -40,7 +39,7 @@ public:
     
     RBPipelineHandle get_pipeline_handle() const
     {
-        assert(vk_pipeline != VK_NULL_HANDLE); 
+        check(vk_pipeline != VK_NULL_HANDLE); 
         return vk_pipeline;
     }
     

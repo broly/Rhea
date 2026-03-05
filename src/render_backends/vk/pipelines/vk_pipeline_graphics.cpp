@@ -15,6 +15,7 @@ import reflect;
 import :enums_adapters;
 import <bit>;
 import <set>;
+import :pipeline_helpers;
 #include "common/assertion_macros.h"
 
 class VkRenderBackend;
@@ -38,70 +39,10 @@ VkPipelineObject_Graphics::~VkPipelineObject_Graphics()
 }
 
 
-static constexpr std::array<VkShaderStageFlagBits, MAX_STAGES> get_vk_stages()
-{
-    std::array<VkShaderStageFlagBits, MAX_STAGES> stages_vk_bits;
-    stages_vk_bits[ShaderStage_index(ShaderStage::vertex)] = VK_SHADER_STAGE_VERTEX_BIT;
-    stages_vk_bits[ShaderStage_index(ShaderStage::fragment)] = VK_SHADER_STAGE_FRAGMENT_BIT;
-    return stages_vk_bits;
-}
-
-constexpr std::array<VkShaderStageFlagBits, MAX_STAGES> STAGES_VK_BITS = get_vk_stages();
-
-VkCullModeFlags conv_cull_mode(CullMode cull_mode)
-{
-    switch (cull_mode) {
-    case CullMode::none:
-        return VK_CULL_MODE_NONE;
-    case CullMode::front:
-        return VK_CULL_MODE_FRONT_BIT;
-    case CullMode::back:
-        return VK_CULL_MODE_BACK_BIT;
-    case CullMode::both:
-        return VK_CULL_MODE_FRONT_AND_BACK;
-    }
-    unreachable("error");
-}
-
-
-VkCompareOp conv_compare_op(CompareOp compare_op)
-{
-    switch (compare_op) {
-    case CompareOp::never:
-        return VK_COMPARE_OP_NEVER;
-    case CompareOp::less:
-        return VK_COMPARE_OP_LESS;
-    case CompareOp::equal:
-        return VK_COMPARE_OP_EQUAL;
-    case CompareOp::less_or_equal:
-        return VK_COMPARE_OP_LESS_OR_EQUAL;
-    case CompareOp::greater:
-        return VK_COMPARE_OP_GREATER;
-    case CompareOp::not_equal:
-        return VK_COMPARE_OP_NOT_EQUAL;
-    case CompareOp::greater_or_equal:
-        return VK_COMPARE_OP_GREATER_OR_EQUAL;
-    case CompareOp::always:
-        return VK_COMPARE_OP_ALWAYS;
-    }
-    unreachable("error");
-}
-
-VkFrontFace conv_front_face(FrontFace front_face)
-{
-    switch (front_face) {
-    case FrontFace::CW:
-        return VK_FRONT_FACE_CLOCKWISE;
-    case FrontFace::CCW:
-        return VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    }
-    unreachable("error");
-}
-
 VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
 {
     
-    for (auto& stage : pipeline_desc->stages)
+    for (auto& stage : pipeline_desc.stages)
     {
         checkf(stage.compiled_shader.has_value(), "shader not compiled!");
         VkShader stage_shader(instance.device, *stage.compiled_shader);
@@ -123,7 +64,7 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
     };
             
-    for (const auto& layout : pipeline_desc->vertex_layout.layouts)
+    for (const auto& layout : pipeline_desc.vertex_layout.layouts)
     {
         VkVertexInputBindingDescription vertex_input_binding;
         vertex_input_binding.stride = layout.stride;
@@ -156,13 +97,15 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     vertex_input.vertexAttributeDescriptionCount = vk_attrs.size();
     vertex_input.pVertexAttributeDescriptions = vk_attrs.data();
     
-    for (uint32_t stage_index = 0; auto& stage : pipeline_desc->stages)
+    for (uint32_t stage_index = 0; auto& stage : pipeline_desc.stages)
     {
+        checkf(is_graphics_stage(stage.stage), "Prohibited stage '%s' for graphics pipeline",
+            reflect::enum_name(stage.stage).to_string().c_str());
         VkPipelineShaderStageCreateInfo vk_stage {
             VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             nullptr,
             0,
-            STAGES_VK_BITS[ShaderStage_index(stage.stage)],
+            vk_conf_converters::conv_shader_stage(stage.stage),
             shaders.at(stage_index).get_module(),
             "main"
         };
@@ -175,7 +118,7 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     VkPipelineInputAssemblyStateCreateInfo input_assembly{
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO
     };
-    input_assembly.topology = vk::to_vk_primitive_topology(pipeline_desc->topology); // VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    input_assembly.topology = vk::to_vk_primitive_topology(pipeline_desc.topology); // VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     VkDynamicState dynamic_states[] = {
         VK_DYNAMIC_STATE_VIEWPORT,
@@ -201,13 +144,13 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     };
     raster.polygonMode = VK_POLYGON_MODE_FILL;
     raster.lineWidth = 1.0f;
-    raster.cullMode = conv_cull_mode(pipeline_desc->cull_mode); // VK_CULL_MODE_BACK_BIT;
-    raster.frontFace = conv_front_face(pipeline_desc->front_face); // VK_FRONT_FACE_CLOCKWISE;
-    if (pipeline_desc->depth_bias.enable)
+    raster.cullMode = vk_conf_converters::conv_cull_mode(pipeline_desc.cull_mode); // VK_CULL_MODE_BACK_BIT;
+    raster.frontFace = vk_conf_converters::conv_front_face(pipeline_desc.front_face); // VK_FRONT_FACE_CLOCKWISE;
+    if (pipeline_desc.depth_bias.enable)
     {
-        raster.depthBiasConstantFactor = pipeline_desc->depth_bias.constant_factor;
-        raster.depthBiasClamp = pipeline_desc->depth_bias.clamp;
-        raster.depthBiasSlopeFactor = pipeline_desc->depth_bias.slope_factor;
+        raster.depthBiasConstantFactor = pipeline_desc.depth_bias.constant_factor;
+        raster.depthBiasClamp = pipeline_desc.depth_bias.clamp;
+        raster.depthBiasSlopeFactor = pipeline_desc.depth_bias.slope_factor;
     }
     
     
@@ -219,7 +162,7 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     
     std::vector<VkPipelineColorBlendAttachmentState> blend_attachments;
     
-    for (auto& attachment_info : pipeline_desc->color_attachments)
+    for (auto& attachment_info : pipeline_desc.color_attachments)
     {
         VkPipelineColorBlendAttachmentState color{};
         if (attachment_info.write_mask.contains(MatModel_WriteMaskEnum::R))
@@ -258,9 +201,9 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     VkPipelineDepthStencilStateCreateInfo depth_ci{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO
     };
-    depth_ci.depthTestEnable = pipeline_desc->depth_test ? VK_TRUE : VK_FALSE;
-    depth_ci.depthWriteEnable = pipeline_desc->depth_write ? VK_TRUE : VK_FALSE;
-    depth_ci.depthCompareOp = conv_compare_op(pipeline_desc->compare_op);
+    depth_ci.depthTestEnable = pipeline_desc.depth_test ? VK_TRUE : VK_FALSE;
+    depth_ci.depthWriteEnable = pipeline_desc.depth_write ? VK_TRUE : VK_FALSE;
+    depth_ci.depthCompareOp = vk_conf_converters::conv_compare_op(pipeline_desc.compare_op);
     depth_ci.depthBoundsTestEnable = VK_FALSE;
     depth_ci.stencilTestEnable = VK_FALSE;
     depth_ci.minDepthBounds = 0.0f;
@@ -274,14 +217,14 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     pci.pRasterizationState = &raster;
     pci.pMultisampleState = &ms;
     pci.pColorBlendState = &blend;
-    checkf(pipeline_desc->layout.pipeline_layout != 0, "Pipeline layout is null");
-    pci.layout = pipeline_desc->layout.pipeline_layout;
+    checkf(pipeline_desc.layout.pipeline_layout != 0, "Pipeline layout is null");
+    pci.layout = pipeline_desc.layout.pipeline_layout;
     pci.renderPass = render_pass;
     pci.subpass = 0;
     pci.pDepthStencilState = &depth_ci;
     pci.pDynamicState = &dynamic_ci;
     
-    if (!pipeline_desc->no_color_attachments) {
+    if (!pipeline_desc.no_color_attachments) {
         pci.pColorBlendState = &blend;
     } else {
         pci.pColorBlendState = nullptr;  // Depth-only
@@ -296,8 +239,8 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
         &vk_pipeline));
     
     LogVkPipeline.Log<Display>("Created graphics pipeline %p (pass: %s, pipeline_layout: %p):",
-        vk_pipeline, pipeline_desc->pass_name.to_string().c_str(), pipeline_desc->layout.pipeline_layout);
-    for (auto& stage : pipeline_desc->stages)
+        vk_pipeline, pipeline_desc.pass_name.to_string().c_str(), pipeline_desc.layout.pipeline_layout);
+    for (auto& stage : pipeline_desc.stages)
     {
         LogVkPipeline.Log<Display>(" * stage '%s', shader: '%s'", 
             reflect::enum_name(stage.stage).to_string().c_str(),
@@ -306,37 +249,4 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     
     return vk_pipeline;
 }
-
-DescriptorType to_descriptor_type(SpvReflectDescriptorType type)
-{
-    switch (type)
-    {
-    case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
-        return DescriptorType::Sampler;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-        return DescriptorType::CombinedImageSampler;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-        return DescriptorType::SampledImage;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-        break;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-        break;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-        break;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-        return DescriptorType::UniformBuffer;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-        return DescriptorType::StorageBuffer;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-        break;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-        break;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-        break;
-    case SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
-        break;
-    }
-    throw std::runtime_error("Invalid descriptor type");
-}
-
 

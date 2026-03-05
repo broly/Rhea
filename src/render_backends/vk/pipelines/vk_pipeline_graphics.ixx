@@ -29,16 +29,13 @@ public:
 
     RBPipelineLayout get_layout() const override
     {
-        return pipeline_desc->layout.pipeline_layout;
+        return pipeline_desc.layout.pipeline_layout;
     }
 
     virtual VkPipeline create_pipeline(VkRenderPass render_pass) override;
 
     
-    std::optional<GraphicsPipelineDesc> pipeline_desc;
-    
-    
-    
+    GraphicsPipelineDesc pipeline_desc;
     
     
 };

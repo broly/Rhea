@@ -18,19 +18,57 @@ import <bit>;
 export enum class ShaderStage : uint16_t
 {
     none = 0x0,
-    vertex = 0x1,
-    fragment = 0x2,
-    reserved2 = 0x4,
-    reserved3 = 0x8,
-    reserved4 = 0x10,
-    reserved5 = 0x20,
-    reserved6 = 0x40,
-    reserved7 = 0x60,
-    all = vertex | fragment,
+    // Graphics pipeline
+    vertex =                    1 << 0,
+    fragment =                  1 << 1,
+    geometry =                  1 << 2,
+    tesselation_control =       1 << 3,
+    tesselation_evaluation =    1 << 4,
+    
+    // Compute pipeline
+    compute =                   1 << 5,
+    
+    // Raytrace pipeline
+    rtx_raygen =                1 << 6,
+    rtx_any_hit =               1 << 7,
+    rtx_closest_hit =           1 << 8,
+    rtx_miss =                  1 << 9,
+    rtx_intersection =          1 << 10,
+    rtx_callable =              1 << 11,
+    
+    
+    all_graphics = vertex | fragment | geometry | tesselation_control | tesselation_evaluation,
+    all_compute = compute,
+    all_rtx = rtx_raygen | rtx_any_hit | rtx_closest_hit | rtx_miss | rtx_intersection | rtx_callable,
+    
+    all = all_graphics | all_compute | all_rtx,
+    
 };
 REFLECT_ENUM(ShaderStage,
-    none, vertex, fragment, reserved2, reserved3, reserved4, reserved5, reserved6, reserved7);
+    none, 
+    vertex, fragment, geometry,
+    tesselation_control, tesselation_evaluation,
+    compute,
+    rtx_raygen, rtx_any_hit, rtx_closest_hit, rtx_miss, rtx_intersection, rtx_callable);
 ENUM_MASK_OPS(ShaderStage, export);
+
+export bool is_graphics_stage(ShaderStage stage)
+{
+    return stage != ShaderStage::none && 
+           (stage & ~ShaderStage::all_graphics) == ShaderStage::none;
+}
+
+export bool is_compute_stage(ShaderStage stage)
+{
+    return stage != ShaderStage::none && 
+           (stage & ~ShaderStage::all_compute) == ShaderStage::none;
+}
+
+export bool is_rtx_stage(ShaderStage stage)
+{
+    return stage != ShaderStage::none && 
+           (stage & ~ShaderStage::all_rtx) == ShaderStage::none;
+}
 
 export ShaderStage make_shader_stages_mask(const std::vector<ShaderStage>& stages)
 {

@@ -77,11 +77,6 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
         index++;
     }
     
-    //for (auto& resource_info : desc.resources)
-    //{
-    //    LogVkPipeline.Log(" * set %i: %s", resource_info.resource->desc.set_index, resource_info.resource->desc.set.to_string().c_str());
-    //}
-    
     instance_data[pipeline_layout] = {desc};
     
     RBPipelineLayout result {pipeline_layout};

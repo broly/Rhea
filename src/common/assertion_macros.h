@@ -2,6 +2,7 @@
 
 import assertions;
 import <source_location>;
+import <exception>;
 
 #define ENSURE_IMPL(v) \
     [](decltype(v) value, std::source_location sl = std::source_location::current()) -> decltype(v) \
