@@ -43,7 +43,7 @@ namespace vk
             , buffer_manager(in_buffer_manager)
         {}
         
-        PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc);
+        PipelineObject* create_graphics_pipeline(const GraphicsPipelineDesc& desc);
         RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc);
         
         VkDescriptorSetLayout get_empty_descriptor_set();

@@ -6,6 +6,7 @@ import <set>;
 import paths;
 import <fstream>;
 import <filesystem>;
+import <variant>;
 import file_helpers;
 import string_helpers;
 import expr;
@@ -31,108 +32,81 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     this->model = model;
     pipeline_config = model->get_pipeline_config_by_pass(in_pass_name);
     checkf(pipeline_config, "MaterialModel has no pipeline config that relates to pass '%s'", in_pass_name.to_string().c_str());
+
+    const PipelineInfo& config = get_base_pipeline_config();
     
-    if (std::holds_alternative<PipelineInfo_Graphics>(*pipeline_config))
+    
+    layout_desc.pass = in_pass_name;
+    
+    
+    std::map<Name, uint32_t> processed_resources;
+    for (const auto& [stage, stage_info] : config.stages)
     {
-        auto& config = std::get<PipelineInfo_Graphics>(*pipeline_config);
-    
-    
-        for (uint32_t index = 0; auto& vertex_layout : config.vertex_layouts)
+        for (auto resource_name : stage_info.resources)
         {
-            const Name vertex_type_name = vertex_layout.vertex_type;
-            auto runtime_info = reflect::find_runtime_info(vertex_type_name);
-        
-            VertexLayoutData data {
-                .binding_index = index++, // todo
-                .stride = runtime_info->size,
-                .attributes = {}
-            };
-        
-            for (uint16_t loc = 0; auto& attribute_info : vertex_layout.attributes)
+            if (processed_resources.contains(resource_name))
             {
-                auto field_info = runtime_info->find_field(attribute_info.name);
-                checkf(field_info != nullptr, "could not find field %s", attribute_info.name.to_string().c_str());
-            
-                data.attributes.push_back(VertexAttributeInfo{
-                    .variable_name = attribute_info.variable,
-                    .location = loc++,
-                    .offset = (uint32_t)field_info->offset,
-                });
+                const size_t index = processed_resources.at(resource_name);
+                for (ResourceBinding& var : layout_desc.resources[index].resource_variable_bindings)
+                {
+                    var.stages |= stage;
+                }
+                continue;
             }
-            layout_desc.vertex_layout.layouts.push_back(std::move(data));
-        }
-        layout_desc.pass = in_pass_name;
-    
-    
-        std::map<Name, uint32_t> processed_resources;
-        for (const auto& [stage, stage_info] : config.stages)
-        {
-            for (auto resource_name : stage_info.resources)
-            {
-                if (processed_resources.contains(resource_name))
-                {
-                    const size_t index = processed_resources.at(resource_name);
-                    for (ResourceBinding& var : layout_desc.resources[index].resource_variable_bindings)
-                    {
-                        var.stages |= stage;
-                    }
-                    continue;
-                }
             
-                GraphicsPipelineResourceInfo resource_info;
-                auto resource = renderer->find_resource(resource_name);
-                checkf(resource, "could not find resource named %s", resource_name.to_string().c_str());
+            PipelineResourceInfo resource_info;
+            auto resource = renderer->find_resource(resource_name);
+            checkf(resource, "could not find resource named %s", resource_name.to_string().c_str());
         
-                resource_info.resource = resource;
+            resource_info.resource = resource;
         
-                auto& resource_desc = resource->desc;
-                resource_info.name = resource_name;
+            auto& resource_desc = resource->desc;
+            resource_info.name = resource_name;
         
-                uint32_t binding_index = 0;
-                for (auto variable : resource_desc.variables)
-                {
-                    std::optional<RBSampler> sampler;
-                    if (variable.parameter.sampler.has_value())
-                        sampler.emplace(renderer->get_sampler(*variable.parameter.sampler));
-                    resource_info.resource_variable_bindings.push_back(ResourceBinding{
-                        variable.parameter, 
-                        binding_index,
-                        sampler,
-                        stage
-                        });
-                    binding_index++;
-                }
+            uint32_t binding_index = 0;
+            for (auto variable : resource_desc.variables)
+            {
+                std::optional<RBSampler> sampler;
+                if (variable.parameter.sampler.has_value())
+                    sampler.emplace(renderer->get_sampler(*variable.parameter.sampler));
+                resource_info.resource_variable_bindings.push_back(ResourceBinding{
+                    variable.parameter, 
+                    binding_index,
+                    sampler,
+                    stage
+                });
+                binding_index++;
+            }
             
             
                         
-                layout_desc.resources.push_back(resource_info);
-                const size_t index = layout_desc.resources.size() - 1;
-                processed_resources.insert({resource_name, index});
+            layout_desc.resources.push_back(resource_info);
+            const size_t index = layout_desc.resources.size() - 1;
+            processed_resources.insert({resource_name, index});
             
-            }
         }
+    }
     
     
-        size_t cur_offset = 0;
-        layout_desc.push_constants.clear();
-        for (auto& push_constant_info : config.push_constants)
+    size_t cur_offset = 0;
+    layout_desc.push_constants.clear();
+    for (auto& push_constant_info : config.push_constants)
+    {
+        size_t pc_size = 0;
+        if (push_constant_info.type == "uint32_t")
         {
-            size_t pc_size = 0;
-            if (push_constant_info.type == "uint32_t")
-            {
-                pc_size = sizeof(uint32_t);
-            } else
-            {
-                const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(push_constant_info.type);
-                pc_size = info->size;
-            }
-            PushConstantRange pcr;
-            pcr.size = pc_size;
-            pcr.offset = cur_offset;
-            pcr.stages = make_shader_stages_mask(push_constant_info.stages);
-            cur_offset += pc_size;
-            layout_desc.push_constants.push_back(pcr);
+            pc_size = sizeof(uint32_t);
+        } else
+        {
+            const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(push_constant_info.type);
+            pc_size = info->size;
         }
+        PushConstantRange pcr;
+        pcr.size = pc_size;
+        pcr.offset = cur_offset;
+        pcr.stages = make_shader_stages_mask(push_constant_info.stages);
+        cur_offset += pc_size;
+        layout_desc.push_constants.push_back(pcr);
     }
     pipeline_layout = backend->create_pipeline_layout(layout_desc);
     
@@ -221,6 +195,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         auto& config = std::get<PipelineInfo_Graphics>(*pipeline_config);
         DefinitionMap defines;
         decode_key_to_defines(key, defines);
+        
 
         GraphicsPipelineDesc desc;
         desc.pass_name = config.pass;
@@ -236,6 +211,33 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         desc.topology = config.topology;
         desc.layout = layout_desc;
         desc.layout.pipeline_layout = pipeline_layout;
+        
+        
+        
+        for (uint32_t index = 0; auto& vertex_layout : config.vertex_layouts)
+        {
+            const Name vertex_type_name = vertex_layout.vertex_type;
+            auto runtime_info = reflect::find_runtime_info(vertex_type_name);
+        
+            VertexLayoutData data {
+                .binding_index = index++, // todo
+                .stride = runtime_info->size,
+                .attributes = {}
+            };
+        
+            for (uint16_t loc = 0; auto& attribute_info : vertex_layout.attributes)
+            {
+                auto field_info = runtime_info->find_field(attribute_info.name);
+                checkf(field_info != nullptr, "could not find field %s", attribute_info.name.to_string().c_str());
+            
+                data.attributes.push_back(VertexAttributeInfo{
+                    .variable_name = attribute_info.variable,
+                    .location = loc++,
+                    .offset = (uint32_t)field_info->offset,
+                });
+            }
+            desc.vertex_layout.layouts.push_back(std::move(data));
+        }
     
     
         // add attributes support for vertex shader
@@ -273,7 +275,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     
 
     
-        auto pipeline = backend->create_pipeline(desc);
+        auto pipeline = backend->create_graphics_pipeline(desc);
         pipelines[key.key] = pipeline;
 
         return pipeline;
@@ -284,6 +286,21 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
 RBPipelineLayout PipelineFamily::get_pipeline_layout() const
 {
     return pipeline_layout;
+}
+
+const PipelineInfo& PipelineFamily::get_base_pipeline_config() const
+{
+    checkf(pipeline_config != nullptr, "Unable to retrieve config");
+    
+    const PipelineInfo* info = nullptr;
+    std::visit([&info] (const auto& v)
+    {
+        info = &v;
+    }, *pipeline_config);
+    
+    checkf(info != nullptr, "invalid config");
+    
+    return *info;
 }
 
 

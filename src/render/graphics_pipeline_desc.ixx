@@ -119,7 +119,7 @@ export
     };
     
     
-    struct GraphicsPipelineResourceInfo
+    struct PipelineResourceInfo
     {
         Name name;
         RenderResource* resource;
@@ -129,20 +129,10 @@ export
     struct PipelineLayoutDesc
     {
         Name pass;
-        VertexLayout vertex_layout;
-        std::vector<GraphicsPipelineResourceInfo> resources;
+        std::vector<PipelineResourceInfo> resources;
         std::vector<PushConstantRange> push_constants;
         RBPipelineLayout pipeline_layout;
-        
-        const GraphicsPipelineResourceInfo* get_graphics_pipeline_resource_info(RenderResource* rr) const
-        {
-            for (const auto& info : resources)
-                if (info.resource == rr)
-                    return &info;
-            return nullptr;
-        }
     };
-    
 
 
     struct GraphicsPipelineStage
@@ -180,6 +170,7 @@ export
         DepthBiasInfo depth_bias;
         RBBufferTopology topology;
         std::vector<MatModel_ColorAttachmentInfo> color_attachments;
+        VertexLayout vertex_layout;
         
 
         PipelineRenderTargetDesc rt_compat;

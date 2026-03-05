@@ -56,6 +56,7 @@ set(RHEA_MODULE_DIRS
     src/engine
     src/render_backends/vk
     src/render_backends/vk/aggregate
+    src/render_backends/vk/pipelines
     src/game
 )
 

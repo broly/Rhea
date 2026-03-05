@@ -116,7 +116,7 @@ public:
     virtual bool acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
     
-    virtual PipelineObject* create_pipeline(const GraphicsPipelineDesc& desc) = 0;
+    virtual PipelineObject* create_graphics_pipeline(const GraphicsPipelineDesc& desc) = 0;
 
 
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors,Name debug_name) = 0;

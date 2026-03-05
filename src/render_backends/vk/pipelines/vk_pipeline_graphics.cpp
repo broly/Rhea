@@ -1,4 +1,5 @@
-﻿module vk:pipeline;
+﻿module vk:pipeline_graphics;
+
 import render;
 import :helpers;
 import rhmath;
@@ -9,7 +10,7 @@ import spirv_reflect;
 import :reflection;
 import :render_resource;
 import :log;
-#include "vk_macro.h"
+#include "../vk_macro.h"
 import reflect;
 import :enums_adapters;
 import <bit>;
@@ -18,34 +19,22 @@ import <set>;
 
 class VkRenderBackend;
 
-VkPipelineObject::VkPipelineObject(
+VkPipelineObject_Graphics::VkPipelineObject_Graphics(
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
     vk::BufferManager& in_buffer_manager,
     const GraphicsPipelineDesc& desc)
-        : pipeline_desc(desc)
-        , instance(in_instance)
-        , swapchain(in_swapchain)
-        , buffer_manager(in_buffer_manager)
+        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager)
+        , pipeline_desc(desc)
 {
     debug_name = desc.pass_name;
     permutation_value = desc.permutation_value;
-    prepare();
 }
 
-VkPipelineObject::~VkPipelineObject()
+VkPipelineObject_Graphics::~VkPipelineObject_Graphics()
 {
     if (vk_pipeline != nullptr)
         vkDestroyPipeline(instance.device, vk_pipeline, nullptr);
-
-    // if (pipeline_layout != nullptr)
-    //     vkDestroyPipelineLayout(instance.device, pipeline_layout, nullptr);
-}
-
-
-void VkPipelineObject::prepare()
-{
-
 }
 
 
@@ -109,10 +98,8 @@ VkFrontFace conv_front_face(FrontFace front_face)
     unreachable("error");
 }
 
-VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
+VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
 {
-    if (vk_pipeline != nullptr)
-        return vk_pipeline;
     
     for (auto& stage : pipeline_desc->stages)
     {
@@ -136,7 +123,7 @@ VkPipeline VkPipelineObject::get_or_create_pipeline(VkRenderPass render_pass)
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
     };
             
-    for (const auto& layout : pipeline_desc->layout.vertex_layout.layouts)
+    for (const auto& layout : pipeline_desc->vertex_layout.layouts)
     {
         VkVertexInputBindingDescription vertex_input_binding;
         vertex_input_binding.stride = layout.stride;
@@ -353,13 +340,3 @@ DescriptorType to_descriptor_type(SpvReflectDescriptorType type)
 }
 
 
-void VkPipelineObject::reflect_shader(const VkShader& shader, ShaderStage stage)
-{
-    SpirvReflection reflection(shader.get_spirv());
-    
-    pipeline_reflection.insert({stage, 
-        PipelineReflection(
-            shader.get_shader_name(),
-            reflection.get_input_variables(), 
-            reflection.get_bindings())});
-}

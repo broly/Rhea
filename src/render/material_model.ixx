@@ -259,18 +259,18 @@ REFLECT_STRUCT(MatModel_ColorAttachmentInfo,
 export struct PipelineInfo
 {
     Name pass;
+    std::map<ShaderStage, MatModel_PassStage> stages;
+    std::vector<MatModel_PushConstant> push_constants;
 };
 REFLECT_STRUCT(PipelineInfo,
-    pass);
+    pass, stages, push_constants);
 
 export struct PipelineInfo_Graphics : public PipelineInfo
 {
     std::string requirements;
     std::vector<MatModel_AttributesLayout> vertex_layouts;
-    std::map<ShaderStage, MatModel_PassStage> stages;
     bool depth_test;
     bool depth_write;
-    std::vector<MatModel_PushConstant> push_constants;
     std::vector<MatModel_ColorAttachmentInfo> color_attachments;
     CullMode cull_mode;
     FrontFace front_face;
@@ -280,7 +280,7 @@ export struct PipelineInfo_Graphics : public PipelineInfo
     RBBufferTopology topology;
 };
 REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
-    requirements, stages, depth_test, push_constants, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+    requirements, depth_test, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
 export struct PipelineInfo_Compute : public PipelineInfo

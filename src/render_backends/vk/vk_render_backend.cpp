@@ -481,7 +481,7 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-
+    // SUBPASS -> EXTERNAL
     deps[1].srcSubpass = 0;
     deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
     deps[1].srcStageMask =
@@ -795,9 +795,9 @@ bool VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
 }
 
 
-PipelineObject* VkRenderBackend::create_pipeline(const GraphicsPipelineDesc& desc)
+PipelineObject* VkRenderBackend::create_graphics_pipeline(const GraphicsPipelineDesc& desc)
 {
-    return pipeline_manager.create_pipeline(desc);
+    return pipeline_manager.create_graphics_pipeline(desc);
 }
 
 vk::DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(RBDescriptorSetLayout descriptor_set_layout)

@@ -2,6 +2,7 @@ module vk:pipeline_manager;
 import :helpers;
 import <vector>;
 import :log;
+import :pipeline_graphics;
 import <vulkan/vulkan_core.h>;
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -11,9 +12,9 @@ import <vulkan/vulkan_core.h>;
 DEFINE_LOGGER(LogVkPipelineManager, Warning);
 
 
-PipelineObject* vk::PipelineManager::create_pipeline(const GraphicsPipelineDesc& desc)
+PipelineObject* vk::PipelineManager::create_graphics_pipeline(const GraphicsPipelineDesc& desc)
 {
-    std::unique_ptr<VkPipelineObject> pipeline = std::make_unique<VkPipelineObject>(instance, swapchain, buffer_manager, desc);
+    std::unique_ptr<VkPipelineObject_Graphics> pipeline = std::make_unique<VkPipelineObject_Graphics>(instance, swapchain, buffer_manager, desc);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;
@@ -260,7 +261,7 @@ void vk::PipelineManager::bind_pipeline(RBCommandList cmd_list, PipelineObject* 
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_vk);
     
-    current_pipeline_layout = ((VkPipelineObject*)pipeline_object)->get_layout();
+    current_pipeline_layout = pipeline_object->get_layout();
 }
 
 void vk::PipelineManager::invalidate_pipeline_layout()

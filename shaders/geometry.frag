@@ -188,7 +188,7 @@ void main()
 
     float lod = roughness * MAX_REFLECTION_LOD;
     lod += 1.0;
-    lod += clamp(dist * 0.01, 0.0, 2.0);  // distance bias  
+    lod += clamp(dist * 0.01, 0.0, 2.0);
 
     vec3 prefilteredColor =
     textureLod(u_prefilter_map, R, lod).rgb;

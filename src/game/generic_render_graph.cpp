@@ -398,7 +398,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     //
     //         draw_fullscreen_copy(ctx, hdr_color);
     //     },
-
+    //     .num_layers = 2,
     // });
     
     // add_pass({
@@ -766,7 +766,6 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
     auto instance =
         material_instance->get_or_create_resource_instance(
             ctx.frame);
-
 
     instance->update_image(
         "u_hdr_color",

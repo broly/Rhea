@@ -52,3 +52,8 @@ import <source_location>;
         __debugbreak(); \
         std::terminate(); \
     }
+
+#define pure \
+    { \
+        unreachable("Pure virtual function call"); \
+    }

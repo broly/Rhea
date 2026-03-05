@@ -30,6 +30,8 @@ public:
     PipelineObject* request_pipeline(ShaderKey key);
     
     RBPipelineLayout get_pipeline_layout() const;
+    
+    const PipelineInfo& get_base_pipeline_config() const;
 
 private:
 
