@@ -184,6 +184,8 @@ public:
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
+    
+    RGTextureHandle duplicate_texture(RGTextureHandle in_texture_handle, Name name);
 
     RGPassId add_pass(RenderGraphPass&& pass);
 

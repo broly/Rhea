@@ -102,6 +102,7 @@ public:
     RGTextureHandle swapchain_color;
     
     RGTextureHandle hdr_color;
+    RGTextureHandle hdr_color_temp;
     
     RGTextureHandle g_depth;
     RGTextureHandle g_normal;
@@ -120,6 +121,7 @@ public:
     RenderResource* light_resource = nullptr;
     RenderResource* shadow_resource = nullptr;
     RenderResource* reflection_resource = nullptr;
+    RenderResource* copy_resource = nullptr;
     RenderResource* ssr_resource = nullptr;
     RenderResource* hdr_color_resource = nullptr;
     

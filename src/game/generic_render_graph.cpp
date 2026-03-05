@@ -52,6 +52,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     gbuffer_resource = renderer->find_resource("gbuffer");
     ssr_resource = renderer->find_resource("ssr");
     hdr_color_resource = renderer->find_resource("hdr_color");
+    copy_resource = renderer->find_resource("copy");
     
     
     
@@ -78,6 +79,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .external = false,
         .dimension = capture_dimension
     });
+    
+    hdr_color_temp = duplicate_texture(hdr_color, NAME(hdr_color_temp));
     
     g_normal = create_texture({
         .name = NAME(g_normal),
@@ -345,33 +348,17 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
     });
     
-    add_pass({
-        .name = "HistoryStore",
-        .reads = {
-            { hdr_color, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.level != history_index)
-                return;
     
-            draw_fullscreen_copy(ctx, hdr_color);
-        },
-        .num_layers = 2,
-    });
     
     add_pass({
         .name = "SSRComposite",
         .reads = {
-            { history_hdr, RBImageUsage::SampledFragment },
+            { hdr_color, RBImageUsage::SampledFragment },
             { ssr_texture, RBImageUsage::SampledFragment },
             { g_roughness, RBImageUsage::SampledFragment }
         },
         .writes = {
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color_temp, RBImageUsage::ColorAttachment, RBLoadOp::Load }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
@@ -379,6 +366,40 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
     });
     
+    add_pass({
+        .name = "copy_hdr_color",
+        .reads = {
+            { hdr_color_temp, RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_fullscreen_copy(ctx, hdr_color_temp);
+        },
+        .num_layers = 1,
+    });
+    
+    // std::swap(hdr_color, hdr_color_ping_pong);
+    
+    // add_pass({
+    //     .name = "HistoryStore",
+    //     .reads = {
+    //         { hdr_color, RBImageUsage::SampledFragment }
+    //     },
+    //     .writes = {
+    //         { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+    //     },
+    //     .execute = [this](RenderGraphContext& ctx)
+    //     {
+    //         if (ctx.level != history_index)
+    //             return;
+    //
+    //         draw_fullscreen_copy(ctx, hdr_color);
+    //     },
+
+    // });
     
     // add_pass({
     //     .name = "Wireframe",
@@ -749,7 +770,7 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
 
     instance->update_image(
         "u_hdr_color",
-        get_image(history_hdr),
+        get_image(hdr_color),
         ctx.frame);
 
     
@@ -785,23 +806,15 @@ void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTexture
 {
     ctx.bind_pipeline(copy_pipeline);
     
-    auto material_instance =
-        renderer->query_material_instance(copy_material, ctx.pass_name);
-     
-    auto instance =
-        material_instance->get_or_create_resource_instance(
-            ctx.frame
-        );
-             
-    instance->update_image(
+    copy_resource->query_single()->update_image(
         "u_source",
         get_image(source),
         ctx.frame
     );
     
-    ctx.bind(instance);
+    ctx.bind(copy_resource);
              
-    ctx.backend.draw_fullscreen(ctx.cmd);
+    ctx.draw_fullscreen();
 }
 
 

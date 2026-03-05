@@ -156,6 +156,23 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     return handle;
 }
 
+RGTextureHandle RenderGraph::duplicate_texture(RGTextureHandle in_texture_handle, Name name)
+{
+    auto& current_tex = textures[in_texture_handle.id];
+
+    RGTextureDesc desc = current_tex.desc;
+    desc.name = name;
+    
+    RGTextureHandle handle;
+    handle.id = uint32_t(textures.size());
+    handle.name = desc.name;
+    
+    RGTexture tex {desc};
+
+    textures.push_back(std::move(tex));
+    return handle;
+}
+
 
 RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
 {
@@ -247,13 +264,15 @@ void RenderGraph::compile()
             
             for (auto& write : pass.writes)
             {
-                if (read.texture.id == write.texture.id)
-                {
-                    const bool is_read_attachment = read.usage == RBImageUsage::ColorAttachment || read.usage == RBImageUsage::DepthStencilAttachment;
-                    const bool is_write_sampled = write.usage == RBImageUsage::SampledFragment || write.usage == RBImageUsage::SampledVertex;
-                    checkf(!(is_read_attachment && is_write_sampled),
-                        "Texture %s could not be used as attachment and read from shader", read.texture.name.to_string().c_str());
-                }
+                checkf(read.texture.id != write.texture.id, "Simultaneous writing and reading is prohibited. Check the pass '%s' for texture '%s'",
+                    pass.name.to_string().c_str(), textures[read.texture.id].desc.name.to_string().c_str());
+                // if (read.texture.id == write.texture.id)
+                // {
+                //     const bool is_read_attachment = read.usage == RBImageUsage::ColorAttachment || read.usage == RBImageUsage::DepthStencilAttachment;
+                //     const bool is_write_sampled = write.usage == RBImageUsage::SampledFragment || write.usage == RBImageUsage::SampledVertex;
+                //     checkf(!(is_read_attachment && is_write_sampled),
+                //         "Texture %s could not be used as attachment and read from shader", read.texture.name.to_string().c_str());
+                // }
             }
         }
         
