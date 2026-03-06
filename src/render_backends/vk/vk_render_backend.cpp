@@ -805,6 +805,12 @@ PipelineObject* VkRenderBackend::create_compute_pipeline(const PipelineCreateDes
     return pipeline_manager.create_compute_pipeline(desc, pipeline_layout);
 }
 
+PipelineObject* VkRenderBackend::create_raytrace_pipeline(const PipelineCreateDesc_RayTrace& desc,
+    RBPipelineLayout pipeline_layout)
+{
+    return pipeline_manager.create_raytrace_pipeline(desc, pipeline_layout);
+}
+
 vk::DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(RBDescriptorSetLayout descriptor_set_layout)
 {
     return resource_manager.get_vk_descriptor_set_layout(descriptor_set_layout);

@@ -18,6 +18,13 @@ namespace vk_ext
     PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR = nullptr;
     PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR = nullptr;
     
+    PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
+    PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR = nullptr;
+    PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR vkGetRayTracingCaptureReplayShaderGroupHandlesKHR = nullptr;
+    PFN_vkCmdTraceRaysIndirectKHR vkCmdTraceRaysIndirectKHR = nullptr;
+    PFN_vkGetRayTracingShaderGroupStackSizeKHR vkGetRayTracingShaderGroupStackSizeKHR = nullptr;
+    PFN_vkCmdSetRayTracingPipelineStackSizeKHR vkCmdSetRayTracingPipelineStackSizeKHR = nullptr;
+    
     void load_functions(VkDevice device)
     {
         LOAD_VK_EXT_FUNCTION(device, vkCreateAccelerationStructureKHR);
@@ -25,5 +32,12 @@ namespace vk_ext
         LOAD_VK_EXT_FUNCTION(device, vkGetAccelerationStructureBuildSizesKHR);
         LOAD_VK_EXT_FUNCTION(device, vkCmdBuildAccelerationStructuresKHR);
         LOAD_VK_EXT_FUNCTION(device, vkGetAccelerationStructureDeviceAddressKHR);
+        
+        LOAD_VK_EXT_FUNCTION(device, vkCmdTraceRaysKHR);
+        LOAD_VK_EXT_FUNCTION(device, vkCreateRayTracingPipelinesKHR);
+        LOAD_VK_EXT_FUNCTION(device, vkGetRayTracingCaptureReplayShaderGroupHandlesKHR);
+        LOAD_VK_EXT_FUNCTION(device, vkCmdTraceRaysIndirectKHR);
+        LOAD_VK_EXT_FUNCTION(device, vkGetRayTracingShaderGroupStackSizeKHR);
+        LOAD_VK_EXT_FUNCTION(device, vkCmdSetRayTracingPipelineStackSizeKHR);
     }
 }

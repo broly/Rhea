@@ -46,6 +46,21 @@ import type_id;
         }\
     }
 
+
+#define REFLECT_STRUCT_DERIVED_NOFIELDS(T, Parent) \
+    export template<> \
+    struct reflect::ReflectionInfo<T> \
+    { \
+        using Type = T; \
+        using Fields = typename reflect::ReflectionInfo<Parent>::Fields;\
+        static constexpr std::string_view name = #T; \
+        static constexpr detail::reflection_tag reflected {}; \
+        static constexpr void iter(auto Func) \
+        {\
+            Fields::iter(Func); \
+        }\
+    }
+
 #define REFLECT_STRUCT_RUNTIME(T, ...) \
     export template<> \
     struct reflect::ReflectionInfo<T> \

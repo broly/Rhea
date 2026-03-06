@@ -4,6 +4,7 @@ import <vector>;
 import :log;
 import :pipeline_graphics;
 import :pipeline_compute;
+import :pipeline_raytrace;
 import <vulkan/vulkan_core.h>;
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -24,6 +25,15 @@ PipelineObject* vk::PipelineManager::create_graphics_pipeline(const PipelineCrea
 PipelineObject* vk::PipelineManager::create_compute_pipeline(const PipelineCreateDesc_Compute& desc, RBPipelineLayout pipeline_layout)
 {
     std::unique_ptr<VkPipelineObject_Compute> pipeline = std::make_unique<VkPipelineObject_Compute>(instance, swapchain, buffer_manager, pipeline_layout, desc);
+    PipelineObject* result = pipeline.get();
+    pending_pipelines.push_back(std::move(pipeline));
+    return result;
+}
+
+PipelineObject* vk::PipelineManager::create_raytrace_pipeline(const PipelineCreateDesc_RayTrace& desc,
+    RBPipelineLayout pipeline_layout)
+{
+    std::unique_ptr<VkPipelineObject_RayTrace> pipeline = std::make_unique<VkPipelineObject_RayTrace>(instance, swapchain, buffer_manager, pipeline_layout, desc);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;

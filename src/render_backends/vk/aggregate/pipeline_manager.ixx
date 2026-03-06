@@ -45,6 +45,7 @@ namespace vk
         
         PipelineObject* create_graphics_pipeline(const PipelineCreateDesc_Graphics& desc, RBPipelineLayout pipeline_layout);
         PipelineObject* create_compute_pipeline(const PipelineCreateDesc_Compute& desc, RBPipelineLayout pipeline_layout);
+        PipelineObject* create_raytrace_pipeline(const PipelineCreateDesc_RayTrace& desc, RBPipelineLayout pipeline_layout);
         
         RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc);
         

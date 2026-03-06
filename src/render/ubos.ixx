@@ -35,3 +35,14 @@ export struct ModelPushConstants
 };
 REFLECT_STRUCT_RUNTIME(ModelPushConstants,
     model, prev_model);
+
+
+
+
+export struct RTXGIPushConstants
+{
+    uint32_t frame;
+    float intensity;
+};
+REFLECT_STRUCT_RUNTIME(RTXGIPushConstants,
+    frame, intensity);

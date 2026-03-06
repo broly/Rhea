@@ -131,7 +131,6 @@ export
     {
         Name pass_name;
         uint64_t permutation_value;
-        std::vector<GraphicsPipelineStage> stages;
         PipelineLayoutDesc layout;
     };
 
@@ -147,14 +146,39 @@ export
         RBBufferTopology topology;
         std::vector<MatModel_ColorAttachmentInfo> color_attachments;
         VertexLayout vertex_layout;
+        std::vector<GraphicsPipelineStage> stages;
     };
     
     
     struct PipelineCreateDesc_Compute : public PipelineCreateDesc_Base
     {
-        // Compute shader has no any specific parameters
+        std::vector<GraphicsPipelineStage> stages;
+    };
+    
+    
+    struct RayTracingShaderStage
+    {
+        ShaderStage stage;
+        std::string compiled_shader;
     };
 
+    struct RayTracingShaderGroupDesc
+    {
+        RayTracingGroupType type;
+
+        int general_shader = -1;
+        int closest_hit_shader = -1;
+        int any_hit_shader = -1;
+        int intersection_shader = -1;
+    };
+
+    struct PipelineCreateDesc_RayTrace : public PipelineCreateDesc_Base
+    {
+        uint32_t max_recursion_depth = 1;
+
+        std::vector<RayTracingShaderStage> stages;
+        std::vector<RayTracingShaderGroupDesc> groups;
+    };
 
     struct FrameResources
     {

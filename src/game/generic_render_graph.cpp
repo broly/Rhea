@@ -165,6 +165,12 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     ssr_material->model = "ssr";
     
     
+    auto rtxgi_model = renderer->find_model("rtxgi");
+    
+    rtx_gi_pipeline_family = renderer->query_pipeline_family("RTXGI", rtxgi_model);
+    rtx_gi_pipeline = rtx_gi_pipeline_family->request_pipeline({});
+    
+    
     shadow_map = create_texture({
         .name = NAME(shadow_map),
         .extent = Constants::shadowmap_extent,

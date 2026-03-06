@@ -321,21 +321,52 @@ REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
     requirements, depth_test, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
+export enum class RayTracingGroupType
+{
+    general,
+    triangles_hit,
+    procedural_hit
+};
+REFLECT_ENUM(RayTracingGroupType,
+    general, triangles_hit, procedural_hit);
+
+
+export struct RayTracingShaderGroup
+{
+    RayTracingGroupType type;
+
+    std::optional<ShaderStage> general;
+    std::optional<ShaderStage> closest_hit;
+    std::optional<ShaderStage> any_hit;
+    std::optional<ShaderStage> intersection;
+};
+REFLECT_STRUCT(RayTracingShaderGroup,
+    type,
+    general,
+    closest_hit,
+    any_hit,
+    intersection);
+
+
+export struct PipelineInfo_RayTracing : public PipelineInfo
+{
+    uint32_t max_recursion_depth = 2;
+
+    std::vector<RayTracingShaderGroup> shader_groups;
+};
+REFLECT_STRUCT_DERIVED(PipelineInfo_RayTracing, PipelineInfo,
+    max_recursion_depth,
+    shader_groups
+);
+
+
 export struct PipelineInfo_Compute : public PipelineInfo
 {
-    bool dummy;
 };
-REFLECT_STRUCT_DERIVED(PipelineInfo_Compute, PipelineInfo,
-    dummy);
+REFLECT_STRUCT_DERIVED_NOFIELDS(PipelineInfo_Compute, PipelineInfo);
 
-export struct PipelineInfo_Raytrace : public PipelineInfo
-{
-    bool dummy;
-};
-REFLECT_STRUCT_DERIVED(PipelineInfo_Raytrace, PipelineInfo,
-    dummy);
 
-using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics>;
+using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics, PipelineInfo_Compute, PipelineInfo_RayTracing>;
 
 export class MaterialModel : public RhObject
 {

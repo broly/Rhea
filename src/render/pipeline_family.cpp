@@ -189,17 +189,38 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     PROFILE("PipelineFamily::request_pipeline");
     if (auto it = pipelines.find(key.key); it != pipelines.end())
         return it->second;
+    
+    PipelineObject* result = nullptr;
+    
+    DefinitionMap defines;
+    decode_key_to_defines(key, defines);
+    
+    auto update_generic_desc_and_defines = [&] (const PipelineInfo& config, PipelineCreateDesc_Base& desc)
+    {
+        desc.pass_name = config.pass;
+        desc.permutation_value = key.key;
+        desc.layout = layout_desc;
+    
+        for (auto& resource : layout_desc.resources)
+        {
+            const Name resource_set_name = resource.resource->desc.set;
+            const uint16_t resource_set = resource.resource->desc.set_index;
+            defines.insert({resource_set_name, resource_set});
+        
+            for (auto& variable_binding : resource.resource_variable_bindings)
+            {
+                const Name binding_name = *variable_binding.parameter.binding;
+                const uint16_t binding = *variable_binding.binding_index;
+                defines.insert({binding_name, binding});
+            }
+        }
+    };
 
     if (std::holds_alternative<PipelineInfo_Graphics>(*pipeline_config))
     {
         auto& config = std::get<PipelineInfo_Graphics>(*pipeline_config);
-        DefinitionMap defines;
-        decode_key_to_defines(key, defines);
-        
 
         PipelineCreateDesc_Graphics desc;
-        desc.pass_name = config.pass;
-        desc.permutation_value = key.key;
         desc.depth_test = config.depth_test;
         desc.depth_write = config.depth_write;
         desc.color_attachments = config.color_attachments;
@@ -210,8 +231,6 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         desc.depth_bias = config.depth_bias ? *config.depth_bias : DepthBiasInfo{};
         desc.topology = config.topology;
         desc.layout = layout_desc;
-        
-        
         
         for (uint32_t index = 0; auto& vertex_layout : config.vertex_layouts)
         {
@@ -249,20 +268,9 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
                 location++;
             }
         }
-    
-        for (auto& resource : layout_desc.resources)
-        {
-            const Name resource_set_name = resource.resource->desc.set;
-            const uint16_t resource_set = resource.resource->desc.set_index;
-            defines.insert({resource_set_name, resource_set});
         
-            for (auto& variable_binding : resource.resource_variable_bindings)
-            {
-                const Name binding_name = *variable_binding.parameter.binding;
-                const uint16_t binding = *variable_binding.binding_index;
-                defines.insert({binding_name, binding});
-            }
-        }
+        update_generic_desc_and_defines(config, desc);
+        
     
         for (const auto& [shader_stage, stage_info] : config.stages)
         {
@@ -272,14 +280,81 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
             desc.stages.push_back(stage);
         }
     
+        result = backend->create_graphics_pipeline(desc, pipeline_layout);
 
-    
-        auto pipeline = backend->create_graphics_pipeline(desc, pipeline_layout);
-        pipelines[key.key] = pipeline;
+    } else if (std::holds_alternative<PipelineInfo_Compute>(*pipeline_config))
+    {
+        auto& config = std::get<PipelineInfo_Compute>(*pipeline_config);
+        
+        PipelineCreateDesc_Compute desc;
+        
+        update_generic_desc_and_defines(config, desc);
+            
+        for (const auto& [shader_stage, stage_info] : config.stages)
+        {
+            GraphicsPipelineStage stage;
+            stage.stage = shader_stage;
+            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines).string();
+            desc.stages.push_back(stage);
+        }
+        
+        result = backend->create_compute_pipeline(desc, pipeline_layout);
+    } else if (std::holds_alternative<PipelineInfo_RayTracing>(*pipeline_config))
+    {
+        auto& config = std::get<PipelineInfo_RayTracing>(*pipeline_config);
 
-        return pipeline;
+        PipelineCreateDesc_RayTrace desc;
+
+        desc.max_recursion_depth = config.max_recursion_depth;
+
+        std::vector<RayTracingShaderStage> rt_stages;
+        std::map<ShaderStage, uint32_t> stage_indices;
+
+        for (const auto& [shader_stage, stage_info] : config.stages)
+        {
+            if (!is_rtx_stage(shader_stage))
+                continue;
+
+            RayTracingShaderStage stage;
+            stage.stage = shader_stage;
+            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines).string();
+            
+            uint32_t index = (uint32_t)rt_stages.size();
+            stage_indices[shader_stage] = index;
+            rt_stages.push_back(stage);
+        }
+
+        desc.stages = std::move(rt_stages);
+
+        for (auto& group : config.shader_groups)
+        {
+            RayTracingShaderGroupDesc g{};
+            g.type = group.type;
+
+            if (group.general)
+                g.general_shader = stage_indices[*group.general];
+
+            if (group.closest_hit)
+                g.closest_hit_shader = stage_indices[*group.closest_hit];
+
+            if (group.any_hit)
+                g.any_hit_shader = stage_indices[*group.any_hit];
+
+            if (group.intersection)
+                g.intersection_shader = stage_indices[*group.intersection];
+
+            desc.groups.push_back(g);
+        }
+
+        update_generic_desc_and_defines(config, desc);
+
+        result = backend->create_raytrace_pipeline(desc, pipeline_layout);
+        
     }
-    return nullptr;
+    pipelines[key.key] = result;
+    
+    checkf(result != nullptr, "Could not create pipeline");
+    return result;
 }
 
 RBPipelineLayout PipelineFamily::get_pipeline_layout() const
@@ -403,7 +478,8 @@ std::filesystem::path PipelineFamily::request_permutation(
         }
     }
     cmd += std::string("-I ") + shaders_dir.string() + " ";
-    cmd += "-o " + compiled_shader_permutation_file.string();
+    cmd += "-o " + compiled_shader_permutation_file.string() + " ";
+    cmd += "--target-env=vulkan1.3";
     
     LogPipelineFamily.Log("Compiling shader: %s", cmd.c_str());
     

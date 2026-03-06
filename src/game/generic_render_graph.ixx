@@ -151,6 +151,7 @@ public:
     PipelineObject* wireframe_pipeline;
     PipelineObject* ssr_pipeline;
     PipelineObject* ssr_composite_pipeline;
+    PipelineObject* rtx_gi_pipeline;
 
     
     std::shared_ptr<PipelineFamily> copy_pipeline_family;
@@ -159,6 +160,7 @@ public:
     std::shared_ptr<PipelineFamily> wireframe_pipeline_family;
     std::shared_ptr<PipelineFamily> ssr_pipeline_family;
     std::shared_ptr<PipelineFamily> ssr_composite_pipeline_family;
+    std::shared_ptr<PipelineFamily> rtx_gi_pipeline_family;
     
     bool use_swapchain_extent;
     

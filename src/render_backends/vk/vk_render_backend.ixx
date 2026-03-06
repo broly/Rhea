@@ -93,6 +93,7 @@ public:   /// API Section
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
     virtual PipelineObject* create_graphics_pipeline(const PipelineCreateDesc_Graphics& desc, RBPipelineLayout pipeline_layout) override;
     virtual PipelineObject* create_compute_pipeline(const PipelineCreateDesc_Compute& desc, RBPipelineLayout pipeline_layout) override;
+    virtual PipelineObject* create_raytrace_pipeline(const PipelineCreateDesc_RayTrace& desc, RBPipelineLayout pipeline_layout) override;
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type) override;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) override;
     void destroy_render_pass_cache() override;
