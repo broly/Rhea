@@ -1,0 +1,76 @@
+{
+	"model_name": "ssr",
+	
+	"enums": {},
+	"uniform_buffers": {},
+	
+	"material_resource": "hdr_color",
+		
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "SSR",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "ssr.frag",
+					"resources": ["camera", "hdr_color", "gbuffer"]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "greater",
+			"resources": ["hdr_color", "gbuffer"],
+			"push_constants": [],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false,
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "SSRComposite",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "ssr_composite.frag",
+					"resources": ["hdr_color", "gbuffer", "ssr"]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "greater",
+			"push_constants": [],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false,
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		}
+	]
+}

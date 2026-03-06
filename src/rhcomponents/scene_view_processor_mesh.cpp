@@ -22,6 +22,8 @@ RenderId SceneViewProcessor_Mesh::register_proxy()
     meshes.push_back({});
     const RenderId render_id(identifier, 0);
     
+    dirty = true;
+    
     return render_id;
 }
 
@@ -37,9 +39,11 @@ void SceneViewProcessor_Mesh::process()
 {
     auto& renderer = *RhGlobals::engine->renderer;
 
-    for (const auto& submitted :
-         read_submission_buffer<SceneViewProxy_Mesh>())
+    for (const auto& submitted : read_submission_buffer<SceneViewProxy_Mesh>())
     {
+        
+        dirty = true;
+        
         auto& ro = meshes[submitted.render_id.identifier];
 
         bool is_new = ro.primitives.empty();
@@ -107,13 +111,6 @@ void SceneViewProcessor_Mesh::process()
                         auto geom_pipeline_family =
                             renderer.query_pipeline_family(pass_name, model);
 
-                        // auto pipeline =
-                        //     geom_pipeline_family->request_pipeline(
-                        //         geom_pipeline_family->make_shader_key(
-                        //             instance->material,
-                        //             pass_name));
-                    
-                        // rp.pipeline_by_pass[pass_name] = pipeline;
                         rp.passes.emplace(pass_name);
                         auto& info = rp.info_by_pass[pass_name];
                         info.pipeline_family = geom_pipeline_family;

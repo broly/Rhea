@@ -34,35 +34,6 @@ void VkRenderBackend::destroy_render_pass_cache()
 }
 
 
-
-DescriptorType TEMP_CONVERT_DESCRIPTOR_TYPE_CRUTCH(VkDescriptorType descriptor_type)
-{
-    switch (descriptor_type)
-    {
-    case VK_DESCRIPTOR_TYPE_SAMPLER:
-        return DescriptorType::Sampler;
-    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-        return DescriptorType::CombinedImageSampler;
-    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-        return DescriptorType::SampledImage;
-    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-        return DescriptorType::UniformBuffer;
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-        return DescriptorType::StorageBuffer;
-    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-    case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-    case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-    case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-    default: 
-        break;
-    }
-    assert(false);
-    __assume(false);
-}
-
-
 RBPipelineLayout VkRenderBackend::create_pipeline_layout(const PipelineLayoutDesc& desc)
 {    
     return pipeline_manager.create_pipeline_layout(desc);
@@ -557,6 +528,11 @@ RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
     return resources.back().get();
 }
 
+void VkRenderBackend::build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms)
+{
+    tlas_manager.build_tlas(cmd, meshes, transforms);
+}
+
 
 void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame)
 {
@@ -687,6 +663,8 @@ RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
     LogVkCommands.Log<VeryVerbose>(" ==================== Begin commands %lu ===================", frame_handle);
     
     auto& frame = swapchain.frames[frame_handle];
+    
+    immediate_command_pool.on_begin_main_commands(frame.cmd);
 
     VK_CHECK(vkResetCommandBuffer(frame.cmd, 0));
 
@@ -694,6 +672,8 @@ RBCommandList VkRenderBackend::begin_commands(RBFrameHandle frame_handle)
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
     };
     VK_CHECK(vkBeginCommandBuffer(frame.cmd, &begin));
+    
+    
 
     return RBCommandList{frame.cmd};
 }
@@ -703,6 +683,7 @@ void VkRenderBackend::end_commands(RBCommandList cmd_list)
     LogVkCommands.Log<VeryVerbose>("========================= End commands =====================");
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     VK_CHECK(vkEndCommandBuffer(cmd));
+    immediate_command_pool.on_end_main_commands(cmd_list);
 }
 
 RBFramebufferId VkRenderBackend::get_or_create_framebuffer(const FramebufferDesc& desc)

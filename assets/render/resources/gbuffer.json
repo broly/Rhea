@@ -1,0 +1,28 @@
+{
+	"resource": {
+		"name": "gbuffer",
+		"usage": "frame",
+		"set": "SET_GBUFFER",
+		"allowed_stages": ["fragment"],
+		"parameters": {
+			"depth": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_depth",
+				"binding": "BINDING_SAMPLER_DEPTH"
+			},
+			"normal": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_normal",
+				"binding": "BINDING_SAMPLER_NORMAL"
+			},
+			"roughness": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_roughness",
+				"binding": "BINDING_SAMPLER_ROUGHNESS"
+			}
+		}
+	}
+}

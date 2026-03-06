@@ -1,0 +1,22 @@
+{
+	"resource": {
+		"name": "hdr_color_storage",
+		"usage": "frame",
+		"set": "SET_HDR_COLOR_STORAGE",
+		"allowed_stages": ["rtx_raygen"],
+		"parameters": {
+			"hdr_color": {
+				"type": "image",
+				"sampler": "default",
+				"variable": "u_hdr_color",
+				"binding": "BINDING_SAMPLER_HDR_COLOR_STORAGE"
+			},
+			"history": {
+				"type": "image",
+				"sampler": "default",
+				"variable": "u_history",
+				"binding": "BINDING_SAMPLER_HISTORY_STORAGE"
+			}
+		}
+	}
+}

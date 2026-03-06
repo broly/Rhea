@@ -95,5 +95,14 @@ public:
     std::vector<RenderPrimitive> primitives;
     
     std::vector<RenderPrimitiveId> free_primitive_ids;
+    
+    bool dirty = false;
+    
+    bool is_dirty() const { return dirty; }
+    
+    void set_dirty(bool in_dirty)
+    {
+        dirty = in_dirty;
+    }
 };
 REFLECT_OBJECT(SceneViewProcessor_Mesh, SceneViewProcessor);

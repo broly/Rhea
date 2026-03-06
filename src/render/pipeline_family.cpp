@@ -132,7 +132,7 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> materi
     
     for (const auto& [param_name, param_info] : resource_info->resource.parameters)
     {
-        if (param_info.type == MaterialParamType::sampler)
+        if (param_info.type == MaterialParamType::sampler || param_info.type == MaterialParamType::image || param_info.type == MaterialParamType::tlas)
         {
             const bool provided = material->parameters.contains(param_name);
             ctx[param_name.to_string()] = provided;
@@ -310,6 +310,8 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         std::vector<RayTracingShaderStage> rt_stages;
         std::map<ShaderStage, uint32_t> stage_indices;
 
+        update_generic_desc_and_defines(config, desc);
+        
         for (const auto& [shader_stage, stage_info] : config.stages)
         {
             if (!is_rtx_stage(shader_stage))
@@ -346,7 +348,6 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
             desc.groups.push_back(g);
         }
 
-        update_generic_desc_and_defines(config, desc);
 
         result = backend->create_raytrace_pipeline(desc, pipeline_layout);
         

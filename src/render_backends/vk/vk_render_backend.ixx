@@ -22,6 +22,7 @@ import :render_resource;
 import :debug;
 import :vertex_buffer_mgr;
 import :pipeline_manager;
+import :tlas_mgr;
 
 
 struct RenderPassAttachmentInfo
@@ -136,6 +137,7 @@ public:   /// API Section
     virtual RBImageHandle create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info) override;
     virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
+    void build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) override;
     
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) override;
     virtual uint32_t get_num_images_in_flight() const override;
@@ -165,10 +167,11 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::SamplerManager sampler_manager {instance};
     vk::SwapchainControl swapchain {instance, image_manager, sampler_manager, debug};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
-    vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain}; // holds refs
+    vk::BufferManager resource_manager {instance.device, instance.physical_device, swapchain, immediate_command_pool}; // holds refs
     vk::MeshManager mesh_manager{instance, immediate_command_pool, resource_manager};
     vk::VertexBufferManager vertex_buffer_manager{instance.device, instance.physical_device};
     vk::PipelineManager pipeline_manager{instance, swapchain, image_manager, resource_manager};
+    vk::TLASManager tlas_manager{instance, immediate_command_pool, resource_manager, mesh_manager};
     
     std::vector<std::unique_ptr<VkRenderResource>> resources;
     

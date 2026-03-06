@@ -6,21 +6,8 @@ import :buffer_mgr;
 import assets;
 import <unordered_map>;
 import <vulkan/vulkan_core.h>;
-
-export struct MeshGPUData {
-    VkBuffer vertex_buffer = VK_NULL_HANDLE;
-    VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
-    VkBuffer index_buffer = VK_NULL_HANDLE;
-    VkDeviceMemory index_memory = VK_NULL_HANDLE;
-    uint32_t index_count = 0;
-    RBDescriptorSet descriptor_set;
-    
-    // BLAS
-    VkAccelerationStructureKHR blas;
-    VkDeviceMemory blas_memory;
-    VkBuffer blas_buffer;
-    VkDeviceAddress blas_address;
-};
+import :mesh_gpu_data;
+#include "common/assertion_macros.h"
 
 
 namespace vk
@@ -47,13 +34,12 @@ namespace vk
         
         void bind(const RBCommandList& cmd, MeshPrimHandle mesh);
         
-        void create_device_local_buffer_with_data(
-            const void* src_data,
-            VkDeviceSize size,
-            VkBufferUsageFlags usage,
-            VkBuffer& out_buffer,
-            VkDeviceMemory& out_memory);
-
+        const MeshGPUData& get_mesh_gpu_data(MeshPrimHandle handle)
+        {
+            auto data_it = mesh_map.find(handle);
+            checkf(data_it != mesh_map.end(), "Could not find gpu mesh data");
+            return data_it->second;
+        }
 
         std::unordered_map<MeshPrimHandle, MeshGPUData> mesh_map;
     };

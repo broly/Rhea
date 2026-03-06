@@ -47,7 +47,8 @@ void VkRenderResourceInstance::update_image(Name buffer_name,
     auto [binding_index, binding] =
         pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
 
-    checkf(binding.parameter.type == MaterialParamType::sampler, "Type mismatch");
+    checkf(binding.parameter.type == MaterialParamType::sampler || binding.parameter.type == MaterialParamType::image, 
+        "Type mismatch");
 
     uint32_t frame_index = usage.frame_index(frame);
 

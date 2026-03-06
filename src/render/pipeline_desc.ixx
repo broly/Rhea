@@ -18,28 +18,6 @@ export class RenderResource;
 
 export
 {
-    
-    enum class DescriptorType
-    {
-        UniformBuffer,
-        StorageBuffer,
-        Sampler,
-        SampledImage,
-        CombinedImageSampler,
-    };
-
-
-    struct DescriptorBinding
-    {
-        uint32_t binding_index; // index of binding in shader
-        DescriptorType type; // UniformBuffer, Sampler, Texture
-        ShaderStage stages; // VS | FS
-        uint32_t count = 1; // arrays...
-        uint32_t size = 0;
-        Name name;
-        RBSampler sampler;
-    };
-
     struct PushConstantRange
     {
         ShaderStage stages;

@@ -14,27 +14,6 @@ export
         none,
         build_blas,
     };
-    
-    enum class RGResourceType {
-        SwapchainColor,
-
-        Depth,
-
-        GBuffer_Albedo,
-        GBuffer_Normal,
-        GBuffer_MetallicRoughness,
-        GBuffer_Emissive,
-
-        ShadowMap,
-        SSAO,
-        Lighting,
-    };
-
-    enum class RGResourceKind
-    {
-        Texture,
-        Buffer,
-    };
 
     struct RGTextureDesc
     {
@@ -59,25 +38,6 @@ export
         uint8_t num_frames = 1;
     };
 
-
-    struct RGBufferDesc
-    {
-        size_t size = 0;
-    };
-
-    struct RGResource
-    {
-        RGResourceKind kind;
-        RGTextureDesc texture_desc{};
-        RGBufferDesc  buffer_desc{};
-    };
-    
-    struct RGResourceHandle
-    {
-        std::uint32_t id = UINT32_MAX;
-
-        bool valid() const { return id != UINT32_MAX; }
-    };
 
     struct RGPassId
     {

@@ -62,6 +62,7 @@ public:
     void init_resources(const std::map<Name, bool>& parameters) override;
     void build_passes(const std::map<Name, bool>& parameters) override;
     void prepare_resources(RenderGraphContext& ctx) override;
+    void prepare_raytracing(RenderGraphContext& ctx);
     void end_frame() override;
     
     void rebuild_camera_ubo(RenderGraphContext& ctx);

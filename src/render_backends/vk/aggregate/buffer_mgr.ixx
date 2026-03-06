@@ -24,10 +24,12 @@ namespace vk
     class BufferManager
     {
     public:
-        BufferManager(const VkDevice& in_device, const VkPhysicalDevice& in_physical_device, const vk::SwapchainControl& in_swapchain)
+        BufferManager(const VkDevice& in_device, const VkPhysicalDevice& in_physical_device, 
+            const vk::SwapchainControl& in_swapchain, vk::ImmediateCommandPool& in_command_pool)
             : device(in_device)
             , physical_device(in_physical_device)
             , swapchain(in_swapchain)
+            , command_pool(in_command_pool)
         {}
     
         uint32_t persistent_ubo_counter = 0;
@@ -60,11 +62,21 @@ namespace vk
         
         void update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame);
 
+        
+        void create_device_local_buffer_with_data(
+            const void* src_data,
+            VkDeviceSize size,
+            VkBufferUsageFlags usage,
+            VkBuffer& out_buffer,
+            VkDeviceMemory& out_memory,
+            std::optional<RBCommandList> cmd_opt = std::nullopt) const;
+        
     private:
         const VkDevice& device;
         const VkPhysicalDevice& physical_device;
         
         const vk::SwapchainControl& swapchain;
+        vk::ImmediateCommandPool& command_pool;
     };
     
 }

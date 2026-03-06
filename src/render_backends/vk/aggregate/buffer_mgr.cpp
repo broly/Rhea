@@ -294,3 +294,58 @@ void vk::BufferManager::update_uniform_buffer(RBBufferHandle buffer_handle, size
 
     vkFlushMappedMemoryRanges(device, 1, &range);
 }
+
+
+void vk::BufferManager::create_device_local_buffer_with_data(
+    const void* src_data,
+    VkDeviceSize size,
+    VkBufferUsageFlags usage,
+    VkBuffer& out_buffer,
+    VkDeviceMemory& out_memory,
+    std::optional<RBCommandList> cmd_opt) const
+{
+    VkDevice device = this->device;
+    VkPhysicalDevice phys = this->physical_device;
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+
+    vk::create_buffer(
+        device,
+        phys,
+        size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buffer,
+        staging_memory
+    );
+
+    void* mapped;
+    vkMapMemory(device, staging_memory, 0, size, 0, &mapped);
+    memcpy(mapped, src_data, (size_t)size);
+    vkUnmapMemory(device, staging_memory);
+
+    vk::create_buffer(
+        device,
+        phys,
+        size,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        out_buffer,
+        out_memory
+    );
+    
+    command_pool.submit([=] (VkCommandBuffer cmd)
+    {
+        VkBufferCopy copy{};
+        copy.size = size;
+        vkCmdCopyBuffer(cmd, staging_buffer, out_buffer, 1, &copy);
+    }, [=]
+    {
+        vkDestroyBuffer(device, staging_buffer, nullptr);
+        vkFreeMemory(device, staging_memory, nullptr);
+    }, cmd_opt);
+    
+    
+}

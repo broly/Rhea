@@ -440,6 +440,34 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     prepare_clouds_pass(ctx);
     prepare_wireframe_pass(ctx);
     prepare_ssr(ctx);
+    // prepare_raytracing(ctx);
+}
+
+void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
+{
+    auto& mesh_processor =
+       engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
+    
+    if (mesh_processor.is_dirty())
+    {
+        std::vector<MeshPrimHandle> meshes;
+        std::vector<Transform> transforms;
+
+        meshes.reserve(mesh_processor.primitives.size());
+        transforms.reserve(mesh_processor.primitives.size());
+
+        for (auto& prim : mesh_processor.primitives)
+        {
+            meshes.push_back(prim.mesh);
+            transforms.emplace_back(*prim.world);
+        }
+
+        backend->build_tlas(
+            ctx.cmd,
+            meshes,
+            transforms);
+        mesh_processor.set_dirty(false);
+    }
 }
 
 void GenericRenderGraph::end_frame()
@@ -857,7 +885,7 @@ glm::mat4 GenericRenderGraph::build_dir_light_vp() const
     glm::vec3 corners[8];
     aabb.get_corners(corners);
 
-    glm::vec3 minLS( FLT_MAX);
+    glm::vec3 minLS(FLT_MAX);
     glm::vec3 maxLS(-FLT_MAX);
 
     for (int i = 0; i < 8; ++i)

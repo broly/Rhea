@@ -278,6 +278,12 @@ export namespace vk
         {
         case MaterialParamType::uniform:
             return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            
+        case MaterialParamType::image:
+            return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        
+        case MaterialParamType::tlas:
+            return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;    
 
         // case MaterialParamType::storage_buffer:
         //     return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -290,32 +296,6 @@ export namespace vk
 
         // case DescriptorType::CombinedImageSampler:
         //     return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-        default:
-            assert(false);
-            return VK_DESCRIPTOR_TYPE_MAX_ENUM;
-        }
-    }
-
-    [[deprecated]]
-    inline VkDescriptorType to_vk_descriptor_type(DescriptorType type)
-    {
-        switch (type)
-        {
-        case DescriptorType::UniformBuffer:
-            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-        case DescriptorType::StorageBuffer:
-            return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-
-        case DescriptorType::Sampler:
-            return VK_DESCRIPTOR_TYPE_SAMPLER;
-
-        case DescriptorType::SampledImage:
-            return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-
-        case DescriptorType::CombinedImageSampler:
-            return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
         default:
             assert(false);

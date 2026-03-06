@@ -22,6 +22,13 @@ void MatModel_Parameter::validate()
         checkf(binding.has_value(), "sampler parameters must have binding");
         checkf(variable.has_value(), "sampler parameters must have variable");
         checkf(!definition.has_value(), "definition for sampler should be null");
+        checkf(sampler.has_value(), "sampler parameters must have sampler");
+        //checkf(definition.has_value(), "sampler parameters must have definition");
+    } else if (type == MaterialParamType::image)
+    {
+        checkf(binding.has_value(), "image parameters must have binding");
+        checkf(variable.has_value(), "image parameters must have variable");
+        checkf(!definition.has_value(), "definition for sampler should be null");
         //checkf(definition.has_value(), "sampler parameters must have definition");
     } else if (type == MaterialParamType::definition)
     {

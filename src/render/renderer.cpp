@@ -129,6 +129,8 @@ void Renderer::load_schemas()
         if (entry.is_regular_file()) {
             if (entry.path().extension() == ".json")
             {
+                if (entry.path().string()[0] == '!')
+                    continue;
                 files.emplace_back(entry.path().string());
             }
         }
@@ -153,6 +155,8 @@ void Renderer::load_resources()
         if (entry.is_regular_file()) {
             if (entry.path().extension() == ".json")
             {
+                if (entry.path().string()[0] == '!')
+                    continue;
                 files.emplace_back(entry.path().string());
             }
         }
@@ -203,6 +207,16 @@ void Renderer::load_resources()
                 checkf(found_sampler != samplers.end(), "Could not find sampler named %s", 
                     variable.sampler->to_string().c_str());
                 var_desc.sampler = found_sampler->second;
+                var_desc.size = -1;
+                var_desc.binding = current_binding;
+            }
+            else if (variable.type == MaterialParamType::image)
+            {
+                var_desc.size = -1;
+                var_desc.binding = current_binding;
+            }
+            else if (variable.type == MaterialParamType::tlas)
+            {
                 var_desc.size = -1;
                 var_desc.binding = current_binding;
             }
@@ -333,6 +347,16 @@ RenderResource* Renderer::query_material_resource(std::shared_ptr<MaterialModel>
             desc.variables.push_back(RenderResourceVariableDesc{
                 .parameter = param,
                 .sampler = samplers[*param.sampler],
+            });
+        } else if (param.type == MaterialParamType::image)
+        {
+            desc.variables.push_back(RenderResourceVariableDesc{
+                .parameter = param,
+            });
+        } else if (param.type == MaterialParamType::tlas)
+        {
+            desc.variables.push_back(RenderResourceVariableDesc{
+                .parameter = param,
             });
         }
     }

@@ -1,5 +1,6 @@
 ﻿module vk:immediate_commands;
 
+#include "common/assertion_macros.h"
 #include "render_backends/vk/vk_macro.h"
 
 void vk::ImmediateCommandPool::init()
@@ -39,7 +40,7 @@ void vk::ImmediateCommandPool::init()
     ));
 }
 
-void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& fn)
+void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& commands)
 {
     vkResetFences(instance.device, 1, &fence);
     vkResetCommandBuffer(cmd, 0);
@@ -48,7 +49,7 @@ void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& fn)
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &begin);
 
-    fn(cmd);
+    commands(cmd);
 
     vkEndCommandBuffer(cmd);
 
@@ -60,8 +61,68 @@ void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& fn)
     VK_CHECK(vkWaitForFences(instance.device, 1, &fence, VK_TRUE, UINT64_MAX));
 }
 
+void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& commands, std::optional<RBCommandList> cmd)
+{
+    if (cmd.has_value())
+    {
+        commands(cmd.value());
+    }
+    else
+    {
+        submit(std::move(commands));
+    }
+}
+
+void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& commands, std::function<void()> finally)
+{
+    submit(std::move(commands));
+    finally();
+}
+
+void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& commands, std::function<void()> finally,
+    std::optional<RBCommandList> cmd)
+{
+    if (cmd.has_value())
+    {
+        commands(cmd.value());
+        add_release_callback(cmd.value(), std::move(finally));
+    }
+    else
+    {
+        submit(std::move(commands), std::move(finally));
+    }
+}
+
+void vk::ImmediateCommandPool::add_release_callback(RBCommandList in_cmd, std::function<void()>&& callback)
+{
+    checkf(cmd != VK_NULL_HANDLE, "No commands started");
+    release_callbacks[in_cmd].push_back(std::move(callback));
+}
+
+void vk::ImmediateCommandPool::on_begin_main_commands(RBCommandList cmd)
+{
+    check(active_main_command_buffer == 0);
+    active_main_command_buffer = cmd;
+}
+
+void vk::ImmediateCommandPool::on_end_main_commands(RBCommandList cmd)
+{
+    check(active_main_command_buffer == cmd);
+    
+    
+    for (auto& callback : release_callbacks[cmd])
+    {
+        callback();
+    }
+    release_callbacks.erase(cmd);
+    
+    active_main_command_buffer = {};
+}
+
 VkCommandBuffer vk::ImmediateCommandPool::begin_single_time_commands()
 {
+    checkf(cmd == VK_NULL_HANDLE, "Commands already started");
+    
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -92,4 +153,9 @@ void vk::ImmediateCommandPool::end_single_time_commands()
     vkQueueWaitIdle(instance.graphics_queue);
 
     vkFreeCommandBuffers(instance.device, pool, 1, &cmd);
+    
+    
+    cmd = VK_NULL_HANDLE;
+    
+    
 }

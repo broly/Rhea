@@ -95,7 +95,7 @@ void MaterialInstance::apply_material_parameters(
         }
 
         // -------- Texture --------
-        else if (param.type == MaterialParamType::sampler)
+        else if (param.type == MaterialParamType::sampler || param.type == MaterialParamType::image)
         {
             auto tex = std::get<TextureHandle>(param_value.data);
             instance->update_image(

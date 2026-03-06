@@ -144,6 +144,7 @@ public:
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) = 0;
+    virtual void build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) = 0;
     
     virtual void transition_image(
         RBCommandList cmd, const ImageBarrierParams& params) = 0;

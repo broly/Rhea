@@ -124,6 +124,7 @@ file(GLOB_RECURSE SHADERS
     ${SHADER_SOURCE_DIR}/*.frag
     ${SHADER_SOURCE_DIR}/*.comp
     ${SHADER_SOURCE_DIR}/*.glsl
+    ${SHADER_SOURCE_DIR}/*.r*
 )
 
 source_group("Shaders" FILES ${SHADERS})
