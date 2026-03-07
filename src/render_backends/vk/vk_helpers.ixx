@@ -14,6 +14,7 @@ import :context;
 import platform;
 import render;
 import assets;
+import :pipeline_helpers;
 import <GLFW/glfw3.h>;
 import <cassert>;
 
@@ -304,15 +305,12 @@ export namespace vk
     }
 
 
-    inline VkShaderStageFlags to_vk_shader_stage_flags(ShaderStage stages)
+    inline VkShaderStageFlags to_vk_shader_stage_flags(Mask<ShaderStage> stages)
     {
         VkShaderStageFlags flags = 0;
-
-        if (bool(stages & ShaderStage::vertex))
-            flags |= VK_SHADER_STAGE_VERTEX_BIT;
-
-        if (bool(stages & ShaderStage::fragment))
-            flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+        
+        for (ShaderStage flag : stages.vector())
+            flags |= vk_conf_converters::conv_shader_stage(flag);
 
         return flags;
     }

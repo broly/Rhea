@@ -174,7 +174,7 @@ RBDescriptorSetLayout vk::BufferManager::allocate_descriptor_layout_handle()
 }
 
 RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
-    const DescriptorSetLayoutDesc& descriptor_set_layout, Name from_pass)
+    const DescriptorSetLayoutDesc& descriptor_set_layout, Name resource_name)
 {
     std::vector<VkDescriptorSetLayoutBinding> vk_bindings;
     vk_bindings.reserve(descriptor_set_layout.bindings.size());
@@ -214,8 +214,8 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
     descriptor_set_layouts[handle] = layout_data;
     
     
-    LogVkBufferManager.Log("created descriptor set layout (debug_name=%s, set_index=%i), identifier: %p, num bindings: %i. DescriptorSetLayout: %p, from pass: %s",
-        descriptor_set_layout.debug_name.to_string().c_str(), descriptor_set_layout.set_index, layout, vk_bindings.size(), handle, from_pass.to_string().c_str());
+    LogVkBufferManager.Log("created descriptor set layout (debug_name=%s, set_index=%i), identifier: %p, num bindings: %i. DescriptorSetLayout: %p, resource name: %s",
+        descriptor_set_layout.debug_name.to_string().c_str(), descriptor_set_layout.set_index, layout, vk_bindings.size(), handle, resource_name.to_string().c_str());
     for (const ResourceBinding& b : descriptor_set_layout.bindings)
     {
         LogVkBufferManager.Log("  * binding %i, type %s, name: %s, stages mask: %i ",

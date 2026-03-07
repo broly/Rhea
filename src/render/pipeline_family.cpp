@@ -104,7 +104,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
         PushConstantRange pcr;
         pcr.size = pc_size;
         pcr.offset = cur_offset;
-        pcr.stages = make_shader_stages_mask(push_constant_info.stages);
+        pcr.stages = push_constant_info.stages;
         cur_offset += pc_size;
         layout_desc.push_constants.push_back(pcr);
     }

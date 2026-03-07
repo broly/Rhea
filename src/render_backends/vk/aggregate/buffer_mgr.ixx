@@ -56,7 +56,7 @@ namespace vk
         std::vector<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsage usage_type, Name debug_name);
         void create_descriptor_pool();
         RBDescriptorSetLayout allocate_descriptor_layout_handle();
-        RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout, Name from_pass);
+        RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout, Name resource_name);
         DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
         RBBufferHandle create_uniform_buffer(size_t size, ResourceUsage resource_usage);
         

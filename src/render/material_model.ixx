@@ -70,7 +70,7 @@ export bool is_rtx_stage(ShaderStage stage)
            (stage & ~ShaderStage::all_rtx) == ShaderStage::none;
 }
 
-export ShaderStage make_shader_stages_mask(const std::vector<ShaderStage>& stages)
+export Mask<ShaderStage> make_shader_stages_mask(const std::vector<ShaderStage>& stages)
 {
     ShaderStage result = ShaderStage::none;
     for (auto& stage : stages)
@@ -147,7 +147,7 @@ export struct MatModel_PushConstant
 {
     Name name;
     Name type;
-    std::vector<ShaderStage> stages;
+    Mask<ShaderStage> stages;
 };
 REFLECT_STRUCT(MatModel_PushConstant,
     name, type, stages);

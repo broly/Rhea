@@ -20,7 +20,7 @@ export
 {
     struct PushConstantRange
     {
-        ShaderStage stages;
+        Mask<ShaderStage> stages;
         uint32_t offset;
         uint32_t size;
     };

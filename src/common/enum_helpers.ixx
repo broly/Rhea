@@ -1,6 +1,7 @@
 ﻿export module enum_helpers;
 
 import <type_traits>;
+import <vector>;
 
 template<typename T, typename E>
 concept enum_compatible = std::is_same_v<E, T> || std::is_integral_v<T>;
@@ -43,6 +44,23 @@ struct Mask
     {
         value = static_cast<enum_type>(static_cast<underlying>(value) | static_cast<underlying>(rhs));
         return *this;
+    }
+    
+    std::vector<Enum> vector() const
+    {
+        std::vector<Enum> result;
+        uint32_t index = 0;
+        underlying flag = 0;
+        while (flag < (static_cast<underlying>(value) + 1))
+        {
+            flag = (1 << index);
+            if (static_cast<underlying>(value) & flag)
+            {
+                result.emplace_back(static_cast<Enum>(flag));
+            }
+            index++;
+        }
+        return result;
     }
     
     constexpr operator underlying() const
