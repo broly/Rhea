@@ -41,7 +41,10 @@ PipelineObject* vk::PipelineManager::create_raytrace_pipeline(const PipelineCrea
 
 RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayoutDesc& desc)
 {
-    
+    if (desc.pass == "rtxgi")
+    {
+        __nop();
+    }
     VkPipelineLayout pipeline_layout;
     
     std::vector<VkDescriptorSetLayout> vk_layouts;

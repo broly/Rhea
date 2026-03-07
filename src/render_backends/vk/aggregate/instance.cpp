@@ -19,6 +19,7 @@ constexpr const char* VALIDATION_LAYERS[] = {
 };
 
 
+
 void vk::Instance::init(GLFWwindow* in_window)
 {
     window = in_window;
@@ -115,8 +116,20 @@ void vk::Instance::init(GLFWwindow* in_window)
     };
     rtFeatures.rayTracingPipeline = VK_TRUE;
     rtFeatures.pNext = &accelFeatures;
+    
+    VkPhysicalDeviceVulkan13Features features13{};
+    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features13.shaderDemoteToHelperInvocation = VK_TRUE;
 
-    dci.pNext = &rtFeatures;
+    VkDeviceCreateInfo deviceInfo{};
+    deviceInfo.pNext = &rtFeatures;
+    
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.bufferDeviceAddress = VK_TRUE;
+    features12.pNext = &features13;
+
+    dci.pNext = &features12;
 
     VK_CHECK(
         vkCreateDevice(physical_device, &dci, nullptr, &device)
