@@ -95,28 +95,17 @@ void vk::ImmediateCommandPool::submit(std::function<void(VkCommandBuffer)>&& com
 
 void vk::ImmediateCommandPool::add_release_callback(RBCommandList in_cmd, std::function<void()>&& callback)
 {
-    checkf(cmd != VK_NULL_HANDLE, "No commands started");
     release_callbacks[in_cmd].push_back(std::move(callback));
 }
 
 void vk::ImmediateCommandPool::on_begin_main_commands(RBCommandList cmd)
 {
-    check(active_main_command_buffer == 0);
-    active_main_command_buffer = cmd;
+    
 }
 
 void vk::ImmediateCommandPool::on_end_main_commands(RBCommandList cmd)
 {
-    check(active_main_command_buffer == cmd);
     
-    
-    for (auto& callback : release_callbacks[cmd])
-    {
-        callback();
-    }
-    release_callbacks.erase(cmd);
-    
-    active_main_command_buffer = {};
 }
 
 VkCommandBuffer vk::ImmediateCommandPool::begin_single_time_commands()
@@ -158,4 +147,20 @@ void vk::ImmediateCommandPool::end_single_time_commands()
     cmd = VK_NULL_HANDLE;
     
     
+}
+
+void vk::ImmediateCommandPool::flush_garbage(RBFrameHandle frame)
+{
+    
+    
+    for (auto& [_, callbacks] : release_callbacks)
+    {
+        for (auto& callback : callbacks)
+        {
+            callback();
+        }
+    }
+    release_callbacks = {};
+    
+    active_main_command_buffer = {};
 }

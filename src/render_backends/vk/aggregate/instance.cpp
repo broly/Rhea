@@ -99,17 +99,17 @@ void vk::Instance::init(GLFWwindow* in_window)
     dci.pEnabledFeatures = &features;
     dci.enabledExtensionCount = array_size(device_extensions);
     dci.ppEnabledExtensionNames = device_extensions;
-    
-    VkPhysicalDeviceBufferDeviceAddressFeatures bufferAddress{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES
-    };
-    bufferAddress.bufferDeviceAddress = VK_TRUE;
+    //
+    // VkPhysicalDeviceBufferDeviceAddressFeatures bufferAddress{
+    //     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES
+    // };
+    // bufferAddress.bufferDeviceAddress = VK_TRUE;
 
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeatures{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
     };
     accelFeatures.accelerationStructure = VK_TRUE;
-    accelFeatures.pNext = &bufferAddress;
+    // accelFeatures.pNext = &bufferAddress;
 
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR
@@ -117,19 +117,18 @@ void vk::Instance::init(GLFWwindow* in_window)
     rtFeatures.rayTracingPipeline = VK_TRUE;
     rtFeatures.pNext = &accelFeatures;
     
-    VkPhysicalDeviceVulkan13Features features13{};
-    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-    features13.shaderDemoteToHelperInvocation = VK_TRUE;
-
-    VkDeviceCreateInfo deviceInfo{};
-    deviceInfo.pNext = &rtFeatures;
     
     VkPhysicalDeviceVulkan12Features features12{};
     features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     features12.bufferDeviceAddress = VK_TRUE;
-    features12.pNext = &features13;
+    features12.pNext = &rtFeatures;
+    
+    VkPhysicalDeviceVulkan13Features features13{};
+    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features13.shaderDemoteToHelperInvocation = VK_TRUE;
+    features13.pNext = &features12;
 
-    dci.pNext = &features12;
+    dci.pNext = &features13;
 
     VK_CHECK(
         vkCreateDevice(physical_device, &dci, nullptr, &device)

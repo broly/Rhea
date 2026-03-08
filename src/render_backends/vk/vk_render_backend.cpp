@@ -240,6 +240,11 @@ void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
     swapchain.wait_for_frame(frame_handle);
 }
 
+void VkRenderBackend::flush_frame_garbage(RBFrameHandle frame)
+{
+    immediate_command_pool.flush_garbage(frame);
+}
+
 void VkRenderBackend::reset_frame_fence(RBFrameHandle frame)
 {
     swapchain.reset_frame_fence(frame);

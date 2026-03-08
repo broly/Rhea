@@ -112,6 +112,7 @@ public:   /// API Section
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, Name debug_name) override;
     virtual RBFrameHandle get_current_frame() const override;
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
+    virtual void flush_frame_garbage(RBFrameHandle frame) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) override;

@@ -30,6 +30,8 @@ namespace vk
 
         void end_single_time_commands();
         
+        void flush_garbage(RBFrameHandle frame);
+        
         struct CommandPoolScope
         {
             CommandPoolScope(ImmediateCommandPool& in_icp)

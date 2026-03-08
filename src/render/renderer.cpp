@@ -67,8 +67,11 @@ void Renderer::execute_graph(
     auto& backend = *render_backend;
     
     RBFrameHandle frame = backend.get_current_frame();
+        
 
     backend.wait_for_frame(frame);
+    
+    backend.flush_frame_garbage(frame); 
 
     if (!backend.acquire_next_image(frame))
     {
@@ -83,14 +86,16 @@ void Renderer::execute_graph(
     
     // render graph execution
     rg->execute(cmd, frame, params, callback);
+    
 
     backend.end_commands(cmd);
-
+    
     if (!backend.submit_frame(frame, cmd))
     {
         rg->rebuild_resources();
         return;
     }
+    
 
     backend.advance_frame();
 

@@ -440,7 +440,7 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     prepare_clouds_pass(ctx);
     prepare_wireframe_pass(ctx);
     prepare_ssr(ctx);
-    // prepare_raytracing(ctx);
+    prepare_raytracing(ctx);
 }
 
 void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)

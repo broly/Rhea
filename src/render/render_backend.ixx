@@ -61,6 +61,7 @@ public:
     virtual ~RenderBackend() = default;
     virtual RBFrameHandle get_current_frame() const = 0;
     virtual void wait_for_frame(RBFrameHandle frame) = 0;
+    virtual void flush_frame_garbage(RBFrameHandle frame) = 0;
     virtual void reset_frame_fence(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
