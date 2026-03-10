@@ -53,15 +53,49 @@ void VkRenderResourceInstance::update_image(Name buffer_name,
     uint32_t frame_index = usage.frame_index(frame);
 
     RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
+    
+    if (binding.parameter.type == MaterialParamType::sampler)
+    {
+        resource->backend.update_sampled_image(
+            set,
+            *binding.binding_index,
+            image_handle,
+            usage,
+            binding.sampler,
+            array_index,
+            cubemap);
+        return;
+    }
+    
+    if (binding.parameter.type == MaterialParamType::image)
+    {
+        resource->backend.update_storage_image(
+            set, *binding.binding_index, image_handle);
+        return;
+    }
 
-    resource->backend.update_sampled_image(
+    unreachable("invalid parameter type");
+}
+
+void VkRenderResourceInstance::update_tlas(Name name, RBAccelStruct tlas, RBFrameHandle frame)
+{
+    auto inst_info =
+        resource->backend.pipeline_manager.resource_instance_data.at(this);
+
+    auto& pipe_info =
+        resource->backend.pipeline_manager.resources_info.at(resource);
+
+    auto [binding_index, binding] =
+        pipe_info.descritor_set_layout_desc.get_binding(name);
+
+    uint32_t frame_index = usage.frame_index(frame);
+
+    RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
+
+    resource->backend.update_tlas(
         set,
         *binding.binding_index,
-        image_handle,
-        usage,
-        binding.sampler,
-        array_index,
-        cubemap);
+        tlas);
 }
 
 void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle frame)

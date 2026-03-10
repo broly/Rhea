@@ -46,6 +46,7 @@ public:
     }
     
     virtual VkPipeline create_pipeline(VkRenderPass render_pass) pure;
+    virtual VkPipelineBindPoint get_bind_point() pure;
     
     RBPipelineHandle get_pipeline_handle() const
     {

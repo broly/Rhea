@@ -140,7 +140,15 @@ void vk::BufferManager::create_descriptor_pool()
         {
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1000 
-        }
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = 256 
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+            .descriptorCount = 64 
+        },
     };
 
     VkDescriptorPoolCreateInfo pool_info{

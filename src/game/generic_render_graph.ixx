@@ -84,6 +84,7 @@ public:
     void draw_wireframe(RenderGraphContext& ctx);
     void draw_ssr(RenderGraphContext& ctx);
     void draw_ssr_composite(RenderGraphContext& ctx);
+    void draw_rtxgi(RenderGraphContext& ctx);
     
     ViewInfo  build_view_info(
         RenderGraphContext& ctx,
@@ -117,6 +118,8 @@ public:
     
     RGTextureHandle brdf_lut;
     
+    RBAccelStruct tlas = {};
+    
     RenderResource* camera_resource = nullptr;
     RenderResource* gbuffer_resource = nullptr;
     RenderResource* light_resource = nullptr;
@@ -125,6 +128,8 @@ public:
     RenderResource* copy_resource = nullptr;
     RenderResource* ssr_resource = nullptr;
     RenderResource* hdr_color_resource = nullptr;
+    RenderResource* hdr_color_storage_resource = nullptr;
+    RenderResource* tlas_resource = nullptr;
     
     Extent resolution;
     Extent swapchain_extent;

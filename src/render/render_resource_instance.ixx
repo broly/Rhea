@@ -20,4 +20,6 @@ public:
     
     virtual void update_uniform_buffer_impl(Name buffer_name, size_t size, void* data, RBFrameHandle frame) = 0;
     
+    virtual void update_tlas(Name name, RBAccelStruct tlas, RBFrameHandle frame) = 0;
+    
 };

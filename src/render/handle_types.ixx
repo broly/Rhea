@@ -62,6 +62,8 @@ export enum class RBImageUsage
 
     TransferSrc,
     TransferDst,
+    
+    StorageImage,
 
     Present
 };
@@ -74,6 +76,7 @@ REFLECT_ENUM(RBImageUsage,
     SampledVertex,
     TransferSrc,
     TransferDst,
+    StorageImage,
     Present
     );
 
@@ -144,6 +147,19 @@ export
             }
     #endif
             return (T)(handle);
+        }
+        
+        template<typename T>
+        requires AllowedTypes::template contains<T>
+        T* ptr() const
+        {
+#if _DEBUG
+            if (type_id)
+            {
+                assert(type_id == get_type_id<T>());  // todo: debug compare, remake it to strcmp
+            }
+#endif
+            return (T*)&handle;
         }
         
         friend bool operator==(RBHandle lhs, RBHandle rhs)
@@ -253,6 +269,8 @@ export
     using RBPipelineHandle = RBHandle<VkPipeline>;
     using RBDescriptorSet = RBHandle<VkDescriptorSet>;
     using RBDescriptorSetLayout = RBHandle<uint64_t>; // temporary
+    
+    using RBAccelStruct = RBHandle<VkAccelerationStructureKHR>;
     
     using RBObject = RBHandle<uint64_t>;
 

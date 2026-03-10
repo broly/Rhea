@@ -90,6 +90,7 @@ public:   /// API Section
     virtual void end_render_pass(RBCommandList cmd_list) override;
     virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) override;
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
+    virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) override;
     virtual bool acquire_next_image(RBFrameHandle frame_handle) override;
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
     virtual PipelineObject* create_graphics_pipeline(const PipelineCreateDesc_Graphics& desc, RBPipelineLayout pipeline_layout) override;
@@ -109,6 +110,8 @@ public:   /// API Section
         std::optional<RBSampler> sampler,
         uint32_t array_index = 0,
         bool cubemap = false) override;
+    virtual void update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image) override;
+    virtual void update_tlas(RBDescriptorSet set, uint32_t binding, RBAccelStruct tlas) override;
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, Name debug_name) override;
     virtual RBFrameHandle get_current_frame() const override;
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
@@ -138,7 +141,7 @@ public:   /// API Section
     virtual RBImageHandle create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info) override;
     virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
-    void build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) override;
+    virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) override;
     
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) override;
     virtual uint32_t get_num_images_in_flight() const override;

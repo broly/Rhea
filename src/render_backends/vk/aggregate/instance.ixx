@@ -23,7 +23,14 @@ namespace vk
             return physical_device;
         }
         
+        const auto& get_rt_props() const
+        {
+            return rt_props;
+        }
+        
     public:
+        
+        
         
         VkInstance instance;
         VkDevice device;
@@ -31,6 +38,8 @@ namespace vk
         VkQueue graphics_queue;
         VkQueue present_queue;
         QueueFamilies queues;
+        
+        VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props;
     
         uint32_t queues_indices[MAX_QUEUES];
         VkSurfaceKHR surface;

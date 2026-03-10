@@ -200,6 +200,9 @@ static RBImageLayout initial_layout_from_usage(RBImageUsage usage)
     case RBImageUsage::SampledFragment:
         return RBImageLayout::shader_read_only_optimal;
 
+    case RBImageUsage::StorageImage:
+        return RBImageLayout::general;
+        
     case RBImageUsage::TransferDst:
         return RBImageLayout::transfer_dst_optimal;
     case RBImageUsage::TransferSrc:
@@ -257,6 +260,7 @@ void RenderGraph::compile()
                 RBImageUsage::SampledVertex,
                 RBImageUsage::DepthStencilReadOnly,
                 RBImageUsage::TransferSrc,
+                RBImageUsage::StorageImage,
             };
             
             checkf(allowed_in_read.contains(read.usage), 
@@ -282,6 +286,7 @@ void RenderGraph::compile()
                 RBImageUsage::ColorAttachment,
                 RBImageUsage::DepthStencilAttachment,
                 RBImageUsage::Present,
+                RBImageUsage::StorageImage,
             };
             
             checkf(allowed_in_write.contains(write.usage), 
@@ -439,7 +444,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         
                 current_pass_name = pass.name;
                 
-                backend->begin_render_pass(cmd, ctx.framebuffer);
+                if (pass.type == RenderPassType::graphics)
+                    backend->begin_render_pass(cmd, ctx.framebuffer);
 
                 {
                     PROFILE("RenderGraph Pass");
@@ -449,7 +455,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
                     pass.execute(ctx);
                 }
 
-                backend->end_render_pass(cmd);
+                if (pass.type == RenderPassType::graphics)
+                    backend->end_render_pass(cmd);
         
         
             }

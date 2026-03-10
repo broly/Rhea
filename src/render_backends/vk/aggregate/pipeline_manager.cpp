@@ -194,10 +194,7 @@ void vk::PipelineManager::push_constants(const RBCommandList& cmd, const void* d
     
     for (auto& stage : pipeline_layout_desc.push_constants)
     {
-        if ((stage.stages & ShaderStage::fragment) != ShaderStage::none)
-            stage_bits |= VK_SHADER_STAGE_FRAGMENT_BIT;
-        if ((stage.stages & ShaderStage::vertex) != ShaderStage::none)
-            stage_bits |= VK_SHADER_STAGE_VERTEX_BIT;
+        stage_bits |= vk::to_vk_shader_stage_flags(stage.stages);
     }
     
     auto vk_pipeline_layout = current_pipeline_layout.as<VkPipelineLayout>();
@@ -240,7 +237,7 @@ void vk::PipelineManager::bind_descriptor_set(RBCommandList cmd_list, int set_in
         PROFILE("vkCmdBindDescriptorSets");
         vkCmdBindDescriptorSets(
             cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            current_pipeline_object->get_bind_point(),
             vk_pipeline_layout,
             set_index, 
             1, 
@@ -259,7 +256,6 @@ void vk::PipelineManager::bind_pipeline(RBCommandList cmd_list, PipelineObject* 
     auto vk_pipeline_object = static_cast<VkPipelineObject*>(pipeline_object);
     
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    checkf(current_render_pass != VK_NULL_HANDLE, "Invalid render pass");
     VkPipeline pipeline_vk = vk_pipeline_object->get_or_create_pipeline(current_render_pass);
     RBPipelineHandle handle = pipeline_vk;
     
@@ -276,14 +272,16 @@ void vk::PipelineManager::bind_pipeline(RBCommandList cmd_list, PipelineObject* 
 
     checkf(pipeline_vk != VK_NULL_HANDLE, "pipeline not created");
     
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_vk);
+    vkCmdBindPipeline(cmd, vk_pipeline_object->get_bind_point(), pipeline_vk);
     
     current_pipeline_layout = pipeline_object->get_layout();
+    current_pipeline_object = vk_pipeline_object;
 }
 
 void vk::PipelineManager::invalidate_pipeline_layout()
 {
     current_pipeline_layout = RBPipelineLayout();
+    current_pipeline_object = nullptr;
 }
 
 void vk::PipelineManager::update_buffers()

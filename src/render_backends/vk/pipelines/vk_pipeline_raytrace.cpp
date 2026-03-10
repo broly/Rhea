@@ -21,6 +21,11 @@ import :device_extension_api;
 
 class VkRenderBackend;
 
+static uint32_t align_up(uint32_t value, uint32_t alignment)
+{
+    return (value + alignment - 1) & ~(alignment - 1);
+}
+
 VkPipelineObject_RayTrace::VkPipelineObject_RayTrace(
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
@@ -120,6 +125,85 @@ VkPipeline VkPipelineObject_RayTrace::create_pipeline(VkRenderPass)
         "Created ray tracing pipeline %p (pass: %s)",
         vk_pipeline,
         pipeline_desc.pass_name.to_string().c_str());
+    
+    create_sbt();
 
     return vk_pipeline;
+}
+void VkPipelineObject_RayTrace::create_sbt()
+{
+    auto& props = instance.get_rt_props();
+
+    uint32_t group_count = pipeline_desc.groups.size();
+    
+    uint32_t handle_size = props.shaderGroupHandleSize;
+
+    uint32_t handle_stride =
+        align_up(handle_size, props.shaderGroupHandleAlignment);
+
+    uint32_t region_stride =
+        align_up(handle_stride, props.shaderGroupBaseAlignment);
+
+    uint32_t sbt_size = region_stride * group_count;
+
+    std::vector<uint8_t> handles(group_count * handle_size);
+
+    vk_ext::vkGetRayTracingShaderGroupHandlesKHR(
+        instance.device,
+        vk_pipeline,
+        0,
+        group_count,
+        handles.size(),
+        handles.data());
+
+    vk::create_buffer(
+        instance.device,
+        instance.physical_device,
+        sbt_size,
+        VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR |
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        sbt_buffer,
+        sbt_memory);
+
+    void* data;
+
+    vkMapMemory(instance.device, sbt_memory, 0, sbt_size, 0, &data);
+
+    uint8_t* dst = reinterpret_cast<uint8_t*>(data);
+
+    for (uint32_t i = 0; i < group_count; i++)
+    {
+        memcpy(
+            dst + i * region_stride,
+            handles.data() + i * handle_size,
+            handle_size);
+    }
+
+    vkUnmapMemory(instance.device, sbt_memory);
+
+    VkBufferDeviceAddressInfo addr_info{
+        VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO
+    };
+
+    addr_info.buffer = sbt_buffer;
+
+    VkDeviceAddress sbt_address =
+        vkGetBufferDeviceAddress(instance.device, &addr_info);
+
+    raygen_region.deviceAddress = sbt_address;
+    raygen_region.stride = region_stride;
+    raygen_region.size   = region_stride;
+
+    miss_region.deviceAddress = sbt_address + region_stride;
+    miss_region.stride = region_stride;
+    miss_region.size   = region_stride;
+
+    hit_region.deviceAddress = sbt_address + region_stride * 2;
+    hit_region.stride = region_stride;
+    hit_region.size   = region_stride;
+
+    callable_region = {};
 }

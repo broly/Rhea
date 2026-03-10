@@ -17,6 +17,7 @@ namespace vk_ext
     PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR = nullptr;
     PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR = nullptr;
     PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR = nullptr;
+    PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
     
     PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
     PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR = nullptr;
@@ -39,5 +40,6 @@ namespace vk_ext
         LOAD_VK_EXT_FUNCTION(device, vkCmdTraceRaysIndirectKHR);
         LOAD_VK_EXT_FUNCTION(device, vkGetRayTracingShaderGroupStackSizeKHR);
         LOAD_VK_EXT_FUNCTION(device, vkCmdSetRayTracingPipelineStackSizeKHR);
+        LOAD_VK_EXT_FUNCTION(device, vkGetRayTracingShaderGroupHandlesKHR);
     }
 }

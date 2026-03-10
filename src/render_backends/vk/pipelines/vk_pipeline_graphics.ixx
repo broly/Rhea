@@ -29,5 +29,10 @@ public:
 
     virtual VkPipeline create_pipeline(VkRenderPass render_pass) override;
     
+    virtual VkPipelineBindPoint get_bind_point() override
+    {
+        return VK_PIPELINE_BIND_POINT_GRAPHICS;
+    }
+    
     PipelineCreateDesc_Graphics pipeline_desc;
 };

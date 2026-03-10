@@ -61,6 +61,23 @@ void vk::Instance::init(GLFWwindow* in_window)
     
     match_queue_families();
     
+    
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+    };
+
+    VkPhysicalDeviceProperties2 props2{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2
+    };
+
+    props2.pNext = &rt_props;
+
+    vkGetPhysicalDeviceProperties2(physical_device, &props2);
+    
+    this->rt_props = rt_props;
+    
+    
+    
     float priority = 1.0f;
 
     std::vector<VkDeviceQueueCreateInfo> queue_infos;
@@ -164,6 +181,8 @@ void vk::Instance::match_queue_families()
                 surface,
                 &presentSupported
             );
+            
+            
 
             LogVkInstance.Log("Present support: %i",
                 presentSupported);

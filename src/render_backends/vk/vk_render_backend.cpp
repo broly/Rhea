@@ -18,8 +18,10 @@ import :enums_adapters;
 import :helpers;
 import :log;
 import :pipeline;
+import :pipeline_raytrace;
 import profile;
 import reflect;
+import :device_extension_api;
 
 DEFINE_LOGGER(LogVkCommands, Display);
 
@@ -71,6 +73,47 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &info;
+
+    vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
+}
+
+void VkRenderBackend::update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image)
+{
+    VkDescriptorImageInfo info{};
+    info.imageView = get_image_view(image);
+    info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    write.pImageInfo = &info;
+
+    vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
+}
+
+void VkRenderBackend::update_tlas(RBDescriptorSet set, uint32_t binding, RBAccelStruct tlas)
+{
+    VkWriteDescriptorSetAccelerationStructureKHR as_info{};
+    as_info.sType =
+        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+
+    as_info.accelerationStructureCount = 1;
+    as_info.pAccelerationStructures = tlas.ptr<VkAccelerationStructureKHR>();
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+
+    write.dstSet = set;
+    write.dstBinding = binding;
+
+    write.descriptorCount = 1;
+    write.descriptorType =
+        VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+
+    write.pNext = &as_info;
 
     vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
 }
@@ -533,9 +576,9 @@ RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
     return resources.back().get();
 }
 
-void VkRenderBackend::build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms)
+RBAccelStruct VkRenderBackend::build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms)
 {
-    tlas_manager.build_tlas(cmd, meshes, transforms);
+    return tlas_manager.build_tlas(cmd, meshes, transforms);
 }
 
 
@@ -759,6 +802,17 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
     
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     vkCmdDraw(cmd, vertex_count, 1, 0, 0);
+}
+
+void VkRenderBackend::trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth)
+{
+    auto as_vk_rtx_pipeline = (VkPipelineObject_RayTrace*)pipeline_object;
+    vk_ext::vkCmdTraceRaysKHR(cmd.as<VkCommandBuffer>(),
+        as_vk_rtx_pipeline->get_raygen_sbt(),
+        as_vk_rtx_pipeline->get_miss_sbt(),
+        as_vk_rtx_pipeline->get_hit_sbt(),
+        as_vk_rtx_pipeline->get_callable_sbt(),
+        resolution.width, resolution.height, depth);
 }
 
 bool VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)

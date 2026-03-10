@@ -196,6 +196,9 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     
     if (desc.usage & RenderTextureUsage::TransferSrc)
         vk_usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    
+    if (desc.usage & RenderTextureUsage::Storage)
+        vk_usage |= VK_IMAGE_USAGE_STORAGE_BIT;
 
     VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_info.imageType = VK_IMAGE_TYPE_2D;

@@ -29,7 +29,7 @@ static VkTransformMatrixKHR to_vk_transform(const Transform& t)
     return vk;
 }
 
-void vk::TLASManager::build_tlas(
+RBAccelStruct vk::TLASManager::build_tlas(
     RBCommandList cmd, 
     const std::vector<MeshPrimHandle>& meshes,
     const std::vector<Transform>& transforms)
@@ -211,5 +211,5 @@ void vk::TLASManager::build_tlas(
         instance.device,
         &addr
     );
-    
+    return tlas.tlas;
 }

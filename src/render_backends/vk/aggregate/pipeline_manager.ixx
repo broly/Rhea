@@ -78,6 +78,7 @@ namespace vk
         
         RBPipelineLayout current_pipeline_layout = {};
         VkDescriptorSet current_descriptor_set = {};
+        VkPipelineObject* current_pipeline_object = nullptr;
         
         
         // currently working pipelines (moving from pending_pipelines)

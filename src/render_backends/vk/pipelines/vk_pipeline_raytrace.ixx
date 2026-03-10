@@ -17,6 +17,8 @@ import :reflection;
 import :pipeline;
 
 
+
+
 class VkPipelineObject_RayTrace : public VkPipelineObject
 {
 public:
@@ -29,9 +31,41 @@ public:
 
 
     virtual VkPipeline create_pipeline(VkRenderPass render_pass) override;
+    
+    void create_sbt();
 
     
     PipelineCreateDesc_RayTrace pipeline_desc;
     
+    VkBuffer sbt_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory sbt_memory = VK_NULL_HANDLE;
+
+    VkStridedDeviceAddressRegionKHR raygen_region{};
+    VkStridedDeviceAddressRegionKHR miss_region{};
+    VkStridedDeviceAddressRegionKHR hit_region{};
+    VkStridedDeviceAddressRegionKHR callable_region{};
     
+    
+    virtual VkPipelineBindPoint get_bind_point() override
+    {
+        return VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+    }
+    
+    
+    const VkStridedDeviceAddressRegionKHR* get_raygen_sbt() const 
+    {
+        return &raygen_region;
+    }
+    const VkStridedDeviceAddressRegionKHR* get_miss_sbt() const 
+    {
+        return &miss_region;
+    }
+    const VkStridedDeviceAddressRegionKHR* get_hit_sbt() const 
+    {
+        return &hit_region;
+    }
+    const VkStridedDeviceAddressRegionKHR* get_callable_sbt() const 
+    {
+        return &callable_region;
+    }
 };

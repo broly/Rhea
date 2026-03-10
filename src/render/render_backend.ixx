@@ -114,6 +114,8 @@ public:
     
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) = 0;
     
+    virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) = 0;
+    
     virtual bool acquire_next_image(RBFrameHandle frame_handle) = 0;
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) = 0;
     
@@ -145,7 +147,7 @@ public:
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) = 0;
-    virtual void build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) = 0;
+    virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) = 0;
     
     virtual void transition_image(
         RBCommandList cmd, const ImageBarrierParams& params) = 0;
@@ -158,6 +160,17 @@ public:
         std::optional<RBSampler> sampler,
         uint32_t array_index = 0,
         bool cubemap = false) = 0;
+    
+    
+    virtual void update_storage_image(
+        RBDescriptorSet set,
+        uint32_t binding,
+        RBImageHandle image) = 0;
+    
+    virtual void update_tlas(
+        RBDescriptorSet set,
+        uint32_t binding,
+        RBAccelStruct tlas) = 0;
     
     virtual Extent get_viewport_extent() const = 0;
     

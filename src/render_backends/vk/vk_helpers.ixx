@@ -392,6 +392,9 @@ export namespace vk
 
         case RBImageUsage::Present:
             return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            
+        case RBImageUsage::StorageImage:
+            return VK_IMAGE_LAYOUT_GENERAL;
 
         case RBImageUsage::Undefined:
             return VK_IMAGE_LAYOUT_UNDEFINED;
@@ -507,6 +510,12 @@ export namespace vk
                 .access = 0
             };
 
+        case RBImageLayout::general:
+            return {
+                .layout = VK_IMAGE_LAYOUT_GENERAL,
+                .stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+            };
         case RBImageLayout::undefined:
             return {
                 .layout = VK_IMAGE_LAYOUT_UNDEFINED,

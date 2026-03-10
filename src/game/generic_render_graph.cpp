@@ -52,6 +52,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     gbuffer_resource = renderer->find_resource("gbuffer");
     ssr_resource = renderer->find_resource("ssr");
     hdr_color_resource = renderer->find_resource("hdr_color");
+    hdr_color_storage_resource = renderer->find_resource("hdr_color_storage");
+    tlas_resource = renderer->find_resource("tlas");
     copy_resource = renderer->find_resource("copy");
     
     
@@ -75,7 +77,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .name = NAME(hdr_color),
         .extent = resolution,
         .format = TextureFormat::RGBA16F,
-        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
         .external = false,
         .dimension = capture_dimension
     });
@@ -295,7 +297,21 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
-    
+    add_pass({
+        .name = "RTXGI",
+        .reads = {
+            { g_depth, RBImageUsage::SampledFragment },
+            { g_normal, RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { hdr_color, RBImageUsage::StorageImage }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_rtxgi(ctx);
+        },
+        .type = RenderPassType::rtx
+    });
     
     add_pass({
         .name = Names::pass_geometry_translucent,
@@ -462,7 +478,7 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
             transforms.emplace_back(*prim.world);
         }
 
-        backend->build_tlas(
+        tlas = backend->build_tlas(
             ctx.cmd,
             meshes,
             transforms);
@@ -1186,6 +1202,40 @@ void GenericRenderGraph::draw_ssr_composite(RenderGraphContext& ctx)
         ctx.bind(ssr_resource);
     }
     ctx.backend.draw_fullscreen(ctx.cmd);
+}
+
+void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
+{
+    ctx.bind_pipeline(rtx_gi_pipeline);
+
+    hdr_color_storage_resource->query_single()->update_image(
+        "u_hdr_color",
+        get_image(hdr_color),
+        ctx.frame);
+
+    tlas_resource->query_single()->update_tlas(
+        "u_tlas",
+        tlas,
+        ctx.frame);
+    
+    ctx.bind(hdr_color_storage_resource);
+    ctx.bind(tlas_resource);
+    
+    RTXGIPushConstants pc{};
+    pc.frame = ctx.frame;
+    pc.intensity = 1.0f;
+
+    ctx.backend.push_constants(
+        ctx.cmd,
+        pc
+    );
+
+    ctx.backend.trace_rays(
+        ctx.cmd,
+        rtx_gi_pipeline,
+        {resolution.width, resolution.height},
+        1
+    );
 }
 
 

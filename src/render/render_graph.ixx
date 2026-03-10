@@ -15,6 +15,14 @@ import :rg_params;
 
 constexpr uint8_t MAX_ALLOWED_FRAMES_IN_FLIGHT = 5;
 
+export enum class RenderPassType
+{
+    graphics,
+    compute,
+    rtx,
+};
+
+
 export struct RenderGraphPass
 {
     Name name;
@@ -30,6 +38,8 @@ export struct RenderGraphPass
     
     uint32_t num_layers = 1;
     uint32_t num_mip_maps = 1;
+    
+    RenderPassType type = RenderPassType::graphics;
 };
 
 

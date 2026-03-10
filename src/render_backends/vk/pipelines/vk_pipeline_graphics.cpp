@@ -38,6 +38,8 @@ VkPipelineObject_Graphics::VkPipelineObject_Graphics(
 VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
 {
     
+    checkf(render_pass != VK_NULL_HANDLE, "Invalid render pass");
+    
     for (auto& stage : pipeline_desc.stages)
     {
         checkf(stage.compiled_shader.has_value(), "shader not compiled!");
