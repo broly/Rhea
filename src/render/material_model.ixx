@@ -199,13 +199,14 @@ export enum class MaterialParamType
     sampler,
     image,
     tlas,
+    ssbo,
     Float,
     vec2,
     vec3,
     vec4,
 };
 REFLECT_ENUM(MaterialParamType,
-    definition, uniform, sampler, image, tlas, Float, vec2, vec4, vec4);
+    definition, uniform, sampler, image, ssbo, tlas, Float, vec2, vec4, vec4);
 
 
 
@@ -223,7 +224,8 @@ export struct MatModel_Parameter
     
     bool is_descriptor() const
     {
-        return type == MaterialParamType::uniform || type == MaterialParamType::sampler || type == MaterialParamType::image || type == MaterialParamType::tlas;
+        return type == MaterialParamType::uniform || type == MaterialParamType::sampler || 
+            type == MaterialParamType::image || type == MaterialParamType::ssbo || type == MaterialParamType::tlas;
     }
     
     void validate();

@@ -132,7 +132,7 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> materi
     
     for (const auto& [param_name, param_info] : resource_info->resource.parameters)
     {
-        if (param_info.type == MaterialParamType::sampler || param_info.type == MaterialParamType::image || param_info.type == MaterialParamType::tlas)
+        if (param_info.is_descriptor())
         {
             const bool provided = material->parameters.contains(param_name);
             ctx[param_name.to_string()] = provided;

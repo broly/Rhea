@@ -288,7 +288,45 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
     }
 }
 
-void vk::BufferManager::update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
+RBBufferHandle vk::BufferManager::create_storage_buffer(size_t buffer_size, ResourceUsage usage_type, bool host_visible)
+{
+    VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    VkMemoryPropertyFlags mem_flags = host_visible ?
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT :
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    if (usage_type.is_frame_based())
+    {
+        frames_ubo_counter++;
+        const RBBufferHandle handle {frames_ubo_counter, usage_type};
+        std::array<vk::BufferInfo, vk::MAX_FRAMES_IN_FLIGHT> buffers;
+
+        for (int i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; ++i)
+        {
+            vk::create_buffer(device, physical_device, buffer_size, usage_flags, mem_flags,
+                              buffers[i].buffer, buffers[i].memory);
+            if (host_visible)
+                vkMapMemory(device, buffers[i].memory, 0, VK_WHOLE_SIZE, 0, &buffers[i].mapped_ptr);
+        }
+
+        frames_ubos.emplace(handle.get_identifier(), buffers);
+        return handle;
+    }
+    else
+    {
+        persistent_ubo_counter++;
+        const RBBufferHandle handle {persistent_ubo_counter, usage_type};
+        vk::BufferInfo buffer_info;
+        vk::create_buffer(device, physical_device, buffer_size, usage_flags, mem_flags,
+                          buffer_info.buffer, buffer_info.memory);
+        if (host_visible)
+            vkMapMemory(device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
+        persistent_ubos[handle.get_identifier()] = buffer_info;
+        return handle;
+    }
+}
+
+void vk::BufferManager::update_any_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
 {
     auto& buf = get_buffer(buffer_handle, frame);
     

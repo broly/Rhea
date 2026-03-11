@@ -286,8 +286,8 @@ export namespace vk
         case MaterialParamType::tlas:
             return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;    
 
-        // case MaterialParamType::storage_buffer:
-        //     return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        case MaterialParamType::ssbo:
+            return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
         case MaterialParamType::sampler:
             return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

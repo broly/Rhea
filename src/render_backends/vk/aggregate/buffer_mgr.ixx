@@ -59,8 +59,9 @@ namespace vk
         RBDescriptorSetLayout create_descriptor_set_layout(const DescriptorSetLayoutDesc& descriptor_set_layout, Name resource_name);
         DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
         RBBufferHandle create_uniform_buffer(size_t size, ResourceUsage resource_usage);
+        RBBufferHandle create_storage_buffer(size_t buffer_size, ResourceUsage usage_type, bool host_visible);
         
-        void update_uniform_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame);
+        void update_any_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame);
 
         
         void create_device_local_buffer_with_data(

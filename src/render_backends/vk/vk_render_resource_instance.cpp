@@ -31,15 +31,13 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(Name buffer_name, size
     RBBufferHandle buffer =
         inst_info.buffers[binding_index][frame_index];
 
-    buffer_manager.update_uniform_buffer(buffer, size, data, frame);
+    buffer_manager.update_any_buffer(buffer, size, data, frame);
 }
 
 void VkRenderResourceInstance::update_image(Name buffer_name,
                                             RBImageHandle image_handle, RBFrameHandle frame, uint32_t array_index, bool cubemap)
 {
     PROFILE("VkRenderResourceInstance::update_image");
-    
-    
     
     auto inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
     auto& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
@@ -79,14 +77,15 @@ void VkRenderResourceInstance::update_image(Name buffer_name,
 
 void VkRenderResourceInstance::update_tlas(Name name, RBAccelStruct tlas, RBFrameHandle frame)
 {
-    auto inst_info =
-        resource->backend.pipeline_manager.resource_instance_data.at(this);
+    auto var = resource->desc.find_variable_checked(name);
+    
+    checkf(var.parameter.type == MaterialParamType::tlas, "Type mismatch");
+    
+    auto inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
 
-    auto& pipe_info =
-        resource->backend.pipeline_manager.resources_info.at(resource);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
 
-    auto [binding_index, binding] =
-        pipe_info.descritor_set_layout_desc.get_binding(name);
+    auto [binding_index, binding] = pipe_info.descritor_set_layout_desc.get_binding(name);
 
     uint32_t frame_index = usage.frame_index(frame);
 
@@ -96,6 +95,20 @@ void VkRenderResourceInstance::update_tlas(Name name, RBAccelStruct tlas, RBFram
         set,
         *binding.binding_index,
         tlas);
+}
+
+void VkRenderResourceInstance::update_ssbo(Name buffer_name, size_t size, void* data, RBFrameHandle frame)
+{
+    auto inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
+
+    auto [binding_index, binding] = pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
+    checkf(binding.parameter.type == MaterialParamType::ssbo, "Type mismatch");
+
+    uint32_t frame_index = usage.frame_index(frame);
+
+    RBBufferHandle buffer = inst_info.buffers[binding_index][frame_index];
+    buffer_manager.update_any_buffer(buffer, size, data, frame);
 }
 
 void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle frame)

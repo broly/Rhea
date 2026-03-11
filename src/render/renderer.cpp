@@ -225,6 +225,11 @@ void Renderer::load_resources()
                 var_desc.size = -1;
                 var_desc.binding = current_binding;
             }
+            else if (variable.type == MaterialParamType::ssbo)
+            {
+                var_desc.size = -1;
+                var_desc.binding = current_binding;
+            }
             else if (variable.type == MaterialParamType::definition) // skip definitions
             {
                 continue;
@@ -354,6 +359,11 @@ RenderResource* Renderer::query_material_resource(std::shared_ptr<MaterialModel>
                 .sampler = samplers[*param.sampler],
             });
         } else if (param.type == MaterialParamType::image)
+        {
+            desc.variables.push_back(RenderResourceVariableDesc{
+                .parameter = param,
+            });
+        } else if (param.type == MaterialParamType::ssbo)
         {
             desc.variables.push_back(RenderResourceVariableDesc{
                 .parameter = param,

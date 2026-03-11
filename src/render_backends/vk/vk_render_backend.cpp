@@ -27,7 +27,7 @@ DEFINE_LOGGER(LogVkCommands, Display);
 
 void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
 {
-    resource_manager.update_uniform_buffer(buffer_handle, size, data, frame);
+    buffer_manager.update_any_buffer(buffer_handle, size, data, frame);
 }
 
 void VkRenderBackend::destroy_render_pass_cache()
@@ -258,12 +258,12 @@ uint32_t VkRenderBackend::get_num_images_in_flight() const
 
 RBDeviceAddress VkRenderBackend::get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const
 {
-    return resource_manager.get_buffer_device_address(buffer_handle);
+    return buffer_manager.get_buffer_device_address(buffer_handle);
 }
 
 void VkRenderBackend::create_descriptor_pool()
 {
-    resource_manager.create_descriptor_pool();
+    buffer_manager.create_descriptor_pool();
 }
 
 void VkRenderBackend::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors, 
@@ -570,7 +570,7 @@ Extent VkRenderBackend::get_viewport_extent() const
 
 RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
 {
-    std::unique_ptr<VkRenderResource> res = std::make_unique<VkRenderResource>(desc, resource_manager, *this);
+    std::unique_ptr<VkRenderResource> res = std::make_unique<VkRenderResource>(desc, buffer_manager, *this);
     
     resources.push_back(std::move(res));
     return resources.back().get();
@@ -853,12 +853,12 @@ PipelineObject* VkRenderBackend::create_raytrace_pipeline(const PipelineCreateDe
 
 vk::DescriptorSetLayoutData VkRenderBackend::get_vk_descriptor_set_layout(RBDescriptorSetLayout descriptor_set_layout)
 {
-    return resource_manager.get_vk_descriptor_set_layout(descriptor_set_layout);
+    return buffer_manager.get_vk_descriptor_set_layout(descriptor_set_layout);
 }
 
 RBBufferHandle VkRenderBackend::create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type)
 {
-    return resource_manager.create_uniform_buffer(buffer_size, usage_type);
+    return buffer_manager.create_uniform_buffer(buffer_size, usage_type);
 }
 
 
