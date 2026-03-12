@@ -32,9 +32,10 @@ export struct ModelPushConstants
 {
     glm::mat4 model;
     glm::mat4 prev_model;
+    uint32_t mesh_index;
 };
 REFLECT_STRUCT_RUNTIME(ModelPushConstants,
-    model, prev_model);
+    model, prev_model, mesh_index);
 
 
 

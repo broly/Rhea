@@ -319,15 +319,20 @@ void VkRenderBackend::bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle
     return vertex_buffer_manager.bind_vertex_buffer(cmd, handle, frame);
 }
 
+MeshTableInfo VkRenderBackend::get_mesh_table_info() const
+{
+    return mesh_manager.get_mesh_table_info();
+}
+
 ImageReadback VkRenderBackend::readback_image(RBImageHandle img) const
 {
     return image_manager.readback(img);
 }
 
-void VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode)
+GPUMesh VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode)
 {
     PROFILE(__FUNCTION__);
-    mesh_manager.get_or_create_mesh_buffers(handle, rt_build_mode);
+    return mesh_manager.get_or_create_mesh_buffers(handle, rt_build_mode);
 }
 
 TextureFormat VkRenderBackend::get_swapchain_format() const

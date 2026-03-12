@@ -177,6 +177,11 @@ public:
     {
         backend.draw_fullscreen(cmd);
     }
+    
+    void draw(uint32_t vertex_count = 0) const
+    {
+        backend.draw(cmd, vertex_count);
+    }
 };
 
 

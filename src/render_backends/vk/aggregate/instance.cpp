@@ -88,6 +88,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     
     VkPhysicalDeviceFeatures features{};
     features.samplerAnisotropy = VK_TRUE;
+    features.shaderInt64 = VK_TRUE;
     
     for (uint32_t family : unique_families) {
         VkDeviceQueueCreateInfo qi{

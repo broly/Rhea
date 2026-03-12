@@ -17,4 +17,7 @@ export struct MeshGPUData
     VkDeviceMemory blas_memory;
     VkBuffer blas_buffer;
     VkDeviceAddress blas_address;
+    
+    
+    uint32_t mesh_table_index;
 };

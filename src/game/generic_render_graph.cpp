@@ -55,6 +55,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     hdr_color_storage_resource = renderer->find_resource("hdr_color_storage");
     tlas_resource = renderer->find_resource("tlas");
     copy_resource = renderer->find_resource("copy");
+    mesh_table_resource = renderer->find_resource("mesh_table");
     
     
     
@@ -482,6 +483,18 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
             ctx.cmd,
             meshes,
             transforms);
+
+        auto mesh_table_instance = mesh_table_resource->query_single();
+            
+        auto mesh_table_info = backend->get_mesh_table_info();
+        
+        mesh_table_instance->update_ssbo(
+            "u_mesh_table",
+            sizeof(GPUMesh) * mesh_table_info.size,
+            mesh_table_info.address,
+            ctx.frame
+        );
+    
         mesh_processor.set_dirty(false);
     }
 }
@@ -985,6 +998,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         if (ctx.bind_pipeline(pipeline))
         {
             ctx.bind(camera_resource);
+            ctx.bind(mesh_table_resource);
             
             if (!is_depth_prepass)
             {
@@ -1003,15 +1017,16 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
                ctx.frame);
         }
         
-        ctx.bind_mesh(prim.mesh);
+        // ctx.bind_mesh(prim.mesh);
         
         ModelPushConstants pc;
         pc.model = *prim.world;
         pc.prev_model = *prim.world;
+        pc.mesh_index = prim.mesh_index;
 
         ctx.push_constants(pc);
         
-        ctx.draw_indexed(prim.mesh.get().indices.size());
+        ctx.draw(prim.mesh.get().indices.size());
     }
 }
 
@@ -1043,6 +1058,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         ModelPushConstants pc;
         pc.model = *prim.world;
         pc.prev_model = *prim.world;
+        pc.mesh_index = prim.mesh_index;
         ctx.push_constants(pc);
         
         ctx.draw_indexed(prim.mesh.get().indices.size());

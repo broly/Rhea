@@ -3,12 +3,18 @@
 import :vec;
 #include "common/reflect_macros.h"
 
-export struct Vertex 
+export struct Vertex
 {
-    vec3 position;
-    vec3 normal;
-    vec2 tex_coord;
-    vec4 tangent;
+    glm::vec3 position;
+    float pad0;
+
+    glm::vec3 normal;
+    float pad1;
+
+    glm::vec2 tex_coord;
+    glm::vec2 pad2;
+
+    glm::vec4 tangent;
 };
 REFLECT_STRUCT_RUNTIME(Vertex,
     position, normal, tex_coord, tangent);

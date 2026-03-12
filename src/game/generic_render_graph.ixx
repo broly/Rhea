@@ -130,6 +130,7 @@ public:
     RenderResource* hdr_color_resource = nullptr;
     RenderResource* hdr_color_storage_resource = nullptr;
     RenderResource* tlas_resource = nullptr;
+    RenderResource* mesh_table_resource = nullptr;
     
     Extent resolution;
     Extent swapchain_extent;

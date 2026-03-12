@@ -23,7 +23,7 @@ RBDeviceAddress vk::BufferManager::get_buffer_device_address(VkBuffer vk_buffer)
     return vkGetBufferDeviceAddress(device, &info);
 }
 
-void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame)
+void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame, VkDescriptorType descriptor_type)
 {
     vk::BufferInfo* buf = nullptr;
 
@@ -50,7 +50,7 @@ void vk::BufferManager::bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t 
         .dstSet = set,
         .dstBinding = binding,
         .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorType = descriptor_type,
         .pBufferInfo = &info
     };
 
@@ -148,6 +148,10 @@ void vk::BufferManager::create_descriptor_pool()
         {
             .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
             .descriptorCount = 64 
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1024 
         },
     };
 

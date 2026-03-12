@@ -25,7 +25,10 @@ namespace vk
         vk::BufferManager& buffer_manager;
         
         
-        void get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode);
+        MeshTableInfo get_mesh_table_info() const;
+        
+        
+        GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode);
         
         void build_blas(
             MeshGPUData& data,
@@ -42,5 +45,9 @@ namespace vk
         }
 
         std::unordered_map<MeshPrimHandle, MeshGPUData> mesh_map;
+        
+        std::vector<GPUMesh> gpu_mesh_table;
+        RBBufferHandle mesh_table_buffer;
+        bool mesh_table_dirty = false;
     };
 }

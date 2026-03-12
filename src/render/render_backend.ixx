@@ -20,7 +20,7 @@ export class RenderBackend;
 
 export template<typename T>
 concept allowed_for_push_constant = 
-    std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> && sizeof(T) <= 128;
+    std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> && sizeof(T) <= 256;
 
 template<typename T>
 concept RenderBackendType = 
@@ -70,6 +70,8 @@ public:
     virtual RBVertexBufferHandle create_vertex_buffer(const VertexBufferDesc& desc) = 0;
     virtual void* get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame) = 0;
     virtual void bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame) = 0;
+    
+    virtual MeshTableInfo get_mesh_table_info() const = 0;
     
     
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type) = 0;
@@ -137,7 +139,7 @@ public:
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size) = 0;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
-    virtual void get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) = 0;
+    virtual GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) = 0;

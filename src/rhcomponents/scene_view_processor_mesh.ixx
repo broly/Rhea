@@ -43,6 +43,8 @@ export struct RenderPrimitive
     MeshPrimHandle mesh;
     const glm::mat4* world;
     AABB bounds;
+    
+    uint64_t mesh_index;
 
     
     std::set<Name> passes;

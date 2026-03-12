@@ -122,12 +122,13 @@ public:   /// API Section
     virtual RBVertexBufferHandle create_vertex_buffer(const VertexBufferDesc& desc) override;
     virtual void* get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame) override;
     virtual void bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame) override;
+    virtual MeshTableInfo get_mesh_table_info() const override;
     virtual ImageReadback readback_image(RBImageHandle img) const override;
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) override;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size) override;
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
-    virtual void get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) override;
+    virtual GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) override;
     virtual TextureFormat get_swapchain_format() const override;
     virtual RBImageHandle create_image(const RBImageDesc& desc) override;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) override;

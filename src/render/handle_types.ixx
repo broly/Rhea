@@ -99,6 +99,25 @@ export enum class RBStoreOp
 REFLECT_ENUM(RBStoreOp,
     Store, DontCare);
 
+
+
+export struct GPUMesh
+{
+    uint64_t vertex_address;
+    uint64_t index_address;
+    uint32_t index_count;
+    uint32_t mesh_index;
+};
+REFLECT_STRUCT(GPUMesh,
+    vertex_address, index_address, index_count, mesh_index);
+
+
+export struct MeshTableInfo
+{
+    void* address;
+    size_t size;
+};
+
 export 
 {
     template<typename... Ts>
@@ -229,7 +248,6 @@ export
     //     Depth24Stencil8,
     //     Depth32F
     // };
-
 
     struct RBBufferHandle
     {

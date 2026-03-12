@@ -12,7 +12,12 @@ import :device_extension_api;
 DEFINE_LOGGER(LogVkMeshManager, Warning);
 
 
-void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_mode)
+MeshTableInfo vk::MeshManager::get_mesh_table_info() const
+{
+    return {(void*)gpu_mesh_table.data(), gpu_mesh_table.size() };
+}
+
+GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_mode)
 {
     auto it = mesh_map.find(handle);
 
@@ -25,18 +30,24 @@ void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildM
             // build_blas_for_existing(it->second);
         }
 
-        return;
+        auto& data = it->second;
+        return gpu_mesh_table[data.mesh_table_index];
     }
 
     auto& primitive = handle.get();
 
     if (primitive.vertices.empty() ||
         primitive.indices.empty())
-        return;
+        {
+            todo();
+        }
 
     MeshGPUData data{};
+    
+    uint32_t mesh_index = gpu_mesh_table.size();
     data.index_count =
         static_cast<uint32_t>(primitive.indices.size());
+    data.mesh_table_index = mesh_index;
 
     VkDeviceSize vertex_size =
         primitive.vertices.size() * sizeof(Vertex);
@@ -77,6 +88,18 @@ void vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildM
     }
 
     mesh_map.emplace(handle, std::move(data));
+    
+    GPUMesh gpu{};
+    gpu.vertex_address = buffer_manager.get_buffer_device_address(data.vertex_buffer);
+    gpu.index_address = buffer_manager.get_buffer_device_address(data.index_buffer);
+    gpu.index_count = data.index_count;
+    gpu.mesh_index = mesh_index;
+
+    gpu_mesh_table.push_back(gpu);
+
+    mesh_table_dirty = true;
+    
+    return gpu;
 }
 
 void vk::MeshManager::build_blas(MeshGPUData& data, VkDeviceAddress vertex_address, VkDeviceAddress index_address)

@@ -79,6 +79,8 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
     LogVkPipeline.Log("Created pipeline layout %s (%p)", desc.pass.to_string().c_str(), pipeline_layout);
     
+    
+    
     uint32_t index = 0;
     for (auto& vk_layout : vk_layouts)
     {
@@ -319,20 +321,25 @@ void vk::PipelineManager::update_buffers()
                 const auto& binding =
                     info.descritor_set_layout_desc.bindings[binding_index];
 
-                if (binding.parameter.type != MaterialParamType::uniform)
+                if (binding.parameter.type != MaterialParamType::uniform && binding.parameter.type != MaterialParamType::ssbo)
                     continue;
+
+                VkDescriptorType descriptor_type = to_vk_descriptor_type(binding.parameter.type);
 
                 auto& buffers_per_frame = inst.buffers[binding_index];
 
                 for (size_t frame = 0; frame < inst.sets_per_frame.size(); ++frame)
                 {
-                    RBBufferHandle buffer = buffer_manager.create_uniform_buffer(*binding.parameter.size, resource->desc.usage);
+                    RBBufferHandle buffer = binding.parameter.type == MaterialParamType::uniform ?
+                        buffer_manager.create_uniform_buffer(*binding.parameter.size, resource->desc.usage) :
+                        buffer_manager.create_storage_buffer(*binding.parameter.initial_size, resource->desc.usage, true);
 
                     buffer_manager.bind_buffer_to_descriptor(
                         inst.sets_per_frame[frame],
                         *binding.binding_index,
                         buffer,
-                        frame);
+                        frame,
+                        descriptor_type);
 
                     buffers_per_frame.push_back(buffer);
                 }

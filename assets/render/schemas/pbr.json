@@ -35,7 +35,7 @@
 			"stages": {
 				"vertex": {
 					"shader": "geometry.vert",
-					"resources": ["camera"]
+					"resources": ["camera", "mesh_table"]
 				},
 				"fragment": {
 					"shader": "geometry.frag",
@@ -78,28 +78,7 @@
 			"vertex_layouts": [
 				{
 					"vertex_type": "Vertex",
-					"attributes": [ 
-						{ 
-							"name": "position",
-							"definition": "LOCATION_ATTR_POSITION",
-							"variable": "in_position"
-						},
-						{
-							"name": "normal",
-							"definition": "LOCATION_ATTR_NORMAL",
-							"variable": "in_normal"
-						},
-						{
-							"name": "tex_coord",
-							"definition": "LOCATION_ATTR_UV",
-							"variable": "in_uv"
-						},
-						{
-							"name": "tangent",
-							"definition": "LOCATION_ATTR_TANGENT",
-							"variable": "in_tangent"
-						}
-					]
+					"attributes": []
 				}
 			]
 		},
@@ -110,7 +89,7 @@
 			"stages": {
 				"vertex": {
 					"shader": "geometry.vert",
-					"resources": ["camera"]
+					"resources": ["camera", "mesh_table"]
 				},
 				"fragment": {
 					"shader": "geometry.frag",
@@ -140,28 +119,7 @@
 			"vertex_layouts": [
 				{
 					"vertex_type": "Vertex",
-					"attributes": [ 
-						{ 
-							"name": "position",
-							"definition": "LOCATION_ATTR_POSITION",
-							"variable": "in_position"
-						},
-						{
-							"name": "normal",
-							"definition": "LOCATION_ATTR_NORMAL",
-							"variable": "in_normal"
-						},
-						{
-							"name": "tex_coord",
-							"definition": "LOCATION_ATTR_UV",
-							"variable": "in_uv"
-						},
-						{
-							"name": "tangent",
-							"definition": "LOCATION_ATTR_TANGENT",
-							"variable": "in_tangent"
-						}
-					]
+					"attributes": []
 				}
 			]
 		},

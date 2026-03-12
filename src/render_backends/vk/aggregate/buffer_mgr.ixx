@@ -18,7 +18,7 @@ namespace vk
     {
         VkBuffer buffer;
         VkDeviceMemory memory;
-        void* mapped_ptr;
+        void* mapped_ptr = nullptr;
     };
     
     class BufferManager
@@ -50,7 +50,7 @@ namespace vk
         std::vector<RBDescriptorSet> descriptors;
         uint64_t descriptor_set_counter = 0;
         
-        void bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame);
+        void bind_buffer_to_descriptor(RBDescriptorSet set, uint32_t binding, RBBufferHandle buffer, RBFrameHandle frame, VkDescriptorType descriptor_type);
         vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index);
         const vk::BufferInfo& get_buffer(RBBufferHandle buffer_handle, size_t frame_index) const;
         std::vector<RBDescriptorSet> allocate_descriptor_sets_for_layout(RBDescriptorSetLayout layout_handle, ResourceUsage usage_type, Name debug_name);

@@ -119,10 +119,13 @@ void SceneViewProcessor_Mesh::process()
                         if (pass_name != "shadowmap")
                             instance->get_or_create_resource_instance(0 /* material is persistent */);
                     
+                        auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::none);
+                        
+                        rp.mesh_index = result.mesh_index;
                         primitives.push_back(rp);
+                        
                         ro.primitives.push_back(primitives.size() - 1);
                     
-                        renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::none);
                     }
                 }
             }

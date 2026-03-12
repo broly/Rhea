@@ -219,6 +219,7 @@ export struct MatModel_Parameter
     std::optional<Name> ubo;
     std::optional<Name> binding;
     std::optional<Name> storage;
+    std::optional<size_t> initial_size;
     
     std::optional<size_t> size; // not serializable
     
@@ -231,7 +232,7 @@ export struct MatModel_Parameter
     void validate();
 };
 REFLECT_STRUCT(MatModel_Parameter,
-    type, variable, ubo, binding, storage, sampler, definition);
+    type, variable, ubo, binding, storage, sampler, definition, initial_size);
 
 
 export struct MatModel_PassStage
