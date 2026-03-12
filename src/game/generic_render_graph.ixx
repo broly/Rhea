@@ -110,6 +110,8 @@ public:
     RGTextureHandle g_normal;
     RGTextureHandle g_motion_vectors;
     RGTextureHandle g_roughness;
+    RGTextureHandle g_albedo;
+    RGTextureHandle g_position;
     
     
     RGTextureHandle history_hdr;

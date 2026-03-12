@@ -1,16 +1,16 @@
-{
-	"resource": {
-		"name": "tlas",
-		"usage": "frame",
-		"set": "SET_TLAS",
-		"allowed_stages": ["rtx_raygen"],
-		"parameters": {
-			"tlas": {
-				"type": "tlas",
-				"sampler": "default",
-				"variable": "u_tlas",
-				"binding": "BINDING_TLAS_TLAS"
+	{
+		"resource": {
+			"name": "tlas",
+			"usage": "frame",
+			"set": "SET_TLAS",
+			"allowed_stages": ["rtx_raygen", "rtx_closest_hit"],
+			"parameters": {
+				"tlas": {
+					"type": "tlas",
+					"sampler": "default",
+					"variable": "u_tlas",
+					"binding": "BINDING_TLAS_TLAS"
+				}
 			}
 		}
 	}
-}

@@ -54,13 +54,18 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
 
     VkDeviceSize index_size =
         primitive.indices.size() * sizeof(uint32_t);
+    
+    VkBufferUsageFlags usage =
+          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+        | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+        | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+        | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
 
     // ---- Vertex buffer ----
     buffer_manager.create_device_local_buffer_with_data(
         primitive.vertices.data(),
         vertex_size,
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        usage,
         data.vertex_buffer,
         data.vertex_memory
     );
@@ -69,8 +74,7 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     buffer_manager.create_device_local_buffer_with_data(
         primitive.indices.data(),
         index_size,
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        usage,
         data.index_buffer,
         data.index_memory
     );

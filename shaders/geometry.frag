@@ -24,6 +24,8 @@ layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 out_g_normal;
 layout(location = 2) out vec2 out_g_motion_vectors;
 layout(location = 3) out float out_g_roughness;
+layout(location = 4) out vec3 out_g_albedo;
+layout(location = 5) out vec3 out_g_position;
 #endif 
 
 
@@ -231,6 +233,8 @@ void main()
 
     out_g_motion_vectors = curr_ndc - prev_ndc;
     out_g_roughness = roughness;
+    out_g_albedo = albedo;
+    out_g_position = v_world_pos;
 #endif
     
 }

@@ -3,7 +3,7 @@
 		"name": "gbuffer",
 		"usage": "frame",
 		"set": "SET_GBUFFER",
-		"allowed_stages": ["fragment"],
+		"allowed_stages": ["fragment", "rtx_raygen"],
 		"parameters": {
 			"depth": {
 				"type": "sampler",
@@ -22,6 +22,18 @@
 				"sampler": "default",
 				"variable": "u_roughness",
 				"binding": "BINDING_SAMPLER_ROUGHNESS"
+			},
+			"albedo": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_albedo",
+				"binding": "BINDING_SAMPLER_ALBEDO"
+			},
+			"position": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_position",
+				"binding": "BINDING_SAMPLER_POSITION"
 			}
 		}
 	}

@@ -18,14 +18,20 @@ export struct CameraUBO
 {
     glm::mat4 proj;
     glm::mat4 view;
+    
     glm::mat4 prev_proj;
     glm::mat4 prev_view;
+    
+    glm::mat4 inv_view;
+    glm::mat4 inv_proj;
+    glm::mat4 inv_viewproj;
+    
     glm::vec3 camera_pos;   PAD(1);
     float near;
     float far;
 };
 REFLECT_STRUCT_RUNTIME(CameraUBO,
-    proj, view, prev_proj, prev_view,  camera_pos, near, far);
+    proj, view, prev_proj, prev_view, inv_view, inv_proj, inv_viewproj, camera_pos, near, far);
 
 
 export struct ModelPushConstants

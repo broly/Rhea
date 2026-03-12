@@ -94,6 +94,26 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .dimension = capture_dimension
     });
     
+    
+    g_albedo = create_texture({
+        .name = NAME(g_albedo),
+        .extent = resolution,
+        .format = TextureFormat::RGBA8_UNORM,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension
+    });
+    
+    g_position = create_texture({
+        .name = NAME(g_position),
+        .extent = resolution,
+        .format = TextureFormat::RGBA16F,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension
+    });
+    
+    
     g_motion_vectors = create_texture({
         .name = NAME(g_motion_vectors),
         .extent = resolution,
@@ -111,7 +131,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .external = false,
         .dimension = capture_dimension
     });
-    
     
     g_depth = create_texture({
         .name = NAME(g_depth),
@@ -288,6 +307,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { g_normal, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_motion_vectors, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_roughness, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { g_albedo, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { g_position, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -298,21 +319,23 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
-    // add_pass({
-    //     .name = "RTXGI",
-    //     .reads = {
-    //         { g_depth, RBImageUsage::SampledFragment },
-    //         { g_normal, RBImageUsage::SampledFragment },
-    //     },
-    //     .writes = {
-    //         { hdr_color, RBImageUsage::StorageImage }
-    //     },
-    //     .execute = [this](RenderGraphContext& ctx)
-    //     {
-    //         draw_rtxgi(ctx);
-    //     },
-    //     .type = RenderPassType::rtx
-    // });
+    add_pass({
+        .name = "RTXGI",
+        .reads = {
+            { g_depth, RBImageUsage::SampledFragment },
+            { g_normal, RBImageUsage::SampledFragment },
+            { g_albedo, RBImageUsage::SampledFragment },
+            { g_position, RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { hdr_color, RBImageUsage::StorageImage }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_rtxgi(ctx);
+        },
+        .type = RenderPassType::rtx
+    });
     
     add_pass({
         .name = Names::pass_geometry_translucent,
@@ -841,6 +864,8 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
     rinst->update_image("u_depth", get_image(g_depth), ctx.frame);
     rinst->update_image("u_normal", get_image(g_normal), ctx.frame);
     rinst->update_image("u_roughness", get_image(g_roughness), ctx.frame);
+    rinst->update_image("u_position", get_image(g_position), ctx.frame);
+    rinst->update_image("u_albedo", get_image(g_albedo), ctx.frame);
     
     
     auto ssr_instance = ssr_resource->query_single();
@@ -1236,6 +1261,9 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
     
     ctx.bind(hdr_color_storage_resource);
     ctx.bind(tlas_resource);
+    ctx.bind(gbuffer_resource);
+    ctx.bind(camera_resource);
+    ctx.bind(light_resource);
     
     RTXGIPushConstants pc{};
     pc.frame = ctx.frame;
@@ -1321,6 +1349,9 @@ CameraUBO GenericRenderGraph::make_camera_ubo(RenderGraphContext& ctx, bool zero
 
     camera_ubo.proj = proj;
     camera_ubo.view = view;
+    camera_ubo.inv_proj = glm::inverse(proj);
+    camera_ubo.inv_view = glm::inverse(view);
+    camera_ubo.inv_viewproj = glm::inverse(proj * view);
     camera_ubo.camera_pos = cam_ro->position;
     camera_ubo.far = cam_ro->far;
     camera_ubo.near = cam_ro->near;

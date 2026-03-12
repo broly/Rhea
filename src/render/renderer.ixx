@@ -16,6 +16,9 @@ export class MaterialInstance;
 export class RenderGraph;
 export class RenderGraphContext;
 
+export std::function<void()> NVTX_Start = nullptr;
+export std::function<void()> NVTX_Finish = nullptr;
+
 export class Renderer : public std::enable_shared_from_this<Renderer>
 {
 public:

@@ -811,6 +811,9 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
 
 void VkRenderBackend::trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth)
 {
+    if (resolution.is_zero())
+        resolution = swapchain.get_extent();
+    
     auto as_vk_rtx_pipeline = (VkPipelineObject_RayTrace*)pipeline_object;
     vk_ext::vkCmdTraceRaysKHR(cmd.as<VkCommandBuffer>(),
         as_vk_rtx_pipeline->get_raygen_sbt(),

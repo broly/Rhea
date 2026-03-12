@@ -198,3 +198,23 @@ if (MSVC)
         ${CMAKE_SOURCE_DIR}/tools/debugger/Name.natvis
     )
 endif()
+
+
+
+
+# Windows specific: set the CUDA toolkit path manually
+if (WIN32)
+    set(CUDAToolkit_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2")
+endif()
+
+
+# Find CUDA toolkit
+find_package(CUDAToolkit REQUIRED)
+
+# Include NVTX headers
+target_include_directories(rhea PRIVATE "${CUDAToolkit_INCLUDE_DIRS}")
+
+
+
+target_include_directories(rhea PRIVATE ${CUDA_TOOLKIT_ROOT_DIR}/include)
+target_compile_definitions(rhea PRIVATE WIN32)

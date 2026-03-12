@@ -63,15 +63,18 @@ void Renderer::execute_graph(
 {
     PROFILE("execute_graph");
     
+    if (NVTX_Start)
+        NVTX_Start();
+    
     
     auto& backend = *render_backend;
-    
     RBFrameHandle frame = backend.get_current_frame();
-        
 
     backend.wait_for_frame(frame);
-    
-    backend.flush_frame_garbage(frame); 
+
+    backend.reset_frame_fence(frame);
+
+    backend.flush_frame_garbage(frame);
 
     if (!backend.acquire_next_image(frame))
     {
@@ -81,20 +84,18 @@ void Renderer::execute_graph(
 
     RBCommandList cmd = backend.begin_commands(frame);
 
-    backend.reset_frame_fence(frame);
-
-    
-    // render graph execution
     rg->execute(cmd, frame, params, callback);
-    
 
     backend.end_commands(cmd);
-    
+
     if (!backend.submit_frame(frame, cmd))
     {
         rg->rebuild_resources();
         return;
     }
+    
+    if (NVTX_Finish)
+        NVTX_Finish();
     
 
     backend.advance_frame();

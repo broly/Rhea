@@ -10,8 +10,23 @@ import name;
 import log;
 import rhobject;
 import assets;
+import render;
 
 #include "logging/log_macro.h"
+
+
+#undef WIN32_LEAN_AND_MEAN
+#undef VC_EXTRALEAN
+
+
+#include <windows.h>
+
+HMODULE a = 0;
+
+#define NVTX_NO_DEPRECATED
+#define NVTX_NO_CUDA_BINDINGS
+
+#include <nvtx3/nvToolsExt.h>
 
 DEFINE_LOGGER(LogMain, Display);
 
@@ -34,6 +49,15 @@ int main()
 {
     LogMain.Log("Engine init");
     paths::init();
+    
+    NVTX_Start = [] ()
+    {
+        nvtxRangePushA("ExecuteGraph");
+    };
+    NVTX_Finish = [] ()
+    {
+        nvtxRangePop();
+    };
     
     reflect::create_defaults();
     

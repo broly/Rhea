@@ -114,7 +114,7 @@ void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
                 has_swapchain_images ? std::optional{old_image_handle} : std::nullopt);
     }
     
-    images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
+    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
     
     render_finished_per_image.resize(swapchain_image_handles.size());
 
@@ -175,20 +175,6 @@ RBImageHandle vk::SwapchainControl::get_image(RBFrameHandle frame_handle) const
 bool vk::SwapchainControl::acquire_next_image(uint32_t frame)
 {
     auto& f = frames[frame];
-    
-    if (images_in_flight[current_swapchain_index] != VK_NULL_HANDLE)
-    {
-        vkWaitForFences(
-            instance.device,
-            1,
-            &images_in_flight[current_swapchain_index],
-            VK_TRUE,
-            UINT64_MAX);
-    }
-
-    images_in_flight[current_swapchain_index] =
-        frames[frame].in_flight;
-
 
     VkResult res = vkAcquireNextImageKHR(
         instance.device,
@@ -198,8 +184,7 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame)
         VK_NULL_HANDLE,
         &current_swapchain_index);
 
-    if (res == VK_ERROR_OUT_OF_DATE_KHR || 
-        res == VK_SUBOPTIMAL_KHR)
+    if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
     {
         recreate_swapchain();
         return false;
@@ -209,65 +194,44 @@ bool vk::SwapchainControl::acquire_next_image(uint32_t frame)
     return true;
 }
 
+
 bool vk::SwapchainControl::submit_frame(
     RBFrameHandle frame,
     const RBCommandList& cmd_list)
 {
-    if (swapchain == VK_NULL_HANDLE)
-        return false;
-
     auto& f = frames[frame];
 
-    VkCommandBuffer cmd =
-        cmd_list.as<VkCommandBuffer>();
-
-    VkPipelineStageFlags wait_stage =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-    vkResetFences(instance.device, 1, &f.in_flight);
+    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit.waitSemaphoreCount = 1;
     submit.pWaitSemaphores = &f.image_available;
     submit.pWaitDstStageMask = &wait_stage;
     submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &cmd;
+    submit.pCommandBuffers = cmd_list.ptr<VkCommandBuffer>();
     submit.signalSemaphoreCount = 1;
-    VkSemaphore render_finished = render_finished_per_image[current_swapchain_index];
-    submit.pSignalSemaphores = &render_finished;
+    submit.pSignalSemaphores = &render_finished_per_frame[frame];
 
-    VK_CHECK(vkQueueSubmit(
-        instance.graphics_queue,
-        1,
-        &submit,
-        f.in_flight));
+    VK_CHECK(vkQueueSubmit(instance.graphics_queue, 1, &submit, f.in_flight));
 
-    VkPresentInfoKHR present{
-        VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-
+    VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &render_finished;
+    present.pWaitSemaphores = &render_finished_per_frame[frame];
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain;
     present.pImageIndices = &current_swapchain_index;
 
-    VkResult res =
-        vkQueuePresentKHR(instance.present_queue, &present);
-
-    if (res == VK_ERROR_OUT_OF_DATE_KHR ||
-        res == VK_SUBOPTIMAL_KHR ||
-        framebuffer_resized)
+    VkResult res = vkQueuePresentKHR(instance.present_queue, &present);
+    if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || framebuffer_resized)
     {
         framebuffer_resized = false;
         recreate_swapchain();
         return false;
     }
-    
+
     VK_CHECK(res);
-    
     return true;
 }
-
 
 
 void vk::SwapchainControl::advance_frame()
@@ -318,30 +282,20 @@ void vk::SwapchainControl::cleanup()
 void vk::SwapchainControl::create_sync_objects()
 {
     VkSemaphoreCreateInfo sem_ci{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-
     VkFenceCreateInfo fence_ci{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(
-            instance.device, &sem_ci, nullptr,
-            &frames[i].image_available));
-
-        VK_CHECK(vkCreateFence(
-            instance.device, &fence_ci, nullptr,
-            &frames[i].in_flight));
+        VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &frames[i].image_available));
+        VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &render_finished_per_frame[i]));
+        VK_CHECK(vkCreateFence(instance.device, &fence_ci, nullptr, &frames[i].in_flight));
     }
 }
 
 void vk::SwapchainControl::wait_for_frame(uint32_t frame)
 {
-    vkWaitForFences(
-        instance.device,
-        1,
-        &frames[frame].in_flight,
-        VK_TRUE,
-        UINT64_MAX);
+    vkWaitForFences(instance.device, 1, &frames[frame].in_flight, VK_TRUE, UINT64_MAX);
 }
 
 
@@ -350,5 +304,5 @@ void vk::SwapchainControl::reset_frame_fence(uint32_t frame)
     PROFILE(__FUNCTION__);
     auto& f = frames[frame];
 
-    vkResetFences(instance.device, 1, &f.in_flight);
+    vkResetFences(instance.device, 1, &frames[frame].in_flight);
 }

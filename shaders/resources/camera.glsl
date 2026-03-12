@@ -10,6 +10,10 @@ uniform CameraUBO
     mat4 prev_proj;
     mat4 prev_view;
     
+    mat4 inv_view;
+    mat4 inv_proj;
+    mat4 inv_viewproj;
+    
     vec4 camera_pos;
     
     float near;
