@@ -1,0 +1,68 @@
+{
+	"model_name": "rtxgi",
+	
+	"enums": {},
+	"uniform_buffers": {},
+	
+	"material_resource": "hdr_color",
+		
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_RayTracing",
+			"pass": "RTXGI",
+			"max_recursion_depth": 31,
+			"stages": {
+				"rtx_raygen": {
+					"shader": "rtxgi.rgen",
+					"resources": [
+						"hdr_color_storage",
+						"tlas",
+						"gbuffer",
+						"camera"
+					]
+				},
+				"rtx_miss": {
+					"shader": "rtxgi_miss.rmiss",
+					"resources": [
+						"light",
+						"gbuffer",
+						"mesh_table"
+					]
+				},
+				"rtx_closest_hit": {
+					"shader": "rtxgi_hit.rchit",
+					"resources": [
+					]
+				}
+			},
+			"shader_groups": [
+				{
+					"type": "general",
+					"general": "rtx_raygen"
+				},
+				{
+					"type": "general",
+					"general": "rtx_miss"
+				},
+				{
+					"type": "triangles_hit",
+					"closest_hit": "rtx_closest_hit"
+				}
+			],
+			"push_constants": [
+				{
+					"type": "RTXGIPushConstants",
+					"name": "rtxgi",
+					"stages": [
+						"rtx_raygen",
+						"rtx_closest_hit"
+					]
+				}
+			]
+		}
+	]
+}

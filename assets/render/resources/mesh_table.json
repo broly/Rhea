@@ -1,0 +1,16 @@
+{
+	"resource": {
+		"name": "mesh_table",
+		"usage": "persistent",
+		"allowed_stages": ["vertex", "fragment", "raygen", "closesthit"],
+		"parameters": {
+			"mesh_table": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_MESH_TABLE",
+				"variable": "u_mesh_table",
+				"initial_size": 128000
+			}
+		},
+		"set": "SET_SCENE"
+	}
+}
