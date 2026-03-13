@@ -192,11 +192,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     ssr_pipeline = ssr_pipeline_family->request_pipeline({});
 
     ssr_composite_pipeline_family = renderer->query_pipeline_family("SSRComposite", ssr_model);
-    ssr_composite_pipeline = ssr_composite_pipeline_family->request_pipeline({});
-
-    ssr_material = std::make_shared<Material>();
-    ssr_material->model = "ssr";
-    
+    ssr_composite_pipeline = ssr_composite_pipeline_family->request_pipeline({});    
     
     auto rtxgi_model = renderer->find_model("rtxgi");
     
@@ -210,14 +206,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .format = TextureFormat::Depth32F,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
-    
-
-
-    tonemap_material = std::make_shared<Material>();
-    tonemap_material->model = "Tonemap";
-    
-    copy_material = std::make_shared<Material>();
-    copy_material->model = "copy";
     
     
     
@@ -949,14 +937,11 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         
         if (ctx.bind_pipeline(pipeline))
         {
-            ctx.bind(camera_resource);
-            ctx.bind(mesh_table_resource);
+            ctx.bind(camera_resource, mesh_table_resource);
             
             if (!is_depth_prepass)
             {
-                ctx.bind(shadow_resource);
-                ctx.bind(light_resource);
-                ctx.bind(reflection_resource);
+                ctx.bind(shadow_resource, light_resource, reflection_resource);
             }
         }
 
