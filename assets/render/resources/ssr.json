@@ -1,0 +1,16 @@
+{
+	"resource": {
+		"name": "ssr",
+		"usage": "frame",
+		"set": "SET_SSR",
+		"allowed_stages": ["fragment"],
+		"parameters": {
+			"ssr": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_ssr",
+				"binding": "BINDING_SAMPLER_SSR"
+			}
+		}
+	}
+}
