@@ -56,6 +56,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     tlas_resource = renderer->find_resource("tlas");
     copy_resource = renderer->find_resource("copy");
     mesh_table_resource = renderer->find_resource("mesh_table");
+    clouds_resource = renderer->find_resource("clouds");
+
     
     
     
@@ -87,6 +89,15 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     g_normal = create_texture({
         .name = NAME(g_normal),
+        .extent = resolution,
+        .format = TextureFormat::RGBA8_UNORM,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension
+    });
+    
+    g_world_normal = create_texture({
+        .name = NAME(g_world_normal),
         .extent = resolution,
         .format = TextureFormat::RGBA8_UNORM,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
@@ -242,7 +253,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
            },
            .execute = [this] (RenderGraphContext& ctx)
            {
-                ctx.backend.bind_pipeline(ctx.cmd, shadow_debug_pipeline);
+               ctx.bind_pipeline(shadow_debug_pipeline);
             
                 auto shadow_debug_material_instance = 
                     renderer->query_material_instance(shadow_debug_material, ctx.pass_name);
@@ -305,6 +316,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_depth, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
             { g_normal, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { g_world_normal, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_motion_vectors, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_roughness, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_albedo, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
@@ -319,23 +331,24 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
-    add_pass({
-        .name = "RTXGI",
-        .reads = {
-            { g_depth, RBImageUsage::SampledFragment },
-            { g_normal, RBImageUsage::SampledFragment },
-            { g_albedo, RBImageUsage::SampledFragment },
-            { g_position, RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { hdr_color, RBImageUsage::StorageImage }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            draw_rtxgi(ctx);
-        },
-        .type = RenderPassType::rtx
-    });
+    // add_pass({
+    //     .name = "RTXGI",
+    //     .reads = {
+    //         { g_depth, RBImageUsage::SampledFragment },
+    //         { g_normal, RBImageUsage::SampledFragment },
+    //         { g_world_normal, RBImageUsage::SampledFragment },
+    //         { g_albedo, RBImageUsage::SampledFragment },
+    //         { g_position, RBImageUsage::SampledFragment },
+    //     },
+    //     .writes = {
+    //         { hdr_color, RBImageUsage::StorageImage }
+    //     },
+    //     .execute = [this](RenderGraphContext& ctx)
+    //     {
+    //         draw_rtxgi(ctx);
+    //     },
+    //     .type = RenderPassType::rtx
+    // });
     
     add_pass({
         .name = Names::pass_geometry_translucent,
@@ -471,7 +484,6 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     rebuild_camera_ubo(ctx);
     
     prepared_batches.clear();
-    prepared_pass_resources.clear();
 
     // -------- resources --------
     prepare_geometry_resources(ctx);
@@ -506,12 +518,10 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
             ctx.cmd,
             meshes,
             transforms);
-
-        auto mesh_table_instance = mesh_table_resource->query_single();
             
         auto mesh_table_info = backend->get_mesh_table_info();
         
-        mesh_table_instance->update_ssbo(
+        mesh_table_resource->update_ssbo(
             "u_mesh_table",
             sizeof(GPUMesh) * mesh_table_info.size,
             mesh_table_info.address,
@@ -589,24 +599,18 @@ void GenericRenderGraph::bind_shadow_globals(
     RenderGraphContext& ctx)
 {
     auto& scene_view = engine->scene_view;
-    auto cmd   = ctx.cmd;
     auto frame = ctx.frame;
-
     
-    
-    auto& camera_processor =
-        scene_view->get_processor<SceneViewProcessor_Camera>();
+    auto& camera_processor = scene_view->get_processor<SceneViewProcessor_Camera>();
     
     auto light_ubo = build_light_ubo(camera_processor.get_active_camera()->position);
 
-    auto light = light_resource->query_single();
-
-    light->update_uniform_buffer(
+    light_resource->update_uniform_buffer(
         "light_ubo",
         light_ubo,
         frame);
-
-    light->bind(cmd, frame);
+    
+    ctx.bind(light_resource);
 }
 
 
@@ -646,30 +650,19 @@ void GenericRenderGraph::prepare_geometry_resources(
     {
         bool is_depth_prepass = (pass_name == Name("DepthPrepass"));
         
-        PreparedPassResources prep{};
 
         // ---------- Camera ----------
 
-        auto cam =
-            camera_resource->query_single(0);
-
-        cam->update_uniform_buffer(
+        camera_resource->update_uniform_buffer(
             "camera_ubo",
             current_camera_ubo,
             frame);
-
-        prep.camera = cam;
         
         if (!is_depth_prepass)
         {
             // ---------- Reflection ----------
 
-            auto refl =
-                reflection_resource->query_single();
-
-            auto& reflection_capture_processor =
-                engine->scene_view
-                      ->get_processor<SceneViewProcessor_ReflectionCapture>();
+            auto& reflection_capture_processor = engine->scene_view->get_processor<SceneViewProcessor_ReflectionCapture>();
 
             auto reflection_capture =
                 reflection_capture_processor.query_nearest(
@@ -677,58 +670,45 @@ void GenericRenderGraph::prepare_geometry_resources(
 
             if (reflection_capture)
             {
-                refl->update_image(
+                reflection_resource->update_image(
                     "u_irradiance",
                     renderer->get_cubemap(reflection_capture->irradiance),
                     frame,
                     0,
                     true);
 
-                refl->update_image(
+                reflection_resource->update_image(
                     "u_prefilter_map",
                     renderer->get_cubemap(reflection_capture->prefiltered_env),
                     frame,
                     0,
                     true);
 
-                refl->update_image(
+                reflection_resource->update_image(
                     "u_brdf_lut",
                     get_image(brdf_lut),
                     frame);
             }
 
-            prep.reflection = refl;
 
             // ---------- Lights ----------
 
-            LightUBO light_ubo =
-                build_light_ubo(current_camera_ubo.camera_pos);
+            LightUBO light_ubo = build_light_ubo(current_camera_ubo.camera_pos);
 
-            auto light =
-                light_resource->query_single();
-
-            light->update_uniform_buffer(
+            light_resource->update_uniform_buffer(
                 "light_ubo",
                 light_ubo,
                 frame);
 
-            prep.light = light;
-
             // ---------- Shadow ----------
 
-            auto shadow =
-                shadow_resource->query_single();
-
-            shadow->update_image(
+            shadow_resource->update_image(
                 "u_shadow_depth",
                 get_image(shadow_map),
                 frame);
 
-            prep.shadow = shadow;
         }
         
-        prepared_pass_resources[pass_name].resize(1);
-        prepared_pass_resources[pass_name][0][pipeline] = prep;
         // resource_map[pipeline] = prep;
     }
 }
@@ -759,22 +739,14 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
             cloud_model
         );
 
-    PipelineObject* pipeline = pipeline_family->request_pipeline({});
-
-    prepared_clouds.pipeline = pipeline;
+    clouds_pipeline = pipeline_family->request_pipeline({});
 
     // ---------- Camera ----------
-
-    auto cam =
-        camera_resource->query_single();
-
-    cam->update_uniform_buffer(
+    camera_resource->update_uniform_buffer(
         "camera_ubo",
         current_camera_ubo,
         frame
     );
-
-    prepared_clouds.camera = cam;
 
     // ---------- Clouds UBO ----------
     CloudsUBO clouds_ubo{};
@@ -793,96 +765,59 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
     
     clouds_ubo.sky_ambient = { 0.45f, 0.55f, 0.7f, 0.0f };
     clouds_ubo.horizon_color = { 0.8f, 0.9f, 1.0f, 0.0f };
-
-    auto material_instance =
-        renderer->query_material_instance(
-            cloud_material,
-            "Clouds"
-        );
-
-    auto instance =
-        material_instance->get_or_create_resource_instance(
-            frame
-        );
-
-    instance->update_uniform_buffer(
+    
+    clouds_resource->update_uniform_buffer(
         "clouds_ubo",
         clouds_ubo,
         frame
     );
 
-    instance->update_image(
+    clouds_resource->update_image(
         "u_depth",
         get_image(g_depth),
         frame
     );
 
-    instance->update_image(
+    clouds_resource->update_image(
         "u_noise",
         get_image(noise_texture),
         frame
     );
 
-    prepared_clouds.instance = instance;
 }
 
 void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
 {
     auto frame = ctx.frame;
 
-
-    auto cam = camera_resource->query_single();
-
-    cam->update_uniform_buffer(
+    camera_resource->update_uniform_buffer(
         "camera_ubo",
         current_camera_ubo,
         frame
     );
-
-    prepared_wireframe.camera = cam;
 }
 
 void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
 {
-    auto material_instance =
-    renderer->query_material_instance(
-        ssr_material,
-        "SSR");
+    gbuffer_resource->update_image("u_depth", get_image(g_depth), ctx.frame);
+    gbuffer_resource->update_image("u_normal", get_image(g_normal), ctx.frame);
+    gbuffer_resource->update_image("u_world_normal", get_image(g_world_normal), ctx.frame);
+    gbuffer_resource->update_image("u_roughness", get_image(g_roughness), ctx.frame);
+    gbuffer_resource->update_image("u_position", get_image(g_position), ctx.frame);
+    gbuffer_resource->update_image("u_albedo", get_image(g_albedo), ctx.frame);
 
-    auto instance =
-        material_instance->get_or_create_resource_instance(
-            ctx.frame);
-
-    instance->update_image(
-        "u_hdr_color",
-        get_image(hdr_color),
-        ctx.frame);
-
-    
-    auto res = renderer->find_resource("gbuffer");
-    auto rinst = res->query_single();
-    rinst->update_image("u_depth", get_image(g_depth), ctx.frame);
-    rinst->update_image("u_normal", get_image(g_normal), ctx.frame);
-    rinst->update_image("u_roughness", get_image(g_roughness), ctx.frame);
-    rinst->update_image("u_position", get_image(g_position), ctx.frame);
-    rinst->update_image("u_albedo", get_image(g_albedo), ctx.frame);
-    
-    
-    auto ssr_instance = ssr_resource->query_single();
-    auto hdr_color_instance = hdr_color_resource->query_single();
-
-    hdr_color_instance->update_image(
+    hdr_color_resource->update_image(
         "u_hdr_color",
         get_image(hdr_color),
         ctx.frame);
     
     
-    hdr_color_instance->update_image(
+    hdr_color_resource->update_image(
         "u_history",
         get_image(hdr_color),
         ctx.frame);
 
-    ssr_instance->update_image(
+    ssr_resource->update_image(
         "u_ssr",
         get_image(ssr_texture),
         ctx.frame);
@@ -893,7 +828,7 @@ void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTexture
 {
     ctx.bind_pipeline(copy_pipeline);
     
-    copy_resource->query_single()->update_image(
+    copy_resource->update_image(
         "u_source",
         get_image(source),
         ctx.frame
@@ -966,14 +901,6 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     auto& mesh_processor =
         engine->scene_view
             ->get_processor<SceneViewProcessor_Mesh>();
-
-    auto& pass_preps_by_level =
-        prepared_pass_resources[ctx.pass_name];
-
-    auto& pass_preps =
-        pass_preps_by_level[ctx.level];
-    
-    RBPipelineLayout current_pipeline_layout {};
 
     ctx.backend.update_viewport(
         ctx.cmd,
@@ -1094,10 +1021,9 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
 {
     PROFILE("Clouds");
     
-    if (ctx.bind_pipeline(prepared_clouds.pipeline))
+    if (ctx.bind_pipeline(clouds_pipeline))
     {
-        ctx.bind(prepared_clouds.camera);
-        ctx.bind(prepared_clouds.instance);
+        ctx.bind(camera_resource, clouds_resource);
     }
     ctx.draw_fullscreen();
 
@@ -1138,11 +1064,9 @@ void GenericRenderGraph::draw_wireframe(RenderGraphContext& ctx)
         engine->scene_view
             ->get_processor<SceneViewProcessor_Mesh>();
     
-    ctx.backend.bind_pipeline(
-        ctx.cmd,
-        wireframe_pipeline);
+    ctx.bind_pipeline(wireframe_pipeline);
     
-    prepared_wireframe.camera->bind(ctx.cmd, frame);
+    ctx.bind(camera_resource);
 
     const auto& primitives = debug_processor.primitives; 
     
@@ -1218,12 +1142,9 @@ void GenericRenderGraph::draw_ssr(RenderGraphContext& ctx)
     
     if (ctx.bind_pipeline(ssr_pipeline))
     {
-        ctx.bind(camera_resource);
-        ctx.bind(gbuffer_resource);
-        ctx.bind(hdr_color_resource);
+        ctx.bind(camera_resource, gbuffer_resource, hdr_color_resource);
     }
-
-
+    
     ctx.backend.draw_fullscreen(ctx.cmd);
 }
 
@@ -1238,9 +1159,7 @@ void GenericRenderGraph::draw_ssr_composite(RenderGraphContext& ctx)
 
     if (ctx.bind_pipeline(ssr_composite_pipeline))
     {
-        ctx.bind(gbuffer_resource);
-        ctx.bind(hdr_color_resource);
-        ctx.bind(ssr_resource);
+        ctx.bind(gbuffer_resource, hdr_color_resource, ssr_resource);
     }
     ctx.backend.draw_fullscreen(ctx.cmd);
 }
@@ -1249,21 +1168,23 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
 {
     ctx.bind_pipeline(rtx_gi_pipeline);
 
-    hdr_color_storage_resource->query_single()->update_image(
+    hdr_color_storage_resource->update_image(
         "u_hdr_color",
         get_image(hdr_color),
         ctx.frame);
 
-    tlas_resource->query_single()->update_tlas(
+    tlas_resource->update_tlas(
         "u_tlas",
         tlas,
         ctx.frame);
     
-    ctx.bind(hdr_color_storage_resource);
-    ctx.bind(tlas_resource);
-    ctx.bind(gbuffer_resource);
-    ctx.bind(camera_resource);
-    ctx.bind(light_resource);
+    ctx.bind(
+        hdr_color_storage_resource,
+        tlas_resource,
+        gbuffer_resource,
+        camera_resource,
+        light_resource,
+        mesh_table_resource);
     
     RTXGIPushConstants pc{};
     pc.frame = ctx.frame;

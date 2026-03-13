@@ -27,6 +27,7 @@ export struct CameraUBO
     glm::mat4 inv_viewproj;
     
     glm::vec3 camera_pos;   PAD(1);
+    
     float near;
     float far;
 };

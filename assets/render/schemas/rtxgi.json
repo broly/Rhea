@@ -29,6 +29,7 @@
 					"shader": "rtxgi_miss.rmiss",
 					"resources": [
 						"light",
+						"tlas",
 						"gbuffer",
 						"mesh_table"
 					]

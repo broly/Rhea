@@ -17,6 +17,12 @@
 				"variable": "u_normal",
 				"binding": "BINDING_SAMPLER_NORMAL"
 			},
+			"world_normal": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_world_normal",
+				"binding": "BINDING_SAMPLER_WORLD_NORMAL"
+			},
 			"roughness": {
 				"type": "sampler",
 				"sampler": "default",

@@ -34,7 +34,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     ici.ppEnabledLayerNames = VALIDATION_LAYERS;
     
     VkValidationFeatureEnableEXT enables[] = {
-        VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+        // VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
         VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
     };
 

@@ -5,28 +5,28 @@ import :helpers;
 import :device_extension_api;
 import glm;
 
-static VkTransformMatrixKHR to_vk_transform(const Transform& t)
+VkTransformMatrixKHR to_vk_transform(const Transform& t)
 {
     glm::mat4 m = t.matrix();
 
-    VkTransformMatrixKHR vk{};
+    VkTransformMatrixKHR out{};
 
-    vk.matrix[0][0] = m[0][0];
-    vk.matrix[0][1] = m[1][0];
-    vk.matrix[0][2] = m[2][0];
-    vk.matrix[0][3] = m[3][0];
+    out.matrix[0][0] = m[0][0];
+    out.matrix[0][1] = m[1][0];
+    out.matrix[0][2] = m[2][0];
+    out.matrix[0][3] = m[3][0];
 
-    vk.matrix[1][0] = m[0][1];
-    vk.matrix[1][1] = m[1][1];
-    vk.matrix[1][2] = m[2][1];
-    vk.matrix[1][3] = m[3][1];
+    out.matrix[1][0] = m[0][1];
+    out.matrix[1][1] = m[1][1];
+    out.matrix[1][2] = m[2][1];
+    out.matrix[1][3] = m[3][1];
 
-    vk.matrix[2][0] = m[0][2];
-    vk.matrix[2][1] = m[1][2];
-    vk.matrix[2][2] = m[2][2];
-    vk.matrix[2][3] = m[3][2];
+    out.matrix[2][0] = m[0][2];
+    out.matrix[2][1] = m[1][2];
+    out.matrix[2][2] = m[2][2];
+    out.matrix[2][3] = m[3][2];
 
-    return vk;
+    return out;
 }
 
 RBAccelStruct vk::TLASManager::build_tlas(
@@ -46,7 +46,7 @@ RBAccelStruct vk::TLASManager::build_tlas(
 
         inst.transform = to_vk_transform(transforms[i]);
 
-        inst.instanceCustomIndex = i;
+        inst.instanceCustomIndex = mesh.mesh_table_index;
         inst.mask = 0xFF;
 
         inst.instanceShaderBindingTableRecordOffset = 0;
@@ -122,6 +122,7 @@ RBAccelStruct vk::TLASManager::build_tlas(
     build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
     build_info.geometryCount = 1;
     build_info.pGeometries = &geometry;
+    build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
     
     uint32_t primitive_count = instances.size();
 

@@ -10,6 +10,7 @@ export struct MeshGPUData
     VkBuffer index_buffer = VK_NULL_HANDLE;
     VkDeviceMemory index_memory = VK_NULL_HANDLE;
     uint32_t index_count = 0;
+    uint32_t vertex_count = 0;
     RBDescriptorSet descriptor_set;
     
     // BLAS

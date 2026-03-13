@@ -24,12 +24,12 @@ struct GPUMesh
     uint mesh_index;
 };
 
-layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer VertexBuffer
+layout(buffer_reference, std430, buffer_reference_align = 8) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
 
-layout(buffer_reference, std430, buffer_reference_align = 4) readonly buffer IndexBuffer
+layout(buffer_reference, std430, buffer_reference_align = 8) readonly buffer IndexBuffer
 {
     uint indices[];
 };

@@ -2,7 +2,7 @@
 	"resource": {
 		"name": "mesh_table",
 		"usage": "persistent",
-		"allowed_stages": ["vertex", "fragment", "raygen", "closesthit"],
+		"allowed_stages": ["vertex", "fragment", "rtx_raygen", "rtx_closest_hit"],
 		"parameters": {
 			"mesh_table": {
 				"type": "ssbo",

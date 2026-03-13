@@ -47,6 +47,7 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     uint32_t mesh_index = gpu_mesh_table.size();
     data.index_count =
         static_cast<uint32_t>(primitive.indices.size());
+    data.vertex_count = primitive.vertices.size();
     data.mesh_table_index = mesh_index;
 
     VkDeviceSize vertex_size =
@@ -116,7 +117,7 @@ void vk::MeshManager::build_blas(MeshGPUData& data, VkDeviceAddress vertex_addre
     triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
     triangles.vertexData.deviceAddress = vertex_address;
     triangles.vertexStride = sizeof(Vertex);
-    triangles.maxVertex = data.index_count; // todo: more precise
+    triangles.maxVertex = data.vertex_count - 1;
     triangles.indexType = VK_INDEX_TYPE_UINT32;
     triangles.indexData.deviceAddress = index_address;
 
@@ -134,6 +135,7 @@ void vk::MeshManager::build_blas(MeshGPUData& data, VkDeviceAddress vertex_addre
     build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
     build_info.geometryCount = 1;
     build_info.pGeometries = &geometry;
+    build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 
     uint32_t primitive_count = data.index_count / 3;
 

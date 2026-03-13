@@ -26,26 +26,6 @@ struct DrawBatch
     std::vector<DrawItem> items;
 };
 
-struct PreparedPassResources
-{
-    std::shared_ptr<RenderResourceInstance> camera = nullptr;
-    std::shared_ptr<RenderResourceInstance> light  = nullptr;
-    std::shared_ptr<RenderResourceInstance> shadow = nullptr;
-    std::shared_ptr<RenderResourceInstance> reflection = nullptr;
-};
-
-struct PreparedWireframe
-{
-    std::shared_ptr<RenderResourceInstance> camera = nullptr;
-};
-
-struct PreparedCloudsPass
-{
-    PipelineObject* pipeline = nullptr;
-    std::shared_ptr<RenderResourceInstance> camera = nullptr;
-    std::shared_ptr<RenderResourceInstance> instance = nullptr;
-};
-
 struct ViewInfo
 {
     glm::mat4 view;
@@ -108,6 +88,7 @@ public:
     
     RGTextureHandle g_depth;
     RGTextureHandle g_normal;
+    RGTextureHandle g_world_normal;
     RGTextureHandle g_motion_vectors;
     RGTextureHandle g_roughness;
     RGTextureHandle g_albedo;
@@ -133,6 +114,7 @@ public:
     RenderResource* hdr_color_storage_resource = nullptr;
     RenderResource* tlas_resource = nullptr;
     RenderResource* mesh_table_resource = nullptr;
+    RenderResource* clouds_resource = nullptr;
     
     Extent resolution;
     Extent swapchain_extent;
@@ -175,22 +157,8 @@ public:
     
     using PassBatches = std::vector<DrawBatch>;
     std::unordered_map<Name, PassBatches> prepared_batches;
-
-    // pass_name -> [pass_instance_id] -> pipeline -> resources
-    using PipelineResourceMap =
-        std::unordered_map<RBPipelineLayout, PreparedPassResources>;
-
-    std::unordered_map<
-        Name,
-        std::vector<PipelineResourceMap>
-    > prepared_pass_resources;
-    
-    PreparedWireframe prepared_wireframe;
     
     
-    
-    PreparedCloudsPass prepared_clouds;
-
     
     Engine* engine;
     

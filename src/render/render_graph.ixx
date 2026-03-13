@@ -141,6 +141,13 @@ public:
         resource->query_single(level)->bind(cmd, frame);
     }
     
+    template<typename... Ts>
+    requires (sizeof...(Ts) > 1)
+    void bind(Ts... vs) const
+    {
+        (bind(vs), ...);
+    }
+    
     
     void bind(const std::shared_ptr<RenderResourceInstance>& instance) const
     {

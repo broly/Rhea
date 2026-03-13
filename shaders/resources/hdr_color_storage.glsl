@@ -1,0 +1,7 @@
+#ifndef RESOURCES_HDR_COLOR_STORAGE
+#define RESOURCES_HDR_COLOR_STORAGE
+
+layout(set = SET_HDR_COLOR_STORAGE, binding = BINDING_SAMPLER_HDR_COLOR_STORAGE, rgba16f)
+uniform image2D u_hdr_color;
+
+#endif  // RESOURCES_HDR_COLOR_STORAGE

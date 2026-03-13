@@ -22,10 +22,11 @@ layout(location = 6) in vec4 v_prev_clip;
 layout(location = 0) out vec4 out_color;
 #if !BLEND_MODE_TRANSLUCENT
 layout(location = 1) out vec4 out_g_normal;
-layout(location = 2) out vec2 out_g_motion_vectors;
-layout(location = 3) out float out_g_roughness;
-layout(location = 4) out vec3 out_g_albedo;
-layout(location = 5) out vec3 out_g_position;
+layout(location = 2) out vec4 out_g_world_normal;
+layout(location = 3) out vec2 out_g_motion_vectors;
+layout(location = 4) out float out_g_roughness;
+layout(location = 5) out vec3 out_g_albedo;
+layout(location = 6) out vec3 out_g_position;
 #endif 
 
 
