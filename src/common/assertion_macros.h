@@ -56,5 +56,5 @@ import <exception>;
 
 #define pure \
     { \
-        unreachable("Pure virtual function call"); \
+        unreachable("Pure virtual function call "); \
     }

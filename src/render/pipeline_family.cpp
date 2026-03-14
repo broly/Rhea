@@ -40,7 +40,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     
     
     std::map<Name, uint32_t> processed_resources;
-    for (const auto& [stage, stage_info] : config.stages)
+    for (const auto& stage_info : config.get_stages())
     {
         for (auto resource_name : stage_info.resources)
         {
@@ -49,7 +49,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
                 const size_t index = processed_resources.at(resource_name);
                 for (ResourceBinding& var : layout_desc.resources[index].resource_variable_bindings)
                 {
-                    var.stages |= stage;
+                    var.stages |= stage_info.stage;
                 }
                 continue;
             }
@@ -73,7 +73,7 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
                     variable.parameter, 
                     binding_index,
                     sampler,
-                    stage
+                    stage_info.stage
                 });
                 binding_index++;
             }
@@ -274,8 +274,9 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
     
         for (const auto& [shader_stage, stage_info] : config.stages)
         {
-            GraphicsPipelineStage stage;
+            PipelineStage stage;
             stage.stage = shader_stage;
+            stage.shader = stage_info.shader.to_string();
             stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines).string();
             desc.stages.push_back(stage);
         }
@@ -289,15 +290,13 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         PipelineCreateDesc_Compute desc;
         
         update_generic_desc_and_defines(config, desc);
-            
-        for (const auto& [shader_stage, stage_info] : config.stages)
-        {
-            GraphicsPipelineStage stage;
-            stage.stage = shader_stage;
-            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines).string();
-            desc.stages.push_back(stage);
-        }
         
+        PipelineStage stage;
+        stage.stage = ShaderStage::compute;
+        stage.shader = config.shader_stage.shader.to_string();
+        stage.compiled_shader = request_permutation(config.shader_stage.shader.to_string(), key, defines).string();
+        desc.compute_stage = stage;
+
         result = backend->create_compute_pipeline(desc, pipeline_layout);
     } else if (std::holds_alternative<PipelineInfo_RayTracing>(*pipeline_config))
     {
@@ -307,50 +306,90 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
 
         desc.max_recursion_depth = config.max_recursion_depth;
 
-        std::vector<RayTracingShaderStage> rt_stages;
-        std::map<ShaderStage, uint32_t> stage_indices;
-
         update_generic_desc_and_defines(config, desc);
-        
-        for (const auto& [shader_stage, stage_info] : config.stages)
-        {
-            if (!is_rtx_stage(shader_stage))
-                continue;
 
-            RayTracingShaderStage stage;
-            stage.stage = shader_stage;
-            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines).string();
-            
-            uint32_t index = (uint32_t)rt_stages.size();
-            stage_indices[shader_stage] = index;
-            rt_stages.push_back(stage);
+        std::unordered_map<Name, uint32_t> shader_indices;
+        std::unordered_map<Name, uint32_t> group_indices;
+        
+        
+        /*
+            SHADERS
+        */
+
+        for (auto& shader : config.shaders)
+        {
+            RayTracingShaderStage stage{};
+
+            stage.stage = shader.stage;
+            stage.shader_source = shader.shader.to_string();
+            // stage.compiled_shader = request_permutation(shader.shader.to_string(), key, defines).string();
+
+            uint32_t index = (uint32_t)desc.stages.size();
+
+            shader_indices[shader.name] = index;
+
+            desc.stages.push_back(stage);
         }
 
-        desc.stages = std::move(rt_stages);
+        /*
+            GROUPS
+        */
 
         for (auto& group : config.shader_groups)
         {
             RayTracingShaderGroupDesc g{};
+
             g.type = group.type;
 
             if (group.general)
-                g.general_shader = stage_indices[*group.general];
+                g.general_shader = shader_indices[*group.general];
 
             if (group.closest_hit)
-                g.closest_hit_shader = stage_indices[*group.closest_hit];
+                g.closest_hit_shader = shader_indices[*group.closest_hit];
 
             if (group.any_hit)
-                g.any_hit_shader = stage_indices[*group.any_hit];
+                g.any_hit_shader = shader_indices[*group.any_hit];
 
             if (group.intersection)
-                g.intersection_shader = stage_indices[*group.intersection];
+                g.intersection_shader = shader_indices[*group.intersection];
+
+            uint32_t index = (uint32_t)desc.groups.size();
+
+            group_indices[group.name] = index;
 
             desc.groups.push_back(g);
         }
 
+        /*
+            SBT
+        */
+
+        auto build_sbt = [&](const std::vector<RayTracingSBTLayoutEntry>& src,
+            std::vector<uint32_t>& dst)
+        {
+            for (uint32_t i = 0; auto& entry : src)
+            {
+                uint32_t group_index = group_indices[entry.group];
+
+                dst.push_back(group_index);
+
+                defines.insert({ entry.define, (int)i });
+
+                i++;
+            }
+        };
+
+        build_sbt(config.sbt.raygen, desc.sbt_raygen);
+        build_sbt(config.sbt.miss, desc.sbt_miss);
+        build_sbt(config.sbt.hit, desc.sbt_hit);
+        build_sbt(config.sbt.callable, desc.sbt_callable);
+        
+        for (auto& stage : desc.stages)
+        {
+            stage.compiled_shader = request_permutation(stage.shader_source, key, defines).string();
+        }
 
         result = backend->create_raytrace_pipeline(desc, pipeline_layout);
-        
     }
     pipelines[key.key] = result;
     

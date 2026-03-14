@@ -283,6 +283,32 @@ REFLECT_STRUCT(MatModel_Resource,
     name, usage, parameters, set, allowed_stages);
 
 
+export struct PipelineInfoShaderStageInfo
+{
+    Name stage_name;
+    ShaderStage stage;
+    std::set<Name> resources;
+};
+    
+
+export struct PipelineInfo
+{
+    Name pass;
+    std::vector<MatModel_PushConstant> push_constants;
+    
+    virtual ~PipelineInfo() {}
+    virtual std::vector<PipelineInfoShaderStageInfo> get_stages() const pure;
+};
+REFLECT_STRUCT(PipelineInfo,
+    pass, push_constants);
+
+
+
+/************************************************************************
+ * GRAPHICS PIPELINE
+ ***********************************************************************/
+
+
 export enum class MatModel_WriteMaskEnum
 {
     R, G, B, A
@@ -299,18 +325,10 @@ REFLECT_STRUCT(MatModel_ColorAttachmentInfo,
     write_mask, translucent);
 
 
-export struct PipelineInfo
-{
-    Name pass;
-    std::map<ShaderStage, MatModel_PassStage> stages;
-    std::vector<MatModel_PushConstant> push_constants;
-};
-REFLECT_STRUCT(PipelineInfo,
-    pass, stages, push_constants);
-
 export struct PipelineInfo_Graphics : public PipelineInfo
 {
     std::string requirements;
+    std::map<ShaderStage, MatModel_PassStage> stages;
     std::vector<MatModel_AttributesLayout> vertex_layouts;
     bool depth_test;
     bool depth_write;
@@ -321,9 +339,66 @@ export struct PipelineInfo_Graphics : public PipelineInfo
     CompareOp compare_op;
     std::optional<DepthBiasInfo> depth_bias;
     RBBufferTopology topology;
+    
+    std::vector<PipelineInfoShaderStageInfo> get_stages() const override 
+    {
+        std::vector<PipelineInfoShaderStageInfo> result;
+        for (auto& [stage, info] : stages)
+        {
+            PipelineInfoShaderStageInfo stage_info;
+            stage_info.stage_name = reflect::enum_name(stage);
+            stage_info.stage = stage;
+            stage_info.resources = info.resources;
+            result.push_back(stage_info);
+        }
+        return result;
+    }
 };
 REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
-    requirements, depth_test, depth_write, no_color_attachments, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+    requirements, depth_test, depth_write, no_color_attachments, stages, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+
+
+
+/************************************************************************
+ * COMPUTE PIPELINE
+ ***********************************************************************/
+
+
+export struct PipelineInfo_Compute : public PipelineInfo
+{
+    MatModel_PassStage shader_stage;
+    
+    std::vector<PipelineInfoShaderStageInfo> get_stages() const override 
+    {
+        std::vector<PipelineInfoShaderStageInfo> result;
+        {
+            PipelineInfoShaderStageInfo stage_info;
+            stage_info.stage_name = "compute";
+            stage_info.stage = ShaderStage::compute;
+            stage_info.resources = shader_stage.resources;
+            result.push_back(stage_info);
+        }
+        return result;
+    }
+};
+REFLECT_STRUCT_DERIVED(PipelineInfo_Compute, PipelineInfo, 
+    shader_stage);
+
+
+/************************************************************************
+ * RAYTRACE PIPELINE
+ ***********************************************************************/
+
+
+export struct RTShaderInfo
+{
+    Name name;
+    ShaderStage stage;
+    Name shader;
+    std::set<Name> resources;
+};
+REFLECT_STRUCT(RTShaderInfo,
+    name, stage, shader, resources);
 
 
 export enum class RayTracingGroupType
@@ -338,37 +413,72 @@ REFLECT_ENUM(RayTracingGroupType,
 
 export struct RayTracingShaderGroup
 {
+    Name name;
+    
     RayTracingGroupType type;
 
-    std::optional<ShaderStage> general;
-    std::optional<ShaderStage> closest_hit;
-    std::optional<ShaderStage> any_hit;
-    std::optional<ShaderStage> intersection;
+    std::optional<Name> general;
+    std::optional<Name> closest_hit;
+    std::optional<Name> any_hit;
+    std::optional<Name> intersection;
 };
 REFLECT_STRUCT(RayTracingShaderGroup,
+    name,
     type,
     general,
     closest_hit,
     any_hit,
     intersection);
 
+export struct RayTracingSBTLayoutEntry
+{
+    Name group;
+    Name define;
+};
+REFLECT_STRUCT(RayTracingSBTLayoutEntry,
+    group, define);
+
+export struct RayTracingSBTLayout
+{
+    std::vector<RayTracingSBTLayoutEntry> raygen;
+    std::vector<RayTracingSBTLayoutEntry> miss;
+    std::vector<RayTracingSBTLayoutEntry> hit;
+    std::vector<RayTracingSBTLayoutEntry> callable;
+};
+REFLECT_STRUCT(RayTracingSBTLayout,
+    raygen, miss, hit, callable);
 
 export struct PipelineInfo_RayTracing : public PipelineInfo
 {
     uint32_t max_recursion_depth = 2;
+    
+    std::vector<RTShaderInfo> shaders;
 
     std::vector<RayTracingShaderGroup> shader_groups;
+    RayTracingSBTLayout sbt;
+    
+    std::vector<PipelineInfoShaderStageInfo> get_stages() const override 
+    {
+        std::vector<PipelineInfoShaderStageInfo> result;
+        for (auto& info : shaders)
+        {
+            PipelineInfoShaderStageInfo stage_info;
+            stage_info.stage_name = info.name;
+            stage_info.stage = info.stage;
+            stage_info.resources = info.resources;
+            result.push_back(stage_info);
+        }
+        return result;
+    }
 };
 REFLECT_STRUCT_DERIVED(PipelineInfo_RayTracing, PipelineInfo,
     max_recursion_depth,
-    shader_groups
+    shaders,
+    shader_groups,
+    sbt
 );
 
-
-export struct PipelineInfo_Compute : public PipelineInfo
-{
-};
-REFLECT_STRUCT_DERIVED_NOFIELDS(PipelineInfo_Compute, PipelineInfo);
+/***********************************************************************/
 
 
 using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics, PipelineInfo_Compute, PipelineInfo_RayTracing>;

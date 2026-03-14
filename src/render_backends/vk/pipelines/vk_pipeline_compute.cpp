@@ -35,9 +35,9 @@ VkPipelineObject_Compute::VkPipelineObject_Compute(
 
 VkPipeline VkPipelineObject_Compute::create_pipeline(VkRenderPass render_pass)
 {
-    checkf(pipeline_desc.stages.size() == 1, "compute shader missing");
+    checkf(pipeline_desc.compute_stage.compiled_shader.has_value(), "compute shader missing");
     
-    const auto& stage_info = pipeline_desc.stages[0];
+    const auto& stage_info = pipeline_desc.compute_stage;
 
     VkShader shader(instance.device, *stage_info.compiled_shader);
 

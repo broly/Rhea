@@ -319,24 +319,24 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
-    // add_pass({
-    //     .name = "RTXGI",
-    //     .reads = {
-    //         { g_depth, RBImageUsage::SampledFragment },
-    //         { g_normal, RBImageUsage::SampledFragment },
-    //         { g_world_normal, RBImageUsage::SampledFragment },
-    //         { g_albedo, RBImageUsage::SampledFragment },
-    //         { g_position, RBImageUsage::SampledFragment },
-    //     },
-    //     .writes = {
-    //         { hdr_color, RBImageUsage::StorageImage }
-    //     },
-    //     .execute = [this](RenderGraphContext& ctx)
-    //     {
-    //         draw_rtxgi(ctx);
-    //     },
-    //     .type = RenderPassType::rtx
-    // });
+    add_pass({
+        .name = "RTXGI",
+        .reads = {
+            { g_depth, RBImageUsage::SampledFragment },
+            { g_normal, RBImageUsage::SampledFragment },
+            { g_world_normal, RBImageUsage::SampledFragment },
+            { g_albedo, RBImageUsage::SampledFragment },
+            { g_position, RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { hdr_color, RBImageUsage::StorageImage }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_rtxgi(ctx);
+        },
+        .type = RenderPassType::rtx
+    });
     
     add_pass({
         .name = Names::pass_geometry_translucent,

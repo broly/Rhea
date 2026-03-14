@@ -85,7 +85,7 @@ export
     };
 
 
-    struct GraphicsPipelineStage
+    struct PipelineStage
     {
         ShaderStage stage;
         std::string shader;
@@ -124,13 +124,13 @@ export
         RBBufferTopology topology;
         std::vector<MatModel_ColorAttachmentInfo> color_attachments;
         VertexLayout vertex_layout;
-        std::vector<GraphicsPipelineStage> stages;
+        std::vector<PipelineStage> stages;
     };
     
     
     struct PipelineCreateDesc_Compute : public PipelineCreateDesc_Base
     {
-        std::vector<GraphicsPipelineStage> stages;
+        PipelineStage compute_stage;
     };
     
     
@@ -138,6 +138,7 @@ export
     {
         ShaderStage stage;
         std::string compiled_shader;
+        std::string shader_source;
     };
 
     struct RayTracingShaderGroupDesc
@@ -156,6 +157,11 @@ export
 
         std::vector<RayTracingShaderStage> stages;
         std::vector<RayTracingShaderGroupDesc> groups;
+
+        std::vector<uint32_t> sbt_raygen;
+        std::vector<uint32_t> sbt_miss;
+        std::vector<uint32_t> sbt_hit;
+        std::vector<uint32_t> sbt_callable;
     };
 
     struct FrameResources

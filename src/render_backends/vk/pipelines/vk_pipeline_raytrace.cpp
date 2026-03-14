@@ -71,10 +71,13 @@ VkPipeline VkPipelineObject_RayTrace::create_pipeline(VkRenderPass)
             VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR
         };
 
-        g.generalShader      = group.general_shader;
-        g.closestHitShader   = group.closest_hit_shader;
-        g.anyHitShader       = group.any_hit_shader;
-        g.intersectionShader = group.intersection_shader;
+        g.generalShader = group.general_shader >= 0 ? group.general_shader : VK_SHADER_UNUSED_KHR;
+
+        g.closestHitShader = group.closest_hit_shader >= 0 ? group.closest_hit_shader : VK_SHADER_UNUSED_KHR;
+
+        g.anyHitShader = group.any_hit_shader >= 0 ? group.any_hit_shader : VK_SHADER_UNUSED_KHR;
+
+        g.intersectionShader = group.intersection_shader >= 0 ? group.intersection_shader : VK_SHADER_UNUSED_KHR;
 
         switch (group.type)
         {
@@ -130,12 +133,11 @@ VkPipeline VkPipelineObject_RayTrace::create_pipeline(VkRenderPass)
 
     return vk_pipeline;
 }
+
 void VkPipelineObject_RayTrace::create_sbt()
 {
     auto& props = instance.get_rt_props();
 
-    uint32_t group_count = pipeline_desc.groups.size();
-    
     uint32_t handle_size = props.shaderGroupHandleSize;
 
     uint32_t handle_stride =
@@ -144,15 +146,27 @@ void VkPipelineObject_RayTrace::create_sbt()
     uint32_t region_stride =
         align_up(handle_stride, props.shaderGroupBaseAlignment);
 
+    uint32_t raygen_count = pipeline_desc.sbt_raygen.size();
+    uint32_t miss_count   = pipeline_desc.sbt_miss.size();
+    uint32_t hit_count    = pipeline_desc.sbt_hit.size();
+    uint32_t call_count   = pipeline_desc.sbt_callable.size();
+
+    uint32_t group_count =
+        raygen_count +
+        miss_count +
+        hit_count +
+        call_count;
+
     uint32_t sbt_size = region_stride * group_count;
 
-    std::vector<uint8_t> handles(group_count * handle_size);
+    std::vector<uint8_t> handles(
+        pipeline_desc.groups.size() * handle_size);
 
     vk_ext::vkGetRayTracingShaderGroupHandlesKHR(
         instance.device,
         vk_pipeline,
         0,
-        group_count,
+        pipeline_desc.groups.size(),
         handles.size(),
         handles.data());
 
@@ -161,8 +175,7 @@ void VkPipelineObject_RayTrace::create_sbt()
         instance.physical_device,
         sbt_size,
         VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR |
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         sbt_buffer,
@@ -174,13 +187,26 @@ void VkPipelineObject_RayTrace::create_sbt()
 
     uint8_t* dst = reinterpret_cast<uint8_t*>(data);
 
-    for (uint32_t i = 0; i < group_count; i++)
+    uint32_t offset = 0;
+
+    auto write_region =
+    [&](const std::vector<uint32_t>& groups)
     {
-        memcpy(
-            dst + i * region_stride,
-            handles.data() + i * handle_size,
-            handle_size);
-    }
+        for (auto g : groups)
+        {
+            memcpy(
+                dst + offset * region_stride,
+                handles.data() + g * handle_size,
+                handle_size);
+
+            offset++;
+        }
+    };
+
+    write_region(pipeline_desc.sbt_raygen);
+    write_region(pipeline_desc.sbt_miss);
+    write_region(pipeline_desc.sbt_hit);
+    write_region(pipeline_desc.sbt_callable);
 
     vkUnmapMemory(instance.device, sbt_memory);
 
@@ -193,17 +219,32 @@ void VkPipelineObject_RayTrace::create_sbt()
     VkDeviceAddress sbt_address =
         vkGetBufferDeviceAddress(instance.device, &addr_info);
 
-    raygen_region.deviceAddress = sbt_address;
+    uint32_t raygen_offset = 0;
+    uint32_t miss_offset   = raygen_offset + raygen_count;
+    uint32_t hit_offset    = miss_offset + miss_count;
+    uint32_t call_offset   = hit_offset + hit_count;
+
+    raygen_region.deviceAddress =
+        sbt_address + raygen_offset * region_stride;
+
     raygen_region.stride = region_stride;
-    raygen_region.size   = region_stride;
+    raygen_region.size   = region_stride * raygen_count;
 
-    miss_region.deviceAddress = sbt_address + region_stride;
+    miss_region.deviceAddress =
+        sbt_address + miss_offset * region_stride;
+
     miss_region.stride = region_stride;
-    miss_region.size   = region_stride;
+    miss_region.size   = region_stride * miss_count;
 
-    hit_region.deviceAddress = sbt_address + region_stride * 2;
+    hit_region.deviceAddress =
+        sbt_address + hit_offset * region_stride;
+
     hit_region.stride = region_stride;
-    hit_region.size   = region_stride;
+    hit_region.size   = region_stride * hit_count;
 
-    callable_region = {};
+    callable_region.deviceAddress =
+        sbt_address + call_offset * region_stride;
+
+    callable_region.stride = region_stride;
+    callable_region.size   = region_stride * call_count;
 }

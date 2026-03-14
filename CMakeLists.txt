@@ -177,6 +177,20 @@ set(ENABLE_ASAN 1)
 #     target_link_options(rhea PRIVATE /fsanitize=address)
 # endif()
 
+file(GLOB_RECURSE JSON_FILES
+    CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/render/resources/*.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/render/schemas/*.json
+)
+
+source_group("Assets\\JSON" FILES ${JSON_FILES})
+
+target_sources(rhea PRIVATE ${JSON_FILES})
+
+set_source_files_properties(${JSON_FILES}
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
+
 add_dependencies(rhea shaders)
 
 add_custom_target(compile_shaders ALL

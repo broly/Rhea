@@ -1,11 +1,11 @@
 {
 	"model_name": "rtxgi",
-	
+
 	"enums": {},
 	"uniform_buffers": {},
-	
+
 	"material_resource": "hdr_color",
-		
+
 	"permutations": {
 		"flags": {},
 		"enums": {}
@@ -13,47 +13,11 @@
 	"pipelines": [
 		{
 			"__type__": "PipelineInfo_RayTracing",
+
 			"pass": "RTXGI",
-			"max_recursion_depth": 31,
-			"stages": {
-				"rtx_raygen": {
-					"shader": "rtxgi.rgen",
-					"resources": [
-						"hdr_color_storage",
-						"tlas",
-						"gbuffer",
-						"camera"
-					]
-				},
-				"rtx_miss": {
-					"shader": "rtxgi_miss.rmiss",
-					"resources": [
-						"light",
-						"tlas",
-						"gbuffer",
-						"mesh_table"
-					]
-				},
-				"rtx_closest_hit": {
-					"shader": "rtxgi_hit.rchit",
-					"resources": [
-					]
-				}
-			},
-			"shader_groups": [
-				{
-					"type": "general",
-					"general": "rtx_raygen"
-				},
-				{
-					"type": "general",
-					"general": "rtx_miss"
-				},
-				{
-					"type": "triangles_hit",
-					"closest_hit": "rtx_closest_hit"
-				}
-			],
+
+			"max_recursion_depth": 2,
+
 			"push_constants": [
 				{
 					"type": "RTXGIPushConstants",
@@ -63,7 +27,82 @@
 						"rtx_closest_hit"
 					]
 				}
-			]
+			],
+
+			"shaders": [
+				{
+					"name": "raygen",
+					"stage": "rtx_raygen",
+					"shader": "rtxgi.rgen",
+					"resources": [
+						"tlas",
+						"camera",
+						"gbuffer",
+						"hdr_color_storage"
+					]
+				},
+				{
+					"name": "miss",
+					"stage": "rtx_miss",
+					"shader": "rtxgi_miss.rmiss",
+					"resources": [
+
+					]
+				},
+				{
+					"name": "closest_hit",
+					"stage": "rtx_closest_hit",
+					"shader": "rtxgi_hit.rchit",
+					"resources": [
+						"camera",
+						"light",
+						"mesh_table"
+					]
+				}
+			],
+
+			"shader_groups": [
+				{
+					"name": "raygen_group",
+					"type": "general",
+					"general": "raygen"
+				},
+				{
+					"name": "miss_group",
+					"type": "general",
+					"general": "miss"
+				},
+				{
+					"name": "hit_group",
+					"type": "triangles_hit",
+					"closest_hit": "closest_hit"
+				}
+			],
+
+			"sbt": {
+				"raygen": [
+					{
+						"group": "raygen_group",
+						"define": "RTXGI_RAYGEN"
+					}
+				],
+
+				"miss": [
+					{
+						"group": "miss_group",
+						"define": "RTXGI_MISS"
+					}
+				],
+
+				"hit": [
+					{
+						"group": "hit_group",
+						"define": "RTXGI_HIT"
+					}
+				],
+
+				"callable": []
+			}
 		}
 	]
 }
