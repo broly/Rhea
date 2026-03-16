@@ -115,6 +115,7 @@ public:
     RenderResource* tlas_resource = nullptr;
     RenderResource* mesh_table_resource = nullptr;
     RenderResource* clouds_resource = nullptr;
+    RenderResource* base_color_resource = nullptr;
     
     Extent resolution;
     Extent swapchain_extent;
@@ -124,16 +125,7 @@ public:
     bool allow_shadow_debug;
     
     CameraUBO current_camera_ubo;
-    
-
-    
-    std::shared_ptr<Material> tonemap_material;
-    std::shared_ptr<Material> shadow_debug_material;
-    std::shared_ptr<Material> cloud_material;
-    std::shared_ptr<Material> wireframe_material;
-    std::shared_ptr<Material> copy_material;
-    std::shared_ptr<Material> ssr_material;
-    
+        
     
     PipelineObject* copy_pipeline;
     PipelineObject* shadow_debug_pipeline;

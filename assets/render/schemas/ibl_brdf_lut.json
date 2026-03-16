@@ -22,7 +22,7 @@
 				},
 				"fragment": {
 					"shader": "ibl_brdf_lut.frag",
-					"resources": [],
+					"resources": []
 				}
 			},
 			"color_attachments": [

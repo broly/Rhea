@@ -194,12 +194,26 @@ REFLECT_ENUM(RBBufferTopology,
 
 export enum class MaterialParamType
 {
+    // hard macro (fixed parameter for permutations)
     definition,
+    
+    // uniform buffer parameter (could be set of sub-parameters)
     uniform,
+    
+    // sampled image parameter
     sampler,
+    
+    // just image parameter (could be used for write in RTX)
     image,
+    
+    // TLAS parameter
     tlas,
+    
+    // SSBO parameter
     ssbo,
+    
+    // Sub-parameters of uniform buffer:
+    
     Float,
     vec2,
     vec3,
@@ -213,12 +227,26 @@ REFLECT_ENUM(MaterialParamType,
 export struct MatModel_Parameter
 {
     MaterialParamType type;
+    
+    // 
     std::optional<Name> definition;
+    
+    // Name of shader value (can be changed via code)
     std::optional<Name> variable;
+    
+    // Name of sampler (filtering, etc.)
     std::optional<Name> sampler;
+    
+    // Name of C++ UBO class (used by reflection to connect shader and C++ structs)
     std::optional<Name> ubo;
+    
+    // binding definition (macro for binding parameter of layout)
     std::optional<Name> binding;
+    
+    // If this parameter is subparameter of UBO, this should be provided as name of parameter
     std::optional<Name> storage;
+    
+    // used in ssbo (initial buffer size)
     std::optional<size_t> initial_size;
     
     std::optional<size_t> size; // not serializable

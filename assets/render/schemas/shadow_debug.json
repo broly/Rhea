@@ -5,15 +5,6 @@
 	
 	"uniform_buffers": {},
 	
-	"parameters": {
-		"base_color": {
-			"type": "sampler",
-			"sampler": "default",
-			"variable": "u_shadow_depth",
-			"binding": "BINDING_SHADOW_DEPTH",
-			"passes": ["ShadowDebug"]
-		}
-	},	
 	"permutations": {
 		"flags": {},
 		"enums": {}
@@ -33,7 +24,7 @@
 				},
 				"fragment": {
 					"shader": "shadow_debug.frag",
-					"resources": ["base_color"],
+					"resources": ["base_color"]
 				}
 			},
 			"color_attachments": [

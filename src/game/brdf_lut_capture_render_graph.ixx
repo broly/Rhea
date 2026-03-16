@@ -30,7 +30,7 @@ public:
 
     RGTextureHandle brdf_lut;
     PipelineObject* brdf_lut_pipeline;
-    std::shared_ptr<Material> brdf_lut_material;
+    //std::shared_ptr<Material> brdf_lut_material;
     
     std::shared_ptr<PipelineFamily> brdf_lut_pipeline_family;
 

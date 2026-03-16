@@ -36,17 +36,6 @@ void BrdfLutCaptureRenderGraph::init_resources(const std::map<Name, bool>& param
 void BrdfLutCaptureRenderGraph::prepare_resources(RenderGraphContext& ctx)
 {
     
-           
-    if (!brdf_lut_material)
-    {
-        brdf_lut_material = std::make_shared<Material>();
-        brdf_lut_material->model = "IBL_BRDF_LUT";
-    }
-
-    {
-        auto mat_inst = renderer->query_material_instance(brdf_lut_material, "IBL_BRDF_LUT");
-        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
-    }
 }
 
 void BrdfLutCaptureRenderGraph::build_passes(const std::map<Name, bool>& parameters)
@@ -58,14 +47,15 @@ void BrdfLutCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
        .name = "IBL_BRDF_LUT",
        .writes = { { brdf_lut, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
        .execute = [this](RenderGraphContext& ctx) {
-           ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);
-   
-           auto mat_inst = renderer->query_material_instance(brdf_lut_material, ctx.pass_name);
-           auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
-   
-           inst->bind(ctx.cmd, ctx.frame);
-           ctx.backend.update_viewport(ctx.cmd, {512, 512});
-           ctx.backend.draw_fullscreen(ctx.cmd);
+           todo();
+           // ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);
+           //
+           // auto mat_inst = renderer->query_material_instance(brdf_lut_material, ctx.pass_name);
+           // auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
+           //
+           // inst->bind(ctx.cmd, ctx.frame);
+           // ctx.backend.update_viewport(ctx.cmd, {512, 512});
+           // ctx.backend.draw_fullscreen(ctx.cmd);
        }
    });
 }

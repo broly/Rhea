@@ -57,6 +57,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     copy_resource = renderer->find_resource("copy");
     mesh_table_resource = renderer->find_resource("mesh_table");
     clouds_resource = renderer->find_resource("clouds");
+    base_color_resource = renderer->find_resource("base_color");
 
     
     
@@ -178,14 +179,10 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     wireframe_pipeline_family = renderer->query_pipeline_family("Wireframe", wireframe_model);
     wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
-    wireframe_material = std::make_shared<Material>();
-    wireframe_material->model = "wireframe";
     
     shadow_debug_pipeline_family = renderer->query_pipeline_family("ShadowDebug", shadow_debug_model);
     shadow_debug_pipeline = shadow_debug_pipeline_family->request_pipeline({});
-    shadow_debug_material = std::make_shared<Material>();
-    shadow_debug_material->model = "shadow_debug";
-    
+
     auto ssr_model = renderer->find_model("ssr");
 
     ssr_pipeline_family = renderer->query_pipeline_family("SSR", ssr_model);
@@ -241,28 +238,12 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
            },
            .execute = [this] (RenderGraphContext& ctx)
            {
-               ctx.bind_pipeline(shadow_debug_pipeline);
-            
-                auto shadow_debug_material_instance = 
-                    renderer->query_material_instance(shadow_debug_material, ctx.pass_name);
-                
-                auto shadow_debug_instance =
-                    shadow_debug_material_instance->get_or_create_resource_instance(
-                        ctx.frame
-                    );
-                
-                shadow_debug_instance->update_image(
-                    "u_shadow_depth",
-                    get_image(shadow_map),
-                    ctx.frame
-                );
-                    
-                shadow_debug_instance->bind(
-                    ctx.cmd,
-                    ctx.frame
-                );
-                
-                ctx.backend.draw_fullscreen(ctx.cmd);
+                base_color_resource->update_image("u_base_color", get_image(shadow_map), ctx.frame);
+                if (ctx.bind_pipeline(shadow_debug_pipeline))
+                {
+                    ctx.bind(base_color_resource);
+                }
+                ctx.draw_fullscreen();
            },
        });
     }
@@ -319,24 +300,24 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
-    add_pass({
-        .name = "RTXGI",
-        .reads = {
-            { g_depth, RBImageUsage::SampledFragment },
-            { g_normal, RBImageUsage::SampledFragment },
-            { g_world_normal, RBImageUsage::SampledFragment },
-            { g_albedo, RBImageUsage::SampledFragment },
-            { g_position, RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { hdr_color, RBImageUsage::StorageImage }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            draw_rtxgi(ctx);
-        },
-        .type = RenderPassType::rtx
-    });
+    // add_pass({
+    //     .name = "RTXGI",
+    //     .reads = {
+    //         { g_depth, RBImageUsage::SampledFragment },
+    //         { g_normal, RBImageUsage::SampledFragment },
+    //         { g_world_normal, RBImageUsage::SampledFragment },
+    //         { g_albedo, RBImageUsage::SampledFragment },
+    //         { g_position, RBImageUsage::SampledFragment },
+    //     },
+    //     .writes = {
+    //         { hdr_color, RBImageUsage::StorageImage }
+    //     },
+    //     .execute = [this](RenderGraphContext& ctx)
+    //     {
+    //         draw_rtxgi(ctx);
+    //     },
+    //     .type = RenderPassType::rtx
+    // });
     
     add_pass({
         .name = Names::pass_geometry_translucent,
@@ -710,13 +691,6 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
 {
     PROFILE("prepare_clouds_pass");
     auto frame = ctx.frame;
-
-    static std::shared_ptr<Material> cloud_material;
-    if (!cloud_material)
-    {
-        cloud_material = std::make_shared<Material>();
-        cloud_material->model = "clouds";
-    }
 
     auto cloud_model =
         renderer->find_model("clouds");

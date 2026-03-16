@@ -20,9 +20,7 @@ public:
     void apply_material_parameters(
         std::shared_ptr<RenderResourceInstance> instance,
         RBFrameHandle frame);
-    
-    std::map<Name, RenderResourceInstance*> render_resource_instances_per_pass; // TODO (wtf?) by pass or by pipeline?
-    
+
     std::shared_ptr<RenderResourceInstance> get_or_create_resource_instance(
         RBFrameHandle frame
     );

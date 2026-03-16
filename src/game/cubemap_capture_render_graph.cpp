@@ -86,48 +86,48 @@ void CubemapCaptureRenderGraph::prepare_resources(RenderGraphContext& ctx)
     GenericRenderGraph::prepare_resources(ctx);
     
     
-    if (!irradiance_material)
-    {
-        irradiance_material = std::make_shared<Material>();
-        irradiance_material->model = "IBL_Irradiance";
-    }
-    
-    
-    if (!prefilter_material)
-    {
-        prefilter_material = std::make_shared<Material>();
-        prefilter_material->model = "IBL_Prefilter";
-    }
-    
-    
-           
-    if (!brdf_lut_material)
-    {
-        brdf_lut_material = std::make_shared<Material>();
-        brdf_lut_material->model = "IBL_BRDF_LUT";
-    }
-
-    
-    {
-        auto mat_inst = renderer->query_material_instance(irradiance_material, "IBL_Irradiance");
-        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
-    
-        inst->update_image("u_env_map", get_image(hdr_color), ctx.frame, 0, true);
-    }
-    {
-        auto mat_inst = renderer->query_material_instance(prefilter_material, "IBL_Prefilter");
-        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
-
-        inst->update_image("u_env_map", get_image(hdr_color), ctx.frame, 0, true);
-    } 
-    
-    {
-        
-   
-        auto mat_inst = renderer->query_material_instance(brdf_lut_material, "IBL_BRDF_LUT");
-        auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
-   
-    }
+    // if (!irradiance_material)
+    // {
+    //     irradiance_material = std::make_shared<Material>();
+    //     irradiance_material->model = "IBL_Irradiance";
+    // }
+    //
+    //
+    // if (!prefilter_material)
+    // {
+    //     prefilter_material = std::make_shared<Material>();
+    //     prefilter_material->model = "IBL_Prefilter";
+    // }
+    //
+    //
+    //        
+    // if (!brdf_lut_material)
+    // {
+    //     brdf_lut_material = std::make_shared<Material>();
+    //     brdf_lut_material->model = "IBL_BRDF_LUT";
+    // }
+    //
+    //
+    // {
+    //     auto mat_inst = renderer->query_material_instance(irradiance_material, "IBL_Irradiance");
+    //     auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
+    //
+    //     inst->update_image("u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+    // }
+    // {
+    //     auto mat_inst = renderer->query_material_instance(prefilter_material, "IBL_Prefilter");
+    //     auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
+    //
+    //     inst->update_image("u_env_map", get_image(hdr_color), ctx.frame, 0, true);
+    // } 
+    //
+    // {
+    //     
+    //
+    //     auto mat_inst = renderer->query_material_instance(brdf_lut_material, "IBL_BRDF_LUT");
+    //     auto inst = mat_inst->get_or_create_resource_instance(ctx.frame);
+    //
+    // }
 }
 
 void CubemapCaptureRenderGraph::build_passes(const std::map<Name, bool>& parameters)

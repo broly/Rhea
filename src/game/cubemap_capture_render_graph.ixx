@@ -38,11 +38,11 @@ public:
     PipelineObject* prefilter_pipeline;
     PipelineObject* brdf_lut_pipeline;
     
-    std::shared_ptr<Material> irradiance_material;
-    std::shared_ptr<Material> prefilter_material;
-    std::shared_ptr<Material> brdf_lut_material;
+    // std::shared_ptr<Material> irradiance_material;
+    // std::shared_ptr<Material> prefilter_material;
+    // std::shared_ptr<Material> brdf_lut_material;
     
-    std::shared_ptr<MaterialInstance> irradiance_material_instance;
+    // std::shared_ptr<MaterialInstance> irradiance_material_instance;
     
     std::shared_ptr<PipelineFamily> irradiance_pipeline_family;
     std::shared_ptr<PipelineFamily> prefilter_pipeline_family;

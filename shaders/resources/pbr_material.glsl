@@ -1,5 +1,5 @@
-#ifndef PBR_MATERIAL_LIGHT
-#define PBR_MATERIAL_LIGHT
+#ifndef PBR_MATERIAL
+#define PBR_MATERIAL
 
 // ================== MATERIAL ==================
 layout(set = SET_PBR, binding = BINDING_MATERIAL) uniform MaterialUBO
