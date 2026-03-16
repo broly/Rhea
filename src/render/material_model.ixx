@@ -291,9 +291,14 @@ export struct ResourceUsage
         return type == ResourceUsageType::frame;
     }
     
-    uint32_t frame_index(uint32_t frame) const
+    uint32_t frame_index(std::optional<uint32_t> frame) const
     {
-        return type == ResourceUsageType::frame ? frame : 0;
+        if (is_frame_based())
+        {
+            checkf(frame.has_value(), "frame-based resource usage must handle frame");
+            return *frame;
+        }
+        return 0;
     }
 };
 

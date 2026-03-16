@@ -81,7 +81,7 @@ public:
         query_single(instance_id)->update_tlas(name, tlas, frame);
     }
     
-    void update_ssbo(Name buffer_name, size_t size, void* data, RBFrameHandle frame, uint32_t instance_id = 0)
+    void update_ssbo(Name buffer_name, size_t size, void* data, std::optional<RBFrameHandle> frame = std::nullopt, uint32_t instance_id = 0)
     {
         query_single(instance_id)->update_ssbo(buffer_name, size, data, frame);
     }

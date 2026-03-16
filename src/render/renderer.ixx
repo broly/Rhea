@@ -15,6 +15,7 @@ import :rg_params;
 export class MaterialInstance;
 export class RenderGraph;
 export class RenderGraphContext;
+export class MaterialManager;
 
 export std::function<void()> NVTX_Start = nullptr;
 export std::function<void()> NVTX_Finish = nullptr;
@@ -78,6 +79,8 @@ protected: // (semi-)immutable info
     std::map<Name, RBSampler> samplers;
     std::map<Name, RenderResource*> resources;
     std::map<std::pair<Name, std::shared_ptr<MaterialModel>>, RenderResource*> material_resources;
+    
+    std::shared_ptr<MaterialManager> material_manager;
     
     
 protected: // materials and resources

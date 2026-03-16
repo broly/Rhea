@@ -22,6 +22,6 @@ public:
     
     virtual void update_tlas(Name name, RBAccelStruct tlas, RBFrameHandle frame) = 0;
     
-    virtual void update_ssbo(Name buffer_name, size_t size, void* data, RBFrameHandle frame) = 0;
+    virtual void update_ssbo(Name buffer_name, size_t size, void* data, std::optional<RBFrameHandle> frame = std::nullopt) = 0;
     
 };

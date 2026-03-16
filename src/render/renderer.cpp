@@ -8,6 +8,7 @@ import reflect;
 import :render_graph;
 import json_utils;
 import enum_helpers;
+import :material_manager;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -17,6 +18,14 @@ void Renderer::init(RBWindowHandle in_window)
     load_schemas();
     
     load_resources();
+    
+    
+    SerializationContext ctx;
+    ctx.strict_checking_enabled = true;
+    const char* mat_manager_object = "render/material_manager.json";
+    material_manager = json_object::load_object<MaterialManager>(paths::get_assets_path() / mat_manager_object,
+        ctx, shared_from_this());
+    
     
     
     const char* engine_config_path = "render/renderer.json";

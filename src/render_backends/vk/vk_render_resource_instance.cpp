@@ -97,7 +97,7 @@ void VkRenderResourceInstance::update_tlas(Name name, RBAccelStruct tlas, RBFram
         tlas);
 }
 
-void VkRenderResourceInstance::update_ssbo(Name buffer_name, size_t size, void* data, RBFrameHandle frame)
+void VkRenderResourceInstance::update_ssbo(Name buffer_name, size_t size, void* data, std::optional<RBFrameHandle> frame)
 {
     auto inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
     auto& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
@@ -108,7 +108,7 @@ void VkRenderResourceInstance::update_ssbo(Name buffer_name, size_t size, void* 
     uint32_t frame_index = usage.frame_index(frame);
 
     RBBufferHandle buffer = inst_info.buffers[binding_index][frame_index];
-    buffer_manager.update_any_buffer(buffer, size, data, frame);
+    buffer_manager.update_any_buffer(buffer, size, data, frame_index);
 }
 
 void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle frame)
