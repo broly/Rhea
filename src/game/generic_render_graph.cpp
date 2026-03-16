@@ -238,7 +238,10 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
            },
            .execute = [this] (RenderGraphContext& ctx)
            {
-                base_color_resource->update_image("u_base_color", get_image(shadow_map), ctx.frame);
+                base_color_resource->update_image("u_base_color", get_image(shadow_map),
+                    {
+                    .frame = ctx.frame
+                    });
                 if (ctx.bind_pipeline(shadow_debug_pipeline))
                 {
                     ctx.bind(base_color_resource);
@@ -642,21 +645,25 @@ void GenericRenderGraph::prepare_geometry_resources(
                 reflection_resource->update_image(
                     "u_irradiance",
                     renderer->get_cubemap(reflection_capture->irradiance),
-                    frame,
-                    0,
-                    true);
+                    {
+                        .frame = frame,
+                        .cubemap = true
+                    });
 
                 reflection_resource->update_image(
                     "u_prefilter_map",
                     renderer->get_cubemap(reflection_capture->prefiltered_env),
-                    frame,
-                    0,
-                    true);
+                    {
+                        .frame = ctx.frame,
+                        .cubemap = true
+                    });
 
                 reflection_resource->update_image(
                     "u_brdf_lut",
                     get_image(brdf_lut),
-                    frame);
+                    {
+                        .frame = ctx.frame
+                    });
             }
 
 
@@ -674,7 +681,9 @@ void GenericRenderGraph::prepare_geometry_resources(
             shadow_resource->update_image(
                 "u_shadow_depth",
                 get_image(shadow_map),
-                frame);
+            {
+                    .frame = ctx.frame
+                });
 
         }
         
@@ -737,13 +746,17 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
     clouds_resource->update_image(
         "u_depth",
         get_image(g_depth),
-        frame
+        {
+            .frame = ctx.frame
+          }
     );
 
     clouds_resource->update_image(
         "u_noise",
         get_image(noise_texture),
-        frame
+        {
+            .frame = ctx.frame
+        }
     );
 
 }
@@ -761,28 +774,28 @@ void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
 
 void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
 {
-    gbuffer_resource->update_image("u_depth", get_image(g_depth), ctx.frame);
-    gbuffer_resource->update_image("u_normal", get_image(g_normal), ctx.frame);
-    gbuffer_resource->update_image("u_world_normal", get_image(g_world_normal), ctx.frame);
-    gbuffer_resource->update_image("u_roughness", get_image(g_roughness), ctx.frame);
-    gbuffer_resource->update_image("u_position", get_image(g_position), ctx.frame);
-    gbuffer_resource->update_image("u_albedo", get_image(g_albedo), ctx.frame);
+    gbuffer_resource->update_image("u_depth", get_image(g_depth), {.frame=ctx.frame});
+    gbuffer_resource->update_image("u_normal", get_image(g_normal), {.frame=ctx.frame});
+    gbuffer_resource->update_image("u_world_normal", get_image(g_world_normal), {.frame=ctx.frame});
+    gbuffer_resource->update_image("u_roughness", get_image(g_roughness), {.frame=ctx.frame});
+    gbuffer_resource->update_image("u_position", get_image(g_position), {.frame=ctx.frame});
+    gbuffer_resource->update_image("u_albedo", get_image(g_albedo), {.frame=ctx.frame});
 
     hdr_color_resource->update_image(
         "u_hdr_color",
         get_image(hdr_color),
-        ctx.frame);
+        {.frame=ctx.frame});
     
     
     hdr_color_resource->update_image(
         "u_history",
         get_image(hdr_color),
-        ctx.frame);
+        {.frame=ctx.frame});
 
     ssr_resource->update_image(
         "u_ssr",
         get_image(ssr_texture),
-        ctx.frame);
+        {.frame=ctx.frame});
     
 }
 
@@ -793,7 +806,7 @@ void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTexture
     copy_resource->update_image(
         "u_source",
         get_image(source),
-        ctx.frame
+        {.frame=ctx.frame}
     );
     
     ctx.bind(copy_resource);
@@ -1130,7 +1143,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
     hdr_color_storage_resource->update_image(
         "u_hdr_color",
         get_image(hdr_color),
-        ctx.frame);
+        {.frame=ctx.frame});
 
     tlas_resource->update_tlas(
         "u_tlas",

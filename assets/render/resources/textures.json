@@ -1,0 +1,17 @@
+{
+  "resource": {
+    "name": "textures",
+    "usage": "persistent",
+    "set": "SET_TEXTURES",
+    "allowed_stages": ["fragment"],
+    "parameters": {
+      "textures": {
+        "type": "sampler",
+        "sampler": "default",
+        "variable": "u_textures_array",
+        "binding": "BINDING_SAMPLER_ARRAY_TEXTURES",
+        "initial_array_size": 1024
+      }
+    }
+  }
+}

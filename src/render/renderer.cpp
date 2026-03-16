@@ -264,7 +264,7 @@ void Renderer::toggle_flag(Name name, bool needs_rebuild)
     main_render_graph_needs_rebuild = true;
 }
 
-RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
+RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle, bool generate_mips)
 {
     const Texture& data = handle.get();
     
@@ -272,7 +272,10 @@ RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle)
         data,
         TextureCreationInfo{
             TextureFormat::RGBA8,
+            generate_mips,
             true,
+            RBImageLayout::shader_read_only_optimal,
+            RBImageLayout::shader_read_only_optimal,
         }
     );
     

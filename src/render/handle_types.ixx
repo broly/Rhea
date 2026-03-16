@@ -331,6 +331,14 @@ export
 
         bool operator==(const RBImageHandle&) const = default;
     };
+    
+    using RBImageAddress = uint64_t;
+    
+    struct RBImageCreateResult
+    {
+        RBImageHandle handle;
+        RBImageAddress address;
+    };
 
     struct RBImageDesc
     {

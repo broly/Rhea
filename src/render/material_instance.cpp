@@ -35,6 +35,8 @@ void MaterialInstance::apply_material_parameters(
     std::shared_ptr<RenderResourceInstance> instance,
     RBFrameHandle frame)
 {
+    auto textures_array_resource = renderer->find_resource("textures");
+    
     std::optional<Name> material_resource_name = model->material_resource;
     checkf(material_resource_name.has_value(), "material_resource not set");
     
@@ -97,12 +99,16 @@ void MaterialInstance::apply_material_parameters(
         // -------- Texture --------
         else if (param.type == MaterialParamType::sampler || param.type == MaterialParamType::image)
         {
-            auto tex = std::get<TextureHandle>(param_value.data);
+            auto texture_handle = std::get<TextureHandle>(param_value.data);
             instance->update_image(
                 *param.variable,
-                renderer->get_texture(tex),
-                frame
+                renderer->get_texture(texture_handle),
+                {
+                    .frame = frame
+                }
             );
+            
+            // textures_array_resource->update_image()
         }
     }
 }

@@ -61,9 +61,9 @@ public:
         update_uniform_buffer_impl(buffer_name, sizeof(T), (void*)&data, frame, instance_id);
     }
     
-    void update_image(Name buffer_name, RBImageHandle image_handle, RBFrameHandle frame, uint32_t array_index = 0, bool cubemap = false, uint32_t instance_id = 0)
+    void update_image(Name buffer_name, RBImageHandle image_handle, const UpdateImageParams& params = {}, uint32_t instance_id = 0)
     {
-        query_single(instance_id)->update_image(buffer_name, image_handle, frame, array_index, cubemap);
+        query_single(instance_id)->update_image(buffer_name, image_handle, params);
     }
     
     void bind(RBCommandList command_list, RBFrameHandle frame, uint32_t instance_id = 0)

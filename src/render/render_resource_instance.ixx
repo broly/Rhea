@@ -4,6 +4,13 @@ import <string>;
 import :pipeline_desc;
 import name;
 
+export struct UpdateImageParams
+{
+    std::optional<RBFrameHandle> frame = std::nullopt;
+    uint32_t layer_index = 0;
+    bool cubemap = false;
+};
+
 export class RenderResourceInstance
 {
 public:
@@ -14,7 +21,7 @@ public:
         update_uniform_buffer_impl(buffer_name, sizeof(T), (void*)&data, frame);
     }
     
-    virtual void update_image(Name buffer_name, RBImageHandle image_handle, RBFrameHandle frame, uint32_t array_index = 0, bool cubemap = false) = 0;
+    virtual void update_image(Name buffer_name, RBImageHandle image_handle, const UpdateImageParams& update_params) = 0;
     
     virtual void bind(RBCommandList command_list, RBFrameHandle frame) = 0;
     

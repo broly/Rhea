@@ -42,7 +42,7 @@ public:  // public API
     void set_flag(Name name, bool value, bool needs_rebuild = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
 
-    RBImageHandle create_texture_from_asset(TextureHandle handle);
+    RBImageHandle create_texture_from_asset(TextureHandle handle, bool generate_mips = true);
     RBImageHandle create_cubemap_from_asset(CubemapHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
     RBImageHandle get_cubemap(CubemapHandle handle);

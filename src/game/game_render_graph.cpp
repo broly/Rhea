@@ -74,7 +74,9 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     hdr_color_instance->update_image(
         "u_hdr_color",
         get_image(hdr_color),
-        ctx.frame
+        {
+            .frame = ctx.frame
+        }
     );
 
     uint32_t prev_layer = history_index ^ 1;
@@ -82,8 +84,10 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     hdr_color_instance->update_image(
         "u_history",
         get_image(history_hdr),
-        ctx.frame,
-        prev_layer
+        {
+            .frame = ctx.frame,
+            .layer_index = prev_layer
+        }
     );
     
     
@@ -94,7 +98,9 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     shadow_debug_instance->update_image(
         "u_shadow_depth",
         get_image(shadow_map),
-        ctx.frame
+        {
+            .frame = ctx.frame
+        }
     );
 }
 

@@ -247,9 +247,11 @@ export struct MatModel_Parameter
     std::optional<Name> storage;
     
     // used in ssbo (initial buffer size)
-    std::optional<size_t> initial_size;
+    std::optional<size_t> initial_buffer_size;
     
-    std::optional<size_t> size; // not serializable
+    std::optional<size_t> initial_array_size;
+    
+    std::optional<size_t> ubo_size; // not serializable
     
     bool is_descriptor() const
     {
@@ -260,7 +262,7 @@ export struct MatModel_Parameter
     void validate();
 };
 REFLECT_STRUCT(MatModel_Parameter,
-    type, variable, ubo, binding, storage, sampler, definition, initial_size);
+    type, variable, ubo, binding, storage, sampler, definition, initial_buffer_size, initial_array_size);
 
 
 export struct MatModel_PassStage

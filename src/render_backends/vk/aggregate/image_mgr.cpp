@@ -142,9 +142,9 @@ const vk::ImageResource& vk::ImageManager::get_image_resource(RBImageHandle imag
     return image_resources[image_handle.id];
 }
 
-VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t array_index, uint32_t mip_index)
+VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t layer_index, uint32_t mip_index)
 {
-    return fetch_image_view_generic(image_handle, array_index, mip_index);
+    return fetch_image_view_generic(image_handle, layer_index, mip_index);
 }
 
 VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)

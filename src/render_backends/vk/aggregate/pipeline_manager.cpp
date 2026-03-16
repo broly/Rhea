@@ -331,8 +331,8 @@ void vk::PipelineManager::update_buffers()
                 for (size_t frame = 0; frame < inst.sets_per_frame.size(); ++frame)
                 {
                     RBBufferHandle buffer = binding.parameter.type == MaterialParamType::uniform ?
-                        buffer_manager.create_uniform_buffer(*binding.parameter.size, resource->desc.usage) :
-                        buffer_manager.create_storage_buffer(*binding.parameter.initial_size, resource->desc.usage, true);
+                        buffer_manager.create_uniform_buffer(*binding.parameter.ubo_size, resource->desc.usage) :
+                        buffer_manager.create_storage_buffer(*binding.parameter.initial_buffer_size, resource->desc.usage, true);
 
                     buffer_manager.bind_buffer_to_descriptor(
                         inst.sets_per_frame[frame],

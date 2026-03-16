@@ -196,7 +196,9 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
         VkDescriptorSetLayoutBinding vk{};
         vk.binding = *b.binding_index;
         vk.descriptorType = vk::to_vk_descriptor_type(b.parameter.type);
-        vk.descriptorCount = 1; // b.count;
+        
+        // descriptorCount is assumed to be 1 if initial_array_size is not specified
+        vk.descriptorCount = b.parameter.initial_array_size.has_value() ? b.parameter.initial_array_size.value() : 1;
         vk.stageFlags = vk::to_vk_shader_stage_flags(b.stages);
         vk.pImmutableSamplers = nullptr;
 

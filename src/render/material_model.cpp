@@ -15,7 +15,7 @@ void MatModel_Parameter::validate()
         const reflect::RuntimeReflectionInfo* info = reflect::find_runtime_info(ubo_name);
         checkf(info != nullptr, "Can't find structure '%s'", ubo_name.to_string().c_str());
             
-        size = info->size;
+        ubo_size = info->size;
             
     } else if (type == MaterialParamType::sampler)
     {
@@ -34,7 +34,7 @@ void MatModel_Parameter::validate()
     {
         checkf(binding.has_value(), "ssbo parameters must have binding");
         checkf(variable.has_value(), "ssbo parameters must have variable");
-        checkf(initial_size.has_value(), "ssbo parameters must have initial_size");
+        checkf(initial_buffer_size.has_value(), "ssbo parameters must have initial_buffer_size");
         checkf(!definition.has_value(), "definition for sampler should be null");
         //checkf(definition.has_value(), "sampler parameters must have definition");
     } else if (type == MaterialParamType::definition)

@@ -34,8 +34,7 @@ void VkRenderResourceInstance::update_uniform_buffer_impl(Name buffer_name, size
     buffer_manager.update_any_buffer(buffer, size, data, frame);
 }
 
-void VkRenderResourceInstance::update_image(Name buffer_name,
-                                            RBImageHandle image_handle, RBFrameHandle frame, uint32_t array_index, bool cubemap)
+void VkRenderResourceInstance::update_image(Name buffer_name, RBImageHandle image_handle, const UpdateImageParams& update_params)
 {
     PROFILE("VkRenderResourceInstance::update_image");
     
@@ -48,7 +47,7 @@ void VkRenderResourceInstance::update_image(Name buffer_name,
     checkf(binding.parameter.type == MaterialParamType::sampler || binding.parameter.type == MaterialParamType::image, 
         "Type mismatch");
 
-    uint32_t frame_index = usage.frame_index(frame);
+    uint32_t frame_index = usage.frame_index(update_params.frame);
 
     RBDescriptorSet set = inst_info.sets_per_frame[frame_index];
     
@@ -60,8 +59,8 @@ void VkRenderResourceInstance::update_image(Name buffer_name,
             image_handle,
             usage,
             binding.sampler,
-            array_index,
-            cubemap);
+            update_params.layer_index,
+            update_params.cubemap);
         return;
     }
     

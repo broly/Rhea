@@ -56,13 +56,13 @@ void VkRenderBackend::transition_image(RBCommandList cmd, const ImageBarrierPara
 
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
-                                           ResourceUsage usage, std::optional<RBSampler> sampler, uint32_t array_index, bool cubemap)
+                                           ResourceUsage usage, std::optional<RBSampler> sampler, uint32_t layer_index, bool cubemap)
 {
     // VkDescriptorSet set = get_descriptor_set(layout, usage);
     LogRB.Log("update_sampled_image: %p", set);
 
     VkDescriptorImageInfo info{};
-    info.imageView   = cubemap ? get_cubemap_image_view(image) : get_image_view(image, array_index);
+    info.imageView   = cubemap ? get_cubemap_image_view(image) : get_image_view(image, layer_index);
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     info.sampler     = sampler.has_value() ? VkSampler(*sampler) : sampler_manager.get_default_sampler();
 
@@ -366,9 +366,9 @@ void VkRenderBackend::destroy_image(RBImageHandle handle, bool wait_fences)
     return image_manager.destroy_image(handle, wait_fences);
 }
 
-RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t array_index, uint32_t mip_index)
+RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t layer_index, uint32_t mip_index)
 {
-    return image_manager.get_view(handle, array_index, mip_index);
+    return image_manager.get_view(handle, layer_index, mip_index);
 }
 
 RBImageView VkRenderBackend::get_cubemap_image_view(RBImageHandle handle)

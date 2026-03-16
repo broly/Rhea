@@ -13,7 +13,7 @@ void MaterialManager::ctor(const std::shared_ptr<Renderer>& in_renderer)
 
 uint32_t MaterialManager::allocate_material(const GPUMaterial& material)
 {
-    uint32_t index = (uint32_t)materials_cpu.size();
+    const uint32_t index = (uint32_t)materials_cpu.size();
 
     materials_cpu.push_back(material);
 
@@ -27,7 +27,7 @@ void MaterialManager::upload()
     if (!dirty)
         return;
 
-    size_t size = materials_cpu.size() * sizeof(GPUMaterial);
+    const size_t size = materials_cpu.size() * sizeof(GPUMaterial);
     
     material_resource->update_ssbo("material_ssbo", size, materials_cpu.data());
 

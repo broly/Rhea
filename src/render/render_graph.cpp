@@ -5,6 +5,7 @@ import :render_backend;
 import <vulkan/vulkan_core.h>;
 import <cassert>;
 import profile;
+import :renderer;
 #include "profiling/profile.h"
 
 #include "common/assertion_macros.h"
@@ -138,16 +139,8 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     desc.name = data.name;
     desc.usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst;
     desc.num_frames = 1;
-    
-    RBImageHandle image = backend->create_texture_2d(
-        data, TextureCreationInfo {
-            TextureFormat::RGBA8,
-            generate_mips,
-            true,
-            RBImageLayout::shader_read_only_optimal,
-            RBImageLayout::shader_read_only_optimal,
-        }
-    );
+
+    const RBImageHandle image = renderer->create_texture_from_asset(tex_handle, generate_mips);
 
     RGTexture tex {desc};
     tex.image = image;

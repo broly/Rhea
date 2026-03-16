@@ -29,12 +29,14 @@ public:
     std::vector<GPUMaterial> materials_cpu;
     
     bool dirty;
-
-    Name material_resource_name;
     
     std::shared_ptr<Renderer> renderer;
-    
     RenderResource* material_resource;
+    
+    
+public: // to serialize
+    
+    Name material_resource_name;
 };
 REFLECT_OBJECT_FIELDS(MaterialManager, RhObject,
     material_resource_name);

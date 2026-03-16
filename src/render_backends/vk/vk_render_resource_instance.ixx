@@ -14,8 +14,7 @@ public:
 
     virtual void update_uniform_buffer_impl(Name buffer_name, size_t size, void* data, RBFrameHandle frame);
     
-    void update_image(Name buffer_name, RBImageHandle image_handle, RBFrameHandle
-                      frame, uint32_t array_index = 0, bool cubemap = false) override;
+    void update_image(Name buffer_name, RBImageHandle image_handle, const UpdateImageParams& update_params) override;
     
     void update_tlas(Name name, RBAccelStruct tlas, RBFrameHandle frame) override;
     
