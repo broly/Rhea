@@ -333,72 +333,6 @@ std::shared_ptr<PipelineFamily> Renderer::query_pipeline_family(Name pass_name, 
 }
 
 
-RenderResource* Renderer::query_material_resource(std::shared_ptr<MaterialModel> model, Name pass_name)
-{
-    if (material_resources.contains({pass_name, model}))
-        return material_resources.at({pass_name, model});
-    
-    const MatModel_PipelineVariant* pipeline_config = model->get_pipeline_config_by_pass(pass_name);
-    checkf(pipeline_config, "MaterialModel has no pipeline config that related to pass %s", pass_name.to_string().c_str());
-
-    
-    checkf(model->material_resource != std::nullopt, "material resource should provide 'material_resource' field");
-    const Name material_resource_name = *model->material_resource;
-    
-    auto material_resource_info = find_resource_info(material_resource_name);
-    
-    RenderResourceDesc desc{};
-    desc.name = model->model_name;
-    desc.usage = material_resource_info->resource.usage;
-    desc.set = material_resource_info->resource.set;
-
-    // UBOs
-    for (const auto& [name, param] : material_resource_info->resource.parameters)
-    {
-        // if (param.type == MaterialParamType::uniform || param.type == MaterialParamType::sampler)
-        //     if (!param.passes.contains(pass_name))
-        //         continue;
-        if (param.type == MaterialParamType::uniform)
-        {
-            const Name cpp_ubo_name = *param.ubo;
-            auto info = reflect::find_runtime_info(cpp_ubo_name);
-            checkf(info, "Could not find type");
-            desc.variables.push_back(RenderResourceVariableDesc{
-                .parameter = param,
-                .size = info->size,
-            });
-        } else if (param.type == MaterialParamType::sampler)
-        {
-            desc.variables.push_back(RenderResourceVariableDesc{
-                .parameter = param,
-                .sampler = samplers[*param.sampler],
-            });
-        } else if (param.type == MaterialParamType::image)
-        {
-            desc.variables.push_back(RenderResourceVariableDesc{
-                .parameter = param,
-            });
-        } else if (param.type == MaterialParamType::ssbo)
-        {
-            desc.variables.push_back(RenderResourceVariableDesc{
-                .parameter = param,
-            });
-        } else if (param.type == MaterialParamType::tlas)
-        {
-            desc.variables.push_back(RenderResourceVariableDesc{
-                .parameter = param,
-            });
-        }
-    }
-    
-    auto resource =  find_resource(material_resource_name);
-    
-    material_resources.insert({std::pair{pass_name, model}, resource});
-    
-    return resource;
-}
-
-
 RenderResource* Renderer::find_resource(Name resource_name) const
 {
     auto resource_it = resources.find(resource_name);
@@ -426,7 +360,7 @@ std::shared_ptr<MaterialInstance> Renderer::query_material_instance(std::shared_
     
     auto pipeline_family = query_pipeline_family(pass_name, model);
     
-    auto instance = std::make_shared<MaterialInstance>(material, shared_from_this(), pass_name, pipeline_family);
+    auto instance = std::make_shared<MaterialInstance>(material, shared_from_this(), pass_name);
 
     material_instances.emplace(std::pair{material, pass_name}, instance);
     return instance;

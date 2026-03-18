@@ -4,8 +4,6 @@
 	"enums": {},
 	"uniform_buffers": {},
 
-	"material_resource": "hdr_color",
-
 	"permutations": {
 		"flags": {},
 		"enums": {}

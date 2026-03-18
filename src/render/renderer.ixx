@@ -51,7 +51,6 @@ public:  // public API
     RenderResource* find_resource(Name resource_name) const;
     std::shared_ptr<RenderResourceInfo> find_resource_info(Name resource_name) const;
     std::shared_ptr<PipelineFamily> query_pipeline_family(Name pass_name, const std::shared_ptr<MaterialModel>& model_name);
-    RenderResource* query_material_resource(std::shared_ptr<MaterialModel> model, Name pass_name);
     std::shared_ptr<MaterialInstance> query_material_instance(std::shared_ptr<Material> material, Name pass_name);
     std::shared_ptr<MaterialModel> find_model(Name model_name) const;
     

@@ -518,6 +518,7 @@ REFLECT_STRUCT_DERIVED(PipelineInfo_RayTracing, PipelineInfo,
 
 export enum class MatParamType
 {
+    definition,
     Float,
     vec2,
     vec3,
@@ -525,7 +526,7 @@ export enum class MatParamType
     texture,
 };
 REFLECT_ENUM(MatParamType,
-    Float, vec2, vec3, vec4, texture);
+    definition, Float, vec2, vec3, vec4, texture);
 
 export size_t get_mat_param_size(MatParamType type)
 {
@@ -548,11 +549,29 @@ export size_t get_mat_param_size(MatParamType type)
 export struct MaterialParamInfo
 {
     MatParamType type;
-    Name member;
-    uint32_t offset;
+    std::optional<Name> member;
+    std::optional<uint32_t> offset;
+    std::optional<Name> definition;
+    
+    bool is_static_parameter() const
+    {
+        return type == MatParamType::definition;
+    }
+    
+    Name get_member_name() const
+    {
+        check(member.has_value());
+        return member.value();
+    }
+    
+    uint32_t get_offset() const
+    {
+        check(offset.has_value());
+        return offset.value();
+    }
 };
 REFLECT_STRUCT(MaterialParamInfo,
-    type, member, offset);
+    type, member, offset, definition);
 
 export struct MaterialInfo
 {
@@ -572,8 +591,6 @@ public:
     MatModel_Permutations permutations;
     std::vector<MatModel_PipelineVariant> pipelines;
     
-    std::optional<Name> material_resource;
-    
     std::optional<MaterialInfo> material_info;
     
     Name set;
@@ -583,7 +600,7 @@ public:
     void on_serialize(const SerializationContext& context) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, permutations, pipelines, material_info, material_resource);
+                      model_name, enums, permutations, pipelines, material_info);
 
 
 

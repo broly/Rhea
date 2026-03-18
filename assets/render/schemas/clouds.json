@@ -8,8 +8,6 @@
 		"flags": {},
 		"enums": {}
 	},
-	
-	"material_resource": "clouds",
 
     "pipelines": [
         {

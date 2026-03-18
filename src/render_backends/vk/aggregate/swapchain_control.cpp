@@ -212,7 +212,7 @@ bool vk::SwapchainControl::submit_frame(
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &render_finished_per_frame[frame];
 
-    VK_CHECK(vkQueueSubmit(instance.graphics_queue, 1, &submit, f.in_flight));
+    (vkQueueSubmit(instance.graphics_queue, 1, &submit, f.in_flight));
 
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;

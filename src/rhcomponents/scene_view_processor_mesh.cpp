@@ -117,7 +117,7 @@ void SceneViewProcessor_Mesh::process()
                         info.pipeline = geom_pipeline_family->request_pipeline(geom_pipeline_family->make_shader_key(instance->material, pass_name));
                         info.material_instance = instance;
                         if (pass_name != "shadowmap")
-                            instance->get_or_create_resource_instance(0 /* material is persistent */);
+                            instance->apply_material_parameters();
                     
                     
                         info.material_index = instance->material_id;

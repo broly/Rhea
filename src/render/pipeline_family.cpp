@@ -120,8 +120,8 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> materi
     uint64_t bits = 0;
     uint8_t bit_index = 0;
     
-    checkf(model->material_resource.has_value(), "Model should provide material resource");
-    auto resource_info = renderer->find_resource_info(*model->material_resource);
+    // checkf(model->material_resource.has_value(), "Model should provide material resource");
+    // auto resource_info = renderer->find_resource_info(*model->material_resource);
     
     std::vector<Name> provided_options;
 
@@ -130,15 +130,18 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> materi
     
     expr::Context ctx;
     
-    for (const auto& [param_name, param_info] : resource_info->resource.parameters)
+    if (model->material_info.has_value())
     {
-        if (param_info.is_descriptor())
+        for (const auto& [param_name, param_info] : model->material_info->params)
         {
-            const bool provided = material->parameters.contains(param_name);
-            ctx[param_name.to_string()] = provided;
-        } else if (param_info.type == MaterialParamType::definition)
-        {
-            ctx[param_name.to_string()] = material->parameters.find(param_name.to_string())->second.as<Name>().to_string();
+            if (param_info.is_static_parameter())
+            {
+                ctx[param_name.to_string()] = material->parameters.find(param_name.to_string())->second.as<Name>().to_string();
+            } else
+            {
+                const bool provided = material->parameters.contains(param_name);
+                ctx[param_name.to_string()] = provided;
+            }
         }
     }
     
