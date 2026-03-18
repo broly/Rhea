@@ -112,6 +112,15 @@ REFLECT_STRUCT(GPUMesh,
     vertex_address, index_address, index_count, mesh_index);
 
 
+export struct GPUTransform
+{
+    glm::mat4 current_transform;
+    glm::mat4 prev_transform;
+};
+REFLECT_STRUCT(GPUTransform,
+    current_transform, prev_transform);
+
+
 export struct MeshTableInfo
 {
     void* address;

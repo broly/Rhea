@@ -39,6 +39,8 @@ void SceneViewProcessor_Mesh::process()
 {
     auto& renderer = *RhGlobals::engine->renderer;
 
+    RenderResource& transform_resource = renderer.find_resource_checked("transform_table");
+
     for (const auto& submitted : read_submission_buffer<SceneViewProxy_Mesh>())
     {
         
@@ -130,6 +132,13 @@ void SceneViewProcessor_Mesh::process()
                     rp.debug_texture_name = 
                     rp.id = render_primitive_id_counter++;
                     primitives.push_back(rp);
+                    
+                    const GPUTransform transform {
+                        ro.world,
+                        ro.world // todo: make previous frame support
+                    };
+                    transform_resource.update_ssbo_element("u_transform_table", sizeof(GPUTransform), rp.id, &transform);
+                    
                         
                     ro.primitives.push_back(primitives.size() - 1);
                 }
@@ -227,6 +236,6 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
             key = uint64_t(pipeline_family->unique_id);
         }
 
-        out_items.push_back({ prim.id, &prim, key });
+        out_items.push_back({ &prim, key });
     }
 }

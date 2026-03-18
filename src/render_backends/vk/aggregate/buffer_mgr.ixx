@@ -64,8 +64,10 @@ namespace vk
         RBBufferHandle create_storage_buffer(size_t buffer_size, ResourceUsage usage_type, bool host_visible);
         
         void update_any_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame);
-
         
+        void update_buffer_element(RBBufferHandle buffer_handle, size_t element_size, size_t index, const void* data, RBFrameHandle frame);
+
+
         void create_device_local_buffer_with_data(
             const void* src_data,
             VkDeviceSize size,

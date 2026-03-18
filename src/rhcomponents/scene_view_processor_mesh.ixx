@@ -72,7 +72,6 @@ export struct RenderPrimitive
 
 export struct ViewRenderItem
 {
-    RenderPrimitiveId primitive_id;
     const RenderPrimitive* primitive = nullptr;
     uint64_t sort_key = 0;
     

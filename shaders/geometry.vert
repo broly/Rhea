@@ -7,6 +7,7 @@
 #include "definitions.glsl"
 #include "resources/camera.glsl"
 #include "resources/mesh_table.glsl"
+#include "resources/transform_table.glsl"
 
 #include "push_constants/model_push_constants.glsl"
 
@@ -22,19 +23,15 @@ layout(location = 6) out vec4 v_prev_clip;
 
 void main()
 {
+    Vertex v = fetch_vertex(get_mesh_index(), gl_VertexIndex);
     
-    GPUMesh mesh = u_mesh_table.meshes[nonuniformEXT(get_mesh_index())];
-
-    VertexBuffer vb = VertexBuffer(mesh.vertex_address);
-    IndexBuffer ib = IndexBuffer(mesh.index_address);
-
-
-    uint index = ib.indices[gl_VertexIndex];
-
-    Vertex v = vb.vertices[index];
-
-    vec4 world_curr = model_pc.model * vec4(v.position,1);
-    vec4 world_prev = model_pc.prev_model * vec4(v.position,1);
+    GPUTransform transform_info = get_transform(get_transform_index());
+    
+    mat4 transform_curr = transform_info.current_transform;
+    mat4 transform_prev = transform_info.prev_transform;
+    
+    vec4 world_curr = transform_curr * vec4(v.position, 1);
+    vec4 world_prev = transform_prev * vec4(v.position, 1);
     
     v_uv = v.uv;  // in_uv;
 

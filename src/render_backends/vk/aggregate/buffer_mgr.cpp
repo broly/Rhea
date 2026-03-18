@@ -374,6 +374,24 @@ void vk::BufferManager::update_any_buffer(RBBufferHandle buffer_handle, size_t s
     vkFlushMappedMemoryRanges(device, 1, &range);
 }
 
+void vk::BufferManager::update_buffer_element(RBBufferHandle buffer_handle, size_t element_size, size_t index,
+                                              const void* data, RBFrameHandle frame)
+{
+    auto& buf = get_buffer(buffer_handle, frame);
+
+    size_t offset = element_size * index;
+
+    memcpy(static_cast<uint8_t*>(buf.mapped_ptr) + offset, data, element_size);
+
+    VkMappedMemoryRange range{};
+    range.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    range.memory = buf.memory;
+    range.offset = offset;
+    range.size   = element_size;
+
+    vkFlushMappedMemoryRanges(device, 1, &range);
+}
+
 
 void vk::BufferManager::create_device_local_buffer_with_data(
     const void* src_data,

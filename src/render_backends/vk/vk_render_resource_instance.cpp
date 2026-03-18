@@ -111,6 +111,22 @@ void VkRenderResourceInstance::update_ssbo(Name buffer_name, size_t size, void* 
     buffer_manager.update_any_buffer(buffer, size, data, frame_index);
 }
 
+void VkRenderResourceInstance::update_ssbo_element(Name buffer_name, size_t element_size, size_t index, const void* data,
+                                                   std::optional<RBFrameHandle> frame)
+{
+    auto inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
+
+    auto [binding_index, binding] = pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
+    checkf(binding.parameter.type == MaterialParamType::ssbo, "Type mismatch");
+
+    uint32_t frame_index = usage.frame_index(frame);
+
+    RBBufferHandle buffer = inst_info.buffers[binding_index][frame_index];
+
+    buffer_manager.update_buffer_element(buffer, element_size, index, data, frame_index);
+}
+
 void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle frame)
 {
     PROFILE("VkRenderResourceInstance::bind");

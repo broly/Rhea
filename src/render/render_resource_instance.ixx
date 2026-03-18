@@ -15,6 +15,7 @@ export struct UpdateImageParams
 export class RenderResourceInstance
 {
 public:
+    virtual ~RenderResourceInstance() {}
     
     template<typename T>
     void update_uniform_buffer(Name buffer_name, const T& data, RBFrameHandle frame)
@@ -31,5 +32,7 @@ public:
     virtual void update_tlas(Name name, RBAccelStruct tlas, RBFrameHandle frame) = 0;
     
     virtual void update_ssbo(Name buffer_name, size_t size, void* data, std::optional<RBFrameHandle> frame = std::nullopt) = 0;
+    
+    virtual void update_ssbo_element(Name buffer_name, size_t element_size, size_t index, const void* data, std::optional<RBFrameHandle> frame) = 0;
     
 };

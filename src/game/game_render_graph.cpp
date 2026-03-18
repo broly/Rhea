@@ -47,7 +47,9 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .condition = [this] () { return !is_debugging(); },
             .reads = {
                 { hdr_color, RBImageUsage::SampledFragment },
-                { history_hdr, RBImageUsage::SampledFragment }
+                { history_hdr, RBImageUsage::SampledFragment },
+                
+                
             },
             .writes = {
                 { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }

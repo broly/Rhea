@@ -6,6 +6,7 @@ import :render_resource_instance;
 import :pipeline_object;
 import name;
 #include "common/assertion_macros.h"
+#include "common/type_macros.h"
 
 export struct RenderResourceVariableDesc
 {
@@ -48,6 +49,8 @@ export struct RenderResourceDesc
 export class RenderResource
 {
 public:
+    NON_COPYABLE(RenderResource);
+    
     virtual ~RenderResource() = default;
 
     RenderResource(const RenderResourceDesc& in_desc)
@@ -84,6 +87,11 @@ public:
     void update_ssbo(Name buffer_name, size_t size, void* data, std::optional<RBFrameHandle> frame = std::nullopt, uint32_t instance_id = 0)
     {
         query_single(instance_id)->update_ssbo(buffer_name, size, data, frame);
+    }
+    
+    void update_ssbo_element(Name buffer_name, size_t element_size, uint32_t index, const void* data, std::optional<RBFrameHandle> frame = std::nullopt, uint32_t instance_id = 0)
+    {
+        query_single(instance_id)->update_ssbo_element(buffer_name, element_size, index, data, frame);
     }
 
     virtual std::shared_ptr<RenderResourceInstance> query_single(uint32_t instance_id = 0) = 0;

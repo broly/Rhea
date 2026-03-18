@@ -118,6 +118,7 @@ public:
     RenderResource* base_color_resource = nullptr;
     RenderResource* pbr_material_ssbo_resource = nullptr;
     RenderResource* textures_resource = nullptr;
+    RenderResource* transform_table_resource = nullptr;
     
     Extent resolution;
     Extent swapchain_extent;

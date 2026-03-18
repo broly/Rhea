@@ -24,12 +24,14 @@ struct GPUMesh
     uint mesh_index;
 };
 
-layout(buffer_reference, std430, buffer_reference_align = 8) readonly buffer VertexBuffer
+layout(buffer_reference, std430, buffer_reference_align = 8) 
+readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
 
-layout(buffer_reference, std430, buffer_reference_align = 8) readonly buffer IndexBuffer
+layout(buffer_reference, std430, buffer_reference_align = 8) 
+readonly buffer IndexBuffer
 {
     uint indices[];
 };
@@ -39,5 +41,16 @@ readonly buffer MeshTable
 {
     GPUMesh meshes[];
 } u_mesh_table;
+
+Vertex fetch_vertex(uint mesh_index, int vertex_index)
+{
+    GPUMesh mesh = u_mesh_table.meshes[nonuniformEXT(mesh_index)];
+    VertexBuffer vb = VertexBuffer(mesh.vertex_address);
+    IndexBuffer ib = IndexBuffer(mesh.index_address);
+    uint index = ib.indices[vertex_index];
+    Vertex v = vb.vertices[index];
+    
+    return v;
+}
 
 #endif  // RESOURCES_MESH_TABLE

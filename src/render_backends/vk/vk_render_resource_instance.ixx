@@ -20,6 +20,8 @@ public:
     
     void update_ssbo(Name buffer_name, size_t size, void* data, std::optional<RBFrameHandle> frame = std::nullopt) override;
     
+    void update_ssbo_element(Name buffer_name, size_t element_size, size_t index, const void* data, std::optional<RBFrameHandle> frame) override;
+
     void bind(RBCommandList command_list, RBFrameHandle frame) override;
 
     vk::BufferManager& buffer_manager;

@@ -88,7 +88,7 @@
 			"stages": {
 				"vertex": {
 					"shader": "geometry.vert",
-					"resources": ["camera", "mesh_table"]
+					"resources": ["camera", "mesh_table", "transform_table"]
 				},
 				"fragment": {
 					"shader": "geometry.frag",
@@ -154,7 +154,7 @@
 			"stages": {
 				"vertex": {
 					"shader": "geometry.vert",
-					"resources": ["camera", "mesh_table"]
+					"resources": ["camera", "mesh_table", "transform_table"]
 				},
 				"fragment": {
 					"shader": "geometry.frag",
@@ -195,7 +195,7 @@
 			"stages": {
 				"vertex": {
 					"shader": "shadow.vert",
-					"resources": ["camera", "light"]
+					"resources": ["camera", "light", "transform_table", "mesh_table"]
 				},
 				"fragment": {
 					"shader": "shadow.frag",
@@ -232,15 +232,9 @@
 			"vertex_layouts": [
 				{
 					"vertex_type": "Vertex",
-					"attributes": [ 
-						{ 
-							"name": "position",
-							"definition": "LOCATION_ATTR_POSITION",
-							"variable": "in_position"
-						},
-					]
+					"attributes": []
 				}
-			],
+			]
 		}
 	]
 }

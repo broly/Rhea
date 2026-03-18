@@ -60,6 +60,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     base_color_resource = renderer->find_resource("base_color");
     pbr_material_ssbo_resource = renderer->find_resource("pbr_material_ssbo");
     textures_resource = renderer->find_resource("textures");
+    transform_table_resource = renderer->find_resource("transform_table");
     
     
     
@@ -583,7 +584,7 @@ void GenericRenderGraph::bind_shadow_globals(
         light_ubo,
         frame);
     
-    ctx.bind(light_resource);
+    ctx.bind(light_resource, mesh_table_resource, transform_table_resource);
 }
 
 
@@ -921,20 +922,19 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
             continue;
     
         PipelineObject* pipeline = prim_info->pipeline;
-        
-        
-        const auto& instance = prim_info->material_instance;
     
         if (ctx.bind_pipeline(pipeline))
         {
             ctx.bind(camera_resource, mesh_table_resource,
-                     shadow_resource, light_resource, reflection_resource, pbr_material_ssbo_resource, textures_resource);
+                     shadow_resource, light_resource, reflection_resource, pbr_material_ssbo_resource, textures_resource,
+                     transform_table_resource);
         }       
         
         ModelPushConstants pc;
         pc.model = *prim.world;
         pc.prev_model = *prim.world;
         pc.indices.x = prim.mesh_index;
+        pc.indices.y = prim.id;
         pc.indices.z = prim_info->material_index;
         
         ctx.push_constants(pc);
@@ -973,9 +973,10 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         pc.model = *prim.world;
         pc.prev_model = *prim.world;
         pc.indices.x = prim.mesh_index;
+        pc.indices.y = prim.id;
         ctx.push_constants(pc);
         
-        ctx.draw_indexed(prim.mesh.get().indices.size());
+        ctx.draw(prim.mesh.get().indices.size());
     }
 }
 

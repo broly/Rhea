@@ -18,6 +18,11 @@ uint get_material_index()
     return model_pc.indices.z;
 }
 
+uint get_transform_index()
+{
+    return model_pc.indices.y;
+}
+
 uint get_debug_index()
 {
     return model_pc.indices.w;

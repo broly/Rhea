@@ -342,6 +342,13 @@ RenderResource* Renderer::find_resource(Name resource_name) const
     return resource_it->second;
 }
 
+RenderResource& Renderer::find_resource_checked(Name resource_name) const
+{
+    RenderResource* resource = find_resource(resource_name);
+    checkf(resource != nullptr, "Could not find resource '%s'", resource_name.to_string().c_str());
+    return *resource;
+}
+
 std::shared_ptr<RenderResourceInfo> Renderer::find_resource_info(Name resource_name) const
 {
     return resources_info.at(resource_name);
