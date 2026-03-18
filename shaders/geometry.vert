@@ -2,6 +2,7 @@
 
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_nonuniform_qualifier : enable
 
 #include "definitions.glsl"
 #include "resources/camera.glsl"
@@ -19,12 +20,10 @@ layout(location = 5) out vec4 v_curr_clip;
 layout(location = 6) out vec4 v_prev_clip;
 
 
-
-
 void main()
 {
     
-    GPUMesh mesh = u_mesh_table.meshes[model_pc.mesh_index];
+    GPUMesh mesh = u_mesh_table.meshes[nonuniformEXT(get_mesh_index())];
 
     VertexBuffer vb = VertexBuffer(mesh.vertex_address);
     IndexBuffer ib = IndexBuffer(mesh.index_address);

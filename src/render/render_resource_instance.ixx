@@ -9,6 +9,7 @@ export struct UpdateImageParams
     std::optional<RBFrameHandle> frame = std::nullopt;
     uint32_t layer_index = 0;
     bool cubemap = false;
+    uint32_t array_index = 0;
 };
 
 export class RenderResourceInstance

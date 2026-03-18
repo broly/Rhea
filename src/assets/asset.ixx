@@ -33,7 +33,7 @@ struct AssetHandle
     
     bool is_valid() const
     {
-        return id != 0;
+        return id != INVALID_ASSET_ID;
     }
     friend bool operator==(const AssetHandle<T>& lhs, const AssetHandle<T>& rhs)
     {

@@ -5,7 +5,7 @@ import :render_resource_instance;
 import :renderer;
 import assets;
 
-
+export class MaterialManager;
 
 export class MaterialInstance
 {
@@ -31,8 +31,9 @@ public:
     std::shared_ptr<MaterialModel> model;
     std::shared_ptr<Renderer> renderer;
     std::shared_ptr<PipelineFamily> pipeline_family;
+    std::shared_ptr<MaterialManager> material_manager;
     
     std::map<Name, std::vector<std::byte>> cached_ubos;
     
-    uint32_t unique_id;
+    uint32_t material_id;
 };

@@ -160,8 +160,9 @@ public:
         RBImageHandle image,
         ResourceUsage usage,
         std::optional<RBSampler> sampler,
-        uint32_t array_index = 0,
-        bool cubemap = false) = 0;
+        uint32_t layer_index = 0,
+        bool cubemap = false,
+        uint32_t array_index = 0) = 0;
     
     
     virtual void update_storage_image(

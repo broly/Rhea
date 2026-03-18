@@ -56,25 +56,13 @@ void VkRenderBackend::transition_image(RBCommandList cmd, const ImageBarrierPara
 
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
-                                           ResourceUsage usage, std::optional<RBSampler> sampler, uint32_t layer_index, bool cubemap)
+                                           ResourceUsage usage, std::optional<RBSampler> sampler, uint32_t layer_index, bool cubemap, uint32_t array_index)
 {
     // VkDescriptorSet set = get_descriptor_set(layout, usage);
-    LogRB.Log("update_sampled_image: %p", set);
-
-    VkDescriptorImageInfo info{};
-    info.imageView   = cubemap ? get_cubemap_image_view(image) : get_image_view(image, layer_index);
-    info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    info.sampler     = sampler.has_value() ? VkSampler(*sampler) : sampler_manager.get_default_sampler();
-
-    VkWriteDescriptorSet write{};
-    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = set;
-    write.dstBinding = binding;
-    write.descriptorCount = 1;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write.pImageInfo = &info;
-
-    vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
+    auto used_sampler = sampler.has_value() ? VkSampler(*sampler) : sampler_manager.get_default_sampler();
+    auto image_view = cubemap ? get_cubemap_image_view(image) : get_image_view(image, layer_index);
+    buffer_manager.update_sampled_image(set, binding, image_view, usage, used_sampler, array_index);
+    
 }
 
 void VkRenderBackend::update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image)

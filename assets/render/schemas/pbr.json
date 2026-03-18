@@ -25,6 +25,57 @@
 			}
 		}
 	},
+	
+	"material_info": {
+		"structure": "GPUMaterial", 
+		"params": {
+			"base_color_factor": {
+				"type": "float",
+				"member": "params0",
+				"offset": 0
+			},
+			"emissive_factor": {
+				"type": "float",
+				"member": "params0",
+				"offset": 1
+			},
+			"roughness_factor": {
+				"type": "float",
+				"member": "params1",
+				"offset": 0
+			},
+			"metallic_factor": {
+				"type": "float",
+				"member": "params1",
+				"offset": 1
+			},
+			"occlusion_factor": {
+				"type": "float",
+				"member": "params1",
+				"offset": 2
+			},
+			"base_color": {
+				"type": "texture",
+				"member": "textures0",
+				"offset": 0
+			},
+			"normal": {
+				"type": "texture",
+				"member": "textures0",
+				"offset": 1
+			},
+			"orm": {
+				"type": "texture",
+				"member": "textures0",
+				"offset": 2
+			},
+			"emissive": {
+				"type": "texture",
+				"member": "textures0",
+				"offset": 3
+			}
+		}
+	},
 
 	
 	"pipelines": [
@@ -39,7 +90,7 @@
 				},
 				"fragment": {
 					"shader": "geometry.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material"]
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material", "pbr_material_ssbo", "textures"]
 				}
 			},
 			"depth_write": true,
@@ -83,7 +134,7 @@
 				{
 					"type": "ModelPushConstants",
 					"name": "model",
-					"stages": ["vertex"]
+					"stages": ["vertex", "fragment"]
 				}
 			],
 			"topology": "triangle_list",
@@ -105,7 +156,7 @@
 				},
 				"fragment": {
 					"shader": "geometry.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material"]
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material", "pbr_material_ssbo", "textures"]
 				}
 			},
 			"depth_write": false,
@@ -124,7 +175,7 @@
 				{
 					"type": "ModelPushConstants",
 					"name": "model",
-					"stages": ["vertex"]
+					"stages": ["vertex", "fragment"]
 				}
 			],
 			"topology": "triangle_list",
@@ -165,7 +216,7 @@
 				{
 					"type": "ModelPushConstants",
 					"name": "model",
-					"stages": ["vertex"]
+					"stages": ["vertex", "fragment"]
 				}
 			],
 			"set": "SET_SHADOW",

@@ -11,6 +11,7 @@ import <variant>;
 #include "common/type_macros.h"
 import enum_helpers;
 import <bit>;
+import glm;
 
 #include "common/assertion_macros.h"
 
@@ -515,8 +516,53 @@ REFLECT_STRUCT_DERIVED(PipelineInfo_RayTracing, PipelineInfo,
 
 /***********************************************************************/
 
+export enum class MatParamType
+{
+    Float,
+    vec2,
+    vec3,
+    vec4,
+    texture,
+};
+REFLECT_ENUM(MatParamType,
+    Float, vec2, vec3, vec4, texture);
 
-using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics, PipelineInfo_Compute, PipelineInfo_RayTracing>;
+export size_t get_mat_param_size(MatParamType type)
+{
+    switch (type)
+    {
+        case MatParamType::Float:
+            return sizeof(float);
+        case MatParamType::vec2:
+            return sizeof(glm::vec2);
+        case MatParamType::vec3:
+            return sizeof(glm::vec3);
+        case MatParamType::vec4:
+            return sizeof(glm::vec4);
+        case MatParamType::texture:
+            return sizeof(uint32_t);
+    }
+    unreachable("Wrong code path");
+}
+
+export struct MaterialParamInfo
+{
+    MatParamType type;
+    Name member;
+    uint32_t offset;
+};
+REFLECT_STRUCT(MaterialParamInfo,
+    type, member, offset);
+
+export struct MaterialInfo
+{
+    Name structure;
+    std::map<Name, MaterialParamInfo> params;
+};
+REFLECT_STRUCT(MaterialInfo,
+    structure, params);
+
+export using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics, PipelineInfo_Compute, PipelineInfo_RayTracing>;
 
 export class MaterialModel : public RhObject
 {
@@ -528,6 +574,8 @@ public:
     
     std::optional<Name> material_resource;
     
+    std::optional<MaterialInfo> material_info;
+    
     Name set;
     
     const MatModel_PipelineVariant* get_pipeline_config_by_pass(Name pass_name) const;
@@ -535,7 +583,7 @@ public:
     void on_serialize(const SerializationContext& context) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, permutations, pipelines, material_resource);
+                      model_name, enums, permutations, pipelines, material_info, material_resource);
 
 
 

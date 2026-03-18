@@ -128,6 +128,7 @@ void vk::Instance::init(GLFWwindow* in_window)
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
     };
     accelFeatures.accelerationStructure = VK_TRUE;
+    // accelFeatures.descriptorBindingAccelerationStructureUpdateAfterBind = VK_TRUE;
     // accelFeatures.pNext = &bufferAddress;
 
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtFeatures{
@@ -140,6 +141,13 @@ void vk::Instance::init(GLFWwindow* in_window)
     VkPhysicalDeviceVulkan12Features features12{};
     features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     features12.bufferDeviceAddress = VK_TRUE;
+    features12.runtimeDescriptorArray = VK_TRUE;
+    // features12.descriptorBindingVariableDescriptorCount = VK_TRUE;
+    // features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    // features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    // features12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+    features12.descriptorBindingPartiallyBound = VK_TRUE;
+    // features12.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
     features12.pNext = &rtFeatures;
     
     VkPhysicalDeviceVulkan13Features features13{};

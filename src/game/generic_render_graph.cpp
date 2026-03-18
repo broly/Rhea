@@ -58,7 +58,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     mesh_table_resource = renderer->find_resource("mesh_table");
     clouds_resource = renderer->find_resource("clouds");
     base_color_resource = renderer->find_resource("base_color");
-
+    pbr_material_ssbo_resource = renderer->find_resource("pbr_material_ssbo");
+    textures_resource = renderer->find_resource("textures");
     
     
     
@@ -894,14 +895,14 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         ctx.pass_name,
         items);
 
-    // if (ctx.pass_name == Name("DepthPrepass"))
+    if (ctx.pass_name == Name("DepthPrepass"))
     {
         PROFILE("draw_scene - sort");
         std::sort(items.begin(), items.end(),
             [](const ViewRenderItem& a,
                const ViewRenderItem& b)
             {
-                return a.sort_key < b.sort_key;
+                return a.get_sort_key() < b.get_sort_key();
             });
     }
     
@@ -909,31 +910,27 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     auto pbr = renderer->find_model("pbr");
     std::shared_ptr<PipelineFamily> family = renderer->query_pipeline_family(ctx.pass_name, pbr);
     
-    
     PROFILE("GenericRenderGraph::draw_scene - items");
     for (auto& item : items)
     {
-        RenderPrimitive& prim = *item.primitive;
-
+        const RenderPrimitive& prim = *item.primitive;
+    
         const RenderPrimitivePassInfo* prim_info = prim.get_pass_info(ctx.pass_name);
         
         if (!prim_info)
             continue;
-
+    
         PipelineObject* pipeline = prim_info->pipeline;
         
+        
+        const auto& instance = prim_info->material_instance;
+    
         if (ctx.bind_pipeline(pipeline))
         {
-            ctx.bind(camera_resource, mesh_table_resource);
-            
-            if (!is_depth_prepass)
-            {
-                ctx.bind(shadow_resource, light_resource, reflection_resource);
-            }
+            ctx.bind(camera_resource, mesh_table_resource,
+                     shadow_resource, light_resource, reflection_resource, pbr_material_ssbo_resource, textures_resource);
         }
-
-        const auto& instance = prim_info->material_instance;
-
+        
         if (!is_depth_prepass)
         {
             instance->bind(
@@ -941,17 +938,18 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
                ctx.frame);
         }
         
-        // ctx.bind_mesh(prim.mesh);
         
         ModelPushConstants pc;
         pc.model = *prim.world;
         pc.prev_model = *prim.world;
-        pc.mesh_index = prim.mesh_index;
-
+        pc.indices.x = prim.mesh_index;
+        pc.indices.z = prim_info->material_index;
+        
         ctx.push_constants(pc);
         
         ctx.draw(prim.mesh.get().indices.size());
     }
+    
 }
 
 
@@ -982,7 +980,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         ModelPushConstants pc;
         pc.model = *prim.world;
         pc.prev_model = *prim.world;
-        pc.mesh_index = prim.mesh_index;
+        pc.indices.x = prim.mesh_index;
         ctx.push_constants(pc);
         
         ctx.draw_indexed(prim.mesh.get().indices.size());

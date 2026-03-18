@@ -9,8 +9,8 @@
         "type": "sampler",
         "sampler": "default",
         "variable": "u_textures_array",
-        "binding": "BINDING_SAMPLER_ARRAY_TEXTURES",
-        "initial_array_size": 1024
+        "binding": "BINDING_ARRAY_TEXTURES",
+        "initial_array_size": 2048
       }
     }
   }

@@ -46,6 +46,8 @@ namespace vk
         
         
         std::map<RBDescriptorSetLayout, DescriptorSetLayoutData> descriptor_set_layouts;
+        
+        std::map<RBDescriptorSet, RBDescriptorSetLayout> descriptor_sets_validation;
 
         std::vector<RBDescriptorSet> descriptors;
         uint64_t descriptor_set_counter = 0;
@@ -71,6 +73,9 @@ namespace vk
             VkBuffer& out_buffer,
             VkDeviceMemory& out_memory,
             std::optional<RBCommandList> cmd_opt = std::nullopt) const;
+        
+        void update_sampled_image(RBDescriptorSet set, uint32_t binding, VkImageView image,
+                                           ResourceUsage usage, VkSampler sampler, uint32_t array_index = 0);
         
     private:
         const VkDevice& device;

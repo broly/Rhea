@@ -34,6 +34,7 @@ export struct RenderPrimitivePassInfo
     std::shared_ptr<MaterialInstance> material_instance;
     std::shared_ptr<PipelineFamily> pipeline_family;
     PipelineObject* pipeline;
+    uint32_t material_index;
 };
 
 export struct RenderPrimitive
@@ -45,6 +46,8 @@ export struct RenderPrimitive
     AABB bounds;
     
     uint64_t mesh_index;
+    uint32_t debug_texture_id;
+    std::string debug_texture_name;
 
     
     std::set<Name> passes;
@@ -56,7 +59,7 @@ export struct RenderPrimitive
     }
     
     
-    const RenderPrimitivePassInfo* get_pass_info(Name pass_name)
+    const RenderPrimitivePassInfo* get_pass_info(Name pass_name) const
     {
         auto it = info_by_pass.find(pass_name);
         if (it != info_by_pass.end())
@@ -69,8 +72,14 @@ export struct RenderPrimitive
 
 export struct ViewRenderItem
 {
-    RenderPrimitive* primitive = nullptr;
+    RenderPrimitiveId primitive_id;
+    const RenderPrimitive* primitive = nullptr;
     uint64_t sort_key = 0;
+    
+    auto get_sort_key() const
+    {
+        return sort_key;
+    }
 };
 
 export class SceneViewProcessor_Mesh : public SceneViewProcessor
@@ -106,5 +115,7 @@ public:
     {
         dirty = in_dirty;
     }
+    
+    RenderPrimitiveId render_primitive_id_counter = 0;
 };
 REFLECT_OBJECT(SceneViewProcessor_Mesh, SceneViewProcessor);

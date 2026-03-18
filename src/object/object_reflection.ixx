@@ -447,9 +447,6 @@ export namespace reflect
     
 }
 
-
-
-
 export template<typename T = RhObject, typename... Ts>
 std::shared_ptr<T> new_object(Ts&&... vs)
 {

@@ -1,6 +1,7 @@
 module render:material_instance;
 import assets;
 #include "common/assertion_macros.h"
+import :material_manager;
 import log;
 #include "logging/log_macro.h"
 
@@ -17,10 +18,10 @@ MaterialInstance::MaterialInstance(const std::shared_ptr<const Material>& in_mat
     checkf(model, "Could not find specified model");
     
     render_resource = renderer->query_material_resource(model, pass_name);
+    material_manager = renderer->get_material_manager();
     
-    static uint32_t unique_id_counter = 0;
     
-    unique_id = unique_id_counter++;
+    material_id = material_manager->allocate_material();
 
 }
 
@@ -41,6 +42,50 @@ void MaterialInstance::apply_material_parameters(
     checkf(material_resource_name.has_value(), "material_resource not set");
     
     auto resource_info = renderer->find_resource_info(*material_resource_name);
+    
+    
+    checkf(model->material_info.has_value(), "material_info not set");
+
+    const reflect::RuntimeReflectionInfo& material_structure = 
+        reflect::find_runtime_info_checked(model->material_info->structure);
+    GPUMaterial gpu_material;
+    for (auto& [info_param_name, info] : model->material_info->params)
+    {
+        const reflect::FieldRuntimeReflectionInfo& field_info = material_structure.find_field_checked(info.member);
+        void* value_ptr = field_info.get_value_ptr(&gpu_material);
+        const size_t param_size = get_mat_param_size(info.type);
+        void* value_ptr_with_offset = ((uint8_t*)value_ptr) + param_size * info.offset;
+        
+        for (const auto& [param_name, param_value] : material->parameters)
+        {
+            if (param_name == info_param_name)
+            {
+                if (param_value.is<TextureHandle>())
+                {
+                    auto texture_handle = param_value.as<TextureHandle>();
+                    if (texture_handle.is_valid() && !texture_handle.is_pending())
+                    {
+                        uint32_t texture_id = texture_handle.id;
+                        memcpy(value_ptr_with_offset, &texture_id, param_size);
+
+                        RBImageHandle image = renderer->get_texture(texture_handle);
+                        textures_array_resource->update_image(
+                            "u_textures_array",
+                            image,
+                            {.array_index=texture_id}
+                        );
+                    } else
+                    {
+                        uint32_t texture_id = 0;
+                        memcpy(value_ptr_with_offset, &texture_id, param_size);
+                    }
+                }
+                else
+                    memcpy(value_ptr_with_offset, param_value.get_raw(), param_size);
+            }
+        }
+    }
+    material_manager->update_material(material_id, gpu_material);
     
     for (const auto& [param_name, param_value] : material->parameters)
     {
@@ -81,7 +126,7 @@ void MaterialInstance::apply_material_parameters(
                 cached_ubos.insert({ubo_name, data});
             }
             auto& buf = cached_ubos.at(ubo_name);
-            for (auto& field : uniform_buffer_info->fields)
+            for (const reflect::FieldRuntimeReflectionInfo& field : uniform_buffer_info->fields)
             {
                 if (field.name == param_name)
                 {
@@ -107,8 +152,6 @@ void MaterialInstance::apply_material_parameters(
                     .frame = frame
                 }
             );
-            
-            // textures_array_resource->update_image()
         }
     }
 }

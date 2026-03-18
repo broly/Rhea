@@ -1,4 +1,5 @@
 export module reflect;
+#include "assertion_macros.h"
 #include "common/foreach_macro.h"
 
 import fixed_string;
@@ -86,6 +87,13 @@ export namespace reflect
                     return &field;
             return nullptr;
         }
+        
+        const FieldRuntimeReflectionInfo& find_field_checked(Name field_name) const
+        {
+            auto result = find_field(field_name);
+            checkf(result != nullptr, "find_field_checked failed");
+            return *result;
+        }
     };
     
     bool register_type(TypeId type_id, size_t size, type_initializer initializer, 
@@ -99,6 +107,12 @@ export namespace reflect
     const RuntimeReflectionInfo* find_runtime_info(Name type_name)
     {
         return find_runtime_info(TypeId(type_name));
+    }
+    const RuntimeReflectionInfo& find_runtime_info_checked(Name type_name)
+    {
+        auto result = find_runtime_info(TypeId(type_name));
+        checkf(result != nullptr, "find_runtime_info failed");
+        return *result;
     }
     
     template<typename E>

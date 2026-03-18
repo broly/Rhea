@@ -60,7 +60,8 @@ void VkRenderResourceInstance::update_image(Name buffer_name, RBImageHandle imag
             usage,
             binding.sampler,
             update_params.layer_index,
-            update_params.cubemap);
+            update_params.cubemap,
+            update_params.array_index);
         return;
     }
     

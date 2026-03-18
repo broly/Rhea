@@ -4,7 +4,7 @@ import render_scene;
 import framework;
 import globals;
 import profile;
-
+import render;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -119,14 +119,19 @@ void SceneViewProcessor_Mesh::process()
                         if (pass_name != "shadowmap")
                             instance->get_or_create_resource_instance(0 /* material is persistent */);
                     
-                        auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::build_blas);
-                        
-                        rp.mesh_index = result.mesh_index;
-                        primitives.push_back(rp);
-                        
-                        ro.primitives.push_back(primitives.size() - 1);
                     
+                        info.material_index = instance->material_id;
                     }
+                    
+                    auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::build_blas);
+                        
+                    rp.mesh_index = result.mesh_index;
+                        
+                    rp.debug_texture_name = 
+                    rp.id = render_primitive_id_counter++;
+                    primitives.push_back(rp);
+                        
+                    ro.primitives.push_back(primitives.size() - 1);
                 }
             }
 
@@ -185,8 +190,9 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
     PROFILE(__FUNCTION__);
     out_items.clear();
     out_items.reserve(primitives.size());
+    
 
-    for (auto& prim : primitives)
+    for (const auto& prim : primitives)
     {
         // Frustum culling
         if (!frustum.test_aabb_world(prim.bounds))
@@ -209,7 +215,7 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
         {
             key = build_sort_key_opaque(
                 pipeline_family->unique_id,
-                material_instancce->unique_id,
+                material_instancce->material_id,
                 depth);
         }
         else if (pass_name == "GeometryTranslucent")
@@ -221,6 +227,6 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
             key = uint64_t(pipeline_family->unique_id);
         }
 
-        out_items.push_back({ &prim, key });
+        out_items.push_back({ prim.id, &prim, key });
     }
 }

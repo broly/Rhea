@@ -3,6 +3,7 @@ import <vulkan/vulkan_core.h>;
 import :helpers;
 import :log;
 import reflect;
+#include "common/assertion_macros.h"
 #include "render_backends/vk/vk_macro.h"
 
 RBDeviceAddress vk::BufferManager::get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const
@@ -104,6 +105,7 @@ std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_lay
                 layout_data.vk_layout, set, debug_name.to_string().c_str());
             
             result.push_back(set);
+            descriptor_sets_validation.insert({set, layout_handle});
         }
         return result;
     } else
@@ -124,6 +126,7 @@ std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_lay
         
         LogVkBufferManager.Log("allocate_descriptor_sets_for_layout. DescriptorSetLayout=%p, VkDescritorSet=%p (%s)",
             layout_handle, set, debug_name.to_string().c_str());
+        descriptor_sets_validation.insert({set, layout_handle});
         
         return {set};
     }
@@ -135,23 +138,23 @@ void vk::BufferManager::create_descriptor_pool()
     VkDescriptorPoolSize pool_sizes[] = {
         {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1000 
+            .descriptorCount = 2000 
         },
         {
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1000 
+            .descriptorCount = 2048 
         },
         {
             .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .descriptorCount = 256 
+            .descriptorCount = 512 
         },
         {
             .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-            .descriptorCount = 64 
+            .descriptorCount = 128 
         },
         {
             .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount = 1024 
+            .descriptorCount = 2048 
         },
     };
 
@@ -160,8 +163,8 @@ void vk::BufferManager::create_descriptor_pool()
     };
     pool_info.poolSizeCount = uint32_t(std::size(pool_sizes));
     pool_info.pPoolSizes = pool_sizes;
-    pool_info.maxSets = 1000;
-    pool_info.flags = 0;
+    pool_info.maxSets = 2048;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
     VK_CHECK(vkCreateDescriptorPool(
         device,
@@ -190,6 +193,10 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
 {
     std::vector<VkDescriptorSetLayoutBinding> vk_bindings;
     vk_bindings.reserve(descriptor_set_layout.bindings.size());
+    
+    std::vector<vk::DescriptorSetLayoutBindingInfo> binding_validation_infp; 
+    
+    std::vector<VkDescriptorBindingFlags> binding_flags;
 
     for (const ResourceBinding& b : descriptor_set_layout.bindings)
     {
@@ -198,18 +205,37 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
         vk.descriptorType = vk::to_vk_descriptor_type(b.parameter.type);
         
         // descriptorCount is assumed to be 1 if initial_array_size is not specified
-        vk.descriptorCount = b.parameter.initial_array_size.has_value() ? b.parameter.initial_array_size.value() : 1;
+        vk.descriptorCount = b.parameter.initial_array_size.value_or(1);
         vk.stageFlags = vk::to_vk_shader_stage_flags(b.stages);
         vk.pImmutableSamplers = nullptr;
 
         vk_bindings.push_back(vk);
+        VkDescriptorBindingFlags flags = {
+            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT
+        };
+        binding_flags.push_back(flags);
+        binding_validation_infp.push_back({vk.descriptorCount});
     }
+    
 
     VkDescriptorSetLayoutCreateInfo ci{
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
     };
+    
     ci.bindingCount = uint32_t(vk_bindings.size());
     ci.pBindings = vk_bindings.data();
+    ci.flags |= VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+    
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_info{};
+    flags_info.sType =
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+
+    
+
+    flags_info.bindingCount = binding_flags.size();
+    flags_info.pBindingFlags = binding_flags.data();
+
+    ci.pNext = &flags_info;
 
     VkDescriptorSetLayout layout = VK_NULL_HANDLE;
     VK_CHECK(vkCreateDescriptorSetLayout(
@@ -220,7 +246,8 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
     ));
     DescriptorSetLayoutData layout_data {
         layout, 
-        descriptor_set_layout.set_index
+        descriptor_set_layout.set_index,
+        binding_validation_infp
     };
     
     
@@ -400,4 +427,32 @@ void vk::BufferManager::create_device_local_buffer_with_data(
     }, cmd_opt);
     
     
+}
+
+void vk::BufferManager::update_sampled_image(RBDescriptorSet set, uint32_t binding, VkImageView image,
+    ResourceUsage usage, VkSampler sampler, uint32_t array_index)
+{
+    LogRB.Log("update_sampled_image: %p", set);
+    
+    auto found_validation_info = descriptor_sets_validation.find(set);
+    checkf(found_validation_info != descriptor_sets_validation.end(), "Unknown descriptor set");
+    
+    auto& using_binding = descriptor_set_layouts[found_validation_info->second].bindings[binding];
+    checkf(using_binding.array_size > array_index, "Out of bounds");
+
+    VkDescriptorImageInfo info{};
+    info.imageView   = image;
+    info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    info.sampler     = sampler;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo = &info;
+    write.dstArrayElement = array_index;
+
+    vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 }

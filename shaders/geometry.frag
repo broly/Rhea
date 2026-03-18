@@ -1,5 +1,9 @@
 #version 450
 
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_nonuniform_qualifier : enable
+
 #include "definitions.glsl"
 #include "pbr_helpers.glsl"
 #include "math.glsl"
@@ -8,6 +12,10 @@
 #include "resources/shadow.glsl"
 #include "resources/reflection.glsl"
 #include "resources/pbr_material.glsl"
+#include "resources/pbr_material_ssbo.glsl"
+#include "push_constants/model_push_constants.glsl"
+#include "utils/hsv.glsl"
+
 
 // ================== INPUTS ==================
 layout(location = 0) in vec3 v_world_pos;
@@ -32,7 +40,22 @@ layout(location = 6) out vec3 out_g_position;
 
 void main()
 {
-    vec4 base_tx = texture(u_base_color, v_uv);
+    
+    // vec4 base_tx = texture(u_base_color, v_uv);  // <-- old style color read
+    // vec4 base_tx = get_base_color(model_pc.indices.z, v_uv);  // new (ssbo)
+
+    uint material_index = nonuniformEXT(get_material_index());
+
+    GPUMaterial mat = materials.materials[material_index];
+
+    uint base_color_tex_index = nonuniformEXT(mat.textures0.x);
+    
+    uint debug_tex_index = nonuniformEXT(get_debug_index());
+
+    // vec4 base_tx = texture(u_textures_array[get_debug_index()], v_uv);
+    // vec4 base_tx = vec4(cyclicHSV(float(debug_tex_index) / 10.0), 1.0);
+    
+    vec4 base_tx = texture(u_textures_array[base_color_tex_index], v_uv);
 
 #if BLEND_MODE_TRANSLUCENT
     float alpha = base_tx.a;

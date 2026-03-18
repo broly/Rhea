@@ -18,3 +18,4 @@ export import :system_ubo;
 export import :rg_params;
 export import :vertex_buffer;
 export import :material_model;
+export import :material_manager;

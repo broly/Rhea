@@ -42,7 +42,9 @@ public:  // public API
     void set_flag(Name name, bool value, bool needs_rebuild = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
 
-    RBImageHandle create_texture_from_asset(TextureHandle handle, bool generate_mips = true);
+    RBImageHandle create_texture_from_asset(TextureHandle handle, bool generate_mips = true, 
+        RBImageLayout initial_layout = RBImageLayout::undefined,
+        RBImageLayout final_layout = RBImageLayout::undefined);
     RBImageHandle create_cubemap_from_asset(CubemapHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
     RBImageHandle get_cubemap(CubemapHandle handle);
@@ -61,6 +63,11 @@ public:  // public API
     std::shared_ptr<RenderBackend> get_backend() const
     {
         return render_backend;
+    }
+
+    std::shared_ptr<MaterialManager> get_material_manager() const
+    {
+        return material_manager;
     }
 protected:  // internal functions
     

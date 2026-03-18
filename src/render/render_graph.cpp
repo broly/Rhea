@@ -140,7 +140,9 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     desc.usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst;
     desc.num_frames = 1;
 
-    const RBImageHandle image = renderer->create_texture_from_asset(tex_handle, generate_mips);
+    const RBImageHandle image = renderer->create_texture_from_asset(tex_handle, generate_mips,
+        RBImageLayout::shader_read_only_optimal,
+        RBImageLayout::shader_read_only_optimal);
 
     RGTexture tex {desc};
     tex.image = image;
