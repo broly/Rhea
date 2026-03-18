@@ -37,7 +37,7 @@ void main()
 
     v_world_pos = world_curr.xyz;
 
-    mat3 normal_matrix = transpose(inverse(mat3(model_pc.model)));
+    mat3 normal_matrix = transpose(inverse(mat3(transform_curr)));
 
     vec3 N = normalize(normal_matrix * v.normal);
     vec3 T = normalize(normal_matrix * v.tangent.xyz);

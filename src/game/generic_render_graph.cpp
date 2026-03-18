@@ -931,11 +931,10 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         }       
         
         ModelPushConstants pc;
-        pc.model = *prim.world;
-        pc.prev_model = *prim.world;
-        pc.indices.x = prim.mesh_index;
-        pc.indices.y = prim.id;
-        pc.indices.z = prim_info->material_index;
+        pc.mesh_id = prim.mesh_index;
+        pc.transform_id = prim.id;
+        pc.material_id = prim_info->material_index;
+        pc.debug_id = 0;
         
         ctx.push_constants(pc);
         
@@ -967,13 +966,12 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
             bind_shadow_globals(ctx);
         }
         
-        ctx.bind_mesh(prim.mesh);
         
         ModelPushConstants pc;
-        pc.model = *prim.world;
-        pc.prev_model = *prim.world;
-        pc.indices.x = prim.mesh_index;
-        pc.indices.y = prim.id;
+        pc.mesh_id = prim.mesh_index;
+        pc.transform_id = prim.id;
+        pc.material_id = 0;
+        pc.debug_id = 0;
         ctx.push_constants(pc);
         
         ctx.draw(prim.mesh.get().indices.size());

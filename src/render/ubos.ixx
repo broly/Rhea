@@ -37,14 +37,16 @@ REFLECT_STRUCT_RUNTIME(CameraUBO,
 
 export struct ModelPushConstants
 {
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 prev_model = glm::mat4(1.0f);
-    glm::uvec4 indices = glm::uvec4{0};
+    uint32_t mesh_id;
+    uint32_t transform_id;
+    uint32_t material_id;
+    uint32_t debug_id;
 };
 REFLECT_STRUCT_RUNTIME(ModelPushConstants,
-    model, 
-    prev_model, 
-    indices);
+    mesh_id, 
+    transform_id, 
+    material_id,
+    debug_id);
 
 
 
