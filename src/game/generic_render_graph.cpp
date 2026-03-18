@@ -929,15 +929,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         {
             ctx.bind(camera_resource, mesh_table_resource,
                      shadow_resource, light_resource, reflection_resource, pbr_material_ssbo_resource, textures_resource);
-        }
-        
-        if (!is_depth_prepass)
-        {
-            instance->bind(
-               ctx.cmd,
-               ctx.frame);
-        }
-        
+        }       
         
         ModelPushConstants pc;
         pc.model = *prim.world;

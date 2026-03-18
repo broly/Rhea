@@ -11,7 +11,6 @@
 #include "resources/light.glsl"
 #include "resources/shadow.glsl"
 #include "resources/reflection.glsl"
-#include "resources/pbr_material.glsl"
 #include "resources/pbr_material_ssbo.glsl"
 #include "push_constants/model_push_constants.glsl"
 #include "utils/hsv.glsl"
@@ -40,22 +39,10 @@ layout(location = 6) out vec3 out_g_position;
 
 void main()
 {
+    uint material_id = get_material_index();
+    GPUMaterial mat = get_material(material_id);
     
-    // vec4 base_tx = texture(u_base_color, v_uv);  // <-- old style color read
-    // vec4 base_tx = get_base_color(model_pc.indices.z, v_uv);  // new (ssbo)
-
-    uint material_index = nonuniformEXT(get_material_index());
-
-    GPUMaterial mat = materials.materials[material_index];
-
-    uint base_color_tex_index = nonuniformEXT(mat.textures0.x);
-    
-    uint debug_tex_index = nonuniformEXT(get_debug_index());
-
-    // vec4 base_tx = texture(u_textures_array[get_debug_index()], v_uv);
-    // vec4 base_tx = vec4(cyclicHSV(float(debug_tex_index) / 10.0), 1.0);
-    
-    vec4 base_tx = texture(u_textures_array[base_color_tex_index], v_uv);
+    vec4 base_tx = get_base_color(mat, v_uv);
 
 #if BLEND_MODE_TRANSLUCENT
     float alpha = base_tx.a;
@@ -66,16 +53,16 @@ void main()
     
 
     // ----- Albedo (linear) -----
-    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * material_ubo.base_color_factor;
+    vec3 albedo = pow(base_tx.rgb, vec3(2.2));
 
     // ----- ORM -----
-    vec3 orm = texture(u_orm, v_uv).rgb;
-    float ao        = orm.r * material_ubo.occlusion_factor;
-    float roughness = orm.g * material_ubo.roughness_factor;
-    float metallic  = orm.b * material_ubo.metallic_factor;
+    vec3 orm = get_orm(mat, v_uv);
+    float ao        = orm.r;
+    float roughness = orm.g;
+    float metallic  = orm.b;
     
-    vec3 emissive_tx = texture(u_emissive, v_uv).rgb;
-    vec3 emissive = pow(emissive_tx, vec3(2.2)) * material_ubo.emissive_factor;
+    vec3 emissive_tx = get_emissive(mat, v_uv).rgb;
+    vec3 emissive = pow(emissive_tx, vec3(2.2));
 
 #if BLEND_MODE_TRANSLUCENT
     metallic  = 0.0;
@@ -99,7 +86,7 @@ void main()
     vec3 B = normalize(v_world_bitangent);
     mat3 TBN = mat3(T, B, Ng);
 
-    vec3 n_tx = texture(u_normal_map, v_uv).rgb;
+    vec3 n_tx = get_normal(mat, v_uv).rgb;
     n_tx.y = 1.0 - n_tx.y;
     vec3 n_ts = n_tx * 2.0 - 1.0;
 
