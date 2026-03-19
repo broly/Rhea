@@ -66,7 +66,7 @@
 						"pbr_material_ssbo",
 						"textures",
 						"tlas",
-						"transform_table"
+						"primitive_table"
 					]
 				},
 				{

@@ -5,13 +5,15 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 #include "resources/mesh_table.glsl"
-#include "resources/transform_table.glsl"
+#include "resources/primitive_table.glsl"
 #include "resources/pbr_material_ssbo.glsl"
 #include "resources/light.glsl"
 #include "resources/tlas.glsl"
 
 #include "rtx/ray_payload.glsl"
 #include "rtx/rng.glsl"
+
+#include "rtx/sbt.glsl"
 
 layout(location = 0) rayPayloadInEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT ShadowPayload shadow_payload;
@@ -38,7 +40,9 @@ void main()
     vec2 uv = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
 
     // ---------- TRANSFORM ----------
-    GPUTransform tr = get_transform(gl_InstanceID);
+    uint primitive_id = gl_InstanceID;  // primitive_id is stored as instanceCustomIndex
+    
+    GPUPrimitiveInfo tr = get_primitive_info(primitive_id);
 
     vec3 world_pos = (tr.current_transform * vec4(pos, 1.0)).xyz;
 
@@ -66,7 +70,9 @@ void main()
                 u_tlas,
                 gl_RayFlagsTerminateOnFirstHitEXT,
                 0xFF,
-                0, 0, 0,
+                RTXGI_HIT_PRIMARY,
+                RTXGI_DEFAULT_STRIDE, 
+                RTXGI_MISS_PRIMARY,
                 world_pos + N * 0.001,
                 0.001,
                 L,
@@ -100,7 +106,9 @@ void main()
         u_tlas,
         gl_RayFlagsOpaqueEXT,
         0xFF,
-        1, 1, 1,
+        RTXGI_HIT_SECONDARY, 
+        RTXGI_DEFAULT_STRIDE, 
+        RTXGI_MISS_SECONDARY,
         world_pos + N * 0.001,
         0.001,
         dir,

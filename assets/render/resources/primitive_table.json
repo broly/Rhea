@@ -1,16 +1,16 @@
 {
 	"resource": {
-		"name": "transform_table",
+		"name": "primitive_table",
 		"usage": "persistent",
 		"allowed_stages": ["vertex", "rtx_raygen", "rtx_any_hit", "rtx_closest_hit", "rtx_miss", "rtx_intersection"],
 		"parameters": {
 			"mesh_table": {
 				"type": "ssbo",
-				"binding": "BINDING_TRANSFORM_TABLE",
-				"variable": "u_transform_table",
+				"binding": "BINDING_PRIMITIVE_TABLE",
+				"variable": "u_primitive_table",
 				"initial_buffer_size": 128000
 			}
 		},
-		"set": "SET_TRANSFORM"
+		"set": "SET_PRIMITIVE_TABLE"
 	}
 }

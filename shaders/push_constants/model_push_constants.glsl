@@ -4,7 +4,7 @@
 layout(push_constant) uniform ModelPushConstants
 {
     uint mesh_id;
-    uint transform_id;
+    uint primitive_id;
     uint material_id;
     uint debug_id;
 } model_pc;
@@ -19,9 +19,9 @@ uint get_material_index()
     return model_pc.material_id;
 }
 
-uint get_transform_index()
+uint get_primitive_index()
 {
-    return model_pc.transform_id;
+    return model_pc.primitive_id;
 }
 
 uint get_debug_index()

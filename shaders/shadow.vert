@@ -8,15 +8,16 @@
 
 #include "resources/light.glsl"
 #include "resources/mesh_table.glsl"
-#include "resources/transform_table.glsl"
+#include "resources/primitive_table.glsl"
 #include "push_constants/model_push_constants.glsl"
 
 void main()
 {
     Vertex vertex = fetch_vertex(get_mesh_index(), gl_VertexIndex);
 
-    GPUTransform transform_info = get_transform(get_transform_index());
-    mat4 transform_curr = transform_info.current_transform;
+    uint prim_id = get_primitive_index();
+    GPUPrimitiveInfo primitive_info = get_primitive_info(prim_id);
+    mat4 transform_curr = primitive_info.current_transform;
     
     gl_Position = light_ubo.dir_light.light_vp * transform_curr * vec4(vertex.position, 1.0);
 }

@@ -38,13 +38,13 @@ REFLECT_STRUCT_RUNTIME(CameraUBO,
 export struct ModelPushConstants
 {
     uint32_t mesh_id;
-    uint32_t transform_id;
+    uint32_t primitive_id;
     uint32_t material_id;
     uint32_t debug_id;
 };
 REFLECT_STRUCT_RUNTIME(ModelPushConstants,
     mesh_id, 
-    transform_id, 
+    primitive_id, 
     material_id,
     debug_id);
 

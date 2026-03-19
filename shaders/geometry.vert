@@ -7,7 +7,7 @@
 #include "definitions.glsl"
 #include "resources/camera.glsl"
 #include "resources/mesh_table.glsl"
-#include "resources/transform_table.glsl"
+#include "resources/primitive_table.glsl"
 
 #include "push_constants/model_push_constants.glsl"
 
@@ -25,7 +25,8 @@ void main()
 {
     Vertex v = fetch_vertex(get_mesh_index(), gl_VertexIndex);
     
-    GPUTransform transform_info = get_transform(get_transform_index());
+    uint prim_id = get_primitive_index();
+    GPUPrimitiveInfo transform_info = get_primitive_info(prim_id);
     
     mat4 transform_curr = transform_info.current_transform;
     mat4 transform_prev = transform_info.prev_transform;

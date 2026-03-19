@@ -112,13 +112,16 @@ REFLECT_STRUCT(GPUMesh,
     vertex_address, index_address, index_count, mesh_index);
 
 
-export struct GPUTransform
+export struct GPUPrimitiveInfo
 {
     glm::mat4 current_transform;
     glm::mat4 prev_transform;
+    // uint32_t mesh_id;
+    // uint32_t material_id;
+    // uint32_t pad[30];
 };
-REFLECT_STRUCT(GPUTransform,
-    current_transform, prev_transform);
+REFLECT_STRUCT(GPUPrimitiveInfo,
+    current_transform, prev_transform); //, mesh_id, material_id);
 
 
 export struct MeshTableInfo

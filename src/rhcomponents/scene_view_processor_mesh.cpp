@@ -39,7 +39,7 @@ void SceneViewProcessor_Mesh::process()
 {
     auto& renderer = *RhGlobals::engine->renderer;
 
-    RenderResource& transform_resource = renderer.find_resource_checked("transform_table");
+    RenderResource& primitive_table_resource = renderer.find_resource_checked("primitive_table");
 
     for (const auto& submitted : read_submission_buffer<SceneViewProxy_Mesh>())
     {
@@ -133,11 +133,19 @@ void SceneViewProcessor_Mesh::process()
                     rp.id = render_primitive_id_counter++;
                     primitives.push_back(rp);
                     
-                    const GPUTransform transform {
+                    // todo: temp. exact pass is bad idea
+                    auto mat_instance_TODO_EXACT_PASS =
+                            renderer.query_material_instance(
+                                submitted.materials[mat_index], "GeometryBase");
+                    
+                    const GPUPrimitiveInfo primitive_info {
                         ro.world,
-                        ro.world // todo: make previous frame support
+                        ro.world, // todo: make previous frame support
+                        // (uint32_t)rp.mesh_index,
+                        // mat_instance_TODO_EXACT_PASS->material_id
+                        
                     };
-                    transform_resource.update_ssbo_element("u_transform_table", sizeof(GPUTransform), rp.id, &transform);
+                    primitive_table_resource.update_ssbo_element("u_primitive_table", sizeof(GPUPrimitiveInfo), rp.id, &primitive_info);
                     
                         
                     ro.primitives.push_back(primitives.size() - 1);

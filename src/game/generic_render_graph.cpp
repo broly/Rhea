@@ -60,7 +60,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     base_color_resource = renderer->find_resource("base_color");
     pbr_material_ssbo_resource = renderer->find_resource("pbr_material_ssbo");
     textures_resource = renderer->find_resource("textures");
-    transform_table_resource = renderer->find_resource("transform_table");
+    primitive_table_resource = renderer->find_resource("primitive_table");
     
     
     
@@ -584,7 +584,7 @@ void GenericRenderGraph::bind_shadow_globals(
         light_ubo,
         frame);
     
-    ctx.bind(light_resource, mesh_table_resource, transform_table_resource);
+    ctx.bind(light_resource, mesh_table_resource, primitive_table_resource);
 }
 
 
@@ -927,12 +927,12 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         {
             ctx.bind(camera_resource, mesh_table_resource,
                      shadow_resource, light_resource, reflection_resource, pbr_material_ssbo_resource, textures_resource,
-                     transform_table_resource);
+                     primitive_table_resource);
         }       
         
         ModelPushConstants pc;
         pc.mesh_id = prim.mesh_index;
-        pc.transform_id = prim.id;
+        pc.primitive_id = prim.id;
         pc.material_id = prim_info->material_index;
         pc.debug_id = 0;
         
@@ -969,7 +969,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         
         ModelPushConstants pc;
         pc.mesh_id = prim.mesh_index;
-        pc.transform_id = prim.id;
+        pc.primitive_id = prim.id;
         pc.material_id = 0;
         pc.debug_id = 0;
         ctx.push_constants(pc);
@@ -1148,7 +1148,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
         mesh_table_resource,
         pbr_material_ssbo_resource,
         textures_resource,
-        transform_table_resource);
+        primitive_table_resource);
     
     RTXGIPushConstants pc{};
     pc.frame = ctx.frame;
