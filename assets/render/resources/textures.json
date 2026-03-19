@@ -3,7 +3,7 @@
     "name": "textures",
     "usage": "persistent",
     "set": "SET_TEXTURES",
-    "allowed_stages": ["fragment"],
+    "allowed_stages": ["fragment", "rtx_raygen", "rtx_any_hit", "rtx_closest_hit", "rtx_miss", "rtx_intersection"],
     "parameters": {
       "textures": {
         "type": "sampler",

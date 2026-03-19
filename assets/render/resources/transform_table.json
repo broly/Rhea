@@ -2,7 +2,7 @@
 	"resource": {
 		"name": "transform_table",
 		"usage": "persistent",
-		"allowed_stages": ["vertex"],
+		"allowed_stages": ["vertex", "rtx_raygen", "rtx_any_hit", "rtx_closest_hit", "rtx_miss", "rtx_intersection"],
 		"parameters": {
 			"mesh_table": {
 				"type": "ssbo",

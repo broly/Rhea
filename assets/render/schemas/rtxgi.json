@@ -8,6 +8,7 @@
 		"flags": {},
 		"enums": {}
 	},
+
 	"pipelines": [
 		{
 			"__type__": "PipelineInfo_RayTracing",
@@ -22,7 +23,8 @@
 					"name": "rtxgi",
 					"stages": [
 						"rtx_raygen",
-						"rtx_closest_hit"
+						"rtx_closest_hit",
+						"rtx_miss"
 					]
 				}
 			],
@@ -39,22 +41,45 @@
 						"hdr_color_storage"
 					]
 				},
+
 				{
-					"name": "miss",
+					"name": "miss_primary",
 					"stage": "rtx_miss",
 					"shader": "rtxgi_miss.rmiss",
-					"resources": [
-
-					]
+					"resources": []
 				},
 				{
-					"name": "closest_hit",
+					"name": "miss_secondary",
+					"stage": "rtx_miss",
+					"shader": "rtxgi_miss_secondary.rmiss",
+					"resources": []
+				},
+
+				{
+					"name": "closest_hit_primary",
 					"stage": "rtx_closest_hit",
 					"shader": "rtxgi_hit.rchit",
 					"resources": [
 						"camera",
 						"light",
-						"mesh_table"
+						"mesh_table",
+						"pbr_material_ssbo",
+						"textures",
+						"tlas",
+						"transform_table"
+					]
+				},
+				{
+					"name": "closest_hit_secondary",
+					"stage": "rtx_closest_hit",
+					"shader": "rtxgi_hit_secondary.rchit",
+					"resources": [
+						"camera",
+						"light",
+						"mesh_table",
+						"pbr_material_ssbo",
+						"textures",
+						"tlas"
 					]
 				}
 			],
@@ -65,15 +90,27 @@
 					"type": "general",
 					"general": "raygen"
 				},
+
 				{
-					"name": "miss_group",
+					"name": "miss_group_primary",
 					"type": "general",
-					"general": "miss"
+					"general": "miss_primary"
 				},
 				{
-					"name": "hit_group",
+					"name": "miss_group_secondary",
+					"type": "general",
+					"general": "miss_secondary"
+				},
+
+				{
+					"name": "hit_group_primary",
 					"type": "triangles_hit",
-					"closest_hit": "closest_hit"
+					"closest_hit": "closest_hit_primary"
+				},
+				{
+					"name": "hit_group_secondary",
+					"type": "triangles_hit",
+					"closest_hit": "closest_hit_secondary"
 				}
 			],
 
@@ -87,15 +124,23 @@
 
 				"miss": [
 					{
-						"group": "miss_group",
-						"define": "RTXGI_MISS"
+						"group": "miss_group_primary",
+						"define": "RTXGI_MISS_PRIMARY"
+					},
+					{
+						"group": "miss_group_secondary",
+						"define": "RTXGI_MISS_SECONDARY"
 					}
 				],
 
 				"hit": [
 					{
-						"group": "hit_group",
-						"define": "RTXGI_HIT"
+						"group": "hit_group_primary",
+						"define": "RTXGI_HIT_PRIMARY"
+					},
+					{
+						"group": "hit_group_secondary",
+						"define": "RTXGI_HIT_SECONDARY"
 					}
 				],
 
