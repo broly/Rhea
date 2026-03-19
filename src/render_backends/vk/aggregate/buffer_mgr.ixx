@@ -24,9 +24,10 @@ namespace vk
     class BufferManager
     {
     public:
-        BufferManager(const VkDevice& in_device, const VkPhysicalDevice& in_physical_device, 
+        BufferManager(vk::Instance& in_instance, const VkDevice& in_device, const VkPhysicalDevice& in_physical_device, 
             const vk::SwapchainControl& in_swapchain, vk::ImmediateCommandPool& in_command_pool)
-            : device(in_device)
+            : instance(in_instance)
+            , device(in_device)
             , physical_device(in_physical_device)
             , swapchain(in_swapchain)
             , command_pool(in_command_pool)
@@ -80,6 +81,7 @@ namespace vk
                                            ResourceUsage usage, VkSampler sampler, uint32_t array_index = 0);
         
     private:
+        vk::Instance& instance;
         const VkDevice& device;
         const VkPhysicalDevice& physical_device;
         

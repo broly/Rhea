@@ -379,15 +379,22 @@ void vk::BufferManager::update_buffer_element(RBBufferHandle buffer_handle, size
 {
     auto& buf = get_buffer(buffer_handle, frame);
 
-    size_t offset = element_size * index;
+    size_t raw_offset = element_size * index;
+    size_t raw_size = element_size;
+    
+    VkDeviceSize atom_size = instance.get_non_coherent_atom_size();
+    
+    VkDeviceSize aligned_offset = raw_offset & ~(atom_size - 1);
+    VkDeviceSize aligned_end = (raw_offset + raw_size + atom_size - 1) & ~(atom_size - 1);
+    VkDeviceSize aligned_size = aligned_end - aligned_offset;
 
-    memcpy(static_cast<uint8_t*>(buf.mapped_ptr) + offset, data, element_size);
+    memcpy(static_cast<uint8_t*>(buf.mapped_ptr) + raw_offset, data, raw_size);
 
     VkMappedMemoryRange range{};
     range.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
     range.memory = buf.memory;
-    range.offset = offset;
-    range.size   = element_size;
+    range.offset = aligned_offset;
+    range.size   = aligned_size;
 
     vkFlushMappedMemoryRanges(device, 1, &range);
 }

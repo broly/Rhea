@@ -42,15 +42,15 @@ void main()
     // ---------- TRANSFORM ----------
     uint primitive_id = gl_InstanceID;  // primitive_id is stored as instanceCustomIndex
     
-    GPUPrimitiveInfo tr = get_primitive_info(primitive_id);
+    GPUPrimitiveInfo primitive_info = get_primitive_info(primitive_id);
 
-    vec3 world_pos = (tr.current_transform * vec4(pos, 1.0)).xyz;
+    vec3 world_pos = (primitive_info.current_transform * vec4(pos, 1.0)).xyz;
 
-    mat3 normal_matrix = transpose(inverse(mat3(tr.current_transform)));
+    mat3 normal_matrix = transpose(inverse(mat3(primitive_info.current_transform)));
     vec3 N = normalize(normal_matrix * normal);
 
     // ---------- MATERIAL ----------
-    GPUMaterial mat = get_material(mesh_index);
+    GPUMaterial mat = get_material(primitive_info.material_id);
     vec3 albedo = get_base_color(mat, uv).rgb;
 
     // ================= DIRECT LIGHT =================

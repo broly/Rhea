@@ -26,10 +26,10 @@ void main()
     Vertex v = fetch_vertex(get_mesh_index(), gl_VertexIndex);
     
     uint prim_id = get_primitive_index();
-    GPUPrimitiveInfo transform_info = get_primitive_info(prim_id);
+    GPUPrimitiveInfo primitive_info = get_primitive_info(prim_id);
     
-    mat4 transform_curr = transform_info.current_transform;
-    mat4 transform_prev = transform_info.prev_transform;
+    mat4 transform_curr = primitive_info.current_transform;
+    mat4 transform_prev = primitive_info.prev_transform;
     
     vec4 world_curr = transform_curr * vec4(v.position, 1);
     vec4 world_prev = transform_prev * vec4(v.position, 1);

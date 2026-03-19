@@ -13,6 +13,8 @@ namespace vk
         void init(GLFWwindow* window);
         void match_queue_families();
         
+        VkDeviceSize get_non_coherent_atom_size() const;
+        
         const VkDevice& get_device() const
         {
             return device;

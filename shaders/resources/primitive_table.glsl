@@ -5,19 +5,19 @@ struct GPUPrimitiveInfo
 {
     mat4 current_transform;
     mat4 prev_transform;
-//    uint mesh_id;
-//    uint material_id;
+    uint mesh_id;
+    uint material_id;
 };
 
 layout(std430, set=SET_PRIMITIVE_TABLE, binding=BINDING_PRIMITIVE_TABLE)
 readonly buffer PrimitiveTable
 {
-    GPUPrimitiveInfo transforms[];
+    GPUPrimitiveInfo primitive_info_array[];
 } u_primitive_table;
 
 GPUPrimitiveInfo get_primitive_info(uint primitive_id)
 {
-    return u_primitive_table.transforms[nonuniformEXT(primitive_id)];
+    return u_primitive_table.primitive_info_array[nonuniformEXT(primitive_id)];
 }
 
 #endif  // RESOURCES_PRIMITIVE_TABLE

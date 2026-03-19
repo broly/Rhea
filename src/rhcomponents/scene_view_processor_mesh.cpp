@@ -141,8 +141,8 @@ void SceneViewProcessor_Mesh::process()
                     const GPUPrimitiveInfo primitive_info {
                         ro.world,
                         ro.world, // todo: make previous frame support
-                        // (uint32_t)rp.mesh_index,
-                        // mat_instance_TODO_EXACT_PASS->material_id
+                        (uint32_t)rp.mesh_index,
+                        mat_instance_TODO_EXACT_PASS->material_id
                         
                     };
                     primitive_table_resource.update_ssbo_element("u_primitive_table", sizeof(GPUPrimitiveInfo), rp.id, &primitive_info);

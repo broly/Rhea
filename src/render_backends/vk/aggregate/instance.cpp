@@ -211,3 +211,12 @@ void vk::Instance::match_queue_families()
     queues_indices[0] = queues.graphics;
     queues_indices[1] = queues.present;
 }
+
+VkDeviceSize vk::Instance::get_non_coherent_atom_size() const
+{
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(physical_device, &props);
+    VkDeviceSize atom_size = props.limits.nonCoherentAtomSize;
+    
+    return atom_size;
+}

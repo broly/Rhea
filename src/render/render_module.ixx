@@ -19,3 +19,4 @@ export import :rg_params;
 export import :vertex_buffer;
 export import :material_model;
 export import :material_manager;
+export import :gpu_types;

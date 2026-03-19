@@ -11,6 +11,7 @@ import :rg_types;
 import :render_resource;
 import :sampler_desc;
 import :vertex_buffer;
+import :gpu_types;
 
 import assets;
 
