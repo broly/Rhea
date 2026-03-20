@@ -15,7 +15,7 @@
 
 			"pass": "RTXGI",
 
-			"max_recursion_depth": 2,
+			"max_recursion_depth": 6,
 
 			"push_constants": [
 				{

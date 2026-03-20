@@ -40,6 +40,12 @@
 				"sampler": "default",
 				"variable": "u_position",
 				"binding": "BINDING_SAMPLER_POSITION"
+			},
+			"shadow": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_shadow",
+				"binding": "BINDING_SAMPLER_POSITION"
 			}
 		}
 	}

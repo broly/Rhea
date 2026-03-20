@@ -5,8 +5,23 @@
 
 layout(location = 0) rayPayloadInEXT RayPayload payload;
 
+layout(push_constant) uniform RTXGIPushConstants
+{
+    uint frame;
+    float intensity;
+} pc;
+
 void main()
 {
-    vec3 sky = vec3(0.03, 0.035, 0.04);
+    vec3 dir = normalize(gl_WorldRayDirectionEXT);
+
+    float t = 0.5 * (dir.y + 1.0);
+
+    vec3 sky = mix(
+        vec3(0.1, 0.15, 0.3),   // низ (горизонт)
+        vec3(0.7, 0.8, 1.0),    // верх
+        t
+    );
+
     payload.radiance += payload.throughput * sky;
 }

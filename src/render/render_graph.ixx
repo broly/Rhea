@@ -280,6 +280,7 @@ public:
     uint8_t num_frames_in_flight;
     
     bool graph_compiled = false;
+    uint32_t frame_index = 0;
     
 protected: // dynamic info
     std::map<Name, bool> render_flags;

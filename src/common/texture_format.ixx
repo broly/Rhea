@@ -17,6 +17,8 @@ export enum class TextureFormat
     RG16F,
     
     R16F,
+    
+    R8F,
 
     Depth24Stencil8,
     Depth32F,

@@ -31,6 +31,8 @@ namespace vk
             return VK_FORMAT_R16G16_SFLOAT;
         case TextureFormat::R16F:
             return VK_FORMAT_R16_SFLOAT;
+        case TextureFormat::R8F:
+            return VK_FORMAT_R8_UNORM;
         case TextureFormat::RGBA32F:
             return VK_FORMAT_R32G32B32A32_SFLOAT;
         case TextureFormat::Depth24Stencil8:

@@ -88,6 +88,16 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .dimension = capture_dimension
     });
     
+    
+    // hdr_color_rtxgi = create_texture({
+    //     .name = NAME(hdr_color_rtxgi),
+    //     .extent = resolution,
+    //     .format = TextureFormat::RGBA16F,
+    //     .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
+    //     .external = false,
+    //     .dimension = capture_dimension
+    // });
+    
     hdr_color_temp = duplicate_texture(hdr_color, NAME(hdr_color_temp));
     
     g_normal = create_texture({
@@ -154,6 +164,14 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .dimension = capture_dimension
     });
     
+    g_shadow = create_texture({
+        .name = NAME(g_shadow),
+        .extent = resolution,
+        .format = TextureFormat::R16F,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension
+    });
 
     history_hdr = create_texture({
         .name = NAME(history_hdr),
@@ -295,6 +313,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { g_roughness, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_albedo, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_position, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+             {g_shadow, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -303,25 +322,6 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             draw_scene(ctx);
         },
         .num_layers = num_pass_instances
-    });
-    
-    add_pass({
-        .name = "RTXGI",
-        .reads = {
-            { g_depth, RBImageUsage::SampledFragment },
-            { g_normal, RBImageUsage::SampledFragment },
-            { g_world_normal, RBImageUsage::SampledFragment },
-            { g_albedo, RBImageUsage::SampledFragment },
-            { g_position, RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { hdr_color, RBImageUsage::StorageImage }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            draw_rtxgi(ctx);
-        },
-        .type = RenderPassType::rtx
     });
     
     add_pass({
@@ -341,6 +341,27 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .num_layers = num_pass_instances
     });
+    
+    
+    
+    // add_pass({
+    //     .name = "RTXGI",
+    //     .reads = {
+    //         { g_depth, RBImageUsage::SampledFragment },
+    //         { g_normal, RBImageUsage::SampledFragment },
+    //         { g_world_normal, RBImageUsage::SampledFragment },
+    //         { g_albedo, RBImageUsage::SampledFragment },
+    //         { g_position, RBImageUsage::SampledFragment },
+    //     },
+    //     .writes = {
+    //         { hdr_color_rtxgi, RBImageUsage::StorageImage }
+    //     },
+    //     .execute = [this](RenderGraphContext& ctx)
+    //     {
+    //         draw_rtxgi(ctx);
+    //     },
+    //     .type = RenderPassType::rtx
+    // });
     
     
     
@@ -484,8 +505,11 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
 
         for (auto& prim : mesh_processor.primitives)
         {
-            meshes.push_back(prim.mesh);
-            transforms.emplace_back(*prim.world);
+            if (!prim.passes.contains("GeometryTranslucent"))
+            {
+                meshes.push_back(prim.mesh);
+                transforms.emplace_back(*prim.world);
+            }
         }
 
         tlas = backend->build_tlas(
@@ -782,6 +806,7 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
     gbuffer_resource->update_image("u_roughness", get_image(g_roughness), {.frame=ctx.frame});
     gbuffer_resource->update_image("u_position", get_image(g_position), {.frame=ctx.frame});
     gbuffer_resource->update_image("u_albedo", get_image(g_albedo), {.frame=ctx.frame});
+    gbuffer_resource->update_image("u_shadow", get_image(g_shadow), {.frame=ctx.frame});
 
     hdr_color_resource->update_image(
         "u_hdr_color",
@@ -1151,7 +1176,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
         primitive_table_resource);
     
     RTXGIPushConstants pc{};
-    pc.frame = ctx.frame;
+    pc.frame = frame_index;
     pc.intensity = 1.0f;
 
     ctx.backend.push_constants(

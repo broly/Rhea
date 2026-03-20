@@ -84,6 +84,7 @@ public:
     RGTextureHandle swapchain_color;
     
     RGTextureHandle hdr_color;
+    // RGTextureHandle hdr_color_rtxgi;
     RGTextureHandle hdr_color_temp;
     
     RGTextureHandle g_depth;
@@ -93,6 +94,7 @@ public:
     RGTextureHandle g_roughness;
     RGTextureHandle g_albedo;
     RGTextureHandle g_position;
+    RGTextureHandle g_shadow;
     
     
     RGTextureHandle history_hdr;
@@ -162,5 +164,6 @@ public:
     uint8_t*     debug_line_mapped = nullptr;
 
     uint32_t debug_line_capacity = 19440*32;
+    
 };
 REFLECT_OBJECT(GenericRenderGraph, RenderGraph)

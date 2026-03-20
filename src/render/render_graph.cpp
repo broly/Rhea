@@ -477,6 +477,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     }
     
     end_frame();
+    
+    frame_index++;
 }
 
 

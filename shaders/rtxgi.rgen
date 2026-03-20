@@ -31,7 +31,12 @@ void main()
     if (length(world_pos) < 0.0001)
     return;
 
-    uint seed = pc.frame * 1664525u + pixel.x * 1013904223u + pixel.y;
+    // ✅ правильный seed (движущийся шум)
+    uint seed = wang_hash(
+        uint(pixel.x) +
+        uint(pixel.y) * 4096u +
+        pc.frame * 16777619u
+    );
 
     payload.radiance   = vec3(0.0);
     payload.throughput = vec3(1.0);
@@ -51,7 +56,12 @@ void main()
         0
     );
 
+    // ✅ accumulation
 //    vec3 prev = imageLoad(u_hdr_color, pixel).rgb;
-//    imageStore(u_hdr_color, pixel, vec4(prev + payload.radiance * pc.intensity, 1.0));
+//
+//    float alpha = 1.0 / float(pc.frame + 1);
+//    vec3 color = mix(prev, payload.radiance * pc.intensity, alpha);
+//
+//    imageStore(u_hdr_color, pixel, vec4(color, 1.0));
     imageStore(u_hdr_color, pixel, vec4(payload.radiance * pc.intensity, 1.0));
 }

@@ -19,6 +19,12 @@ layout(location = 0) rayPayloadInEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT ShadowPayload shadow_payload;
 hitAttributeEXT vec2 attribs;
 
+layout(push_constant) uniform RTXGIPushConstants
+{
+    uint frame;
+    float intensity;
+} pc;
+
 void main()
 {
     uint mesh_index = gl_InstanceCustomIndexEXT;
@@ -40,8 +46,7 @@ void main()
     vec2 uv = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
 
     // ---------- TRANSFORM ----------
-    uint primitive_id = gl_InstanceID;  // primitive_id is stored as instanceCustomIndex
-    
+    uint primitive_id = gl_InstanceID;
     GPUPrimitiveInfo primitive_info = get_primitive_info(primitive_id);
 
     vec3 world_pos = (primitive_info.current_transform * vec4(pos, 1.0)).xyz;
@@ -52,9 +57,16 @@ void main()
     // ---------- MATERIAL ----------
     GPUMaterial mat = get_material(primitive_info.material_id);
     vec3 albedo = get_base_color(mat, uv).rgb;
+    vec3 emissive = get_emissive(mat, uv).rgb;
 
-    // ================= DIRECT LIGHT =================
-    vec3 direct = vec3(0.0);
+    // =====================================================
+    // ✅ EMISSION
+    // =====================================================
+    payload.radiance += payload.throughput * emissive;
+
+    // =====================================================
+    // ✅ NEXT EVENT ESTIMATION (КЛЮЧЕВОЕ!)
+    // =====================================================
 
     if (light_ubo.has_dir_light == 1)
     {
@@ -63,7 +75,6 @@ void main()
 
         if (NdotL > 0.0)
         {
-            // ---------- SHADOW RAY ---------
             shadow_payload.hit = false;
 
             traceRayEXT(
@@ -71,7 +82,7 @@ void main()
                 gl_RayFlagsTerminateOnFirstHitEXT,
                 0xFF,
                 RTXGI_HIT_PRIMARY,
-                RTXGI_DEFAULT_STRIDE, 
+                RTXGI_DEFAULT_STRIDE,
                 RTXGI_MISS_PRIMARY,
                 world_pos + N * 0.001,
                 0.001,
@@ -82,32 +93,73 @@ void main()
 
             if (!shadow_payload.hit)
             {
-                direct = light_ubo.dir_light.color.rgb * NdotL;
+                vec3 light = light_ubo.dir_light.color.rgb;
+        
+                // ✅ только для indirect
+                if (payload.depth > 0)
+                {
+                    payload.radiance += payload.throughput * albedo * light * NdotL;
+                }
             }
         }
     }
+    // =====================================================
+    // ✅ STOP
+    // =====================================================
+    const int MAX_BOUNCES = 4;
 
-    // ---------- ADD LIGHT ----------
-    payload.radiance += payload.throughput * direct * albedo;
-
-    // ---------- STOP ----------
-    if (payload.depth >= 1)
+    if (payload.depth >= MAX_BOUNCES)
     return;
 
-    // ================= BOUNCE =================
-    uint seed = uint(gl_LaunchIDEXT.x * 1973 + gl_LaunchIDEXT.y * 9277 + gl_PrimitiveID);
+    // =====================================================
+    // ✅ RANDOM
+    // =====================================================
+    uint seed = wang_hash(
+        uint(gl_LaunchIDEXT.x) * 1973u +
+        uint(gl_LaunchIDEXT.y) * 9277u +
+        uint(payload.depth) * 26699u +
+        pc.frame * 374761393u
+    );
 
     vec3 dir = cosine_sample(N, seed);
 
+    // =====================================================
+    // ✅ THROUGHPUT
+    // =====================================================
     payload.throughput *= albedo;
+
+    // =====================================================
+    // 🔥 GI BOOST (умеренный!)
+    // =====================================================
+    payload.throughput *= 1.5;
+
+    // =====================================================
+    // ✅ RUSSIAN ROULETTE
+    // =====================================================
+    if (payload.depth >= 2)
+    {
+        float p = max(payload.throughput.r,
+                      max(payload.throughput.g, payload.throughput.b));
+
+        p = clamp(p, 0.1, 1.0);
+
+        if (rand(seed) > p)
+        return;
+
+        payload.throughput /= p;
+    }
+
     payload.depth++;
 
+    // =====================================================
+    // ✅ NEXT BOUNCE
+    // =====================================================
     traceRayEXT(
         u_tlas,
         gl_RayFlagsOpaqueEXT,
         0xFF,
-        RTXGI_HIT_SECONDARY, 
-        RTXGI_DEFAULT_STRIDE, 
+        RTXGI_HIT_SECONDARY,
+        RTXGI_DEFAULT_STRIDE,
         RTXGI_MISS_SECONDARY,
         world_pos + N * 0.001,
         0.001,
