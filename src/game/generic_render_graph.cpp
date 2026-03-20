@@ -51,7 +51,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     reflection_resource = renderer->find_resource("reflection");
     gbuffer_resource = renderer->find_resource("gbuffer");
     ssr_resource = renderer->find_resource("ssr");
-    hdr_color_resource = renderer->find_resource("hdr_color");
+    hdr_color_output_resource = renderer->find_resource("hdr_color_output");
     hdr_color_storage_resource = renderer->find_resource("hdr_color_storage");
     tlas_resource = renderer->find_resource("tlas");
     copy_resource = renderer->find_resource("copy");
@@ -797,13 +797,13 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
     gbuffer_resource->update_image("u_position", get_image(g_position), {.frame=ctx.frame});
     gbuffer_resource->update_image("u_albedo", get_image(g_albedo), {.frame=ctx.frame});
 
-    hdr_color_resource->update_image(
+    hdr_color_output_resource->update_image(
         "u_hdr_color",
         get_image(hdr_color),
         {.frame=ctx.frame});
     
     
-    hdr_color_resource->update_image(
+    hdr_color_output_resource->update_image(
         "u_history",
         get_image(hdr_color),
         {.frame=ctx.frame});
@@ -1117,7 +1117,7 @@ void GenericRenderGraph::draw_ssr(RenderGraphContext& ctx)
     
     if (ctx.bind_pipeline(ssr_pipeline))
     {
-        ctx.bind(camera_resource, gbuffer_resource, hdr_color_resource);
+        ctx.bind(camera_resource, gbuffer_resource, hdr_color_output_resource);
     }
     
     ctx.backend.draw_fullscreen(ctx.cmd);
@@ -1134,7 +1134,7 @@ void GenericRenderGraph::draw_ssr_composite(RenderGraphContext& ctx)
 
     if (ctx.bind_pipeline(ssr_composite_pipeline))
     {
-        ctx.bind(gbuffer_resource, hdr_color_resource, ssr_resource);
+        ctx.bind(gbuffer_resource, hdr_color_output_resource, ssr_resource);
     }
     ctx.backend.draw_fullscreen(ctx.cmd);
 }

@@ -1,6 +1,15 @@
 #ifndef RESOURCES_HDR_COLOR_STORAGE
 #define RESOURCES_HDR_COLOR_STORAGE
 
+#ifndef SET_HDR_COLOR_STORAGE
+    #define SET_HDR_COLOR_STORAGE 0 
+    #error "SET_HDR_COLOR_STORAGE must be provided"
+#endif
+#ifndef BINDING_SAMPLER_HDR_COLOR_STORAGE
+    #define BINDING_SAMPLER_HDR_COLOR_STORAGE 0 
+    #error "BINDING_SAMPLER_HDR_COLOR_STORAGE must be provided"
+#endif
+
 layout(set = SET_HDR_COLOR_STORAGE, binding = BINDING_SAMPLER_HDR_COLOR_STORAGE, rgba16f)
 uniform image2D u_hdr_color;
 

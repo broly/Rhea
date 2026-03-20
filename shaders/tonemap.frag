@@ -1,7 +1,7 @@
 #version 450
 
 #include "definitions.glsl"
-#include "resources/hdr_color.glsl"
+#include "resources/hdr_color_output.glsl"
 
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
@@ -34,7 +34,7 @@ float linearize_depth(float depth)
 
 void main()
 {
-    vec3 hdr_color = texture(u_hdr_color, v_uv).rgb;
+    vec3 hdr_color = texture(u_hdr_color[COLOR_OUTPUT_HDR_BASE], v_uv).rgb;
     // exposure
     hdr_color *= 0.6;
     // tonemap

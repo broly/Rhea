@@ -1,6 +1,6 @@
 #version 450
 
-#include "resources/hdr_color.glsl"
+#include "resources/hdr_color_output.glsl"
 #include "resources/gbuffer.glsl"
 #include "resources/ssr.glsl"
 
@@ -8,9 +8,9 @@ layout(location = 0) out vec4 out_color;
 
 void main()
 {
-    vec2 uv = gl_FragCoord.xy / textureSize(u_hdr_color, 0);
+    vec2 uv = gl_FragCoord.xy / textureSize(u_hdr_color[COLOR_OUTPUT_HDR_BASE], 0);
 
-    vec3 base = texture(u_hdr_color, uv).rgb;
+    vec3 base = texture(u_hdr_color[COLOR_OUTPUT_HDR_BASE], uv).rgb;
 
     vec4 ssr_sample = texture(u_ssr, uv);
 

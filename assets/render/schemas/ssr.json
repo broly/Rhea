@@ -20,7 +20,7 @@
 				},
 				"fragment": {
 					"shader": "ssr.frag",
-					"resources": ["camera", "hdr_color", "gbuffer"]
+					"resources": ["camera", "hdr_color_output", "gbuffer"]
 				}
 			},
 			"color_attachments": [
@@ -32,7 +32,7 @@
 			"cull_mode": "none",
 			"front_face": "CW",
 			"compare_op": "greater",
-			"resources": ["hdr_color", "gbuffer"],
+			"resources": ["hdr_color_output", "gbuffer"],
 			"push_constants": [],
 			"translucent": false,
 			"depth_test": false,
@@ -51,7 +51,7 @@
 				},
 				"fragment": {
 					"shader": "ssr_composite.frag",
-					"resources": ["hdr_color", "gbuffer", "ssr"]
+					"resources": ["hdr_color_output", "gbuffer", "ssr"]
 				}
 			},
 			"color_attachments": [

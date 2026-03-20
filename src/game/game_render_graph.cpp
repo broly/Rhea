@@ -58,7 +58,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             {
                 if (ctx.bind_pipeline(tonemap_pipeline))
                 {
-                    ctx.bind(hdr_color_resource);
+                    ctx.bind(hdr_color_output_resource);
                 }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);
@@ -71,7 +71,7 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
 {
     GenericRenderGraph::prepare_resources(ctx);
     
-    auto hdr_color_instance = hdr_color_resource->query_single();
+    auto hdr_color_instance = hdr_color_output_resource->query_single();
            
     hdr_color_instance->update_image(
         "u_hdr_color",

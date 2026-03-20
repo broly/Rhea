@@ -1,6 +1,6 @@
 {
 	"resource": {
-		"name": "hdr_color",
+		"name": "hdr_color_output",
 		"usage": "frame",
 		"set": "SET_HDR_COLOR",
 		"allowed_stages": ["fragment"],
@@ -16,7 +16,7 @@
 				"sampler": "default",
 				"variable": "u_history",
 				"binding": "BINDING_SAMPLER_HISTORY"
-			},
+			}
 		}
 	}
 }

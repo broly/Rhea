@@ -1,7 +1,7 @@
 #version 450
 
 #include "resources/camera.glsl"
-#include "resources/hdr_color.glsl"
+#include "resources/hdr_color_output.glsl"
 #include "resources/gbuffer.glsl"
 
 
@@ -89,7 +89,7 @@ void main()
 
         if (rayDepth > sceneDepth && rayDepth - sceneDepth < THICKNESS)
         {
-            vec3 hitColor = texture(u_hdr_color, uv).rgb;
+            vec3 hitColor = texture(u_hdr_color[COLOR_OUTPUT_HDR_BASE], uv).rgb;
 
             float NdotV = max(dot(normal, viewDir), 0.0);
             float fresnel = pow(1.0 - NdotV, 5.0);

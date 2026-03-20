@@ -111,7 +111,7 @@ public:
     RenderResource* reflection_resource = nullptr;
     RenderResource* copy_resource = nullptr;
     RenderResource* ssr_resource = nullptr;
-    RenderResource* hdr_color_resource = nullptr;
+    RenderResource* hdr_color_output_resource = nullptr;
     RenderResource* hdr_color_storage_resource = nullptr;
     RenderResource* tlas_resource = nullptr;
     RenderResource* mesh_table_resource = nullptr;

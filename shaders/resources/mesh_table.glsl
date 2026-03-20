@@ -1,6 +1,15 @@
 #ifndef RESOURCES_MESH_TABLE
 #define RESOURCES_MESH_TABLE
 
+#ifndef SET_SCENE
+    #define SET_SCENE 0
+    #error "SET_SCENE must be provided"
+#endif
+#ifndef BINDING_SSBO_MESH_TABLE
+    #define BINDING_SSBO_MESH_TABLE 0
+    #error "BINDING_SSBO_MESH_TABLE must be provided"
+#endif
+
 
 struct Vertex
 {

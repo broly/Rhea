@@ -1,5 +1,23 @@
 #ifndef PBR_MATERIAL_TABLE
 #define PBR_MATERIAL_TABLE
+
+
+#ifndef SET_SSBO_PBR
+    #define SET_SSBO_PBR 0
+    #error "SET_SSBO_PBR must be provided"
+#endif
+#ifndef BINDING_SSBO_MATERIAL
+    #define BINDING_SSBO_MATERIAL 0
+    #error "BINDING_SSBO_MATERIAL must be provided"
+#endif
+#ifndef SET_TEXTURES
+    #define SET_TEXTURES 0
+    #error "SET_TEXTURES must be provided"
+#endif
+#ifndef BINDING_ARRAY_TEXTURES
+    #define BINDING_ARRAY_TEXTURES 0
+    #error "BINDING_ARRAY_TEXTURES must be provided"
+#endif
     
     
 // ================= MATERIAL STRUCT =================

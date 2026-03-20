@@ -1,6 +1,15 @@
 #ifndef RESOURCES_LIGHT
 #define RESOURCES_LIGHT
 
+#ifndef SET_LIGHT
+    #define SET_LIGHT 0 
+    #error "SET_LIGHT must be provided"
+#endif
+#ifndef BINDING_UBO_LIGHT
+    #define BINDING_UBO_LIGHT 0 
+    #error "BINDING_UBO_LIGHT must be provided"
+#endif
+
 // ================== LIGHT ==================
 struct PointLight
 {
