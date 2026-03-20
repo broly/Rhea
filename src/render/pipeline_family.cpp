@@ -229,7 +229,6 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         desc.color_attachments = config.color_attachments;
         desc.cull_mode = config.cull_mode;
         desc.front_face = config.front_face;
-        desc.no_color_attachments = config.no_color_attachments.has_value() ? *config.no_color_attachments : false;
         desc.compare_op = config.compare_op;
         desc.depth_bias = config.depth_bias ? *config.depth_bias : DepthBiasInfo{};
         desc.topology = config.topology;

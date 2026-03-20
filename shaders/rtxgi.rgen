@@ -31,7 +31,6 @@ void main()
     if (length(world_pos) < 0.0001)
     return;
 
-    // ✅ правильный seed (движущийся шум)
     uint seed = wang_hash(
         uint(pixel.x) +
         uint(pixel.y) * 4096u +
@@ -56,7 +55,6 @@ void main()
         0
     );
 
-    // ✅ accumulation
 //    vec3 prev = imageLoad(u_hdr_color, pixel).rgb;
 //
 //    float alpha = 1.0 / float(pc.frame + 1);

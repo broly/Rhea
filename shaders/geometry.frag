@@ -11,7 +11,7 @@
 #include "resources/light.glsl"
 #include "resources/shadow.glsl"
 #include "resources/reflection.glsl"
-#include "resources/pbr_material_ssbo.glsl"
+#include "resources/pbr_material_table.glsl"
 #include "push_constants/model_push_constants.glsl"
 #include "utils/hsv.glsl"
 
@@ -34,7 +34,6 @@ layout(location = 3) out vec2 out_g_motion_vectors;
 layout(location = 4) out float out_g_roughness;
 layout(location = 5) out vec3 out_g_albedo;
 layout(location = 6) out vec3 out_g_position;
-layout(location = 7) out float out_g_shadow;
 #endif 
 
 
@@ -247,7 +246,6 @@ void main()
     out_g_roughness = roughness;
     out_g_albedo = albedo;
     out_g_position = v_world_pos;
-    out_g_shadow = shadow;
 #endif
     
 }

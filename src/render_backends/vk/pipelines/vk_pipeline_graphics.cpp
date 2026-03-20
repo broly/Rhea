@@ -222,7 +222,7 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
     pci.pDepthStencilState = &depth_ci;
     pci.pDynamicState = &dynamic_ci;
     
-    if (!pipeline_desc.no_color_attachments) {
+    if (!blend_attachments.empty()) {
         pci.pColorBlendState = &blend;
     } else {
         pci.pColorBlendState = nullptr;  // Depth-only

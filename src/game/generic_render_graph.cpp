@@ -58,7 +58,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     mesh_table_resource = renderer->find_resource("mesh_table");
     clouds_resource = renderer->find_resource("clouds");
     base_color_resource = renderer->find_resource("base_color");
-    pbr_material_ssbo_resource = renderer->find_resource("pbr_material_ssbo");
+    pbr_material_table_resource = renderer->find_resource("pbr_material_table");
     textures_resource = renderer->find_resource("textures");
     primitive_table_resource = renderer->find_resource("primitive_table");
     
@@ -161,15 +161,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .extent = resolution,
         .format = TextureFormat::Depth24Stencil8,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
-        .dimension = capture_dimension
-    });
-    
-    g_shadow = create_texture({
-        .name = NAME(g_shadow),
-        .extent = resolution,
-        .format = TextureFormat::R16F,
-        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
-        .external = false,
         .dimension = capture_dimension
     });
 
@@ -312,8 +303,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { g_motion_vectors, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_roughness, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_albedo, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { g_position, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-             {g_shadow, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            { g_position, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -806,7 +796,6 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
     gbuffer_resource->update_image("u_roughness", get_image(g_roughness), {.frame=ctx.frame});
     gbuffer_resource->update_image("u_position", get_image(g_position), {.frame=ctx.frame});
     gbuffer_resource->update_image("u_albedo", get_image(g_albedo), {.frame=ctx.frame});
-    gbuffer_resource->update_image("u_shadow", get_image(g_shadow), {.frame=ctx.frame});
 
     hdr_color_resource->update_image(
         "u_hdr_color",
@@ -951,7 +940,7 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         if (ctx.bind_pipeline(pipeline))
         {
             ctx.bind(camera_resource, mesh_table_resource,
-                     shadow_resource, light_resource, reflection_resource, pbr_material_ssbo_resource, textures_resource,
+                     shadow_resource, light_resource, reflection_resource, pbr_material_table_resource, textures_resource,
                      primitive_table_resource);
         }       
         
@@ -1171,7 +1160,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
         camera_resource,
         light_resource,
         mesh_table_resource,
-        pbr_material_ssbo_resource,
+        pbr_material_table_resource,
         textures_resource,
         primitive_table_resource);
     

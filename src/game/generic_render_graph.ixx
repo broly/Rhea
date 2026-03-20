@@ -94,7 +94,6 @@ public:
     RGTextureHandle g_roughness;
     RGTextureHandle g_albedo;
     RGTextureHandle g_position;
-    RGTextureHandle g_shadow;
     
     
     RGTextureHandle history_hdr;
@@ -118,7 +117,7 @@ public:
     RenderResource* mesh_table_resource = nullptr;
     RenderResource* clouds_resource = nullptr;
     RenderResource* base_color_resource = nullptr;
-    RenderResource* pbr_material_ssbo_resource = nullptr;
+    RenderResource* pbr_material_table_resource = nullptr;
     RenderResource* textures_resource = nullptr;
     RenderResource* primitive_table_resource = nullptr;
     

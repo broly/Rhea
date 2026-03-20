@@ -1,5 +1,5 @@
-#ifndef PBR_MATERIAL_SSBO
-#define PBR_MATERIAL_SSBO
+#ifndef PBR_MATERIAL_TABLE
+#define PBR_MATERIAL_TABLE
     
     
 // ================= MATERIAL STRUCT =================
@@ -84,4 +84,4 @@ vec3 get_orm(in GPUMaterial mat, vec2 uv)
 }
     
     
-#endif // PBR_MATERIAL_SSBO
+#endif // PBR_MATERIAL_TABLE

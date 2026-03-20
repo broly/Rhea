@@ -371,7 +371,6 @@ export struct PipelineInfo_Graphics : public PipelineInfo
     std::vector<MatModel_ColorAttachmentInfo> color_attachments;
     CullMode cull_mode;
     FrontFace front_face;
-    std::optional<bool> no_color_attachments;
     CompareOp compare_op;
     std::optional<DepthBiasInfo> depth_bias;
     RBBufferTopology topology;
@@ -391,7 +390,7 @@ export struct PipelineInfo_Graphics : public PipelineInfo
     }
 };
 REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
-    requirements, depth_test, depth_write, no_color_attachments, stages, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
+    requirements, depth_test, depth_write, stages, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
 
 
 

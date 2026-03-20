@@ -6,7 +6,7 @@
 
 #include "resources/mesh_table.glsl"
 #include "resources/primitive_table.glsl"
-#include "resources/pbr_material_ssbo.glsl"
+#include "resources/pbr_material_table.glsl"
 #include "resources/light.glsl"
 #include "resources/tlas.glsl"
 
@@ -60,12 +60,12 @@ void main()
     vec3 emissive = get_emissive(mat, uv).rgb;
 
     // =====================================================
-    // ✅ EMISSION
+    // EMISSION
     // =====================================================
     payload.radiance += payload.throughput * emissive;
 
     // =====================================================
-    // ✅ NEXT EVENT ESTIMATION (КЛЮЧЕВОЕ!)
+    // NEXT EVENT ESTIMATION
     // =====================================================
 
     if (light_ubo.has_dir_light == 1)
@@ -95,7 +95,6 @@ void main()
             {
                 vec3 light = light_ubo.dir_light.color.rgb;
         
-                // ✅ только для indirect
                 if (payload.depth > 0)
                 {
                     payload.radiance += payload.throughput * albedo * light * NdotL;
@@ -104,7 +103,7 @@ void main()
         }
     }
     // =====================================================
-    // ✅ STOP
+    // STOP
     // =====================================================
     const int MAX_BOUNCES = 4;
 
@@ -112,7 +111,7 @@ void main()
     return;
 
     // =====================================================
-    // ✅ RANDOM
+    // RANDOM
     // =====================================================
     uint seed = wang_hash(
         uint(gl_LaunchIDEXT.x) * 1973u +
@@ -124,17 +123,17 @@ void main()
     vec3 dir = cosine_sample(N, seed);
 
     // =====================================================
-    // ✅ THROUGHPUT
+    // THROUGHPUT
     // =====================================================
     payload.throughput *= albedo;
 
     // =====================================================
-    // 🔥 GI BOOST (умеренный!)
+    // GI BOOST (умеренный!)
     // =====================================================
     payload.throughput *= 1.5;
 
     // =====================================================
-    // ✅ RUSSIAN ROULETTE
+    // RUSSIAN ROULETTE
     // =====================================================
     if (payload.depth >= 2)
     {
@@ -152,7 +151,7 @@ void main()
     payload.depth++;
 
     // =====================================================
-    // ✅ NEXT BOUNCE
+    // NEXT BOUNCE
     // =====================================================
     traceRayEXT(
         u_tlas,

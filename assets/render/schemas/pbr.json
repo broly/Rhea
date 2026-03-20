@@ -92,17 +92,13 @@
 				},
 				"fragment": {
 					"shader": "geometry.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material", "pbr_material_ssbo", "textures"]
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures"]
 				}
 			},
 			"depth_write": true,
 			"depth_test": true,
 			
 			"color_attachments": [
-				{
-					"write_mask": ["R", "G", "B", "A"],
-					"translucent": false
-				},
 				{
 					"write_mask": ["R", "G", "B", "A"],
 					"translucent": false
@@ -162,7 +158,7 @@
 				},
 				"fragment": {
 					"shader": "geometry.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material", "pbr_material_ssbo", "textures"]
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures"]
 				}
 			},
 			"depth_write": false,

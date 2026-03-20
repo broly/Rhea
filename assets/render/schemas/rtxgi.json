@@ -63,7 +63,7 @@
 						"camera",
 						"light",
 						"mesh_table",
-						"pbr_material_ssbo",
+						"pbr_material_table",
 						"textures",
 						"tlas",
 						"primitive_table"
@@ -77,7 +77,7 @@
 						"camera",
 						"light",
 						"mesh_table",
-						"pbr_material_ssbo",
+						"pbr_material_table",
 						"textures",
 						"tlas"
 					]

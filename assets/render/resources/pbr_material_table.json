@@ -1,6 +1,6 @@
 {
 	"resource": {
-		"name": "pbr_material_ssbo",
+		"name": "pbr_material_table",
 		"usage": "persistent",
 		"set": "SET_SSBO_PBR",
 		"allowed_stages": ["fragment", "rtx_raygen", "rtx_any_hit", "rtx_closest_hit", "rtx_miss", "rtx_intersection"],
