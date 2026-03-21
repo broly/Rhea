@@ -90,7 +90,6 @@ public:
     RGTextureHandle swapchain_color;
     
     std::vector<RGTextureHandle> hdr_color_table;
-    // RGTextureHandle hdr_color_rtxgi;
     RGTextureHandle hdr_color_temp;
     
     RGTextureHandle g_depth;

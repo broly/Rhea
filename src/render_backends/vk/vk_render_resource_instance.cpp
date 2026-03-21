@@ -68,7 +68,7 @@ void VkRenderResourceInstance::update_image(Name buffer_name, RBImageHandle imag
     if (binding.parameter.type == MaterialParamType::image)
     {
         resource->backend.update_storage_image(
-            set, *binding.binding_index, image_handle);
+            set, *binding.binding_index, image_handle, update_params.array_index);
         return;
     }
 

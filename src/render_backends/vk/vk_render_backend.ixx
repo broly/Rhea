@@ -111,7 +111,7 @@ public:   /// API Section
         uint32_t layer_index = 0,
         bool cubemap = false, 
         uint32_t array_index = 0) override;
-    virtual void update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image) override;
+    virtual void update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image, uint32_t array_index = 0) override;
     virtual void update_tlas(RBDescriptorSet set, uint32_t binding, RBAccelStruct tlas) override;
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, Name debug_name) override;
     virtual RBFrameHandle get_current_frame() const override;

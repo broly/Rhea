@@ -169,7 +169,8 @@ public:
     virtual void update_storage_image(
         RBDescriptorSet set,
         uint32_t binding,
-        RBImageHandle image) = 0;
+        RBImageHandle image, 
+        uint32_t array_index = 0) = 0;
     
     virtual void update_tlas(
         RBDescriptorSet set,

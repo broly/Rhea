@@ -65,7 +65,7 @@ void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding
     
 }
 
-void VkRenderBackend::update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image)
+void VkRenderBackend::update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image, uint32_t array_index)
 {
     VkDescriptorImageInfo info{};
     info.imageView = get_image_view(image);
@@ -78,6 +78,7 @@ void VkRenderBackend::update_storage_image(RBDescriptorSet set, uint32_t binding
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     write.pImageInfo = &info;
+    write.dstArrayElement = array_index;
 
     vkUpdateDescriptorSets(instance.get_device(), 1, &write, 0, nullptr);
 }

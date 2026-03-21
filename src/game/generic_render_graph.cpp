@@ -91,7 +91,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .dimension = capture_dimension
     }, initial_array_size);
     
-    hdr_color_temp = duplicate_texture(hdr_color_table[0], NAME(hdr_color_temp));
+    hdr_color_temp = duplicate_texture(hdr_color_table[COLOR_OUTPUT_HDR_BASE], NAME(hdr_color_temp));
     
     g_normal = create_texture({
         .name = NAME(g_normal),
@@ -824,6 +824,7 @@ void GenericRenderGraph::setup_hdr_color_table(RenderGraphContext& ctx) const
                 .array_index = index
             });
     }
+    
 }
 
 void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTextureHandle source)

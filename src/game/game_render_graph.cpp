@@ -46,7 +46,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },
             .reads = {
-                { hdr_color_table[0], RBImageUsage::SampledFragment },
+                { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
                 { history_hdr, RBImageUsage::SampledFragment },
                 
                 
@@ -75,7 +75,7 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
            
     hdr_color_instance->update_image(
         "u_hdr_color",
-        get_image(hdr_color_table[0]),
+        get_image(hdr_color_table[COLOR_OUTPUT_HDR_BASE]),
         {
             .frame = ctx.frame
         }
