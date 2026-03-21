@@ -3,11 +3,11 @@
 
 #ifndef SET_PRIMITIVE_TABLE
     #define SET_PRIMITIVE_TABLE 0
-    #error "SET_PRIMITIVE_TABLE must be provided"
+    #error "SET_PRIMITIVE_TABLE definition is missing. Provide this resource: primitive_table"
 #endif
 #ifndef BINDING_PRIMITIVE_TABLE
     #define BINDING_PRIMITIVE_TABLE 0
-    #error "BINDING_PRIMITIVE_TABLE must be provided"
+    #error "BINDING_PRIMITIVE_TABLE definition is missing. Provide this resource: primitive_table"
 #endif
 
 struct GPUPrimitiveInfo

@@ -3,11 +3,11 @@
 
 #ifndef SET_LIGHT
     #define SET_LIGHT 0 
-    #error "SET_LIGHT must be provided"
+    #error "SET_LIGHT definition is missing. Provide this resource: light"
 #endif
 #ifndef BINDING_UBO_LIGHT
     #define BINDING_UBO_LIGHT 0 
-    #error "BINDING_UBO_LIGHT must be provided"
+    #error "BINDING_UBO_LIGHT definition is missing. Provide this resource: light"
 #endif
 
 // ================== LIGHT ==================

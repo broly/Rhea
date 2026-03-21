@@ -212,9 +212,18 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         
             for (auto& variable_binding : resource.resource_variable_bindings)
             {
-                const Name binding_name = *variable_binding.parameter.binding;
-                const uint16_t binding = *variable_binding.binding_index;
-                defines.insert({binding_name, binding});
+                {
+                    const Name binding_name = *variable_binding.parameter.binding;
+                    const uint16_t binding = *variable_binding.binding_index;
+                    defines.insert({binding_name, binding});
+                }
+                if (variable_binding.parameter.array_size_definition.has_value())
+                {
+                    checkf(variable_binding.parameter.initial_array_size.has_value(), "array_size_definition is provided, but initial_array_size is not");
+                    const Name array_size_define_name = *variable_binding.parameter.array_size_definition;
+                    const uint16_t array_size = *variable_binding.parameter.initial_array_size;
+                    defines.insert({array_size_define_name, array_size});
+                }
             }
         }
     };

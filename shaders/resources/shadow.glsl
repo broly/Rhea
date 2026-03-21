@@ -3,11 +3,11 @@
 
 #ifndef SET_SHADOW_RESOURCE
     #define SET_SHADOW_RESOURCE 0
-    #error "SET_SHADOW_RESOURCE must be provided"
+    #error "SET_SHADOW_RESOURCE definition is missing. Provide this resource: shadow"
 #endif
 #ifndef BINDING_UBO_SHADOW
     #define BINDING_UBO_SHADOW 0
-    #error "BINDING_UBO_SHADOW must be provided"
+    #error "BINDING_UBO_SHADOW definition is missing. Provide this resource: shadow"
 #endif
 
 layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW)

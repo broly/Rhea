@@ -5,15 +5,15 @@
 
 #ifndef SET_HDR_COLOR
     #define SET_HDR_COLOR 0
-    #error "SET_HDR_COLOR must be provided"
+    #error "SET_HDR_COLOR definition is missing. Provide this resource: hdr_color_output"
 #endif
 #ifndef BINDING_SAMPLER_HDR_COLOR
     #define BINDING_SAMPLER_HDR_COLOR 0
-    #error "BINDING_SAMPLER_HDR_COLOR must be provided"
+    #error "BINDING_SAMPLER_HDR_COLOR definition is missing. Provide this resource: hdr_color_output"
 #endif
 #ifndef BINDING_SAMPLER_HISTORY
     #define BINDING_SAMPLER_HISTORY 0
-    #error "BINDING_SAMPLER_HISTORY must be provided"
+    #error "BINDING_SAMPLER_HISTORY definition is missing. Provide this resource: hdr_color_output"
 #endif
 
 layout(set = SET_HDR_COLOR, binding = BINDING_SAMPLER_HDR_COLOR) 

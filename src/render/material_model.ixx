@@ -252,6 +252,8 @@ export struct MatModel_Parameter
     
     std::optional<size_t> initial_array_size;
     
+    std::optional<Name> array_size_definition;
+    
     std::optional<size_t> ubo_size; // not serializable
     
     bool is_descriptor() const
@@ -263,7 +265,7 @@ export struct MatModel_Parameter
     void validate();
 };
 REFLECT_STRUCT(MatModel_Parameter,
-    type, variable, ubo, binding, storage, sampler, definition, initial_buffer_size, initial_array_size);
+    type, variable, ubo, binding, storage, sampler, definition, initial_buffer_size, initial_array_size, array_size_definition);
 
 
 export struct MatModel_PassStage

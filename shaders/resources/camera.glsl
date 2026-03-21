@@ -5,11 +5,11 @@
 
 #ifndef SET_CAMERA
     #define SET_CAMERA 0
-    #error "SET_CAMERA must be provided"
+    #error "SET_CAMERA definition is missing. Provide this resource: camera"
 #endif
 #ifndef BINDING_UBO_CAMERA
     #define BINDING_UBO_CAMERA 0
-    #error "BINDING_UBO_CAMERA must be provided"
+    #error "BINDING_UBO_CAMERA definition is missing. Provide this resource: camera"
 #endif
 
 layout(set = SET_CAMERA, binding = BINDING_UBO_CAMERA) 

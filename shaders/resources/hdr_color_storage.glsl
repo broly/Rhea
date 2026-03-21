@@ -3,11 +3,11 @@
 
 #ifndef SET_HDR_COLOR_STORAGE
     #define SET_HDR_COLOR_STORAGE 0 
-    #error "SET_HDR_COLOR_STORAGE must be provided"
+    #error "SET_HDR_COLOR_STORAGE definition is missing. Provide this resource: hdr_color_storage"
 #endif
 #ifndef BINDING_SAMPLER_HDR_COLOR_STORAGE
     #define BINDING_SAMPLER_HDR_COLOR_STORAGE 0 
-    #error "BINDING_SAMPLER_HDR_COLOR_STORAGE must be provided"
+    #error "BINDING_SAMPLER_HDR_COLOR_STORAGE definition is missing. Provide this resource: hdr_color_storage"
 #endif
 
 layout(set = SET_HDR_COLOR_STORAGE, binding = BINDING_SAMPLER_HDR_COLOR_STORAGE, rgba16f)

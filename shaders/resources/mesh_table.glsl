@@ -3,11 +3,11 @@
 
 #ifndef SET_SCENE
     #define SET_SCENE 0
-    #error "SET_SCENE must be provided"
+    #error "SET_SCENE definition is missing. Provide this resource: mesh_table"
 #endif
 #ifndef BINDING_SSBO_MESH_TABLE
     #define BINDING_SSBO_MESH_TABLE 0
-    #error "BINDING_SSBO_MESH_TABLE must be provided"
+    #error "BINDING_SSBO_MESH_TABLE definition is missing. Provide this resource: mesh_table"
 #endif
 
 
