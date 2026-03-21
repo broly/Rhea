@@ -56,6 +56,17 @@ public:
     RenderResource(const RenderResourceDesc& in_desc)
         : desc(in_desc)
     {}
+
+    const RenderResourceVariableDesc* find_var(Name var) const
+    {
+        return desc.find_variable(var);
+    }
+    
+    
+    const RenderResourceVariableDesc& find_var_checked(Name var) const
+    {
+        return *checked(desc.find_variable(var));
+    }
     
     
     template<typename T>

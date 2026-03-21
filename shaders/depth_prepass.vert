@@ -2,11 +2,13 @@
 
 #include "resources/camera.glsl"
 
-layout(location = LOCATION_ATTR_POSITION) in vec3 in_position;
+layout(location = LOCATION_ATTR_POSITION) 
+in vec3 in_position;
 
 
 // ---------- Push constants ----------
-layout(push_constant) uniform PushConstants
+layout(push_constant) 
+uniform PushConstants
 {
     mat4 model;
 } pc;

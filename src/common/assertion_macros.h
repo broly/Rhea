@@ -40,6 +40,16 @@ import <exception>;
         }\
     } while (false)
 
+
+#define checked(assertion, ...) \
+    [&] () \
+    { \
+        auto result = assertion; \
+        check(result); \
+        return result; \
+    }()
+
+
 #define unreachable(text, ...) \
     {\
         print_error(std::source_location::current(), text, ##__VA_ARGS__); \

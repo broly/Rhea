@@ -58,7 +58,7 @@ struct RGTexture
     > current_layouts;
     
     RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
-    RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
+    RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t layer_index = 0, uint32_t mip_index = 0) const;
     
     RBImageLayout get_layout( uint32_t frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
     
@@ -206,6 +206,8 @@ public:
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
+    
+    std::vector<RGTextureHandle> create_textures(const RGTextureDesc& desc, uint16_t num_textures);
     
     RGTextureHandle duplicate_texture(RGTextureHandle in_texture_handle, Name name);
 

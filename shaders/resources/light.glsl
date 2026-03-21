@@ -10,7 +10,6 @@
     #error "BINDING_UBO_LIGHT definition is missing. Provide this resource: light"
 #endif
 
-// ================== LIGHT ==================
 struct PointLight
 {
     vec4 position;
@@ -19,9 +18,9 @@ struct PointLight
 
 struct DirectionalLight
 {
-    mat4 light_vp;  // view-projection for shadow
-    vec4 direction; // xyz normalized (world)
-    vec4 color;     // rgb * intensity
+    mat4 light_vp;
+    vec4 direction;
+    vec4 color;
 };
 
 layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) 

@@ -335,17 +335,17 @@ export
         TextureFormat format;
         Mask<RenderTextureUsage::Type> usage;
         uint32_t mip_levels = 1;
-        uint32_t array_layers = 1;
+        uint32_t num_layers = 1;
         bool is_cubemap = false;
         std::optional<RBImageHandle> old_image_handle;
         bool use_mip_levels_for_image_view = false;
         
         
-        uint32_t get_array_layers() const
+        uint32_t get_num_layers() const
         {
             if (is_cubemap)
-                checkf(array_layers == 6, "cubemap texture array_layers must be 6");
-            return array_layers;
+                checkf(num_layers == 6, "cubemap texture array_layers must be 6");
+            return num_layers;
         }
     };
 

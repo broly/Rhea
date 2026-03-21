@@ -30,8 +30,12 @@ struct ViewInfo
 {
     glm::mat4 view;
     glm::mat4 proj;
-    Frustum   frustum;
+    Frustum frustum;
 };
+
+
+constexpr uint32_t COLOR_OUTPUT_HDR_BASE = 0;
+constexpr uint32_t COLOR_OUTPUT_HDR_RTXGI = 1;
 
 
 class GenericRenderGraph : public RenderGraph
@@ -52,6 +56,8 @@ public:
     void prepare_clouds_pass(RenderGraphContext& ctx);
     void prepare_wireframe_pass(RenderGraphContext& ctx);
     void prepare_ssr(RenderGraphContext& ctx);
+    
+    void setup_hdr_color_table(RenderGraphContext& ctx) const;
     
     void draw_fullscreen_copy(
         RenderGraphContext& ctx,
@@ -83,7 +89,7 @@ public:
     RGTextureHandle noise_texture;
     RGTextureHandle swapchain_color;
     
-    RGTextureHandle hdr_color;
+    std::vector<RGTextureHandle> hdr_color_table;
     // RGTextureHandle hdr_color_rtxgi;
     RGTextureHandle hdr_color_temp;
     

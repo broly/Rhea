@@ -171,7 +171,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     res.extent = extent;
     res.format = vk::to_vk_format(desc.format);
     res.mip_levels = desc.mip_levels;
-    res.num_layers = desc.get_array_layers();
+    res.num_layers = desc.get_num_layers();
     res.usage = desc.usage;
     res.subresource_layouts.resize(res.num_layers);
     for (auto& layer : res.subresource_layouts)
@@ -208,7 +208,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
         image_info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     }
     image_info.mipLevels = desc.mip_levels;
-    image_info.arrayLayers = desc.get_array_layers();
+    image_info.arrayLayers = desc.get_num_layers();
     image_info.format = vk::to_vk_format(desc.format);
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -253,7 +253,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
         res.image, 
         res.get_img_view(0), 
         desc.name.to_string().c_str(),
-        desc.get_array_layers());
+        desc.get_num_layers());
     
     
     debug.register_vk_image_name(res.image, desc.name);
@@ -535,7 +535,7 @@ RBImageHandle vk::ImageManager::create_cubemap(
     desc.format     = format;
     desc.mip_levels = mip_levels;
     desc.is_cubemap = true;
-    desc.array_layers = 6;
+    desc.num_layers = 6;
     
     desc.usage =
         RenderTextureUsage::Sampled |

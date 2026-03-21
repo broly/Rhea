@@ -35,11 +35,11 @@ RBImageHandle RGTexture::get_image(RenderBackend& backend, RBFrameHandle frame) 
     return is_swapchain() ? backend.get_swapchain_image(frame) : *image;
 }
 
-RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t array_index, uint32_t mip_index) const
+RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t layer_index, uint32_t mip_index) const
 {
     if (is_swapchain())
-        checkf(array_index == 0 && mip_index == 0, "Unable to get layers from swapchain");
-    return backend.get_image_view(get_image(backend, frame), array_index, mip_index);
+        checkf(layer_index == 0 && mip_index == 0, "Unable to get layers from swapchain");
+    return backend.get_image_view(get_image(backend, frame), layer_index, mip_index);
 }
 
 RBImageLayout RGTexture::get_layout(uint32_t frame, uint32_t array_index, uint32_t mip_index) const
@@ -151,6 +151,20 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     return handle;
 }
 
+std::vector<RGTextureHandle> RenderGraph::create_textures(const RGTextureDesc& in_desc, uint16_t num_textures)
+{
+    RGTextureDesc desc = in_desc;
+    
+    std::vector<RGTextureHandle> result;
+    for (uint16_t index = 0; index < num_textures; index++)
+    {
+        desc.name = Name(desc.name.to_string() + "_" + std::to_string(index));
+        RGTextureHandle texture = create_texture(desc);
+        result.push_back(texture);
+    }
+    return result;
+}
+
 RGTextureHandle RenderGraph::duplicate_texture(RGTextureHandle in_texture_handle, Name name)
 {
     auto& current_tex = textures[in_texture_handle.id];
@@ -238,7 +252,7 @@ void RenderGraph::compile()
                 .format = tex.desc.format,
                 .usage  = tex.desc.usage,
                 .mip_levels = tex.desc.mip_levels,
-                .array_layers = tex.desc.array_layers,
+                .num_layers = tex.desc.array_layers,
                 .is_cubemap = tex.desc.dimension == TextureDimension::Cube,
             };
             tex.image = backend->create_image(desc);
@@ -506,7 +520,7 @@ void RenderGraph::rebuild_resources()
             .format = tex.desc.format,
             .usage  = tex.desc.usage,
             .mip_levels = tex.get_mip_levels_count(),
-            .array_layers = tex.get_layers_count(),
+            .num_layers = tex.get_layers_count(),
             //.old_image_handle = tex.image,
         };
         tex.image = backend->create_image(desc);

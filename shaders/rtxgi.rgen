@@ -61,5 +61,5 @@ void main()
 //    vec3 color = mix(prev, payload.radiance * pc.intensity, alpha);
 //
 //    imageStore(u_hdr_color, pixel, vec4(color, 1.0));
-    imageStore(u_hdr_color, pixel, vec4(payload.radiance * pc.intensity, 1.0));
+    imageStore(u_hdr_color[COLOR_OUTPUT_HDR_BASE], pixel, vec4(payload.radiance * pc.intensity, 1.0));
 }

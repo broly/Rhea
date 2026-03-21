@@ -78,27 +78,20 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     
     swapchain_extent = backend->get_swapchain_extent();
+
+    const RenderResourceVariableDesc& hdr_color_variable = hdr_color_output_resource->find_var_checked("u_hdr_color");
+    const uint16_t initial_array_size = hdr_color_variable.parameter.initial_array_size.value_or(1);
     
-    hdr_color = create_texture({
-        .name = NAME(hdr_color),
+    hdr_color_table = create_textures({
+        .name = NAME(hdr_color_table),
         .extent = resolution,
         .format = TextureFormat::RGBA16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
         .external = false,
         .dimension = capture_dimension
-    });
+    }, initial_array_size);
     
-    
-    // hdr_color_rtxgi = create_texture({
-    //     .name = NAME(hdr_color_rtxgi),
-    //     .extent = resolution,
-    //     .format = TextureFormat::RGBA16F,
-    //     .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
-    //     .external = false,
-    //     .dimension = capture_dimension
-    // });
-    
-    hdr_color_temp = duplicate_texture(hdr_color, NAME(hdr_color_temp));
+    hdr_color_temp = duplicate_texture(hdr_color_table[0], NAME(hdr_color_temp));
     
     g_normal = create_texture({
         .name = NAME(g_normal),
@@ -296,7 +289,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
         },
         .writes = { 
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_depth, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
             { g_normal, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
             { g_world_normal, RBImageUsage::ColorAttachment, RBLoadOp::Clear },
@@ -320,7 +313,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
              { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
         },
         .writes = { 
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },  
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },  
              { g_depth, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
         },
         .execute = [this] (RenderGraphContext& ctx)
@@ -334,24 +327,24 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     
     
     
-    // add_pass({
-    //     .name = "RTXGI",
-    //     .reads = {
-    //         { g_depth, RBImageUsage::SampledFragment },
-    //         { g_normal, RBImageUsage::SampledFragment },
-    //         { g_world_normal, RBImageUsage::SampledFragment },
-    //         { g_albedo, RBImageUsage::SampledFragment },
-    //         { g_position, RBImageUsage::SampledFragment },
-    //     },
-    //     .writes = {
-    //         { hdr_color_rtxgi, RBImageUsage::StorageImage }
-    //     },
-    //     .execute = [this](RenderGraphContext& ctx)
-    //     {
-    //         draw_rtxgi(ctx);
-    //     },
-    //     .type = RenderPassType::rtx
-    // });
+    add_pass({
+        .name = "RTXGI",
+        .reads = {
+            { g_depth, RBImageUsage::SampledFragment },
+            { g_normal, RBImageUsage::SampledFragment },
+            { g_world_normal, RBImageUsage::SampledFragment },
+            { g_albedo, RBImageUsage::SampledFragment },
+            { g_position, RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::StorageImage }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_rtxgi(ctx);
+        },
+        .type = RenderPassType::rtx
+    });
     
     
     
@@ -362,7 +355,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { noise_texture, RBImageUsage::SampledFragment }
         },
         .writes = {
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -378,7 +371,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = "SSR",
         .reads = {
-            { hdr_color, RBImageUsage::SampledFragment },
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
             { g_depth, RBImageUsage::SampledFragment },
             { g_normal, RBImageUsage::SampledFragment },
             { g_roughness, RBImageUsage::SampledFragment },
@@ -397,7 +390,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = "SSRComposite",
         .reads = {
-            { hdr_color, RBImageUsage::SampledFragment },
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
             { ssr_texture, RBImageUsage::SampledFragment },
             { g_roughness, RBImageUsage::SampledFragment }
         },
@@ -416,7 +409,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { hdr_color_temp, RBImageUsage::SampledFragment }
         },
         .writes = {
-            { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
@@ -796,16 +789,13 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
     gbuffer_resource->update_image("u_roughness", get_image(g_roughness), {.frame=ctx.frame});
     gbuffer_resource->update_image("u_position", get_image(g_position), {.frame=ctx.frame});
     gbuffer_resource->update_image("u_albedo", get_image(g_albedo), {.frame=ctx.frame});
-
-    hdr_color_output_resource->update_image(
-        "u_hdr_color",
-        get_image(hdr_color),
-        {.frame=ctx.frame});
     
+    setup_hdr_color_table(ctx);
+
     
     hdr_color_output_resource->update_image(
         "u_history",
-        get_image(hdr_color),
+        get_image(hdr_color_table[COLOR_OUTPUT_HDR_BASE]),
         {.frame=ctx.frame});
 
     ssr_resource->update_image(
@@ -813,6 +803,27 @@ void GenericRenderGraph::prepare_ssr(RenderGraphContext& ctx)
         get_image(ssr_texture),
         {.frame=ctx.frame});
     
+}
+
+void GenericRenderGraph::setup_hdr_color_table(RenderGraphContext& ctx) const
+{
+    for (uint16_t index = 0; index < hdr_color_table.size(); ++index)
+    {
+        hdr_color_output_resource->update_image(
+            "u_hdr_color",
+            get_image(hdr_color_table[index]),
+            {
+                .frame=ctx.frame,
+                .array_index = index
+            });
+        hdr_color_storage_resource->update_image(
+            "u_hdr_color",
+            get_image(hdr_color_table[index]),
+            {
+                .frame=ctx.frame,
+                .array_index = index
+            });
+    }
 }
 
 void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTextureHandle source)
@@ -1143,10 +1154,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
 {
     ctx.bind_pipeline(rtx_gi_pipeline);
 
-    hdr_color_storage_resource->update_image(
-        "u_hdr_color",
-        get_image(hdr_color),
-        {.frame=ctx.frame});
+    setup_hdr_color_table(ctx);
 
     tlas_resource->update_tlas(
         "u_tlas",
