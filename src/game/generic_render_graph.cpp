@@ -337,7 +337,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { g_position, RBImageUsage::SampledFragment },
         },
         .writes = {
-            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::StorageImage }
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::StorageImage }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
