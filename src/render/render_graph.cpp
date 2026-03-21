@@ -155,10 +155,12 @@ std::vector<RGTextureHandle> RenderGraph::create_textures(const RGTextureDesc& i
 {
     RGTextureDesc desc = in_desc;
     
+    std::string desc_name = desc.name.to_string();
+    
     std::vector<RGTextureHandle> result;
     for (uint16_t index = 0; index < num_textures; index++)
     {
-        desc.name = Name(desc.name.to_string() + "_" + std::to_string(index));
+        desc.name = Name(desc_name + "_" + std::to_string(index));
         RGTextureHandle texture = create_texture(desc);
         result.push_back(texture);
     }
