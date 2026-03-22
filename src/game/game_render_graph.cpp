@@ -47,9 +47,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .condition = [this] () { return !is_debugging(); },
             .reads = {
                 { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
-                { history_hdr, RBImageUsage::SampledFragment },
-                
-                
+                { history_hdr, RBImageUsage::SampledFragment },                
             },
             .writes = {
                 { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
@@ -58,7 +56,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             {
                 if (ctx.bind_pipeline(tonemap_pipeline))
                 {
-                    ctx.bind(hdr_color_output_resource);
+                    ctx.bind(hdr_color_output_resource, gbuffer_resource);
                 }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);
@@ -130,7 +128,7 @@ void GameRenderGraph::pass_translucent(RenderGraphContext& ctx)
 
 void GameRenderGraph::pass_clouds(RenderGraphContext& ctx)
 {
-    draw_clouds(ctx, g_depth, noise_texture);
+    draw_clouds(ctx, gbuffer[GBUFFER_SLOT_DEPTH], noise_texture);
 }
 
 void GameRenderGraph::pass_tonemapping(RenderGraphContext& ctx)

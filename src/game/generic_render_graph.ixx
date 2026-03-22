@@ -37,6 +37,14 @@ struct ViewInfo
 constexpr uint32_t COLOR_OUTPUT_HDR_BASE = 0;
 constexpr uint32_t COLOR_OUTPUT_HDR_RTXGI = 1;
 
+constexpr uint32_t GBUFFER_SLOT_NORMAL = 0;
+constexpr uint32_t GBUFFER_SLOT_WORLD_NORMAL = 1;
+constexpr uint32_t GBUFFER_SLOT_ROUGHNESS = 2;
+constexpr uint32_t GBUFFER_SLOT_DEPTH = 3;
+constexpr uint32_t GBUFFER_SLOT_ALBEDO = 4;
+constexpr uint32_t GBUFFER_SLOT_POSITION = 5;
+constexpr uint32_t GBUFFER_SLOT_MOTION_VECTORS = 6;
+
 
 class GenericRenderGraph : public RenderGraph
 {
@@ -92,13 +100,15 @@ public:
     std::vector<RGTextureHandle> hdr_color_table;
     RGTextureHandle hdr_color_temp;
     
-    RGTextureHandle g_depth;
-    RGTextureHandle g_normal;
-    RGTextureHandle g_world_normal;
-    RGTextureHandle g_motion_vectors;
-    RGTextureHandle g_roughness;
-    RGTextureHandle g_albedo;
-    RGTextureHandle g_position;
+    std::vector<RGTextureHandle> gbuffer;
+    
+    // RGTextureHandle g_depth;
+    // RGTextureHandle g_normal;
+    // RGTextureHandle g_world_normal;
+    // RGTextureHandle g_motion_vectors;
+    // RGTextureHandle g_roughness;
+    // RGTextureHandle g_albedo;
+    // RGTextureHandle g_position;
     
     
     RGTextureHandle history_hdr;

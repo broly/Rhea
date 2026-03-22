@@ -208,6 +208,7 @@ public:
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
     
     std::vector<RGTextureHandle> create_textures(const RGTextureDesc& desc, uint16_t num_textures);
+    std::vector<RGTextureHandle> create_textures(const std::vector<RGTextureDesc>& descs);
     
     RGTextureHandle duplicate_texture(RGTextureHandle in_texture_handle, Name name);
 
@@ -252,6 +253,16 @@ public:
 
         assert(rg_tex.image.has_value());
         return rg_tex.image.value();
+    }
+    
+    std::vector<RBImageHandle> get_image_array(const std::vector<RGTextureHandle>& textures) const
+    {
+        std::vector<RBImageHandle> result;
+        for (auto tex : textures)
+        {
+            result.emplace_back(get_image(tex));
+        }
+        return result;
     }
     
     void rebuild_resources();

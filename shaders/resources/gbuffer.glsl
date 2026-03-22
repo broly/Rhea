@@ -1,40 +1,32 @@
 #ifndef RESOURCES_GBUFFER
 #define RESOURCES_GBUFFER
 
+#ifndef NUM_GBUFFER_SLOTS
+    #define NUM_GBUFFER_SLOTS 0
+    #error "NUM_GBUFFER_SLOTS not provided"
+#endif
+
+const uint GBUFFER_SLOT_NORMAL = 0;
+const uint GBUFFER_SLOT_WORLD_NORMAL = 1;
+const uint GBUFFER_SLOT_ROUGHNESS = 2;
+const uint GBUFFER_SLOT_DEPTH = 3;
+const uint GBUFFER_SLOT_ALBEDO = 4;
+const uint GBUFFER_SLOT_POSITION = 5;
+const uint GBUFFER_SLOT_MOTION_VECTORS = 6;
+
+const uint GBUFFER_NUM_SLOTS = NUM_GBUFFER_SLOTS;
+
 #ifndef SET_GBUFFER
     #define SET_GBUFFER 0
     #error "SET_GBUFFER definition is missing"
 #endif
-#ifndef BINDING_SAMPLER_NORMAL
-    #define BINDING_SAMPLER_NORMAL 0
-    #error "BINDING_SAMPLER_NORMAL definition is missing"
-#endif
-#ifndef BINDING_SAMPLER_WORLD_NORMAL
-    #define BINDING_SAMPLER_WORLD_NORMAL 0
-    #error "BINDING_SAMPLER_WORLD_NORMAL definition is missing"
-#endif
-#ifndef BINDING_SAMPLER_ROUGHNESS
-    #define BINDING_SAMPLER_ROUGHNESS 0
-    #error "BINDING_SAMPLER_ROUGHNESS definition is missing"
-#endif
-#ifndef BINDING_SAMPLER_DEPTH
-    #define BINDING_SAMPLER_DEPTH 0
-    #error "BINDING_SAMPLER_DEPTH definition is missing"
-#endif
-#ifndef BINDING_SAMPLER_ALBEDO
-    #define BINDING_SAMPLER_ALBEDO 0
-    #error "BINDING_SAMPLER_ALBEDO definition is missing. Provide this resource: gbuffer"
-#endif
-#ifndef BINDING_SAMPLER_POSITION
-    #define BINDING_SAMPLER_POSITION 0
-    #error "BINDING_SAMPLER_POSITION definition is missing. Provide this resource: gbuffer"
+#ifndef BINDING_SAMPLER_ARRAY_GBUFFER
+    #define BINDING_SAMPLER_ARRAY_GBUFFER 0
+    #error "BINDING_SAMPLER_ARRAY_GBUFFER definition is missing. Provide this resource: gbuffer"
 #endif
 
-layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_NORMAL) uniform sampler2D u_normal;
-layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_WORLD_NORMAL) uniform sampler2D u_world_normal;
-layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_ROUGHNESS) uniform sampler2D u_roughness;
-layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_DEPTH) uniform sampler2D u_depth;
-layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_ALBEDO) uniform sampler2D u_albedo;
-layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_POSITION) uniform sampler2D u_position;
+layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_ARRAY_GBUFFER) 
+uniform sampler2D u_gbuffer[GBUFFER_NUM_SLOTS];
+
 
 #endif  // RESOURCES_GBUFFER

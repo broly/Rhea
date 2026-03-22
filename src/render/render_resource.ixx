@@ -80,6 +80,18 @@ public:
         query_single(instance_id)->update_image(buffer_name, image_handle, params);
     }
     
+    void update_image_array(Name buffer_name, const std::vector<RBImageHandle>& image_array, const UpdateImageParams& params = {}, uint32_t instance_id = 0)
+    {
+        auto inst = query_single(instance_id);
+        
+        auto new_params = params;
+        for (auto img : image_array)
+        {
+            inst->update_image(buffer_name, img, new_params);
+            new_params.array_index++;
+        }
+    }
+    
     void bind(RBCommandList command_list, RBFrameHandle frame, uint32_t instance_id = 0)
     {
         query_single(instance_id)->bind(command_list, frame);

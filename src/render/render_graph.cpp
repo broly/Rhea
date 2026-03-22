@@ -167,6 +167,17 @@ std::vector<RGTextureHandle> RenderGraph::create_textures(const RGTextureDesc& i
     return result;
 }
 
+std::vector<RGTextureHandle> RenderGraph::create_textures(const std::vector<RGTextureDesc>& descs)
+{
+    std::vector<RGTextureHandle> result;
+    for (const auto& desc : descs)
+    {
+        RGTextureHandle texture = create_texture(desc);
+        result.push_back(texture);
+    }
+    return result;
+}
+
 RGTextureHandle RenderGraph::duplicate_texture(RGTextureHandle in_texture_handle, Name name)
 {
     auto& current_tex = textures[in_texture_handle.id];
