@@ -23,14 +23,14 @@ vec3 reconstructViewPos(vec2 uv, float depth)
 
 void main()
 {
-    float depth = texture(u_gbuffer[GBUFFER_SLOT_DEPTH], v_uv).r;
+    float depth = get_gbuffer_DEPTH(v_uv).r;
     if (depth >= 1.0)
     {
         out_ssr = vec4(0.0);
         return;
     }
 
-    vec4 normalData = texture(u_gbuffer[GBUFFER_SLOT_NORMAL], v_uv);
+    vec4 normalData = get_gbuffer_NORMAL(v_uv);
     vec3 normal = normalize(normalData.xyz * 2.0 - 1.0);
     float roughness = normalData.w;
 
@@ -81,7 +81,7 @@ void main()
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)
             break;
 
-        float sceneDepth = texture(u_gbuffer[GBUFFER_SLOT_DEPTH], uv).r;
+        float sceneDepth = get_gbuffer_DEPTH(uv).r;
 
         float t = float(i) / steps;
         float rayDepth = mix(startNDC.z, endNDC.z, t);

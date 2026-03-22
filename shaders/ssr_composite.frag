@@ -17,7 +17,7 @@ void main()
     vec3 ssr = ssr_sample.rgb;
     float ssr_alpha = ssr_sample.a;
 
-    float roughness = texture(u_gbuffer[GBUFFER_SLOT_ROUGHNESS], uv).r;
+    float roughness = get_gbuffer_ROUGHNESS(uv).r;
 
     float reflectivity = 1.0 - (roughness * 0.5);
 
