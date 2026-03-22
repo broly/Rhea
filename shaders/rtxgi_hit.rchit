@@ -3,7 +3,8 @@
 
 #include "rtx/ray_payload.glsl"
 
-layout(location = 1) rayPayloadInEXT ShadowPayload payload;
+layout(location = RTXGI_RAY_PAYLOAD_SHADOW) 
+rayPayloadInEXT ShadowPayload payload;
 
 void main()
 {

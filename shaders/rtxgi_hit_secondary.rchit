@@ -15,9 +15,14 @@
 
 #include "rtx/sbt.glsl"
 
-layout(location = 0) rayPayloadInEXT RayPayload payload;
-layout(location = 1) rayPayloadEXT ShadowPayload shadow_payload;
-hitAttributeEXT vec2 attribs;
+layout(location = RTXGI_RAY_PAYLOAD_RAY) 
+rayPayloadInEXT RayPayload payload;
+
+layout(location = RTXGI_RAY_PAYLOAD_SHADOW) 
+rayPayloadEXT ShadowPayload shadow_payload;
+
+hitAttributeEXT 
+vec2 attribs;
 
 layout(push_constant) uniform RTXGIPushConstants
 {
@@ -88,7 +93,7 @@ void main()
                 0.001,
                 L,
                 10000.0,
-                1
+                RTXGI_RAY_PAYLOAD_SHADOW
             );
 
             if (!shadow_payload.hit)
@@ -164,6 +169,8 @@ void main()
         0.001,
         dir,
         10000.0,
-        0
+        RTXGI_RAY_PAYLOAD_RAY
+    
     );
+
 }

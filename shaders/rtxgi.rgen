@@ -10,9 +10,11 @@
 #include "rtx/ray_payload.glsl"
 #include "rtx/rng.glsl"
 
-layout(location = 0) rayPayloadEXT RayPayload payload;
+layout(location = RTXGI_RAY_PAYLOAD_RAY) 
+rayPayloadEXT RayPayload payload;
 
-layout(push_constant) uniform RTXGIPushConstants
+layout(push_constant) 
+uniform RTXGIPushConstants
 {
     uint frame;
     float intensity;
@@ -52,7 +54,7 @@ void main()
         0.001,
         dir,
         10000.0,
-        0
+        RTXGI_RAY_PAYLOAD_RAY
     );
 
 //    vec3 prev = imageLoad(u_hdr_color, pixel).rgb;

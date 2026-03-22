@@ -3,9 +3,11 @@
 
 #include "rtx/ray_payload.glsl"
 
-layout(location = 0) rayPayloadInEXT RayPayload payload;
+layout(location = RTXGI_RAY_PAYLOAD_RAY) 
+rayPayloadInEXT RayPayload payload;
 
-layout(push_constant) uniform RTXGIPushConstants
+layout(push_constant) 
+uniform RTXGIPushConstants
 {
     uint frame;
     float intensity;
