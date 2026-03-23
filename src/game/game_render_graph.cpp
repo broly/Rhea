@@ -48,6 +48,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .reads = {
                 { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
                 { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },                
             },
             .writes = {
                 { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
@@ -88,6 +89,17 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
             .frame = ctx.frame,
             .layer_index = prev_layer,
             .array_index = COLOR_OUTPUT_HDR_BASE
+        }
+    );
+    
+    
+    hdr_color_instance->update_image(
+        "u_history",
+        get_image(hdr_color_history[COLOR_OUTPUT_HDR_RTXGI]),
+        {
+            .frame = ctx.frame,
+            .layer_index = prev_layer,
+            .array_index = COLOR_OUTPUT_HDR_RTXGI
         }
     );
     

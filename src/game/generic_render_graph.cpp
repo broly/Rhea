@@ -411,22 +411,21 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = 1,
     });
     
-    // std::swap(hdr_color, hdr_color_ping_pong);
     
     add_pass({
         .name = "HistoryStore",
         .reads = {
-            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment }
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment }
         },
         .writes = {
-            { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::ColorAttachment, RBLoadOp::Load }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
             if (ctx.level != history_index)
                 return;
     
-            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_BASE], COPY_INSTANCE_HDR_HISTORY);
+            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], COPY_INSTANCE_HDR_HISTORY);
         },
         .num_layers = 2,
     });
