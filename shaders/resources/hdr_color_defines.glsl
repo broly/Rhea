@@ -14,5 +14,7 @@ const uint NUM_COLOR_OUTPUTS = NUM_HDR_COLOR_ARRAY_ELEMENTS;
 
 const uint COLOR_OUTPUT_HDR_BASE = 0;
 const uint COLOR_OUTPUT_HDR_RTXGI = 1;
+const uint COLOR_OUTPUT_HDR_SSR = 2;
+const uint COLOR_OUTPUT_HDR_INTERMEDIATE = 3;
         
 #endif

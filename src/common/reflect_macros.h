@@ -122,6 +122,15 @@ import type_id;
         {\
             return names.at((int)value); \
         }\
+        static std::vector<Name> get_names() \
+        {\
+            std::vector<Name> result;\
+            for (auto& [v, n]  : names) \
+            {\
+                result.push_back(n); \
+            }\
+            return result; \
+        }\
         static constexpr detail::reflection_tag reflected {}; \
     };
 

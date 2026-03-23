@@ -89,9 +89,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
         .external = false,
         .dimension = capture_dimension
-    }, initial_array_size);
-    
-    hdr_color_temp = duplicate_texture(hdr_color_table[COLOR_OUTPUT_HDR_BASE], NAME(hdr_color_temp));
+    }, initial_array_size, reflect::enum_names<COLOR_OUTPUT>());
     
     gbuffer = create_textures({
         {
@@ -391,7 +389,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { gbuffer[GBUFFER_SLOT_ROUGHNESS], RBImageUsage::SampledFragment }
         },
         .writes = {
-            { hdr_color_temp, RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
@@ -402,14 +400,14 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = "copy_hdr_color",
         .reads = {
-            { hdr_color_temp, RBImageUsage::SampledFragment }
+            { hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::SampledFragment }
         },
         .writes = {
             { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
-            draw_fullscreen_copy(ctx, hdr_color_temp);
+            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE]);
         },
         .num_layers = 1,
     });

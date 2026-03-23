@@ -151,7 +151,7 @@ RGTextureHandle RenderGraph::create_texture_from_asset(TextureHandle tex_handle,
     return handle;
 }
 
-std::vector<RGTextureHandle> RenderGraph::create_textures(const RGTextureDesc& in_desc, uint16_t num_textures)
+std::vector<RGTextureHandle> RenderGraph::create_textures(const RGTextureDesc& in_desc, uint16_t num_textures, const std::vector<Name>& tex_names)
 {
     RGTextureDesc desc = in_desc;
     
@@ -160,7 +160,10 @@ std::vector<RGTextureHandle> RenderGraph::create_textures(const RGTextureDesc& i
     std::vector<RGTextureHandle> result;
     for (uint16_t index = 0; index < num_textures; index++)
     {
-        desc.name = Name(desc_name + "_" + std::to_string(index));
+        if (tex_names.size() > index)
+            desc.name = tex_names[index];
+        else
+            desc.name = Name(desc_name + "_" + std::to_string(index));
         RGTextureHandle texture = create_texture(desc);
         result.push_back(texture);
     }
@@ -199,7 +202,8 @@ RGTextureHandle RenderGraph::duplicate_texture(RGTextureHandle in_texture_handle
 RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
 {
     assert(!graph_compiled);
-    
+    if (!pass.enabled)
+        return RGPassId(-1);
     RGPassId id{ static_cast<uint32_t>(passes.size()) };
     passes.push_back(std::move(pass));
     return id;

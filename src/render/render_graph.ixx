@@ -29,6 +29,8 @@ export struct RenderGraphPass
     
     std::function<bool()> condition = nullptr;
     
+    bool enabled = true;
+    
     std::vector<RGImageUse> reads;
     std::vector<RGImageUse> writes;
 
@@ -207,7 +209,7 @@ public:
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
     
-    std::vector<RGTextureHandle> create_textures(const RGTextureDesc& desc, uint16_t num_textures);
+    std::vector<RGTextureHandle> create_textures(const RGTextureDesc& desc, uint16_t num_textures, const std::vector<Name>& tex_names = {});
     std::vector<RGTextureHandle> create_textures(const std::vector<RGTextureDesc>& descs);
     
     RGTextureHandle duplicate_texture(RGTextureHandle in_texture_handle, Name name);

@@ -33,9 +33,15 @@ struct ViewInfo
     Frustum frustum;
 };
 
-
-constexpr uint32_t COLOR_OUTPUT_HDR_BASE = 0;
-constexpr uint32_t COLOR_OUTPUT_HDR_RTXGI = 1;
+enum COLOR_OUTPUT : uint8_t
+{
+    COLOR_OUTPUT_HDR_BASE = 0,
+    COLOR_OUTPUT_HDR_RTXGI = 1,
+    COLOR_OUTPUT_HDR_SSR = 2,
+    COLOR_OUTPUT_HDR_INTERMEDIATE = 3,
+};
+REFLECT_ENUM(COLOR_OUTPUT,
+    COLOR_OUTPUT_HDR_BASE, COLOR_OUTPUT_HDR_RTXGI, COLOR_OUTPUT_HDR_SSR, COLOR_OUTPUT_HDR_INTERMEDIATE);
 
 constexpr uint32_t GBUFFER_SLOT_NORMAL = 0;
 constexpr uint32_t GBUFFER_SLOT_WORLD_NORMAL = 1;
@@ -98,7 +104,6 @@ public:
     RGTextureHandle swapchain_color;
     
     std::vector<RGTextureHandle> hdr_color_table;
-    RGTextureHandle hdr_color_temp;
     
     std::vector<RGTextureHandle> gbuffer;
     

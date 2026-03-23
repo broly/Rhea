@@ -123,6 +123,13 @@ export namespace reflect
     }
     
     template<typename E>
+    std::vector<Name> enum_names()
+    {
+        static_assert(is_reflected_v<E>, "enum not reflected");
+        return reflect::ReflectionInfo<E>::get_names();
+    }
+    
+    template<typename E>
     E name_to_enum(Name name)
     {
         static_assert(is_reflected_v<E>, "enum not reflected");
