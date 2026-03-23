@@ -20,7 +20,7 @@
 				},
 				"fragment": {
 					"shader": "tonemap.frag",
-					"resources": ["hdr_color_output"]
+					"resources": ["hdr_color_output", "gbuffer"]
 				}
 			},
 			"color_attachments": [

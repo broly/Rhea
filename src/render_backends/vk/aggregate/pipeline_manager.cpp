@@ -101,7 +101,7 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
         index++;
     }
     
-    instance_data[pipeline_layout] = {desc};
+    instance_data[pipeline_layout] = {desc, vk_layouts};
     
     RBPipelineLayout result {pipeline_layout};
     
@@ -234,6 +234,13 @@ void vk::PipelineManager::bind_descriptor_set(RBCommandList cmd_list, int set_in
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
     
     auto vk_pipeline_layout = current_pipeline_layout.as<VkPipelineLayout>();
+    
+    auto& inst_data = instance_data[vk_pipeline_layout];
+    auto& desc_set_layout = inst_data.desc_set_layouts[set_index];
+    
+    checkf(desc_set_layout != *empty_descriptor_set,
+        "Could not bind descriptor set, because it is not provided for this pipeline layout. "
+        "Check this callstack to detect resource name and check the configs");
     
     {
         PROFILE("vkCmdBindDescriptorSets");

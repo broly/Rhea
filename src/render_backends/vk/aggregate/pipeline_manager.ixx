@@ -13,6 +13,7 @@ namespace vk
     struct PipelineLayoutInstanceData
     {
         PipelineLayoutDesc desc;
+        std::vector<VkDescriptorSetLayout> desc_set_layouts;
     };
     
     struct VkRenderResourceInfo

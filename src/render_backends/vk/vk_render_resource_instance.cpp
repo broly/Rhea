@@ -133,8 +133,7 @@ void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle fr
     
     if (!has_set_per_frame)
     {
-        vk::PipelineManager::ResourceInstanceData inst_info = resource->backend.pipeline_manager.
-                                                                               resource_instance_data.at(this);
+        vk::PipelineManager::ResourceInstanceData inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
         checkf(array_size(set_per_frame) >= inst_info.sets_per_frame.size(),
             "Array too large");
         for (int i = 0; i < inst_info.sets_per_frame.size(); ++i)

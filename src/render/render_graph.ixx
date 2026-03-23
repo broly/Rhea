@@ -97,12 +97,12 @@ struct RGTexture
     
     uint32_t get_layers_count() const
     {
-        return desc.array_layers;
+        return desc.num_layers;
     }
     
     uint32_t get_mip_levels_count() const
     {
-        return desc.mip_levels;
+        return desc.num_mip_levels;
     }
     
     void reset_layout();

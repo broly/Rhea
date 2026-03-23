@@ -91,6 +91,17 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .dimension = capture_dimension
     }, initial_array_size, reflect::enum_names<COLOR_OUTPUT>());
     
+    hdr_color_history = create_textures({
+        .name = NAME(hdr_color_history),
+        .extent = resolution,
+        .format = TextureFormat::RGBA16F,
+        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
+        .external = false,
+        .dimension = capture_dimension,
+        .num_layers = 2
+    }, initial_array_size, reflect::enum_names<COLOR_OUTPUT>());
+    
+    
     gbuffer = create_textures({
         {
             .name = "g_normal",
@@ -147,18 +158,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .external = false,
             .dimension = capture_dimension
         }
-    });
-    
-    
-
-    history_hdr = create_texture({
-        .name = NAME(history_hdr),
-        .extent = resolution,
-        .format = TextureFormat::RGBA16F,
-        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
-        .external = false,
-        .dimension = TextureDimension::Tex2D,
-        .array_layers = 2,
     });
     
     ssr_texture = create_texture({
@@ -407,30 +406,30 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .execute = [this](RenderGraphContext& ctx)
         {
-            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE]);
+            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE], COPY_INSTANCE_SSR);
         },
         .num_layers = 1,
     });
     
     // std::swap(hdr_color, hdr_color_ping_pong);
     
-    // add_pass({
-    //     .name = "HistoryStore",
-    //     .reads = {
-    //         { hdr_color, RBImageUsage::SampledFragment }
-    //     },
-    //     .writes = {
-    //         { history_hdr, RBImageUsage::ColorAttachment, RBLoadOp::Load }
-    //     },
-    //     .execute = [this](RenderGraphContext& ctx)
-    //     {
-    //         if (ctx.level != history_index)
-    //             return;
-    //
-    //         draw_fullscreen_copy(ctx, hdr_color);
-    //     },
-    //     .num_layers = 2,
-    // });
+    add_pass({
+        .name = "HistoryStore",
+        .reads = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.level != history_index)
+                return;
+    
+            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_BASE], COPY_INSTANCE_HDR_HISTORY);
+        },
+        .num_layers = 2,
+    });
     
     // add_pass({
     //     .name = "Wireframe",
@@ -818,17 +817,20 @@ void GenericRenderGraph::setup_hdr_color_table(RenderGraphContext& ctx) const
     
 }
 
-void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTextureHandle source)
+void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTextureHandle source, uint32_t copy_id)
 {
-    ctx.bind_pipeline(copy_pipeline);
+    auto copy_instance = copy_resource->query_single(copy_id);
     
-    copy_resource->update_image(
+    copy_instance->update_image(
         "u_source",
         get_image(source),
         {.frame=ctx.frame}
     );
     
-    ctx.bind(copy_resource);
+    ctx.bind_pipeline(copy_pipeline);
+    
+    
+    ctx.bind(copy_instance);
              
     ctx.draw_fullscreen();
 }

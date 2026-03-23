@@ -17,15 +17,15 @@ RGTexture::RGTexture(const RGTextureDesc& in_desc)
     checkf(desc.num_frames <= MAX_ALLOWED_FRAMES_IN_FLIGHT, "Provided num frames in flight is too high");
 
     if (desc.dimension == TextureDimension::Cube)
-        checkf(desc.array_layers == 6, "Cubemap texture array layers should be always 6");
+        checkf(desc.num_layers == 6, "Cubemap texture array layers should be always 6");
 
     for (uint32_t f = 0; f < MAX_ALLOWED_FRAMES_IN_FLIGHT; ++f)
     {
-        current_layouts[f].resize(desc.array_layers);
+        current_layouts[f].resize(desc.num_layers);
 
-        for (uint32_t l = 0; l < desc.array_layers; ++l)
+        for (uint32_t l = 0; l < desc.num_layers; ++l)
         {
-            current_layouts[f][l].resize(desc.mip_levels, RBImageLayout::undefined);
+            current_layouts[f][l].resize(desc.num_mip_levels, RBImageLayout::undefined);
         }
     }
 }
@@ -88,9 +88,9 @@ void RGTexture::reset_layout()
 {
     for (uint8_t frame = 0; frame < desc.num_frames; frame++)
     {
-        for (uint32_t layer = 0; layer < desc.array_layers; ++layer)
+        for (uint32_t layer = 0; layer < desc.num_layers; ++layer)
         {
-            for (uint32_t mip = 0; mip < desc.mip_levels; ++mip)
+            for (uint32_t mip = 0; mip < desc.num_mip_levels; ++mip)
             {
                 if (is_swapchain())
                     current_layouts[frame][layer][mip] = RBImageLayout::transfer_present;
@@ -161,9 +161,9 @@ std::vector<RGTextureHandle> RenderGraph::create_textures(const RGTextureDesc& i
     for (uint16_t index = 0; index < num_textures; index++)
     {
         if (tex_names.size() > index)
-            desc.name = tex_names[index];
+            desc.name = desc_name + "[" + tex_names[index].to_string() + "]";
         else
-            desc.name = Name(desc_name + "_" + std::to_string(index));
+            desc.name = Name(desc_name + "[" + std::to_string(index) + "]");
         RGTextureHandle texture = create_texture(desc);
         result.push_back(texture);
     }
@@ -268,8 +268,8 @@ void RenderGraph::compile()
                 .extent  = tex.desc.extent,
                 .format = tex.desc.format,
                 .usage  = tex.desc.usage,
-                .mip_levels = tex.desc.mip_levels,
-                .num_layers = tex.desc.array_layers,
+                .mip_levels = tex.desc.num_mip_levels,
+                .num_layers = tex.desc.num_layers,
                 .is_cubemap = tex.desc.dimension == TextureDimension::Cube,
             };
             tex.image = backend->create_image(desc);

@@ -51,6 +51,13 @@ constexpr uint32_t GBUFFER_SLOT_ALBEDO = 4;
 constexpr uint32_t GBUFFER_SLOT_POSITION = 5;
 constexpr uint32_t GBUFFER_SLOT_MOTION_VECTORS = 6;
 
+enum COPY_INSTANCE
+{
+    COPY_INSTANCE_SSR,
+    COPY_INSTANCE_HDR_HISTORY
+};
+
+
 
 class GenericRenderGraph : public RenderGraph
 {
@@ -75,7 +82,8 @@ public:
     
     void draw_fullscreen_copy(
         RenderGraphContext& ctx,
-        RGTextureHandle source);
+        RGTextureHandle source,
+        uint32_t copy_id = 0);
     
     
     void draw_scene(RenderGraphContext& ctx);
@@ -104,6 +112,7 @@ public:
     RGTextureHandle swapchain_color;
     
     std::vector<RGTextureHandle> hdr_color_table;
+    std::vector<RGTextureHandle> hdr_color_history;
     
     std::vector<RGTextureHandle> gbuffer;
     
@@ -116,7 +125,7 @@ public:
     // RGTextureHandle g_position;
     
     
-    RGTextureHandle history_hdr;
+    //RGTextureHandle history_hdr;
     RGTextureHandle ssr_texture;
     uint32_t history_index = 0;
     

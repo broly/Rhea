@@ -46,7 +46,7 @@ void CubemapCaptureRenderGraph::init_resources(const std::map<Name, bool>& param
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false,
         .dimension = TextureDimension::Cube,
-        .array_layers = 6
+        .num_layers = 6
     };
     
     irradiance = create_texture(irradiance_color_desc);
@@ -59,8 +59,8 @@ void CubemapCaptureRenderGraph::init_resources(const std::map<Name, bool>& param
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
         .external = false,
         .dimension = TextureDimension::Cube,
-        .mip_levels = CUBEMAP_PREFILTER_FACE_NUM_MIPS,
-        .array_layers = 6,
+        .num_mip_levels = CUBEMAP_PREFILTER_FACE_NUM_MIPS,
+        .num_layers = 6,
         
     };
     prefiltered_env = create_texture(prefiltered_color_desc);
