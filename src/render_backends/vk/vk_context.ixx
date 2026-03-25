@@ -145,11 +145,11 @@ namespace vk
             
             
             
-            for (uint32_t layer_index = in_layer; layer_index < in_num_layers; ++layer_index)
+            for (uint32_t layer_index = 0; layer_index < in_num_layers; ++layer_index)
             {
-                for (uint32_t mip_index = in_mip; mip_index < in_num_mips; ++mip_index)
+                for (uint32_t mip_index = 0; mip_index < in_num_mips; ++mip_index)
                 {
-                    subresource_layouts[layer_index][mip_index] = in_layout;
+                    subresource_layouts[layer_index + in_layer][mip_index + in_mip] = in_layout;
                 }
             }
         }

@@ -238,6 +238,8 @@ void main()
     vec3 N_view = normalize((camera_ubo.view * vec4(N, 0.0)).xyz);
     out_g_normal = vec4(N_view * 0.5 + 0.5, roughness);
 
+    out_g_world_normal = vec4(N * 0.5 + 0.5, 1.0);
+
     vec2 curr_ndc = v_curr_clip.xy / v_curr_clip.w;
     vec2 prev_ndc = v_prev_clip.xy / v_prev_clip.w;
 

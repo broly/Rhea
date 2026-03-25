@@ -68,43 +68,25 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
 
 void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
 {
-    GenericRenderGraph::prepare_resources(ctx);
-    
-    auto hdr_color_instance = hdr_color_output_resource->query_single();
-           
-    hdr_color_instance->update_image(
-        "u_hdr_color",
-        get_image(hdr_color_table[COLOR_OUTPUT_HDR_BASE]),
-        {
-            .frame = ctx.frame
-        }
-    );
 
     uint32_t prev_layer = history_index ^ 1;
-
-    hdr_color_instance->update_image(
-        "u_history",
-        get_image(hdr_color_history[COLOR_OUTPUT_HDR_BASE]),
-        {
-            .frame = ctx.frame,
-            .layer_index = prev_layer,
-            .array_index = COLOR_OUTPUT_HDR_BASE
-        }
-    );
     
+    GenericRenderGraph::prepare_resources(ctx);
     
-    hdr_color_instance->update_image(
-        "u_history",
-        get_image(hdr_color_history[COLOR_OUTPUT_HDR_RTXGI]),
-        {
-            .frame = ctx.frame,
-            .layer_index = prev_layer,
-            .array_index = COLOR_OUTPUT_HDR_RTXGI
-        }
-    );
+     
     
+    gbuffer_resource->update_image_array("u_gbuffer", get_image_array(gbuffer), 
+    {.frame = ctx.frame});
+    gbuffer_resource->update_image_array("u_gbuffer_hist", get_image_array(gbuffer_hist), 
+    {.frame = ctx.frame, .layer_index = prev_layer});
     
+    hdr_color_output_resource->update_image_array(
+        "u_hdr_color", get_image_array(hdr_color_table), 
+        {.frame = ctx.frame});
     
+    hdr_color_output_resource->update_image_array(
+        "u_history", get_image_array(hdr_color_history), 
+        {.frame = ctx.frame, .layer_index = prev_layer});
     
     auto shadow_debug_instance = shadow_resource->query_single();
     

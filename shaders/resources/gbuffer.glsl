@@ -24,9 +24,16 @@ const uint GBUFFER_NUM_SLOTS = NUM_GBUFFER_SLOTS;
     #define BINDING_SAMPLER_ARRAY_GBUFFER 0
     #error "BINDING_SAMPLER_ARRAY_GBUFFER definition is missing. Provide this resource: gbuffer"
 #endif
+#ifndef BINDING_SAMPLER_ARRAY_GBUFFER_HIST
+    #define BINDING_SAMPLER_ARRAY_GBUFFER_HIST 0
+    #error "BINDING_SAMPLER_ARRAY_GBUFFER_HIST definition is missing. Provide this resource: gbuffer"
+#endif
 
 layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_ARRAY_GBUFFER) 
 uniform sampler2D u_gbuffer[GBUFFER_NUM_SLOTS];
+
+layout(set = SET_GBUFFER, binding = BINDING_SAMPLER_ARRAY_GBUFFER_HIST)
+uniform sampler2D u_gbuffer_hist[GBUFFER_NUM_SLOTS];
 
 #define DECLARE_GBUFFER_GETTER(func, index) \
     vec4 func(vec2 uv) \

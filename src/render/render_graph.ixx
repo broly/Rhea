@@ -20,6 +20,7 @@ export enum class RenderPassType
     graphics,
     compute,
     rtx,
+    transfer,
 };
 
 
@@ -191,6 +192,10 @@ public:
     {
         backend.draw(cmd, vertex_count);
     }
+    
+    
+    void copy_img(const CopyImageParams& params) const;
+
 };
 
 

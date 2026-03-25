@@ -575,6 +575,11 @@ RBAccelStruct VkRenderBackend::build_tlas(RBCommandList cmd, const std::vector<M
     return tlas_manager.build_tlas(cmd, meshes, transforms);
 }
 
+void VkRenderBackend::copy_image(RBCommandList cmd, const CopyImageParams& params)
+{
+    image_manager.perform_image_copy(cmd, params);
+}
+
 
 void VkRenderBackend::bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame)
 {

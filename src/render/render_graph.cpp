@@ -101,6 +101,11 @@ void RGTexture::reset_layout()
     }
 }
 
+void RenderGraphContext::copy_img(const CopyImageParams& params) const
+{
+    backend.copy_image(cmd, params);
+}
+
 void RenderGraph::setup(const std::shared_ptr<RenderBackend>& in_backend, const std::shared_ptr<Renderer>& in_renderer)
 {
     backend = in_backend;
@@ -313,6 +318,7 @@ void RenderGraph::compile()
                 RBImageUsage::DepthStencilAttachment,
                 RBImageUsage::Present,
                 RBImageUsage::StorageImage,
+                RBImageUsage::TransferDst,
             };
             
             checkf(allowed_in_write.contains(write.usage), 
@@ -427,7 +433,6 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
                     texture.memory_barrier(cmd, *backend, barrier.before_pass->layout, frame, layer);
         }
         
-        
         for (uint32_t layer_id = 0; layer_id < pass.num_layers; ++layer_id)
         {
             for (uint32_t mip_map_id = 0; mip_map_id < pass.num_mip_maps; ++mip_map_id)
@@ -437,37 +442,45 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
                 fb_desc.pass = pass.name;
 
 
-                for (const auto& write : pass.writes)
+
+                if (pass.type == RenderPassType::graphics)
                 {
-                    if (!is_attachment(write.usage))
-                        continue;
-
-                    const RGTexture& tex = textures[write.texture.id];
-
-                    RBImageHandle image = tex.get_image(*backend, frame);
-
-                    if (!fb_desc.is_extent_set())
-                        fb_desc.update_extent(tex.desc.extent);
                     
-                    const bool is_depth_attachment = tex.desc.usage & RenderTextureUsage::DepthStencil;
-                    
-                    AttachmentDesc attachment_desc {
-                        .image_name = tex.desc.name,
-                        .image = image,
-                        .load = write.load_op,
-                        .store = write.store_op,
-                        .usage = write.usage,
-                        .layer = layer_id,
-                        .mip_level = mip_map_id,
-                        .depth_attachment = is_depth_attachment
-                    };
-                    
-                    fb_desc.attachments.push_back(attachment_desc);
+                    for (const auto& write : pass.writes)
+                    {
+                        if (!is_attachment(write.usage))
+                            continue;
 
+                        const RGTexture& tex = textures[write.texture.id];
+
+                        RBImageHandle image = tex.get_image(*backend, frame);
+
+                        if (!fb_desc.is_extent_set())
+                            fb_desc.update_extent(tex.desc.extent);
+                    
+                        const bool is_depth_attachment = tex.desc.usage & RenderTextureUsage::DepthStencil;
+                    
+                        AttachmentDesc attachment_desc {
+                            .image_name = tex.desc.name,
+                            .image = image,
+                            .load = write.load_op,
+                            .store = write.store_op,
+                            .usage = write.usage,
+                            .layer = layer_id,
+                            .mip_level = mip_map_id,
+                            .depth_attachment = is_depth_attachment
+                        };
+                    
+                        fb_desc.attachments.push_back(attachment_desc);
+
+                    }
+                    
+                    ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
                 }
-
-                ctx.framebuffer = backend->get_or_create_framebuffer(fb_desc);
-        
+                else
+                {
+                    ctx.framebuffer = {};
+                }
                 current_pass_name = pass.name;
                 
                 if (pass.type == RenderPassType::graphics)

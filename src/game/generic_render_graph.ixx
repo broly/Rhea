@@ -43,20 +43,24 @@ enum COLOR_OUTPUT : uint8_t
 REFLECT_ENUM(COLOR_OUTPUT,
     COLOR_OUTPUT_HDR_BASE, COLOR_OUTPUT_HDR_RTXGI, COLOR_OUTPUT_HDR_SSR, COLOR_OUTPUT_HDR_INTERMEDIATE);
 
-constexpr uint32_t GBUFFER_SLOT_NORMAL = 0;
-constexpr uint32_t GBUFFER_SLOT_WORLD_NORMAL = 1;
-constexpr uint32_t GBUFFER_SLOT_ROUGHNESS = 2;
-constexpr uint32_t GBUFFER_SLOT_DEPTH = 3;
-constexpr uint32_t GBUFFER_SLOT_ALBEDO = 4;
-constexpr uint32_t GBUFFER_SLOT_POSITION = 5;
-constexpr uint32_t GBUFFER_SLOT_MOTION_VECTORS = 6;
-
-enum COPY_INSTANCE
+enum GBUFFER_SLOTS
 {
-    COPY_INSTANCE_SSR,
-    COPY_INSTANCE_HDR_HISTORY
+    GBUFFER_SLOT_NORMAL = 0,
+    GBUFFER_SLOT_WORLD_NORMAL = 1,
+    GBUFFER_SLOT_ROUGHNESS = 2,
+    GBUFFER_SLOT_DEPTH = 3,
+    GBUFFER_SLOT_ALBEDO = 4,
+    GBUFFER_SLOT_POSITION = 5,
+    GBUFFER_SLOT_MOTION_VECTORS = 6,
 };
-
+REFLECT_ENUM(GBUFFER_SLOTS,
+    GBUFFER_SLOT_NORMAL,
+    GBUFFER_SLOT_WORLD_NORMAL,
+    GBUFFER_SLOT_ROUGHNESS,
+    GBUFFER_SLOT_DEPTH,
+    GBUFFER_SLOT_ALBEDO,
+    GBUFFER_SLOT_POSITION,
+    GBUFFER_SLOT_MOTION_VECTORS)
 
 
 class GenericRenderGraph : public RenderGraph
@@ -79,13 +83,8 @@ public:
     void prepare_ssr(RenderGraphContext& ctx);
     
     void setup_hdr_color_table(RenderGraphContext& ctx) const;
-    
-    void draw_fullscreen_copy(
-        RenderGraphContext& ctx,
-        RGTextureHandle source,
-        uint32_t copy_id = 0);
-    
-    
+
+
     void draw_scene(RenderGraphContext& ctx);
     void draw_scene_shadow(RenderGraphContext& ctx);
     void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
@@ -115,6 +114,7 @@ public:
     std::vector<RGTextureHandle> hdr_color_history;
     
     std::vector<RGTextureHandle> gbuffer;
+    std::vector<RGTextureHandle> gbuffer_hist;
     
     // RGTextureHandle g_depth;
     // RGTextureHandle g_normal;
@@ -138,7 +138,6 @@ public:
     RenderResource* light_resource = nullptr;
     RenderResource* shadow_resource = nullptr;
     RenderResource* reflection_resource = nullptr;
-    RenderResource* copy_resource = nullptr;
     RenderResource* ssr_resource = nullptr;
     RenderResource* hdr_color_output_resource = nullptr;
     RenderResource* hdr_color_storage_resource = nullptr;
@@ -160,7 +159,6 @@ public:
     CameraUBO current_camera_ubo;
         
     
-    PipelineObject* copy_pipeline;
     PipelineObject* shadow_debug_pipeline;
     PipelineObject* clouds_pipeline;
     PipelineObject* tonemap_pipeline;
@@ -170,7 +168,6 @@ public:
     PipelineObject* rtx_gi_pipeline;
 
     
-    std::shared_ptr<PipelineFamily> copy_pipeline_family;
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
     std::shared_ptr<PipelineFamily> shadow_debug_pipeline_family;
     std::shared_ptr<PipelineFamily> wireframe_pipeline_family;

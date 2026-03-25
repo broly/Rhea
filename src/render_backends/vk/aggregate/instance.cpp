@@ -23,6 +23,11 @@ constexpr const char* VALIDATION_LAYERS[] = {
 void vk::Instance::init(GLFWwindow* in_window)
 {
     window = in_window;
+    
+    const char instance_extensions[] = {
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+    };
+    
     // Application and instance
     VkApplicationInfo appInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
     appInfo.pApplicationName = "Rhea";
@@ -47,14 +52,38 @@ void vk::Instance::init(GLFWwindow* in_window)
     ici.pNext = &validationFeatures;
 
     // extensions (by GLFW)
-    uint32_t ext_count = 0;
-    const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
-    ici.enabledExtensionCount = ext_count;
-    ici.ppEnabledExtensionNames = extensions;
+    uint32_t required_ext_count = 0;
+    const char** required_extensions = glfwGetRequiredInstanceExtensions(&required_ext_count);
+    std::vector<const char*> extensions;
+    for (int i = 0; i < required_ext_count; i++)
+        extensions.push_back(required_extensions[i]);
+    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    ici.enabledExtensionCount = extensions.size();
+    ici.ppEnabledExtensionNames = extensions.data();
+    
+    
+    VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
+    debug_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    debug_create_info.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+    debug_create_info.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+    debug_create_info.pfnUserCallback = &vk::Instance::debug_callback;
+    debug_create_info.pNext = &validationFeatures;
+    
+    ici.pNext = &debug_create_info;
 
     VK_CHECK(
         vkCreateInstance(&ici, nullptr, &instance)
     );
+    
+    
     
     glfwCreateWindowSurface(instance, window, nullptr, &surface);
     
@@ -106,7 +135,7 @@ void vk::Instance::init(GLFWwindow* in_window)
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
         VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
-        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
     };
     
     
@@ -154,6 +183,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     features13.shaderDemoteToHelperInvocation = VK_TRUE;
     features13.pNext = &features12;
+    
 
     dci.pNext = &features13;
 
@@ -161,7 +191,36 @@ void vk::Instance::init(GLFWwindow* in_window)
         vkCreateDevice(physical_device, &dci, nullptr, &device)
     );
     
-    vk_ext::load_functions(device);
+    vk_ext::load_device_functions(device);
+    vk_ext::load_instance_functions(instance);
+    
+    VkDebugUtilsMessengerEXT debugMessenger;
+
+    VkDebugUtilsMessengerCreateInfoEXT create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    create_info.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+    create_info.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+    create_info.pfnUserCallback = debug_callback;
+    create_info.pUserData = nullptr;
+    
+    VkResult res = vk_ext::vkCreateDebugUtilsMessengerEXT(
+        instance,
+        &create_info,
+        nullptr,
+        &debugMessenger
+    );
+
+    if (res != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create debug messenger");
+    }
 }
 
 void vk::Instance::match_queue_families()
@@ -210,6 +269,19 @@ void vk::Instance::match_queue_families()
     
     queues_indices[0] = queues.graphics;
     queues_indices[1] = queues.present;
+}
+
+VkBool32 vk::Instance::debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+    if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+    {
+        auto message = pCallbackData->pMessage;
+        std::cerr << "[VULKAN VALIDATION ERROR]\n" << message << std::endl;
+        // __debugbreak();
+    }
+    return VK_FALSE;
 }
 
 VkDeviceSize vk::Instance::get_non_coherent_atom_size() const

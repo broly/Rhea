@@ -2,6 +2,7 @@
 
 #include "definitions.glsl"
 #include "resources/hdr_color_output.glsl"
+#include "resources/gbuffer.glsl"
 
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;

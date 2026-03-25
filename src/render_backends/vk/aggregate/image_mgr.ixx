@@ -58,6 +58,8 @@ namespace vk
         RBImageHandle create_fallback_texture(const Texture& tex, const TextureCreationInfo& texture_creation_info);
         RBImageHandle create_cubemap(const Cubemap& tex, const TextureCreationInfo& texture_creation_info);
         
+        void perform_image_copy(RBCommandList cmd, const CopyImageParams& params);
+        
         void transition_image(
             RBCommandList cmd, 
             const ImageBarrierParams& params) const;

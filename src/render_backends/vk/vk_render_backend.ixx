@@ -145,6 +145,8 @@ public:   /// API Section
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) override;
     
+    virtual void copy_image(RBCommandList cmd, const CopyImageParams& params) override;
+    
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) override;
     virtual uint32_t get_num_images_in_flight() const override;
     RBDeviceAddress get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const override;

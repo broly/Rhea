@@ -99,7 +99,7 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
     
     // ---- Image View ----
     VkImageAspectFlags aspect =
-        (image_resource.usage & RenderTextureUsage::DepthStencil)
+        (is_depth_format(image_resource.format))
             ? VK_IMAGE_ASPECT_DEPTH_BIT
             : VK_IMAGE_ASPECT_COLOR_BIT;
 
@@ -199,6 +199,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     
     if (desc.usage & RenderTextureUsage::Storage)
         vk_usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+    
 
     VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -215,6 +216,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     image_info.usage = vk_usage;
     image_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
 
     VK_CHECK(vkCreateImage(instance.device, &image_info, nullptr, &res.image));
     
@@ -657,6 +659,56 @@ RBImageHandle vk::ImageManager::create_cubemap(
     return image;
 }
 
+void vk::ImageManager::perform_image_copy(RBCommandList cmd, const CopyImageParams& params)
+{
+    const auto& src_resource = get_image_resource(params.source);
+    const auto& dst_resource = get_image_resource(params.dest);
+
+    const VkImageLayout current_src_layout = src_resource.get_layout(params.src_layer, params.src_mip);
+    const VkImageLayout current_dst_layout = dst_resource.get_layout(params.dst_layer, params.dst_mip);
+    
+    LogVkImageManager.Log<Verbose>("Copying image '%s' (%p) -> '%s' (%p). Source layout: %s, Dest layout: %s",
+        src_resource.debug_name.to_string().c_str(), src_resource.image,
+        dst_resource.debug_name.to_string().c_str(), dst_resource.image,
+        vk::enum_to_string(current_src_layout).data(), vk::enum_to_string(current_dst_layout).data());
+    
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    if (is_depth_format(src_resource.format))
+    {
+        aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        if (has_stencil(dst_resource.format))
+            aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    
+
+    
+    VkImageCopy region{};
+
+    region.srcSubresource.aspectMask = aspect;
+    region.srcSubresource.mipLevel = params.src_mip;
+    region.srcSubresource.baseArrayLayer = params.src_layer;
+    region.srcSubresource.layerCount = params.num_layers;
+
+    region.srcOffset = {0, 0, 0};
+
+    region.dstSubresource.aspectMask = aspect;
+    region.dstSubresource.mipLevel = params.dst_mip;
+    region.dstSubresource.baseArrayLayer = params.dst_layer;
+    region.dstSubresource.layerCount = params.num_layers;
+
+    region.dstOffset = {0, 0, 0};
+    
+    region.extent = {src_resource.extent.width, src_resource.extent.height, 1};
+    
+    vkCmdCopyImage(cmd.as<VkCommandBuffer>(), 
+        src_resource.image, current_src_layout, 
+        dst_resource.image, current_dst_layout,
+        1,
+        &region);
+}
+
 void vk::ImageManager::transition_image(RBCommandList cmd, const ImageBarrierParams& params) const
 {
     auto [
@@ -671,7 +723,6 @@ void vk::ImageManager::transition_image(RBCommandList cmd, const ImageBarrierPar
     
     auto& img = get_image_resource(image);
     VkImage vk_img = img.image;
-    
     
     if (layer_count == 0)
         layer_count = img.num_layers;
@@ -701,8 +752,6 @@ void vk::ImageManager::transition_image(RBCommandList cmd, const ImageBarrierPar
             reflect::enum_name(before).to_string().c_str(),
             reflect::enum_name(after).to_string().c_str(),
             base_layer,
-            base_layer + layer_count - 1,
-            base_mip,
             base_mip + mip_count - 1
         );
     }

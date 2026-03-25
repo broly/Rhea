@@ -54,7 +54,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     hdr_color_output_resource = renderer->find_resource("hdr_color_output");
     hdr_color_storage_resource = renderer->find_resource("hdr_color_storage");
     tlas_resource = renderer->find_resource("tlas");
-    copy_resource = renderer->find_resource("copy");
     mesh_table_resource = renderer->find_resource("mesh_table");
     clouds_resource = renderer->find_resource("clouds");
     base_color_resource = renderer->find_resource("base_color");
@@ -86,20 +85,40 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .name = NAME(hdr_color_table),
         .extent = resolution,
         .format = TextureFormat::RGBA16F,
-        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
+        .usage  = 
+             RenderTextureUsage::ColorAttachment | 
+                RenderTextureUsage::Sampled | 
+                RenderTextureUsage::TransferSrc | 
+                RenderTextureUsage::TransferDst | 
+                RenderTextureUsage::Storage,
         .external = false,
         .dimension = capture_dimension
     }, initial_array_size, reflect::enum_names<COLOR_OUTPUT>());
+
+    std::vector<Name> color_outputs = reflect::enum_names<COLOR_OUTPUT>();
+    check(color_outputs.size() <= initial_array_size);
     
     hdr_color_history = create_textures({
         .name = NAME(hdr_color_history),
         .extent = resolution,
         .format = TextureFormat::RGBA16F,
-        .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc | RenderTextureUsage::Storage,
+        .usage  = 
+            RenderTextureUsage::ColorAttachment | 
+            RenderTextureUsage::Sampled | 
+            RenderTextureUsage::TransferSrc | 
+            RenderTextureUsage::TransferDst | 
+            RenderTextureUsage::Storage,
         .external = false,
         .dimension = capture_dimension,
         .num_layers = 2
-    }, initial_array_size, reflect::enum_names<COLOR_OUTPUT>());
+    }, initial_array_size, color_outputs);
+    
+    
+    const RenderResourceVariableDesc& gbuffer_resource_desc = gbuffer_resource->find_var_checked("u_gbuffer");
+    
+    std::vector<Name> gbuffer_slots = reflect::enum_names<GBUFFER_SLOTS>();
+    
+    check(gbuffer_slots.size() <= gbuffer_resource_desc.parameter.initial_array_size.value_or(0));
     
     
     gbuffer = create_textures({
@@ -131,7 +150,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .name = "g_depth",
             .extent = resolution,
             .format = TextureFormat::Depth24Stencil8,
-            .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled,
+            .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
             .dimension = capture_dimension
         },
         {
@@ -160,6 +179,73 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         }
     });
     
+    gbuffer_hist = create_textures({
+        {
+            .name = "g_normal_hist",
+            .extent = resolution,
+            .format = TextureFormat::RGBA8_UNORM,
+            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .external = false,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        },
+        {
+            .name = "g_world_normal_hist",
+            .extent = resolution,
+            .format = TextureFormat::RGBA8_UNORM,
+            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .external = false,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        },
+        {
+            .name = "g_roughness_hist",
+            .extent = resolution,
+            .format = TextureFormat::R16F,
+            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .external = false,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        },
+        {
+            .name = "g_depth_hist",
+            .extent = resolution,
+            .format = TextureFormat::Depth24Stencil8,
+            .usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        },
+        {
+            .name = "g_albedo_hist",
+            .extent = resolution,
+            .format = TextureFormat::RGBA8_UNORM,
+            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .external = false,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        },
+        {
+            .name = "g_position_hist",
+            .extent = resolution,
+            .format = TextureFormat::RGBA16F,
+            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .external = false,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        },
+        {
+            .name = "g_motion_vectors_hist",
+            .extent = resolution,
+            .format = TextureFormat::RG16F,
+            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .external = false,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        }
+    });
+    
+    
+    
     ssr_texture = create_texture({
         .name = NAME(ssr_texture),
         .extent = resolution,
@@ -167,9 +253,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
         .dimension = capture_dimension
     });
-    
-    copy_pipeline_family = renderer->query_pipeline_family("HistoryStore", copy_model);
-    copy_pipeline = request_pipeline(copy_pipeline_family, {});
     
     tonemap_pipeline_family = renderer->query_pipeline_family("ToneMapping", tonemap_model);
     tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
@@ -397,37 +480,95 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
     
     add_pass({
-        .name = "copy_hdr_color",
+        .name = "COPY_ssr_compose_to_hdr_base",
         .reads = {
-            { hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::SampledFragment }
+            { hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::TransferSrc }
         },
         .writes = {
-            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::TransferDst, RBLoadOp::Load }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
-            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE], COPY_INSTANCE_SSR);
+            CopyImageParams params;
+            params.source = get_image(hdr_color_table[COLOR_OUTPUT_HDR_INTERMEDIATE]);
+            params.dest = get_image(hdr_color_table[COLOR_OUTPUT_HDR_BASE]);
+            ctx.copy_img(params);
         },
         .num_layers = 1,
+        .type = RenderPassType::transfer
     });
     
     
     add_pass({
-        .name = "HistoryStore",
+        .name = "COPY_hdr_color_rtxgi_to_history",
         .reads = {
-            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment }
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::TransferSrc }
         },
         .writes = {
-            { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::TransferDst, RBLoadOp::Load }
         },
         .execute = [this](RenderGraphContext& ctx)
         {
             if (ctx.level != history_index)
                 return;
     
-            draw_fullscreen_copy(ctx, hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], COPY_INSTANCE_HDR_HISTORY);
+            CopyImageParams params;
+            params.source = get_image(hdr_color_table[COLOR_OUTPUT_HDR_RTXGI]);
+            params.dest = get_image(hdr_color_history[COLOR_OUTPUT_HDR_RTXGI]);
+            params.dst_layer = ctx.level;
+            
+            ctx.copy_img(params);
         },
         .num_layers = 2,
+        .type = RenderPassType::transfer
+    });
+    
+    
+    add_pass({
+        .name = "COPY_gbuffer_world_normal_to_history",
+        .reads = {
+            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::TransferSrc }
+        },
+        .writes = {
+            { gbuffer_hist[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::TransferDst, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.level != history_index)
+                return;
+    
+            
+            CopyImageParams params;
+            params.source = get_image(gbuffer[GBUFFER_SLOT_WORLD_NORMAL]);
+            params.dest = get_image(gbuffer_hist[GBUFFER_SLOT_WORLD_NORMAL]);
+            params.dst_layer = ctx.level;
+            ctx.copy_img(params);
+        },
+        .num_layers = 2,
+        .type = RenderPassType::transfer
+    });
+    
+    add_pass({
+        .name = "COPY_gbuffer_depth_to_history",
+        .reads = {
+            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::TransferSrc }
+        },
+        .writes = {
+            { gbuffer_hist[GBUFFER_SLOT_DEPTH], RBImageUsage::TransferDst, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.level != history_index)
+                return;
+            
+            CopyImageParams params;
+            params.source = get_image(gbuffer[GBUFFER_SLOT_DEPTH]);
+            params.dest = get_image(gbuffer_hist[GBUFFER_SLOT_DEPTH]);
+            params.dst_layer = ctx.level;
+            ctx.copy_img(params);
+        },
+        .num_layers = 2,
+        .type = RenderPassType::transfer
     });
     
     // add_pass({
@@ -450,10 +591,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
 void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
 {
     RenderGraph::prepare_resources(ctx);
-    
-    
-    gbuffer_resource->update_image_array("u_gbuffer", get_image_array(gbuffer), {.frame = ctx.frame});
-    
+   
     rebuild_camera_ubo(ctx);
     
     prepared_batches.clear();
@@ -814,24 +952,6 @@ void GenericRenderGraph::setup_hdr_color_table(RenderGraphContext& ctx) const
             });
     }
     
-}
-
-void GenericRenderGraph::draw_fullscreen_copy(RenderGraphContext& ctx, RGTextureHandle source, uint32_t copy_id)
-{
-    auto copy_instance = copy_resource->query_single(copy_id);
-    
-    copy_instance->update_image(
-        "u_source",
-        get_image(source),
-        {.frame=ctx.frame}
-    );
-    
-    ctx.bind_pipeline(copy_pipeline);
-    
-    
-    ctx.bind(copy_instance);
-             
-    ctx.draw_fullscreen();
 }
 
 

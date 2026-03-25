@@ -37,6 +37,20 @@ export struct TextureCreationInfo
     RBImageLayout current_layout = RBImageLayout::undefined;
 };
 
+export struct CopyImageParams
+{
+    RBImageHandle source;
+    RBImageHandle dest;
+    std::optional<RBImageLayout> src_layout = std::nullopt;
+    std::optional<RBImageLayout> dst_layout = std::nullopt;
+    uint32_t src_layer = 0;
+    uint32_t dst_layer = 0;
+    uint32_t src_mip = 0;
+    uint32_t dst_mip = 0;
+    uint32_t num_mips = 1;
+    uint32_t num_layers = 1;
+};
+
 export struct ImageReadback
 {
     Extent extent;
@@ -151,6 +165,8 @@ public:
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) = 0;
     virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) = 0;
+    
+    virtual void copy_image(RBCommandList cmd, const CopyImageParams& params) = 0;
     
     virtual void transition_image(
         RBCommandList cmd, const ImageBarrierParams& params) = 0;

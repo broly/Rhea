@@ -13,6 +13,12 @@ namespace vk
         void init(GLFWwindow* window);
         void match_queue_families();
         
+        static VkBool32 debug_callback(
+            VkDebugUtilsMessageSeverityFlagBitsEXT           messageSeverity,
+            VkDebugUtilsMessageTypeFlagsEXT                  messageTypes,
+            const VkDebugUtilsMessengerCallbackDataEXT*      pCallbackData,
+            void*                                            pUserData);
+        
         VkDeviceSize get_non_coherent_atom_size() const;
         
         const VkDevice& get_device() const
