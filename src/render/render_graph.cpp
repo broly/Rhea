@@ -227,7 +227,7 @@ static RBImageLayout initial_layout_from_usage(RBImageUsage usage)
 
         // Depth read-only attachments are NOT used anymore
         // Depth read-only is a pipeline state
-
+    case RBImageUsage::Sampled:
     case RBImageUsage::SampledFragment:
         return RBImageLayout::shader_read_only_optimal;
 
@@ -288,6 +288,7 @@ void RenderGraph::compile()
         {
             static std::set<RBImageUsage> allowed_in_read = {
                 RBImageUsage::SampledFragment,
+                RBImageUsage::Sampled,
                 RBImageUsage::SampledVertex,
                 RBImageUsage::DepthStencilReadOnly,
                 RBImageUsage::TransferSrc,
@@ -301,13 +302,6 @@ void RenderGraph::compile()
             {
                 checkf(read.texture.id != write.texture.id, "Simultaneous writing and reading is prohibited. Check the pass '%s' for texture '%s'",
                     pass.name.to_string().c_str(), textures[read.texture.id].desc.name.to_string().c_str());
-                // if (read.texture.id == write.texture.id)
-                // {
-                //     const bool is_read_attachment = read.usage == RBImageUsage::ColorAttachment || read.usage == RBImageUsage::DepthStencilAttachment;
-                //     const bool is_write_sampled = write.usage == RBImageUsage::SampledFragment || write.usage == RBImageUsage::SampledVertex;
-                //     checkf(!(is_read_attachment && is_write_sampled),
-                //         "Texture %s could not be used as attachment and read from shader", read.texture.name.to_string().c_str());
-                // }
             }
         }
         

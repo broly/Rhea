@@ -380,6 +380,7 @@ export namespace vk
         case RBImageUsage::DepthStencilReadOnly:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
+        case RBImageUsage::Sampled:    
         case RBImageUsage::SampledFragment:
         case RBImageUsage::SampledVertex:
             return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -440,6 +441,7 @@ export namespace vk
         case RBImageUsage::DepthStencilReadOnly:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
+        case RBImageUsage::Sampled:    
         case RBImageUsage::SampledFragment:
         case RBImageUsage::SampledVertex:
             return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

@@ -70,6 +70,13 @@ export struct ImageReadback
     std::vector<std::vector<std::vector<float>>> data;
 };
 
+export struct ComputeWorkgroups
+{
+    uint32_t x = 32;
+    uint32_t y = 32;
+    uint32_t z = 1;
+};
+
 export class RenderBackend 
 {
 public:
@@ -149,6 +156,8 @@ public:
     {
         push_constants_impl(cmd, &value, sizeof(value));
     }
+    
+    virtual void compute(RBCommandList cmd, const ComputeWorkgroups& workgroups = {}) = 0;
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size) = 0;

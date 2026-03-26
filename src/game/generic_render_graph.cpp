@@ -276,6 +276,15 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     rtx_gi_pipeline_family = renderer->query_pipeline_family("RTXGI", rtxgi_model);
     rtx_gi_pipeline = rtx_gi_pipeline_family->request_pipeline({});
     
+    rtx_gi_validate_pipeline_family = renderer->query_pipeline_family("RTXGI_VALIDATE", rtxgi_model);
+    rtx_gi_validate_pipeline = rtx_gi_validate_pipeline_family->request_pipeline({});
+    
+    rtx_gi_temporal_accum_pipeline_family = renderer->query_pipeline_family("RTXGI_TEMPORAL_ACCUM", rtxgi_model);
+    rtx_gi_temporal_accum_pipeline = rtx_gi_temporal_accum_pipeline_family->request_pipeline({});
+    
+    rtx_gi_variance_guided_spatial_filter_pipeline_family = renderer->query_pipeline_family("RTXGI_VARIANCE_GUIDED_SPATIAL_FILTER", rtxgi_model);
+    rtx_gi_variance_guided_spatial_filter_pipeline = rtx_gi_variance_guided_spatial_filter_pipeline_family->request_pipeline({});
+    
     
     shadow_map = create_texture({
         .name = NAME(shadow_map),
@@ -341,22 +350,6 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .external = true,
         .swapchain_image = true,
     });
-    
-    // add_pass({
-    //     .name = "DepthPrepass",
-    //     .reads = {
-    //     },
-    //     .writes = {
-    //         { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
-    //     },
-    //     .execute = [this](RenderGraphContext& ctx)
-    //     {
-    //         PROFILE("DepthPrepass");
-    //         draw_scene(ctx);
-    //     },
-    //     .num_layers = 1
-    // });
-
     
     add_pass({
         .name = Names::pass_geometry_base,
@@ -499,30 +492,6 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
     
     
-    add_pass({
-        .name = "COPY_hdr_color_rtxgi_to_history",
-        .reads = {
-            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::TransferSrc }
-        },
-        .writes = {
-            { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::TransferDst, RBLoadOp::Load }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.level != history_index)
-                return;
-    
-            CopyImageParams params;
-            params.source = get_image(hdr_color_table[COLOR_OUTPUT_HDR_RTXGI]);
-            params.dest = get_image(hdr_color_history[COLOR_OUTPUT_HDR_RTXGI]);
-            params.dst_layer = ctx.level;
-            
-            ctx.copy_img(params);
-        },
-        .num_layers = 2,
-        .type = RenderPassType::transfer
-    });
-    
     
     add_pass({
         .name = "COPY_gbuffer_world_normal_to_history",
@@ -571,21 +540,143 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .type = RenderPassType::transfer
     });
     
-    // add_pass({
-    //     .name = "Wireframe",
-    //     .reads = {
-    //     },
-    //     .writes = {
-    //         { hdr_color, RBImageUsage::ColorAttachment, RBLoadOp::Load },
-    //          { depth_texture, RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
-    //     },
-    //     .execute = [this](RenderGraphContext& ctx)
-    //     {
-    //         PROFILE("Wireframe");
-    //         draw_wireframe(ctx);
-    //     },
-    //     .num_layers = 1
-    // });
+    add_pass({
+        .name = "RTXGI_VALIDATE",
+        .reads = {
+            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::Sampled },
+            { gbuffer_hist[GBUFFER_SLOT_DEPTH], RBImageUsage::Sampled },
+            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::Sampled },
+            { gbuffer_hist[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::Sampled },
+            { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::Sampled },
+            
+        },
+        .writes = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::StorageImage, RBLoadOp::Load },
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.bind_pipeline(rtx_gi_validate_pipeline))
+            {
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+            }       
+            
+            auto extent = backend->get_swapchain_extent();
+        
+            PushRTXGIValidate pc;
+            pc.depth_threshold = 0.005;
+            pc.normal_threshold = 0.9;
+            pc.resolution = {extent.width, extent.height};
+            
+            uint32_t groupSize = 8;
+
+            uint32_t groupsX = (extent.width  + groupSize - 1) / groupSize;
+            uint32_t groupsY = (extent.height + groupSize - 1) / groupSize;
+
+        
+            ctx.push_constants(pc);
+            ctx.compute({groupsX, groupsY});
+        },
+        .type = RenderPassType::compute
+    });
+    
+    add_pass({
+        .name = "RTXGI_TEMPORAL_ACCUM",
+        .reads = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::Sampled },
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::Sampled },
+            
+        },
+        .writes = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::StorageImage, RBLoadOp::Load },
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::StorageImage, RBLoadOp::Load },
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.bind_pipeline(rtx_gi_temporal_accum_pipeline))
+            {
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+            }       
+            
+            auto extent = backend->get_swapchain_extent();
+        
+            PushRTXGIAccum pc;
+            pc.resolution = {extent.width, extent.height};
+            pc.alpha = 0.96;
+            
+            uint32_t groupSize = 8;
+    
+            uint32_t groupsX = (extent.width  + groupSize - 1) / groupSize;
+            uint32_t groupsY = (extent.height + groupSize - 1) / groupSize;
+    
+        
+            ctx.push_constants(pc);
+            ctx.compute({groupsX, groupsY});
+        },
+        .type = RenderPassType::compute
+    });
+    
+    add_pass({
+        .name = "RTXGI_VARIANCE_GUIDED_SPATIAL_FILTER",
+        .reads = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::Sampled },
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::Sampled },
+            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::Sampled },
+            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::Sampled },
+            
+        },
+        .writes = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::StorageImage, RBLoadOp::DontCare },
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.bind_pipeline(rtx_gi_variance_guided_spatial_filter_pipeline))
+            {
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+            }       
+            
+            auto extent = backend->get_swapchain_extent();
+        
+            PushRTXGISpatial pc;
+            pc.resolution = {extent.width, extent.height};
+            
+            uint32_t groupSize = 8;
+    
+            uint32_t groupsX = (extent.width  + groupSize - 1) / groupSize;
+            uint32_t groupsY = (extent.height + groupSize - 1) / groupSize;
+    
+        
+            ctx.push_constants(pc);
+            ctx.compute({groupsX, groupsY});
+        },
+        .type = RenderPassType::compute
+    });
+    
+    
+    
+    add_pass({
+        .name = "COPY_hdr_color_rtxgi_to_history",
+        .reads = {
+            { hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::TransferSrc }
+        },
+        .writes = {
+            { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::TransferDst, RBLoadOp::Load }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.level != history_index)
+                return;
+    
+            CopyImageParams params;
+            params.source = get_image(hdr_color_table[COLOR_OUTPUT_HDR_RTXGI_ACCUM]);
+            params.dest = get_image(hdr_color_history[COLOR_OUTPUT_HDR_RTXGI]);
+            params.dst_layer = ctx.level;
+            
+            ctx.copy_img(params);
+        },
+        .num_layers = 2,
+        .type = RenderPassType::transfer
+    });
+    
 }
 
 void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
@@ -944,7 +1035,7 @@ void GenericRenderGraph::setup_hdr_color_table(RenderGraphContext& ctx) const
                 .array_index = index
             });
         hdr_color_storage_resource->update_image(
-            "u_hdr_color",
+            "u_hdr_color_storage",
             get_image(hdr_color_table[index]),
             {
                 .frame=ctx.frame,

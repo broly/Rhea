@@ -1,0 +1,68 @@
+#version 450
+
+#include "resources/gbuffer.glsl"
+#include "resources/hdr_color_output.glsl"
+#include "resources/hdr_color_storage.glsl"
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(push_constant) uniform PushRTXGIAccum
+{
+    vec2 resolution;
+    float alpha;
+} pc;
+
+float luminance(vec3 c)
+{
+    return dot(c, vec3(0.299, 0.587, 0.114));
+}
+
+void main()
+{
+    ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+
+    if (px.x >= int(pc.resolution.x) || px.y >= int(pc.resolution.y))
+        return;
+
+    vec2 uv = (vec2(px) + 0.5) / pc.resolution;
+
+    vec3 current = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI], uv).rgb;
+
+    vec4 reproj = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], uv);
+    vec3 history = reproj.rgb;
+    float validity = reproj.a;
+
+    vec3 minN = vec3(1e9);
+    vec3 maxN = vec3(-1e9);
+
+    for (int y = -1; y <= 1; y++)
+    {
+        for (int x = -1; x <= 1; x++)
+        {
+            ivec2 o = px + ivec2(x, y);
+            vec2 suv = (vec2(o) + 0.5) / pc.resolution;
+
+            vec3 c = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI], suv).rgb;
+
+            minN = min(minN, c);
+            maxN = max(maxN, c);
+        }
+    }
+
+    history = clamp(history, minN, maxN);
+
+    float a = mix(0.05, pc.alpha, validity);
+
+    vec3 gi = mix(current, history, a);
+
+    float lum = luminance(gi);
+
+    vec2 prevMom = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], uv).rg;
+
+    float mean = mix(lum, prevMom.x, a);
+    float variance = mix(lum * lum, prevMom.y, a) - mean * mean;
+    variance = max(variance, 0.0);
+
+    imageStore(u_hdr_color_storage[COLOR_OUTPUT_HDR_RTXGI_ACCUM], px, vec4(gi, 1.0));
+    imageStore(u_hdr_color_storage[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], px, vec4(mean, variance, 0.0, 0.0));
+}

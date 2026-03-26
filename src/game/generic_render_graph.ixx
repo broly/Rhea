@@ -39,9 +39,15 @@ enum COLOR_OUTPUT : uint8_t
     COLOR_OUTPUT_HDR_RTXGI = 1,
     COLOR_OUTPUT_HDR_SSR = 2,
     COLOR_OUTPUT_HDR_INTERMEDIATE = 3,
+    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED = 4,
+    COLOR_OUTPUT_HDR_RTXGI_ACCUM = 6,
+    COLOR_OUTPUT_HDR_RTXGI_MOMENTS = 7,
+    COLOR_OUTPUT_HDR_RTXGI_FILTERED = 8
 };
 REFLECT_ENUM(COLOR_OUTPUT,
-    COLOR_OUTPUT_HDR_BASE, COLOR_OUTPUT_HDR_RTXGI, COLOR_OUTPUT_HDR_SSR, COLOR_OUTPUT_HDR_INTERMEDIATE);
+    COLOR_OUTPUT_HDR_BASE, COLOR_OUTPUT_HDR_RTXGI, COLOR_OUTPUT_HDR_SSR, COLOR_OUTPUT_HDR_INTERMEDIATE, 
+    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED, COLOR_OUTPUT_HDR_RTXGI_ACCUM,
+    COLOR_OUTPUT_HDR_RTXGI_MOMENTS, COLOR_OUTPUT_HDR_RTXGI_FILTERED);
 
 enum GBUFFER_SLOTS
 {
@@ -166,6 +172,9 @@ public:
     PipelineObject* ssr_pipeline;
     PipelineObject* ssr_composite_pipeline;
     PipelineObject* rtx_gi_pipeline;
+    PipelineObject* rtx_gi_validate_pipeline;
+    PipelineObject* rtx_gi_temporal_accum_pipeline;
+    PipelineObject* rtx_gi_variance_guided_spatial_filter_pipeline;
 
     
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
@@ -174,6 +183,9 @@ public:
     std::shared_ptr<PipelineFamily> ssr_pipeline_family;
     std::shared_ptr<PipelineFamily> ssr_composite_pipeline_family;
     std::shared_ptr<PipelineFamily> rtx_gi_pipeline_family;
+    std::shared_ptr<PipelineFamily> rtx_gi_validate_pipeline_family;
+    std::shared_ptr<PipelineFamily> rtx_gi_temporal_accum_pipeline_family;
+    std::shared_ptr<PipelineFamily> rtx_gi_variance_guided_spatial_filter_pipeline_family;
     
     bool use_swapchain_extent;
     

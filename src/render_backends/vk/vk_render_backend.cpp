@@ -180,6 +180,12 @@ void VkRenderBackend::create_depth_resources()
         swapchain.depth_image, swapchain.depth_image_view);
 }
 
+void VkRenderBackend::compute(RBCommandList cmd, const ComputeWorkgroups& workgroups)
+{
+    auto [x, y, z] = workgroups;
+    vkCmdDispatch(cmd.as<VkCommandBuffer>(), x, y, z);
+}
+
 VkImageSubresourceRange VkRenderBackend::full_subresource_range(RBImageHandle image)
 {
     return image_manager.full_subresource_range(image);

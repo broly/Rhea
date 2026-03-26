@@ -19,6 +19,7 @@ constexpr const char* VALIDATION_LAYERS[] = {
 };
 
 
+#define ENABLE_CUSTOM_VALIDATION_OUTPUT 0
 
 void vk::Instance::init(GLFWwindow* in_window)
 {
@@ -57,11 +58,13 @@ void vk::Instance::init(GLFWwindow* in_window)
     std::vector<const char*> extensions;
     for (int i = 0; i < required_ext_count; i++)
         extensions.push_back(required_extensions[i]);
+#if ENABLE_CUSTOM_VALIDATION_OUTPUT
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
     ici.enabledExtensionCount = extensions.size();
     ici.ppEnabledExtensionNames = extensions.data();
     
-    
+#if ENABLE_CUSTOM_VALIDATION_OUTPUT
     VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
     debug_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     debug_create_info.messageSeverity =
@@ -78,6 +81,9 @@ void vk::Instance::init(GLFWwindow* in_window)
     debug_create_info.pNext = &validationFeatures;
     
     ici.pNext = &debug_create_info;
+#else 
+    ici.pNext = &validationFeatures;
+#endif
 
     VK_CHECK(
         vkCreateInstance(&ici, nullptr, &instance)
@@ -194,6 +200,8 @@ void vk::Instance::init(GLFWwindow* in_window)
     vk_ext::load_device_functions(device);
     vk_ext::load_instance_functions(instance);
     
+#if ENABLE_CUSTOM_VALIDATION_OUTPUT
+    
     VkDebugUtilsMessengerEXT debugMessenger;
 
     VkDebugUtilsMessengerCreateInfoEXT create_info{};
@@ -221,6 +229,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     if (res != VK_SUCCESS) {
         throw std::runtime_error("Failed to create debug messenger");
     }
+#endif
 }
 
 void vk::Instance::match_queue_families()

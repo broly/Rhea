@@ -3,7 +3,7 @@
 		"name": "gbuffer",
 		"usage": "frame",
 		"set": "SET_GBUFFER",
-		"allowed_stages": ["fragment", "rtx_raygen"],
+		"allowed_stages": ["fragment", "rtx_raygen", "compute"],
 		"parameters": {
 			"gbuffer": {
 				"type": "sampler",

@@ -68,9 +68,10 @@ VkPipeline VkPipelineObject_Compute::create_pipeline(VkRenderPass render_pass)
         nullptr,
         &vk_pipeline));
 
-    LogVkPipeline.Log("Created compute pipeline %p (%s)",
+    LogVkPipeline.Log("Created compute pipeline %p (%s), layout=%p",
         vk_pipeline,
-        debug_name.to_string().c_str());
+        debug_name.to_string().c_str(),
+        pipeline_layout);
 
     return vk_pipeline;
 }

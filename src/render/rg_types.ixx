@@ -68,6 +68,7 @@ export
     struct BarrierInfo
     {
         RBImageLayout layout;
+        bool is_transition;
     };
 
     struct RGImageBarriers

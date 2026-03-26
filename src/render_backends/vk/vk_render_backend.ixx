@@ -156,6 +156,7 @@ public:   /// API Section
     void create_command_pool();
     void cleanup_swapchain();
     void create_depth_resources();
+    void compute(RBCommandList cmd, const ComputeWorkgroups& workgroups) override;
     
     VkImageSubresourceRange full_subresource_range(RBImageHandle image);
 

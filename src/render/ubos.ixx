@@ -49,6 +49,34 @@ REFLECT_STRUCT_RUNTIME(ModelPushConstants,
     debug_id);
 
 
+export struct PushRTXGIValidate
+{
+    glm::vec2 resolution;
+    float depth_threshold;
+    float normal_threshold;
+};
+REFLECT_STRUCT_RUNTIME(PushRTXGIValidate,
+    resolution, 
+    depth_threshold, 
+    normal_threshold);
+
+
+export struct PushRTXGIAccum
+{
+    glm::vec2 resolution;
+    float alpha;
+};
+REFLECT_STRUCT_RUNTIME(PushRTXGIAccum,
+    resolution, 
+    alpha);
+
+
+export struct PushRTXGISpatial
+{
+    glm::vec2 resolution;
+};
+REFLECT_STRUCT_RUNTIME(PushRTXGISpatial,
+    resolution);
 
 
 export struct RTXGIPushConstants

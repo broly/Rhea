@@ -59,6 +59,7 @@ export enum class RBImageUsage
 
     SampledFragment,
     SampledVertex,
+    Sampled,
 
     TransferSrc,
     TransferDst,
@@ -74,6 +75,7 @@ REFLECT_ENUM(RBImageUsage,
     DepthStencilReadOnly,
     SampledFragment,
     SampledVertex,
+    Sampled,
     TransferSrc,
     TransferDst,
     StorageImage,

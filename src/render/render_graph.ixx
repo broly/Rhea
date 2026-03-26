@@ -173,6 +173,11 @@ public:
         backend.push_constants(cmd, std::forward<T>(value));
     }
     
+    void compute(const ComputeWorkgroups& workgroups = {})
+    {
+        backend.compute(cmd, workgroups);
+    }
+    
     void draw_indexed(size_t size) const
     {
         backend.draw_indexed(cmd, size);

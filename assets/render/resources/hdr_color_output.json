@@ -3,14 +3,14 @@
 		"name": "hdr_color_output",
 		"usage": "frame",
 		"set": "SET_HDR_COLOR",
-		"allowed_stages": ["fragment"],
+		"allowed_stages": ["fragment", "compute"],
 		"parameters": {
 			"hdr_color": {
 				"type": "sampler",
 				"sampler": "default",
 				"variable": "u_hdr_color",
 				"binding": "BINDING_SAMPLER_HDR_COLOR",
-				"initial_array_size": 5,
+				"initial_array_size": 9,
 				"array_size_definition": "NUM_HDR_COLOR_ARRAY_ELEMENTS"
 			},
 			"history": {
@@ -18,7 +18,7 @@
 				"sampler": "default",
 				"variable": "u_history",
 				"binding": "BINDING_SAMPLER_HISTORY",
-				"initial_array_size": 5,
+				"initial_array_size": 9,
 				"array_size_definition": "NUM_HISTORY_ARRAY_ELEMENTS"
 			}
 		}

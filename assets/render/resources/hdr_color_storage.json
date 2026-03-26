@@ -3,14 +3,14 @@
 		"name": "hdr_color_storage",
 		"usage": "frame",
 		"set": "SET_HDR_COLOR_STORAGE",
-		"allowed_stages": ["rtx_raygen"],
+		"allowed_stages": ["rtx_raygen", "compute"],
 		"parameters": {
 			"hdr_color": {
 				"type": "image",
 				"sampler": "default",
-				"variable": "u_hdr_color",
+				"variable": "u_hdr_color_storage",
 				"binding": "BINDING_SAMPLER_HDR_COLOR_STORAGE",
-				"initial_array_size": 5,
+				"initial_array_size": 9,
 				"array_size_definition": "NUM_HDR_COLOR_ARRAY_ELEMENTS"
 			},
 			"history": {
@@ -18,7 +18,7 @@
 				"sampler": "default",
 				"variable": "u_history",
 				"binding": "BINDING_SAMPLER_HISTORY_STORAGE",
-				"initial_array_size": 5,
+				"initial_array_size": 9,
 				"array_size_definition": "NUM_HISTORY_ARRAY_ELEMENTS"
 			}
 		}
