@@ -89,7 +89,7 @@ void main()
 
         if (rayDepth > sceneDepth && rayDepth - sceneDepth < THICKNESS)
         {
-            vec3 hitColor = texture(u_hdr_color[COLOR_OUTPUT_HDR_BASE], uv).rgb;
+            vec3 hitColor = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], uv).rgb;
 
             float NdotV = max(dot(normal, viewDir), 0.0);
             float fresnel = pow(1.0 - NdotV, 5.0);

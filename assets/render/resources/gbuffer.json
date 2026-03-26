@@ -10,7 +10,7 @@
 				"sampler": "default",
 				"variable": "u_gbuffer",
 				"binding": "BINDING_SAMPLER_ARRAY_GBUFFER",
-				"initial_array_size": 7,
+				"initial_array_size": 8,
 				"array_size_definition": "NUM_GBUFFER_SLOTS"
 			},
 			"gbuffer_hist": {
@@ -18,7 +18,7 @@
 				"sampler": "default",
 				"variable": "u_gbuffer_hist",
 				"binding": "BINDING_SAMPLER_ARRAY_GBUFFER_HIST",
-				"initial_array_size": 7
+				"initial_array_size": 8
 			}
 		}
 	}

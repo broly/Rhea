@@ -8,7 +8,7 @@
 			"hdr_color": {
 				"type": "sampler",
 				"sampler": "default",
-				"variable": "u_hdr_color",
+				"variable": "u_hdr_color_present",
 				"binding": "BINDING_SAMPLER_HDR_COLOR",
 				"initial_array_size": 9,
 				"array_size_definition": "NUM_HDR_COLOR_ARRAY_ELEMENTS"
@@ -16,7 +16,7 @@
 			"history": {
 				"type": "sampler",
 				"sampler": "default",
-				"variable": "u_history",
+				"variable": "u_hdr_color_history",
 				"binding": "BINDING_SAMPLER_HISTORY",
 				"initial_array_size": 9,
 				"array_size_definition": "NUM_HISTORY_ARRAY_ELEMENTS"

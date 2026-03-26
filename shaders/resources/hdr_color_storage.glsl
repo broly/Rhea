@@ -13,6 +13,6 @@
 #endif
 
 layout(set = SET_HDR_COLOR_STORAGE, binding = BINDING_SAMPLER_HDR_COLOR_STORAGE, rgba16f)
-uniform image2D u_hdr_color_storage[NUM_COLOR_OUTPUTS];
+uniform image2D u_hdr_color_present_storage[NUM_COLOR_OUTPUTS];
 
 #endif  // RESOURCES_HDR_COLOR_STORAGE

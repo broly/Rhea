@@ -46,7 +46,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },
             .reads = {
-                { hdr_color_table[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
                 { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },                
             },
@@ -81,11 +81,11 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     {.frame = ctx.frame, .layer_index = prev_layer});
     
     hdr_color_output_resource->update_image_array(
-        "u_hdr_color", get_image_array(hdr_color_table), 
+        "u_hdr_color_present", get_image_array(hdr_color_present), 
         {.frame = ctx.frame});
     
     hdr_color_output_resource->update_image_array(
-        "u_history", get_image_array(hdr_color_history), 
+        "u_hdr_color_history", get_image_array(hdr_color_history), 
         {.frame = ctx.frame, .layer_index = prev_layer});
     
     auto shadow_debug_instance = shadow_resource->query_single();

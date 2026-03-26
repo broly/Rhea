@@ -126,6 +126,10 @@
 				{
 					"write_mask": ["R", "G", "B", "A"],
 					"translucent": false
+				},
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
 				}
 			],
 	

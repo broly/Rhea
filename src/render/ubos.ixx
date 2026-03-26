@@ -52,12 +52,12 @@ REFLECT_STRUCT_RUNTIME(ModelPushConstants,
 export struct PushRTXGIValidate
 {
     glm::vec2 resolution;
-    float depth_threshold;
+    float position_threshold;
     float normal_threshold;
 };
 REFLECT_STRUCT_RUNTIME(PushRTXGIValidate,
     resolution, 
-    depth_threshold, 
+    position_threshold, 
     normal_threshold);
 
 

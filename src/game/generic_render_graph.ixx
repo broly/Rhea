@@ -55,15 +55,17 @@ enum GBUFFER_SLOTS
     GBUFFER_SLOT_WORLD_NORMAL = 1,
     GBUFFER_SLOT_ROUGHNESS = 2,
     GBUFFER_SLOT_DEPTH = 3,
-    GBUFFER_SLOT_ALBEDO = 4,
-    GBUFFER_SLOT_POSITION = 5,
-    GBUFFER_SLOT_MOTION_VECTORS = 6,
+    GBUFFER_SLOT_LINEAR_DEPTH = 4,
+    GBUFFER_SLOT_ALBEDO = 5,
+    GBUFFER_SLOT_POSITION = 6,
+    GBUFFER_SLOT_MOTION_VECTORS = 7,
 };
 REFLECT_ENUM(GBUFFER_SLOTS,
     GBUFFER_SLOT_NORMAL,
     GBUFFER_SLOT_WORLD_NORMAL,
     GBUFFER_SLOT_ROUGHNESS,
     GBUFFER_SLOT_DEPTH,
+    GBUFFER_SLOT_LINEAR_DEPTH,
     GBUFFER_SLOT_ALBEDO,
     GBUFFER_SLOT_POSITION,
     GBUFFER_SLOT_MOTION_VECTORS)
@@ -99,6 +101,8 @@ public:
     void draw_ssr_composite(RenderGraphContext& ctx);
     void draw_rtxgi(RenderGraphContext& ctx);
     
+    void add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst);
+    
     ViewInfo  build_view_info(
         RenderGraphContext& ctx,
         bool zero_pos) const;
@@ -116,7 +120,7 @@ public:
     RGTextureHandle noise_texture;
     RGTextureHandle swapchain_color;
     
-    std::vector<RGTextureHandle> hdr_color_table;
+    std::vector<RGTextureHandle> hdr_color_present;
     std::vector<RGTextureHandle> hdr_color_history;
     
     std::vector<RGTextureHandle> gbuffer;

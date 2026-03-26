@@ -35,7 +35,7 @@ float linearize_depth(float depth)
 
 void main()
 {
-    vec3 hdr_color = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI_FILTERED], v_uv).rgb * 2.0;
+    vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], v_uv).rgb;
     // exposure
     hdr_color *= 0.6;
     // tonemap

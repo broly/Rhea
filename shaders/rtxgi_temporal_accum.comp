@@ -22,47 +22,78 @@ void main()
     ivec2 px = ivec2(gl_GlobalInvocationID.xy);
 
     if (px.x >= int(pc.resolution.x) || px.y >= int(pc.resolution.y))
-        return;
+    return;
 
     vec2 uv = (vec2(px) + 0.5) / pc.resolution;
 
-    vec3 current = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI], uv).rgb;
+    vec3 current = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], uv).rgb;
 
-    vec4 reproj = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], uv);
+    vec4 reproj = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], uv);
     vec3 history = reproj.rgb;
-    float validity = reproj.a;
+    float validity = clamp(reproj.a, 0.0, 1.0);
 
     vec3 minN = vec3(1e9);
     vec3 maxN = vec3(-1e9);
+
+    float minLum = 1e9;
+    float maxLum = -1e9;
 
     for (int y = -1; y <= 1; y++)
     {
         for (int x = -1; x <= 1; x++)
         {
-            ivec2 o = px + ivec2(x, y);
+            ivec2 o = clamp(px + ivec2(x, y), ivec2(0), ivec2(pc.resolution) - 1);
             vec2 suv = (vec2(o) + 0.5) / pc.resolution;
 
-            vec3 c = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI], suv).rgb;
+            vec3 c = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], suv).rgb;
 
             minN = min(minN, c);
             maxN = max(maxN, c);
+
+            float lum = luminance(c);
+            minLum = min(minLum, lum);
+            maxLum = max(maxLum, lum);
         }
     }
 
     history = clamp(history, minN, maxN);
 
+    float histLum = luminance(history);
+    histLum = clamp(histLum, minLum, maxLum);
+
+    float scale = histLum / max(luminance(history), 1e-5);
+    history *= scale;
+
+    vec2 prevMom = texture(u_hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], uv).rg;
+    float prevVariance = max(prevMom.y, 0.0);
+
+    float curLum = luminance(current);
+    float prevM1 = prevMom.x;
+
+    float diff = abs(curLum - prevM1);
+
     float a = mix(0.05, pc.alpha, validity);
 
+    float sigma = sqrt(prevVariance + 1e-5);
+
+    float varianceFactor = clamp(diff / (sigma + 1e-5), 0.0, 1.0);
+
+    a = mix(a, 0.2, varianceFactor);
+
+    // --- final temporal accumulation
     vec3 gi = mix(current, history, a);
 
+    // --- anti-firefly clamp (post)
     float lum = luminance(gi);
+    float clampedLum = clamp(lum, minLum, maxLum);
+    gi *= clampedLum / max(lum, 1e-5);
 
-    vec2 prevMom = texture(u_hdr_color[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], uv).rg;
+    // --- moments 
+    float m1 = mix(curLum, prevMom.x, a);
+    float m2 = mix(curLum * curLum, prevMom.y, a);
 
-    float mean = mix(lum, prevMom.x, a);
-    float variance = mix(lum * lum, prevMom.y, a) - mean * mean;
-    variance = max(variance, 0.0);
+    float variance = max(m2 - m1 * m1, 0.0);
 
-    imageStore(u_hdr_color_storage[COLOR_OUTPUT_HDR_RTXGI_ACCUM], px, vec4(gi, 1.0));
-    imageStore(u_hdr_color_storage[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], px, vec4(mean, variance, 0.0, 0.0));
+    imageStore(u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_ACCUM], px, vec4(gi, 1.0));
+    imageStore(u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], px, vec4(m1, variance, 0.0, 0.0));
 }

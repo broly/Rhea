@@ -34,6 +34,7 @@ layout(location = 3) out vec2 out_g_motion_vectors;
 layout(location = 4) out float out_g_roughness;
 layout(location = 5) out vec3 out_g_albedo;
 layout(location = 6) out vec3 out_g_position;
+layout(location = 7) out float out_g_linear_depth;
 #endif 
 
 
@@ -248,6 +249,11 @@ void main()
     out_g_roughness = roughness;
     out_g_albedo = albedo;
     out_g_position = v_world_pos;
+
+    vec4 view_pos = camera_ubo.view * vec4(v_world_pos, 1.0);
+    float linear_depth = -view_pos.z;
+
+    out_g_linear_depth = linear_depth;
 #endif
     
 }

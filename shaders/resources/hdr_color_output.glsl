@@ -17,9 +17,9 @@
 #endif
 
 layout(set = SET_HDR_COLOR, binding = BINDING_SAMPLER_HDR_COLOR) 
-uniform sampler2D u_hdr_color[NUM_COLOR_OUTPUTS];
+uniform sampler2D u_hdr_color_present[NUM_COLOR_OUTPUTS];
 
 layout(set = SET_HDR_COLOR, binding = BINDING_SAMPLER_HISTORY) 
-uniform sampler2D u_history[NUM_COLOR_OUTPUTS];
+uniform sampler2D u_hdr_color_history[NUM_COLOR_OUTPUTS];
 
 #endif  // RESOURCES_HDR_COLOR
