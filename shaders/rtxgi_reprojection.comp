@@ -11,6 +11,7 @@ void main()
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = imageSize(u_hdr_color_present_storage[0]);
 
+
     if (gid.x >= size.x || gid.y >= size.y)
         return;
 
@@ -23,6 +24,21 @@ void main()
 
     float depth      = get_gbuffer_LINEAR_DEPTH(uv).r;
     float prev_depth = get_gbuffer_hist_LINEAR_DEPTH(prev_uv).r;
+
+
+    float raw_depth = get_gbuffer_DEPTH(uv).r;
+
+    bool is_sky = raw_depth >= 0.999;
+
+    if (is_sky)
+    {
+        imageStore(
+            u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED],
+            gid,
+            vec4(0.0, 0.0, 0.0, 0.0)
+        );
+        return;
+    }
 
     vec3 history = texture(
         u_hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
