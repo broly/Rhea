@@ -149,12 +149,12 @@
 		},
 		{
 			"__type__": "PipelineInfo_Compute",
-			"pass": "RTXGI_VALIDATE",
+			"pass": "RTXGI_REPROJECT",
 			"requirements": "",
 			"enum_white_list": {
 			},
 			"shader_stage": {
-				"shader": "rtxgi_reproj_validate.comp",
+				"shader": "rtxgi_reprojection.comp",
 				"resources": ["gbuffer", "hdr_color_output", "hdr_color_storage"]
 			},
 			"push_constants": [
@@ -189,12 +189,32 @@
 		},
 		{
 			"__type__": "PipelineInfo_Compute",
-			"pass": "RTXGI_VARIANCE_GUIDED_SPATIAL_FILTER",
+			"pass": "RTXGI_MOMENTS",
 			"requirements": "",
 			"enum_white_list": {
 			},
 			"shader_stage": {
-				"shader": "rtxgi_variance_guided_spatial_filter.comp",
+				"shader": "rtxgi_moments.comp",
+				"resources": ["gbuffer", "hdr_color_output", "hdr_color_storage"]
+			},
+			"push_constants": [
+				{
+					"type": "PushRTXGISpatial",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "RTXGI_SPATIAL_FILTER",
+			"requirements": "",
+			"enum_white_list": {
+			},
+			"shader_stage": {
+				"shader": "rtxgi_spatial_filter.comp",
 				"resources": ["gbuffer", "hdr_color_output", "hdr_color_storage"]
 			},
 			"push_constants": [

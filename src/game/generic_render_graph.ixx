@@ -39,15 +39,27 @@ enum COLOR_OUTPUT : uint8_t
     COLOR_OUTPUT_HDR_RTXGI = 1,
     COLOR_OUTPUT_HDR_SSR = 2,
     COLOR_OUTPUT_HDR_INTERMEDIATE = 3,
-    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED = 4,
+    COLOR_OUTPUT_HDR_RESERVED_0 = 4,
+    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED = 5,
     COLOR_OUTPUT_HDR_RTXGI_ACCUM = 6,
     COLOR_OUTPUT_HDR_RTXGI_MOMENTS = 7,
-    COLOR_OUTPUT_HDR_RTXGI_FILTERED = 8
+    COLOR_OUTPUT_HDR_RTXGI_FILTERED = 8,
+    COLOR_OUTPUT_HDR_RESERVED_1 = 9,
+    COLOR_OUTPUT_HDR_RESERVED_2 = 10,
+    
 };
 REFLECT_ENUM(COLOR_OUTPUT,
-    COLOR_OUTPUT_HDR_BASE, COLOR_OUTPUT_HDR_RTXGI, COLOR_OUTPUT_HDR_SSR, COLOR_OUTPUT_HDR_INTERMEDIATE, 
-    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED, COLOR_OUTPUT_HDR_RTXGI_ACCUM,
-    COLOR_OUTPUT_HDR_RTXGI_MOMENTS, COLOR_OUTPUT_HDR_RTXGI_FILTERED);
+    COLOR_OUTPUT_HDR_BASE,
+    COLOR_OUTPUT_HDR_RTXGI,
+    COLOR_OUTPUT_HDR_SSR,
+    COLOR_OUTPUT_HDR_INTERMEDIATE,
+    COLOR_OUTPUT_HDR_RESERVED_0,
+    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED,
+    COLOR_OUTPUT_HDR_RTXGI_ACCUM,
+    COLOR_OUTPUT_HDR_RTXGI_MOMENTS,
+    COLOR_OUTPUT_HDR_RTXGI_FILTERED,
+    COLOR_OUTPUT_HDR_RESERVED_1,
+    COLOR_OUTPUT_HDR_RESERVED_2);
 
 enum GBUFFER_SLOTS
 {
@@ -101,7 +113,7 @@ public:
     void draw_ssr_composite(RenderGraphContext& ctx);
     void draw_rtxgi(RenderGraphContext& ctx);
     
-    void add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst);
+    void add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong = true);
     
     ViewInfo  build_view_info(
         RenderGraphContext& ctx,
@@ -176,9 +188,10 @@ public:
     PipelineObject* ssr_pipeline;
     PipelineObject* ssr_composite_pipeline;
     PipelineObject* rtx_gi_pipeline;
-    PipelineObject* rtx_gi_validate_pipeline;
+    PipelineObject* rtx_gi_reproject_pipeline;
     PipelineObject* rtx_gi_temporal_accum_pipeline;
-    PipelineObject* rtx_gi_variance_guided_spatial_filter_pipeline;
+    PipelineObject* rtx_gi_moments_pipeline;
+    PipelineObject* rtx_gi_spatial_filter_pipeline;
 
     
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
@@ -187,9 +200,10 @@ public:
     std::shared_ptr<PipelineFamily> ssr_pipeline_family;
     std::shared_ptr<PipelineFamily> ssr_composite_pipeline_family;
     std::shared_ptr<PipelineFamily> rtx_gi_pipeline_family;
-    std::shared_ptr<PipelineFamily> rtx_gi_validate_pipeline_family;
+    std::shared_ptr<PipelineFamily> rtx_gi_reproject_pipeline_family;
     std::shared_ptr<PipelineFamily> rtx_gi_temporal_accum_pipeline_family;
-    std::shared_ptr<PipelineFamily> rtx_gi_variance_guided_spatial_filter_pipeline_family;
+    std::shared_ptr<PipelineFamily> rtx_gi_moments_pipeline_family;
+    std::shared_ptr<PipelineFamily> rtx_gi_spatial_filter_pipeline_family;
     
     bool use_swapchain_extent;
     

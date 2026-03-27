@@ -49,7 +49,7 @@ void main()
     v_world_bitangent = B;
 
     v_curr_clip = (camera_ubo.proj * camera_ubo.view) * world_curr;
-    v_prev_clip = (camera_ubo.prev_proj * camera_ubo.prev_view) * world_curr;
+    v_prev_clip = (camera_ubo.prev_proj * camera_ubo.prev_view) * world_prev;
 
     gl_Position = v_curr_clip;
 }

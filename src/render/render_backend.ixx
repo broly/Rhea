@@ -75,6 +75,15 @@ export struct ComputeWorkgroups
     uint32_t x = 32;
     uint32_t y = 32;
     uint32_t z = 1;
+    
+    static ComputeWorkgroups from_extent(const Extent& extent)
+    {
+        ComputeWorkgroups result;
+        result.x = extent.width;
+        result.y = extent.height;
+        result.z = 1;
+        return result;
+    }
 };
 
 export class RenderBackend 

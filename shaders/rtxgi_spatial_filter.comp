@@ -1,0 +1,73 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+#include "resources/hdr_color_output.glsl"
+#include "resources/hdr_color_storage.glsl"
+#include "resources/gbuffer.glsl"
+
+shared vec3 tile[20][20]; // 16 + 2*2 border
+
+void main()
+{
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 lid = ivec2(gl_LocalInvocationID.xy);
+
+    ivec2 size = imageSize(u_hdr_color_present_storage[0]);
+
+    if (gid.x >= size.x || gid.y >= size.y)
+        return;
+
+    vec2 texel = 1.0 / vec2(size);
+
+
+    for (int dx = 0; dx < 2; ++dx)
+    {
+        for (int dy = 0; dy < 2; ++dy)
+        {
+            ivec2 coord = gid + ivec2(dx*16 - 2, dy*16 - 2);
+            coord = clamp(coord, ivec2(0), size - 1);
+
+            vec2 uv = (vec2(coord) + 0.5) * texel;
+
+            tile[lid.x + dx*16][lid.y + dy*16] = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], uv).rgb;
+        }
+    }
+    barrier();
+
+    vec2 uv = (vec2(gid) + 0.5) * texel;
+
+    vec3 N0 = get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0;
+    float d0 = get_gbuffer_LINEAR_DEPTH(uv).r;
+
+    vec3 sum = vec3(0);
+    float wsum = 0;
+
+    for (int x = -2; x <= 2; ++x)
+    {
+        for (int y = -2; y <= 2; ++y)
+        {
+            vec3 c = tile[lid.x + x + 2][lid.y + y + 2];
+
+            vec2 suv = uv + vec2(x, y)*texel;
+
+            vec3 N = get_gbuffer_WORLD_NORMAL(suv).xyz * 2.0 - 1.0;
+            float d = get_gbuffer_LINEAR_DEPTH(suv).r;
+
+            float wn = pow(max(dot(N0, N), 0.0), 32.0);
+            float wd = exp(-abs(d0 - d) * 50.0);
+
+            float w = wn * wd;
+
+            sum += c * w;
+            wsum += w;
+        }
+    }
+    vec3 result = sum / max(wsum, 1e-5);
+
+    imageStore(
+        u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_FILTERED],
+        gid,
+        vec4(result, 1.0)
+    );
+}

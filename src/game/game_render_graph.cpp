@@ -49,6 +49,8 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
                 { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::SampledFragment },                
             },
             .writes = {
                 { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }

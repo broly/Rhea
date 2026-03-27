@@ -27,11 +27,6 @@ vec3 ACES(vec3 x)
 const float NEAR = 0.5;
 const float FAR = 2000;
 
-float linearize_depth(float depth)
-{
-    float z = depth;
-    return (NEAR * FAR) / (FAR - z * (FAR - NEAR));
-}
 
 void main()
 {

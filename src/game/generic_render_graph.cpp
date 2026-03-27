@@ -290,14 +290,17 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     rtx_gi_pipeline_family = renderer->query_pipeline_family("RTXGI", rtxgi_model);
     rtx_gi_pipeline = rtx_gi_pipeline_family->request_pipeline({});
     
-    rtx_gi_validate_pipeline_family = renderer->query_pipeline_family("RTXGI_VALIDATE", rtxgi_model);
-    rtx_gi_validate_pipeline = rtx_gi_validate_pipeline_family->request_pipeline({});
+    rtx_gi_reproject_pipeline_family = renderer->query_pipeline_family("RTXGI_REPROJECT", rtxgi_model);
+    rtx_gi_reproject_pipeline = rtx_gi_reproject_pipeline_family->request_pipeline({});
     
     rtx_gi_temporal_accum_pipeline_family = renderer->query_pipeline_family("RTXGI_TEMPORAL_ACCUM", rtxgi_model);
     rtx_gi_temporal_accum_pipeline = rtx_gi_temporal_accum_pipeline_family->request_pipeline({});
     
-    rtx_gi_variance_guided_spatial_filter_pipeline_family = renderer->query_pipeline_family("RTXGI_VARIANCE_GUIDED_SPATIAL_FILTER", rtxgi_model);
-    rtx_gi_variance_guided_spatial_filter_pipeline = rtx_gi_variance_guided_spatial_filter_pipeline_family->request_pipeline({});
+    rtx_gi_moments_pipeline_family = renderer->query_pipeline_family("RTXGI_MOMENTS", rtxgi_model);
+    rtx_gi_moments_pipeline = rtx_gi_moments_pipeline_family->request_pipeline({});
+    
+    rtx_gi_spatial_filter_pipeline_family = renderer->query_pipeline_family("RTXGI_SPATIAL_FILTER", rtxgi_model);
+    rtx_gi_spatial_filter_pipeline = rtx_gi_spatial_filter_pipeline_family->request_pipeline({});
     
     
     shadow_map = create_texture({
@@ -507,6 +510,101 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
 
     
+    add_pass({
+        .name = "RTXGI_REPROJECT",
+        .reads = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
+            { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
+
+            { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::SampledFragment },
+            { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+            { gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.bind_pipeline(rtx_gi_reproject_pipeline))
+            {
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource  , gbuffer_resource);
+            }
+            
+            auto extent = backend->get_swapchain_extent();
+            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+            ctx.compute(workgroups);
+        },
+    });
+    
+    add_pass({
+        .name = "RTXGI_TEMPORAL_ACCUM",
+        .reads = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.bind_pipeline(rtx_gi_temporal_accum_pipeline))
+            {
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+            }
+            auto extent = backend->get_swapchain_extent();
+            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+            ctx.compute(workgroups);
+        },
+    });
+    
+    add_pass({
+        .name = "RTXGI_MOMENTS",
+        .reads = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment }
+        },
+        .writes = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.bind_pipeline(rtx_gi_moments_pipeline))
+            {
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+            }
+            auto extent = backend->get_swapchain_extent();
+            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+            ctx.compute(workgroups);
+        },
+    });
+    
+    add_pass({
+        .name = "RTXGI_SPATIAL",
+        .reads = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::SampledFragment },
+
+            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
+            { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+        },
+        .writes = {
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            if (ctx.bind_pipeline(rtx_gi_spatial_filter_pipeline))
+            {
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+            }
+            auto extent = backend->get_swapchain_extent();
+            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+            ctx.compute(workgroups);
+        },
+    });
+    
+    add_copy_pass("COPY_RTXGI_ACCUM_TO_HISTORY",
+        hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
+        hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM]);
+    
     add_copy_pass("COPY_gbuffer_linear_depth_to_history", 
         gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH]);
     
@@ -518,129 +616,6 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     
     add_copy_pass("COPY_gbuffer_position_to_history", 
         gbuffer[GBUFFER_SLOT_POSITION], gbuffer_hist[GBUFFER_SLOT_POSITION]);
-    
-    add_pass({
-        .name = "RTXGI_VALIDATE",
-        .reads = {
-            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::Sampled },
-            { gbuffer_hist[GBUFFER_SLOT_DEPTH], RBImageUsage::Sampled },
-            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::Sampled },
-            { gbuffer_hist[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::Sampled },
-            { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::Sampled },
-            { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::Sampled },
-            
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::StorageImage, RBLoadOp::Load },
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.bind_pipeline(rtx_gi_validate_pipeline))
-            {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
-            }       
-            
-            auto extent = backend->get_swapchain_extent();
-        
-            PushRTXGIValidate pc;
-            pc.position_threshold = 0.7;
-            pc.normal_threshold = 0.9;
-            pc.resolution = {extent.width, extent.height};
-            
-            uint32_t groupSize = 8;
-
-            uint32_t groupsX = (extent.width  + groupSize - 1) / groupSize;
-            uint32_t groupsY = (extent.height + groupSize - 1) / groupSize;
-
-        
-            ctx.push_constants(pc);
-            ctx.compute({groupsX, groupsY});
-        },
-        .type = RenderPassType::compute
-    });
-    
-    add_pass({
-        .name = "RTXGI_TEMPORAL_ACCUM",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::Sampled },
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::Sampled },
-            
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::StorageImage, RBLoadOp::Load },
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::StorageImage, RBLoadOp::Load },
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.bind_pipeline(rtx_gi_temporal_accum_pipeline))
-            {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
-            }       
-            
-            auto extent = backend->get_swapchain_extent();
-        
-            PushRTXGIAccum pc;
-            pc.resolution = {extent.width, extent.height};
-            pc.alpha = 0.96;
-            
-            uint32_t groupSize = 8;
-    
-            uint32_t groupsX = (extent.width  + groupSize - 1) / groupSize;
-            uint32_t groupsY = (extent.height + groupSize - 1) / groupSize;
-    
-        
-            ctx.push_constants(pc);
-            ctx.compute({groupsX, groupsY});
-        },
-        .type = RenderPassType::compute
-    });
-    
-    add_copy_pass("COPY_moments_rtxgi_to_history", 
-        hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_MOMENTS]);
-    
-    
-    add_pass({
-        .name = "RTXGI_VARIANCE_GUIDED_SPATIAL_FILTER",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::Sampled },
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::Sampled },
-            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::Sampled },
-            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::Sampled },
-            
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::StorageImage, RBLoadOp::DontCare },
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.bind_pipeline(rtx_gi_variance_guided_spatial_filter_pipeline))
-            {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
-            }       
-            
-            auto extent = backend->get_swapchain_extent();
-        
-            PushRTXGISpatial pc;
-            pc.resolution = {extent.width, extent.height};
-            
-            uint32_t groupSize = 8;
-    
-            uint32_t groupsX = (extent.width  + groupSize - 1) / groupSize;
-            uint32_t groupsY = (extent.height + groupSize - 1) / groupSize;
-    
-        
-            ctx.push_constants(pc);
-            ctx.compute({groupsX, groupsY});
-        },
-        .type = RenderPassType::compute
-    });
-    
-    
-    add_copy_pass("COPY_hdr_color_rtxgi_to_history", 
-        hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], hdr_color_history[COLOR_OUTPUT_HDR_RTXGI]);
-    
-    
-    
     
 }
 
@@ -1358,9 +1333,9 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
     );
 }
 
-void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst)
+void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong)
 {
-    
+    const uint32_t num_layers = ping_pong ? 2 : 1;
     add_pass({
         .name = name,
         .reads = {
@@ -1369,9 +1344,9 @@ void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTexture
         .writes = {
             { dst, RBImageUsage::TransferDst, RBLoadOp::Load }
         },
-        .execute = [this, src, dst](RenderGraphContext& ctx)
+        .execute = [this, src, dst, ping_pong](RenderGraphContext& ctx)
         {
-            if (ctx.level != history_index)
+            if (ping_pong && ctx.level != history_index)
                 return;
     
             
@@ -1381,7 +1356,7 @@ void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTexture
             params.dst_layer = ctx.level;
             ctx.copy_img(params);
         },
-        .num_layers = 2,
+        .num_layers = num_layers,
         .type = RenderPassType::transfer
     });
 }
