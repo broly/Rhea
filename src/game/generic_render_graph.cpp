@@ -617,6 +617,10 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_copy_pass("COPY_gbuffer_position_to_history", 
         gbuffer[GBUFFER_SLOT_POSITION], gbuffer_hist[GBUFFER_SLOT_POSITION]);
     
+    
+    add_copy_pass("COPY_moments_to_history", 
+        hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_MOMENTS]);
+    
 }
 
 void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)

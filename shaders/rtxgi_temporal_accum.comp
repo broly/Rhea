@@ -1,5 +1,4 @@
 #version 450
-
 layout(local_size_x = 16, local_size_y = 16) in;
 
 #include "resources/hdr_color_output.glsl"
@@ -10,7 +9,7 @@ void main()
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = imageSize(u_hdr_color_present_storage[0]);
 
-    if (gid.x >= size.x || gid.y >= size.y)
+    if (any(greaterThanEqual(gid, size)))
         return;
 
     vec2 uv = (vec2(gid) + 0.5) / vec2(size);
@@ -19,15 +18,17 @@ void main()
     vec4 reproj  = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], uv);
 
     vec3 history = reproj.rgb;
-    float valid  = reproj.a;
+    float weight = reproj.a;
 
-    float alpha = valid > 0.5 ? 0.05 : 1.0;
+    weight = min(weight, 50.0);
 
-    vec3 result = mix(current, history, 1.0 - alpha);
+    float new_weight = weight + 1.0;
+
+    vec3 result = (history * weight + current) / new_weight;
 
     imageStore(
         u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
         gid,
-        vec4(result, 1.0)
+        vec4(result, new_weight)
     );
 }

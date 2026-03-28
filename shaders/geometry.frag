@@ -244,8 +244,11 @@ void main()
     vec2 curr_ndc = v_curr_clip.xy / v_curr_clip.w;
     vec2 prev_ndc = v_prev_clip.xy / v_prev_clip.w;
 
+    vec2 curr_uv = curr_ndc * 0.5 + 0.5;
+    vec2 prev_uv = prev_ndc * 0.5 + 0.5;
 
-    out_g_motion_vectors = curr_ndc - prev_ndc;
+    out_g_motion_vectors = curr_uv - prev_uv;
+    
     out_g_roughness = roughness;
     out_g_albedo = albedo;
     out_g_position = v_world_pos;
