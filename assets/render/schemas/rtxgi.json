@@ -155,7 +155,7 @@
 			},
 			"shader_stage": {
 				"shader": "rtxgi_reprojection.comp",
-				"resources": ["gbuffer", "hdr_color_output", "hdr_color_storage"]
+				"resources": ["gbuffer", "hdr_color_output", "hdr_color_storage", "camera"]
 			},
 			"push_constants": [
 				{

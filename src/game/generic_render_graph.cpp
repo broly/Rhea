@@ -527,7 +527,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         {
             if (ctx.bind_pipeline(rtx_gi_reproject_pipeline))
             {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource  , gbuffer_resource);
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource, camera_resource);
             }
             
             auto extent = backend->get_swapchain_extent();

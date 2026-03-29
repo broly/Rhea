@@ -2,7 +2,7 @@
 	"resource": {
 		"name": "camera",
 		"usage": "frame",
-		"allowed_stages": ["vertex", "fragment", "rtx_raygen"],
+		"allowed_stages": ["vertex", "fragment", "compute","fragment", "rtx_raygen"],
 		"parameters": {
 			"camera": {
 				"type": "uniform",

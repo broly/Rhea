@@ -4,6 +4,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 #include "resources/hdr_color_output.glsl"
 #include "resources/hdr_color_storage.glsl"
 #include "resources/gbuffer.glsl"
+#include "resources/camera.glsl"
 
 void main()
 {
@@ -23,16 +24,36 @@ void main()
         prev_uv
     );
 
-    float depth      = get_gbuffer_LINEAR_DEPTH(uv).r;
+    vec3 world_pos = get_gbuffer_POSITION(uv).xyz;
+    float depth    = get_gbuffer_LINEAR_DEPTH(uv).r;
+    vec3 N         = normalize(get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0);
     float prev_depth = get_gbuffer_hist_LINEAR_DEPTH(prev_uv).r;
 
-    vec3 N      = get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0;
     vec3 N_prev = get_gbuffer_hist_WORLD_NORMAL(prev_uv).xyz * 2.0 - 1.0;
 
-    float depth_w  = exp(-abs(depth - prev_depth) * 10.0);
-    float normal_w = pow(max(dot(N, N_prev), 0.0), 8.0);
+    // =========================
+    // VALIDATION
+    // =========================
 
-    float valid = depth_w * normal_w;
+    float rel = abs(depth - prev_depth) / max(depth, 1e-3);
+    float depth_w = exp(-rel * 2.0);
+
+    float Nd = max(dot(N, N_prev), 0.0);
+    float normal_w = smoothstep(0.2, 1.0, Nd);
+
+    // reprojection stability
+    vec4 curr_clip_reproj = camera_ubo.proj * camera_ubo.view * vec4(world_pos, 1.0);
+    vec2 curr_uv_reproj = (curr_clip_reproj.xy / curr_clip_reproj.w) * 0.5 + 0.5;
+
+    float reproj_error = length(curr_uv_reproj - uv);
+    float reproj_w = exp(-reproj_error * 200.0);
+
+    float motion_len = length(motion);
+
+    float valid = depth_w * normal_w * reproj_w;
+    float boost_k = mix(3, 0.6, clamp(motion_len * 50.0, 0.0, 1.0));
+
+    valid = 1.0 - pow(1.0 - valid, boost_k);
 
     imageStore(
         u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED],
