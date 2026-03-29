@@ -153,6 +153,48 @@
 		},
 		{
 			"__type__": "PipelineInfo_Graphics",
+			"pass": "Lighting",
+			"requirements": "blend_mode != translucent",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "lighting.frag",
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "gbuffer", "hdr_color_output"]
+				}
+			},
+			"depth_write": false,
+			"depth_test": false,
+
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
+
+			"cull_mode": "back",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "ModelPushConstants",
+					"name": "model",
+					"stages": ["vertex", "fragment"]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": [
+				{
+					"vertex_type": "Vertex",
+					"attributes": []
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
 			"pass": "GeometryTranslucent",
 			"requirements": "blend_mode == translucent",
 			"stages": {

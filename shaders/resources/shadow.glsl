@@ -10,9 +10,16 @@
     #error "BINDING_UBO_SHADOW definition is missing. Provide this resource: shadow"
 #endif
 
+#ifndef BINDING_UBO_SHADOW_DEBUG
+    #define BINDING_UBO_SHADOW_DEBUG 0
+    #error "BINDING_UBO_SHADOW_DEBUG definition is missing. Provide this resource: shadow"
+#endif
+
 layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW)
 uniform sampler2DShadow u_shadow_depth;
 
+layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW_DEBUG)
+uniform sampler2D u_shadow_depth_debug;
 
 
 
@@ -38,9 +45,9 @@ float shadow_factor(vec3 world_pos, vec3 Ng)
     vec3 proj = light_clip.xyz / light_clip.w;
 
     if (proj.x < -1.0 || proj.x > 1.0 ||
-    proj.y < -1.0 || proj.y > 1.0 ||
-    proj.z <  0.0 || proj.z > 1.0)
-    return 1.0;
+        proj.y < -1.0 || proj.y > 1.0 ||
+        proj.z <  0.0 || proj.z > 1.0)
+        return 1.0;
 
     vec2 uv = proj.xy * 0.5 + 0.5;
 

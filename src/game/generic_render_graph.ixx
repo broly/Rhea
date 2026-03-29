@@ -71,6 +71,7 @@ enum GBUFFER_SLOTS
     GBUFFER_SLOT_ALBEDO = 5,
     GBUFFER_SLOT_POSITION = 6,
     GBUFFER_SLOT_MOTION_VECTORS = 7,
+    GBUFFER_SLOT_GEOMETRY_NORMAL = 8,
 };
 REFLECT_ENUM(GBUFFER_SLOTS,
     GBUFFER_SLOT_NORMAL,
@@ -80,7 +81,8 @@ REFLECT_ENUM(GBUFFER_SLOTS,
     GBUFFER_SLOT_LINEAR_DEPTH,
     GBUFFER_SLOT_ALBEDO,
     GBUFFER_SLOT_POSITION,
-    GBUFFER_SLOT_MOTION_VECTORS)
+    GBUFFER_SLOT_MOTION_VECTORS,
+    GBUFFER_SLOT_GEOMETRY_NORMAL)
 
 
 class GenericRenderGraph : public RenderGraph
@@ -192,6 +194,7 @@ public:
     PipelineObject* rtx_gi_temporal_accum_pipeline;
     PipelineObject* rtx_gi_moments_pipeline;
     PipelineObject* rtx_gi_spatial_filter_pipeline;
+    PipelineObject* lighting_pipeline;
 
     
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;

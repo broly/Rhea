@@ -3,6 +3,8 @@
 #include "definitions.glsl"
 #include "resources/hdr_color_output.glsl"
 #include "resources/gbuffer.glsl"
+#include "resources/light.glsl"
+#include "resources/shadow.glsl"
 
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
@@ -30,7 +32,7 @@ const float FAR = 2000;
 
 void main()
 {
-    vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], v_uv).rgb;
+    vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], v_uv).rgb;
     // exposure
     hdr_color *= 0.6;
     // tonemap

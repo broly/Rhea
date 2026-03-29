@@ -9,6 +9,12 @@
 				"type": "sampler",
 				"sampler": "shadow",
 				"binding": "BINDING_UBO_SHADOW"
+			},
+			"shadow_depth_debug": {
+				"variable": "u_shadow_depth_debug",
+				"type": "sampler",
+				"sampler": "shadow",
+				"binding": "BINDING_UBO_SHADOW_DEBUG"
 			}
 		},
 		"set": "SET_SHADOW_RESOURCE"

@@ -4,6 +4,7 @@ import name;
 export namespace Names
 {
     Name pass_geometry_base = "GeometryBase";
+    Name pass_lighting = "Lighting";
     Name pass_geometry_translucent = "GeometryTranslucent";
     
     Name blend_mode = "blend_mode";

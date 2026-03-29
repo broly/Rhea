@@ -59,7 +59,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             {
                 if (ctx.bind_pipeline(tonemap_pipeline))
                 {
-                    ctx.bind(hdr_color_output_resource, gbuffer_resource);
+                    ctx.bind(hdr_color_output_resource, gbuffer_resource, shadow_resource);
                 }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);
@@ -94,6 +94,14 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     shadow_debug_instance->update_image(
         "u_shadow_depth",
+        get_image(shadow_map),
+        {
+            .frame = ctx.frame
+        }
+    );
+    
+    shadow_debug_instance->update_image(
+        "u_shadow_depth_debug",
         get_image(shadow_map),
         {
             .frame = ctx.frame
