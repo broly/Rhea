@@ -44,7 +44,7 @@ RBAccelStruct vk::TLASManager::build_tlas(
 
         inst.transform = to_vk_transform(obj.transform);
 
-        inst.instanceCustomIndex = mesh.mesh_table_index;
+        inst.instanceCustomIndex = obj.primitive_id;
         inst.mask = 0xFF;
 
         inst.instanceShaderBindingTableRecordOffset = 0;

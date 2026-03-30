@@ -32,7 +32,9 @@ layout(push_constant) uniform RTXGIPushConstants
 
 void main()
 {
-    uint mesh_index = gl_InstanceCustomIndexEXT;
+    uint prim_id = gl_InstanceCustomIndexEXT;
+    GPUPrimitiveInfo primitive_info = get_primitive_info(prim_id);
+    uint mesh_index = primitive_info.mesh_id;
 
     // ---------- TRI ----------
     Vertex v0 = fetch_vertex(mesh_index, 3 * gl_PrimitiveID + 0);
@@ -50,9 +52,6 @@ void main()
 
     vec2 uv = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
 
-    // ---------- TRANSFORM ----------
-    uint primitive_id = gl_InstanceID;
-    GPUPrimitiveInfo primitive_info = get_primitive_info(primitive_id);
 
     vec3 world_pos = (primitive_info.current_transform * vec4(pos, 1.0)).xyz;
 
