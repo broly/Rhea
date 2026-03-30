@@ -13,11 +13,14 @@ layout(location = 0) in vec2 v_uv;
 void main()
 {
     vec2 uv = v_uv;
+    
+    vec4 albedo_roughness = get_gbuffer_ALBEDO_ROUGHNESS(uv);
 
-    vec3 albedo = get_gbuffer_ALBEDO(uv).rgb;
+    vec3 albedo = albedo_roughness.rgb;
     vec3 N  = normalize(get_gbuffer_WORLD_NORMAL(uv).rgb * 2.0 - 1.0);
     vec3 Ng = normalize(get_gbuffer_GEOMETRY_NORMAL(uv).rgb * 2.0 - 1.0);
     vec3 pos = get_gbuffer_POSITION(uv).rgb;
+    vec3 emissive = get_gbuffer_EMISSIVE(uv).rgb;
 
     vec3 V = normalize(camera_ubo.camera_pos.xyz - pos);
 
@@ -57,7 +60,7 @@ void main()
     vec3 gi = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], uv).rgb;
     vec3 indirect = gi * albedo;
 
-    vec3 color = direct + (indirect * 2.0);
+    vec3 color = direct + (indirect * 2.0) + emissive;
 
     out_color = vec4(color, 1.0);
 }

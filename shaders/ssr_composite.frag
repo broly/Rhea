@@ -16,8 +16,9 @@ void main()
 
     vec3 ssr = ssr_sample.rgb;
     float ssr_alpha = ssr_sample.a;
-
-    float roughness = get_gbuffer_ROUGHNESS(uv).r;
+    
+    vec4 albedo_roughness = get_gbuffer_ALBEDO_ROUGHNESS(uv);
+    float roughness = albedo_roughness.a;
 
     float reflectivity = 1.0 - (roughness * 0.5);
 

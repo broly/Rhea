@@ -138,14 +138,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .dimension = capture_dimension
         },
         {
-            .name = "g_roughness",
-            .extent = resolution,
-            .format = TextureFormat::R16F,
-            .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
-            .external = false,
-            .dimension = capture_dimension
-        },
-        {
             .name = "g_depth",
             .extent = resolution,
             .format = TextureFormat::Depth24Stencil8,
@@ -190,7 +182,15 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
             .external = false,
             .dimension = capture_dimension
-        }
+        },
+        {
+            .name = "g_emissive",
+            .extent = resolution,
+            .format = TextureFormat::RGBA8_UNORM,
+            .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+            .external = false,
+            .dimension = capture_dimension
+        },
     });
     
     gbuffer_hist = create_textures({
@@ -213,15 +213,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .num_layers = 2
         },
         {
-            .name = "g_roughness_hist",
-            .extent = resolution,
-            .format = TextureFormat::R16F,
-            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
-            .external = false,
-            .dimension = capture_dimension,
-            .num_layers = 2
-        },
-        {
             .name = "g_depth_hist",
             .extent = resolution,
             .format = TextureFormat::Depth24Stencil8,
@@ -238,7 +229,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .num_layers = 2
         },
         {
-            .name = "g_albedo_hist",
+            .name = "g_albedo_roughness_hist",
             .extent = resolution,
             .format = TextureFormat::RGBA8_UNORM,
             .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
@@ -272,7 +263,17 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .external = false,
             .dimension = capture_dimension,
             .num_layers = 2
-        }
+        },
+        
+        {
+            .name = "g_emissive_hist",
+            .extent = resolution,
+            .format = TextureFormat::RGBA8_UNORM,
+            .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .external = false,
+            .dimension = capture_dimension,
+            .num_layers = 2
+        },
     });
     
     
@@ -340,344 +341,345 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     });
 }
 
-void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
-{    
-    add_pass({
-        .name = "ShadowMap",
-        .writes = {
-            { shadow_map, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this] (RenderGraphContext& ctx)
-        {
-            draw_scene_shadow(ctx);
-        },
-    });
-    
-    if (allow_shadow_debug)
-    {
+    void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
+    {    
         add_pass({
-           .name = "ShadowDebug",
-           .condition = [this] () { return renderer->get_render_flag(Names::debug_shadow); },
-           .reads = {
-               { shadow_map, RBImageUsage::SampledFragment }
-           },
-           .writes = {
-               { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-           },
-           .execute = [this] (RenderGraphContext& ctx)
-           {
-                base_color_resource->update_image("u_base_color", get_image(shadow_map),
-                    {
-                    .frame = ctx.frame
-                    });
-                if (ctx.bind_pipeline(shadow_debug_pipeline))
-                {
-                    ctx.bind(base_color_resource);
-                }
-                ctx.draw_fullscreen();
-           },
-       });
-    }
-    
-    
-    
-    swapchain_color = create_texture({
-        .name = "swapchain",
-        .extent = swapchain_extent,
-        .format = backend->get_swapchain_format(),
-        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
-        .external = true,
-        .swapchain_image = true,
-    });
-    
-    add_pass({
-        .name = Names::pass_geometry_base,
-        .reads = {
-        },
-        .writes = { 
-            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_ROUGHNESS], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_ALBEDO], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this] (RenderGraphContext& ctx)
-        {
-            PROFILE("Geometry");
-            
-            draw_scene(ctx);
-        },
-        .num_layers = num_pass_instances
-    });
-    
-    
-    
-    
-    add_pass({
-        .name = "RTXGI",
-        .reads = {
-            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_ALBEDO], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::StorageImage }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            draw_rtxgi(ctx);
-        },
-        .type = RenderPassType::rtx
-    });
-    
-    
-    
-
-    
-    add_pass({
-        .name = "RTXGI_REPROJECT",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
-            { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
-
-            { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
-            { gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.bind_pipeline(rtx_gi_reproject_pipeline))
+            .name = "ShadowMap",
+            .writes = {
+                { shadow_map, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
             {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource, camera_resource);
-            }
-            
-            auto extent = backend->get_swapchain_extent();
-            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
-            ctx.compute(workgroups);
-        },
-    });
-    
-    add_pass({
-        .name = "RTXGI_TEMPORAL_ACCUM",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.bind_pipeline(rtx_gi_temporal_accum_pipeline))
-            {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
-            }
-            auto extent = backend->get_swapchain_extent();
-            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
-            ctx.compute(workgroups);
-        },
-    });
-    
-    add_pass({
-        .name = "RTXGI_MOMENTS",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.bind_pipeline(rtx_gi_moments_pipeline))
-            {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
-            }
-            auto extent = backend->get_swapchain_extent();
-            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
-            ctx.compute(workgroups);
-        },
-    });
-    
-    add_pass({
-        .name = "RTXGI_SPATIAL",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::SampledFragment },
-
-            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            if (ctx.bind_pipeline(rtx_gi_spatial_filter_pipeline))
-            {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
-            }
-            auto extent = backend->get_swapchain_extent();
-            ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
-            ctx.compute(workgroups);
-        },
-    });
-    
-    add_copy_pass("COPY_RTXGI_ACCUM_TO_HISTORY",
-        hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
-        hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM]);
-    
-    add_copy_pass("COPY_gbuffer_linear_depth_to_history", 
-        gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH]);
-    
-    add_copy_pass("COPY_gbuffer_world_normal_to_history", 
-        gbuffer[GBUFFER_SLOT_WORLD_NORMAL], gbuffer_hist[GBUFFER_SLOT_WORLD_NORMAL]);
-    
-    add_copy_pass("COPY_gbuffer_depth_to_history", 
-        gbuffer[GBUFFER_SLOT_DEPTH], gbuffer_hist[GBUFFER_SLOT_DEPTH]);
-    
-    add_copy_pass("COPY_gbuffer_position_to_history", 
-        gbuffer[GBUFFER_SLOT_POSITION], gbuffer_hist[GBUFFER_SLOT_POSITION]);
-    
-    add_copy_pass("COPY_moments_to_history", 
-        hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_MOMENTS]);
-    
-    
-    // add_pass({
-    //     .name = Names::pass_geometry_translucent,
-    //     .reads = {
-    //          { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
-    //     },
-    //     .writes = { 
-    //         { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },  
-    //          { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
-    //     },
-    //     .execute = [this] (RenderGraphContext& ctx)
-    //     {
-    //         PROFILE("Translucent");
-    //         
-    //         draw_scene(ctx);
-    //     },
-    //     .num_layers = num_pass_instances
-    // });
-    
-    
-    
-    
-    add_pass({
-        .name = Names::pass_lighting,
-        .reads = {
-            {  shadow_map, RBImageUsage::SampledFragment },
-            { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
-            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_ROUGHNESS], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_ALBEDO], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::SampledFragment }
-        },
-        .writes = { 
-            { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-        },
-        .execute = [this] (RenderGraphContext& ctx)
-        {
-            PROFILE("Geometry");
-            
-            if (ctx.bind_pipeline(lighting_pipeline))
-            {
-                ctx.bind(camera_resource, light_resource, hdr_color_output_resource, gbuffer_resource, shadow_resource);
-            }
-            
-            ctx.draw_fullscreen();
-        },
-        .num_layers = num_pass_instances
-    });
-    
-    add_pass({
-        .name = "Clouds",
-        .reads = {
-            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-            { noise_texture, RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },
-        },
-        .execute = [this] (RenderGraphContext& ctx)
-        {
-            PROFILE("Clouds");
-            
-            draw_clouds(ctx, gbuffer[GBUFFER_SLOT_DEPTH], noise_texture);
-        },
-        .num_layers = num_pass_instances
+                draw_scene_shadow(ctx);
+            },
+        });
         
-    });
-    
-    
-    add_pass({
-        .name = "SSR",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_ROUGHNESS], RBImageUsage::SampledFragment },
-        },
-        .writes = {
-            { ssr_texture, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
-        },
-        .execute = [this](RenderGraphContext& ctx)
+        if (allow_shadow_debug)
         {
-            draw_ssr(ctx);
-        },
-    });
+            add_pass({
+               .name = "ShadowDebug",
+               .condition = [this] () { return renderer->get_render_flag(Names::debug_shadow); },
+               .reads = {
+                   { shadow_map, RBImageUsage::SampledFragment }
+               },
+               .writes = {
+                   { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+               },
+               .execute = [this] (RenderGraphContext& ctx)
+               {
+                    base_color_resource->update_image("u_base_color", get_image(shadow_map),
+                        {
+                        .frame = ctx.frame
+                        });
+                    if (ctx.bind_pipeline(shadow_debug_pipeline))
+                    {
+                        ctx.bind(base_color_resource);
+                    }
+                    ctx.draw_fullscreen();
+               },
+           });
+        }
+        
+        
+        
+        swapchain_color = create_texture({
+            .name = "swapchain",
+            .extent = swapchain_extent,
+            .format = backend->get_swapchain_format(),
+            .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
+            .external = true,
+            .swapchain_image = true,
+        });
+        
+        add_pass({
+            .name = Names::pass_geometry_base,
+            .reads = {
+            },
+            .writes = { 
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_EMISSIVE], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Geometry");
+                
+                draw_scene(ctx);
+            },
+            .num_layers = num_pass_instances
+        });
+        
+        
+        
+        
+        add_pass({
+            .name = "RTXGI",
+            .reads = {
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::StorageImage }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                draw_rtxgi(ctx);
+            },
+            .type = RenderPassType::rtx
+        });
+        
+        
+        
+
+        
+        add_pass({
+            .name = "RTXGI_REPROJECT",
+            .reads = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
+
+                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+                { gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                if (ctx.bind_pipeline(rtx_gi_reproject_pipeline))
+                {
+                    ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource, camera_resource);
+                }
+                
+                auto extent = backend->get_swapchain_extent();
+                ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+                ctx.compute(workgroups);
+            },
+        });
+        
+        add_pass({
+            .name = "RTXGI_TEMPORAL_ACCUM",
+            .reads = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::SampledFragment },
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                if (ctx.bind_pipeline(rtx_gi_temporal_accum_pipeline))
+                {
+                    ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+                }
+                auto extent = backend->get_swapchain_extent();
+                ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+                ctx.compute(workgroups);
+            },
+        });
+        
+        add_pass({
+            .name = "RTXGI_MOMENTS",
+            .reads = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment }
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                if (ctx.bind_pipeline(rtx_gi_moments_pipeline))
+                {
+                    ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+                }
+                auto extent = backend->get_swapchain_extent();
+                ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+                ctx.compute(workgroups);
+            },
+        });
+        
+        add_pass({
+            .name = "RTXGI_SPATIAL",
+            .reads = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::SampledFragment },
+
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                if (ctx.bind_pipeline(rtx_gi_spatial_filter_pipeline))
+                {
+                    ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+                }
+                auto extent = backend->get_swapchain_extent();
+                ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+                ctx.compute(workgroups);
+            },
+        });
+        
+        add_copy_pass("COPY_RTXGI_ACCUM_TO_HISTORY",
+            hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
+            hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM]);
+        
+        add_copy_pass("COPY_gbuffer_linear_depth_to_history", 
+            gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH]);
+        
+        add_copy_pass("COPY_gbuffer_world_normal_to_history", 
+            gbuffer[GBUFFER_SLOT_WORLD_NORMAL], gbuffer_hist[GBUFFER_SLOT_WORLD_NORMAL]);
+        
+        add_copy_pass("COPY_gbuffer_depth_to_history", 
+            gbuffer[GBUFFER_SLOT_DEPTH], gbuffer_hist[GBUFFER_SLOT_DEPTH]);
+        
+        add_copy_pass("COPY_gbuffer_position_to_history", 
+            gbuffer[GBUFFER_SLOT_POSITION], gbuffer_hist[GBUFFER_SLOT_POSITION]);
+        
+        add_copy_pass("COPY_moments_to_history", 
+            hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_MOMENTS]);
+        
+      
+        
+        
+        
+        add_pass({
+            .name = Names::pass_lighting,
+            .reads = {
+                {  shadow_map, RBImageUsage::SampledFragment },
+                { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::SampledFragment }
+            },
+            .writes = { 
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Geometry");
+                
+                if (ctx.bind_pipeline(lighting_pipeline))
+                {
+                    ctx.bind(camera_resource, light_resource, hdr_color_output_resource, gbuffer_resource, shadow_resource);
+                }
+                
+                ctx.draw_fullscreen();
+            },
+            .num_layers = num_pass_instances
+        });
+        
+        add_pass({
+            .name = "Clouds",
+            .reads = {
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
+                { noise_texture, RBImageUsage::SampledFragment }
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Clouds");
+                
+                draw_clouds(ctx, gbuffer[GBUFFER_SLOT_DEPTH], noise_texture);
+            },
+            .num_layers = num_pass_instances
+            
+        });
+        
     
-    
-    
-    add_pass({
-        .name = "SSRComposite",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
-            { ssr_texture, RBImageUsage::SampledFragment },
-            { gbuffer[GBUFFER_SLOT_ROUGHNESS], RBImageUsage::SampledFragment }
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            draw_ssr_composite(ctx);
-        },
-    });
-    
-    add_pass({
-        .name = "COPY_ssr_compose_to_hdr_base",
-        .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::TransferSrc }
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::TransferDst, RBLoadOp::Load }
-        },
-        .execute = [this](RenderGraphContext& ctx)
-        {
-            CopyImageParams params;
-            params.source = get_image(hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE]);
-            params.dest = get_image(hdr_color_present[COLOR_OUTPUT_HDR_BASE]);
-            ctx.copy_img(params);
-        },
-        .num_layers = 1,
-        .type = RenderPassType::transfer
-    });
-}
+      
+        add_pass({
+            .name = Names::pass_geometry_translucent,
+            .reads = {
+                 { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
+            },
+            .writes = { 
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },  
+                 { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Translucent");
+                    
+                draw_scene(ctx);
+            },
+            .num_layers = num_pass_instances
+        });
+        
+        
+        add_pass({
+            .name = "SSR",
+            .reads = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment },
+            },
+            .writes = {
+                { ssr_texture, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                draw_ssr(ctx);
+            },
+        });
+        
+        
+        
+        add_pass({
+            .name = "SSRComposite",
+            .reads = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
+                { ssr_texture, RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment }
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                draw_ssr_composite(ctx);
+            },
+        });
+        
+        add_pass({
+            .name = "COPY_ssr_compose_to_hdr_base",
+            .reads = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::TransferSrc }
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::TransferDst, RBLoadOp::Load }
+            },
+            .execute = [this](RenderGraphContext& ctx)
+            {
+                CopyImageParams params;
+                params.source = get_image(hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE]);
+                params.dest = get_image(hdr_color_present[COLOR_OUTPUT_HDR_BASE]);
+                ctx.copy_img(params);
+            },
+            .num_layers = 1,
+            .type = RenderPassType::transfer
+        });
+    }
 
 void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
 {

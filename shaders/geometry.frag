@@ -30,11 +30,11 @@ layout(location = 6) in vec4 v_prev_clip;
 layout(location = 0) out vec4 out_g_normal;
 layout(location = 1) out vec4 out_g_world_normal;
 layout(location = 2) out vec2 out_g_motion_vectors;
-layout(location = 3) out float out_g_roughness;
-layout(location = 4) out vec3 out_g_albedo;
-layout(location = 5) out vec3 out_g_position;
-layout(location = 6) out float out_g_linear_depth;
-layout(location = 7) out vec4 out_g_geometry_normal;
+layout(location = 3) out vec4 out_g_albedo_roughness;
+layout(location = 4) out vec3 out_g_position;
+layout(location = 5) out float out_g_linear_depth;
+layout(location = 6) out vec4 out_g_geometry_normal;
+layout(location = 7) out vec3 out_g_emissive;
 #endif 
 
 
@@ -47,6 +47,8 @@ void main()
     vec4 base_tx = get_base_color(mat, v_uv);
 
     vec3 albedo = pow(base_tx.rgb, vec3(2.2));
+    
+    vec3 emissive = get_emissive(mat, v_uv).rgb;
 
     vec3 orm = get_orm(mat, v_uv);
     float ao        = orm.r;
@@ -81,13 +83,14 @@ void main()
 
     out_g_motion_vectors = curr_uv - prev_uv;
 
-    out_g_roughness = roughness;
-    out_g_albedo = albedo;
+    out_g_albedo_roughness = vec4(albedo, roughness);
     out_g_position = v_world_pos;
 
     vec4 view_pos = camera_ubo.view * vec4(v_world_pos, 1.0);
     out_g_linear_depth = -view_pos.z;
 
     out_g_geometry_normal = vec4(Ng * 0.5 + 0.5, 1.0);
+
+    out_g_emissive = emissive;
 #endif
 }

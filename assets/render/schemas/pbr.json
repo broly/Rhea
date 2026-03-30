@@ -203,8 +203,8 @@
 					"resources": ["camera", "mesh_table", "primitive_table"]
 				},
 				"fragment": {
-					"shader": "geometry.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures"]
+					"shader": "forward.frag",
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "hdr_color_output"]
 				}
 			},
 			"depth_write": false,

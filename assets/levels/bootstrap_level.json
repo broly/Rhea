@@ -94,35 +94,13 @@
 								"normal": "TEXTURE(textures/lymphocyte/Lymphocyte_N.png)",
 								"orm": "TEXTURE(textures/lymphocyte/Lymphocyte_ORM.png)",
 								"base_color_factor": 1.0,
-								"emissive_factor": 3.3,
+								"emissive_factor": 18.3,
 								"occlusion_factor": 1.0,
 								"roughness_factor": 1.0,
 								"metallic_factor": 1.0
 							}
 						}
 					]
-				}
-			]
-		},
-		{
-			"name": "light1",
-			"class": "RhActor",
-			
-			"components": [
-				{
-					"name": "light1",
-					"class": "RhComp_Light",
-					"fields": {
-						"transform": {
-							"position": { "x": 5.11173, "y": 1.51831, "z": 5.89107 },
-							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
-							"scale": { "x": 1, "y": 1, "z": 1}
-						},
-						"color": { "x": 10, "y": 10, "z": 10, "w": 0 },
-						"intensity": 100,
-						"falloff": 100,
-						"type": "point"
-					}
 				}
 			]
 		},
