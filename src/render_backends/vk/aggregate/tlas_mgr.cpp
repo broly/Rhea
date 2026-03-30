@@ -30,21 +30,19 @@ VkTransformMatrixKHR to_vk_transform(const Transform& t)
 }
 
 RBAccelStruct vk::TLASManager::build_tlas(
-    RBCommandList cmd, 
-    const std::vector<MeshPrimHandle>& meshes,
-    const std::vector<Transform>& transforms)
+    RBCommandList cmd, const std::vector<TLASInfo>& objects)
 {
     std::vector<VkAccelerationStructureInstanceKHR> instances;
-    instances.reserve(meshes.size());
+    instances.reserve(objects.size());
 
-    for (uint32_t i = 0; i < meshes.size(); ++i)
+    for (auto& obj : objects)
     {
         
-        const auto& mesh = mesh_manager.get_mesh_gpu_data(meshes[i]);
+        const auto& mesh = mesh_manager.get_mesh_gpu_data(obj.mesh);
 
         VkAccelerationStructureInstanceKHR inst{};
 
-        inst.transform = to_vk_transform(transforms[i]);
+        inst.transform = to_vk_transform(obj.transform);
 
         inst.instanceCustomIndex = mesh.mesh_table_index;
         inst.mask = 0xFF;

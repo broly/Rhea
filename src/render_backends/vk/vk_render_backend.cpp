@@ -576,9 +576,9 @@ RenderResource* VkRenderBackend::create_resource(const RenderResourceDesc& desc)
     return resources.back().get();
 }
 
-RBAccelStruct VkRenderBackend::build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms)
+RBAccelStruct VkRenderBackend::build_tlas(RBCommandList cmd, const std::vector<TLASInfo>& objects)
 {
-    return tlas_manager.build_tlas(cmd, meshes, transforms);
+    return tlas_manager.build_tlas(cmd, objects);
 }
 
 void VkRenderBackend::copy_image(RBCommandList cmd, const CopyImageParams& params)

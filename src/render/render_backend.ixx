@@ -86,6 +86,13 @@ export struct ComputeWorkgroups
     }
 };
 
+export struct TLASInfo
+{
+    MeshPrimHandle mesh;
+    Transform transform;
+    uint32_t primitive_id;
+};
+
 export class RenderBackend 
 {
 public:
@@ -182,7 +189,7 @@ public:
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) = 0;
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) = 0;
-    virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) = 0;
+    virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<TLASInfo>& objects) = 0;
     
     virtual void copy_image(RBCommandList cmd, const CopyImageParams& params) = 0;
     

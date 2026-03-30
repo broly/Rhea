@@ -23,10 +23,13 @@ layout(location = 6) out vec4 v_prev_clip;
 
 void main()
 {
-    Vertex v = fetch_vertex(get_mesh_index(), gl_VertexIndex);
     
     uint prim_id = get_primitive_index();
     GPUPrimitiveInfo primitive_info = get_primitive_info(prim_id);
+    
+    uint mesh_index = primitive_info.mesh_id;
+
+    Vertex v = fetch_vertex(mesh_index, gl_VertexIndex);
     
     mat4 transform_curr = primitive_info.current_transform;
     mat4 transform_prev = primitive_info.prev_transform;

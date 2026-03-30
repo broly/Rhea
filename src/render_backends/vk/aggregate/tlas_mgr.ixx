@@ -53,9 +53,7 @@ namespace vk
         TLASData tlas;
 
         RBAccelStruct build_tlas(
-            RBCommandList cmd, 
-            const std::vector<MeshPrimHandle>& meshes,
-            const std::vector<Transform>& transforms
+            RBCommandList cmd, const std::vector<TLASInfo>& objects
         );
     };
 }

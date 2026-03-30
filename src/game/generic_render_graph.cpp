@@ -706,25 +706,21 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
     
     if (mesh_processor.is_dirty())
     {
-        std::vector<MeshPrimHandle> meshes;
-        std::vector<Transform> transforms;
+        std::vector<TLASInfo> tlas_objs;
 
-        meshes.reserve(mesh_processor.primitives.size());
-        transforms.reserve(mesh_processor.primitives.size());
+        tlas_objs.reserve(mesh_processor.primitives.size());
 
         for (auto& prim : mesh_processor.primitives)
         {
             if (!prim.passes.contains("GeometryTranslucent"))
             {
-                meshes.push_back(prim.mesh);
-                transforms.emplace_back(*prim.world);
+                tlas_objs.push_back({prim.mesh, *prim.world, prim.id});
             }
         }
 
         tlas = backend->build_tlas(
             ctx.cmd,
-            meshes,
-            transforms);
+            tlas_objs);
             
         auto mesh_table_info = backend->get_mesh_table_info();
         

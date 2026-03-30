@@ -143,7 +143,7 @@ public:   /// API Section
     virtual RBImageHandle create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info) override;
     virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
-    virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<MeshPrimHandle>& meshes, const std::vector<Transform>& transforms) override;
+    virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<TLASInfo>& objects) override;
     
     virtual void copy_image(RBCommandList cmd, const CopyImageParams& params) override;
     
