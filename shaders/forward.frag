@@ -34,56 +34,7 @@ void main()
         discard;
 
     vec3 albedo = pow(base_tx.rgb, vec3(2.2));
+    
+    out_color = vec4(albedo, alpha);
 
-    vec3 orm = get_orm(mat, v_uv);
-    float ao        = orm.r;
-    float roughness = orm.g;
-    float metallic  = orm.b;
-
-    vec3 Ng = normalize(v_world_normal);
-    vec3 N  = Ng;
-
-    vec3 V = normalize(camera_ubo.camera_pos.xyz - v_world_pos);
-
-    vec3 Lo = vec3(0.0);
-
-    for (int i = 0; i < light_ubo.light_count; ++i)
-    {
-        vec3 Lpos = light_ubo.lights[i].position.xyz;
-        vec3 Lcol = light_ubo.lights[i].color.rgb;
-
-        vec3 L = normalize(Lpos - v_world_pos);
-        float NdotL = max(dot(N, L), 0.0);
-
-        if (NdotL <= 0.0) 
-            continue;
-
-        float dist = length(Lpos - v_world_pos);
-        float attenuation = 1.0 / (dist * dist + 1.0);
-
-        Lo += albedo / 3.14159265 * Lcol * attenuation * NdotL;
-    }
-
-    if (light_ubo.has_dir_light == 1)
-    {
-        vec3 L = normalize(-light_ubo.dir_light.direction.xyz);
-        float NdotL = max(dot(N, L), 0.0);
-
-        if (NdotL > 0.0)
-        {
-            float shadow = shadow_factor(v_world_pos, Ng);
-            vec3 radiance = light_ubo.dir_light.color.rgb * shadow;
-
-            Lo += albedo / 3.14159265 * radiance * NdotL;
-        }
-    }
-
-    // vec2 uv = gl_FragCoord.xy / vec2(camera_ubo.resolution.xy);
-    vec2 screen_size = vec2(textureSize(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], 0));
-    vec2 uv = gl_FragCoord.xy / screen_size;
-    vec3 gi = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], uv).rgb * 2.0;
-
-    vec3 color = Lo + gi * albedo;
-
-    out_color = vec4(color, alpha);
 }

@@ -214,8 +214,7 @@
 					]
 				}
 			]
-		}
-		,
+		},
 		{
 			"name": "imported_scene",
 			"class": "RhActor",
@@ -227,6 +226,30 @@
 					"fields": {
 						"asset_path": "gltf/New_Sponza_001.gltf",
 						"textures_dir": "textures/sponza",
+						"material": {
+							"blend_mode": "masked",
+							"parameters": {
+								"hello": {"r": 1, "g": 0.5, "b": 0.3, "a": 0.1}
+							}
+						},
+						"test": {
+							"hello": "yesss"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "imported_scene2",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "SPONZA_CURTAINS",
+					"class": "RhComp_GltfScene",
+					"fields": {
+						"asset_path": "gltf/NewSponza_Curtains_glTF.gltf",
+						"textures_dir": "textures/sponza_curtains",
 						"material": {
 							"blend_mode": "masked",
 							"parameters": {

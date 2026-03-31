@@ -1,6 +1,7 @@
 #version 450
 
 #include "resources/gbuffer.glsl"
+#include "resources/dbuffer.glsl"
 #include "resources/camera.glsl"
 #include "resources/light.glsl"
 #include "resources/hdr_color_output.glsl"
@@ -15,8 +16,10 @@ void main()
     vec2 uv = v_uv;
     
     vec4 albedo_roughness = get_gbuffer_ALBEDO_ROUGHNESS(uv);
+    
+    vec4 decal = texture(u_decal_albedo, uv);
 
-    vec3 albedo = albedo_roughness.rgb;
+    vec3 albedo = mix(albedo_roughness.rgb, decal.rgb, decal.a);
     vec3 N  = normalize(get_gbuffer_WORLD_NORMAL(uv).rgb * 2.0 - 1.0);
     vec3 Ng = normalize(get_gbuffer_GEOMETRY_NORMAL(uv).rgb * 2.0 - 1.0);
     vec3 pos = get_gbuffer_POSITION(uv).rgb;

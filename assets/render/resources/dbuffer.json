@@ -1,0 +1,16 @@
+{
+	"resource": {
+		"name": "dbuffer",
+		"usage": "frame",
+		"set": "SET_DBUFFER",
+		"allowed_stages": ["fragment"],
+		"parameters": {
+			"decal_albedo": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_decal_albedo",
+				"binding": "BINDING_SAMPLER_DECAL_ALBEDO"
+			}
+		}
+	}
+}

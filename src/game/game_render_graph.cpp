@@ -59,7 +59,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             {
                 if (ctx.bind_pipeline(tonemap_pipeline))
                 {
-                    ctx.bind(hdr_color_output_resource, gbuffer_resource, shadow_resource);
+                    ctx.bind(hdr_color_output_resource, gbuffer_resource, shadow_resource, dbuffer_resource);
                 }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);
@@ -81,6 +81,8 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     {.frame = ctx.frame});
     gbuffer_resource->update_image_array("u_gbuffer_hist", get_image_array(gbuffer_hist), 
     {.frame = ctx.frame, .layer_index = prev_layer});
+    dbuffer_resource->update_image("u_decal_albedo", get_image(decal_albedo),
+        {.frame = ctx.frame});
     
     hdr_color_output_resource->update_image_array(
         "u_hdr_color_present", get_image_array(hdr_color_present), 

@@ -50,6 +50,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     shadow_resource = renderer->find_resource("shadow");
     reflection_resource = renderer->find_resource("reflection");
     gbuffer_resource = renderer->find_resource("gbuffer");
+    dbuffer_resource = renderer->find_resource("dbuffer");
     ssr_resource = renderer->find_resource("ssr");
     hdr_color_output_resource = renderer->find_resource("hdr_color_output");
     hdr_color_storage_resource = renderer->find_resource("hdr_color_storage");
@@ -119,6 +120,14 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     check(gbuffer_slots.size() <= gbuffer_resource_desc.parameter.initial_array_size.value_or(0));
     
+    decal_albedo = create_texture({
+            .name = "decal_albedo",
+            .extent = resolution,
+            .format = TextureFormat::RGBA8_UNORM,
+            .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+            .external = false,
+            .dimension = capture_dimension
+        });
     
     gbuffer = create_textures({
         {
@@ -553,6 +562,24 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         
       
         
+      
+        add_pass({
+            .name = Names::pass_geometry_translucent,
+            .reads = {
+                 { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
+            },
+            .writes = { 
+                { decal_albedo, RBImageUsage::ColorAttachment, RBLoadOp::Clear },  
+                 { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Translucent");
+                    
+                draw_scene(ctx);
+            },
+            .num_layers = num_pass_instances
+        });
         
         
         add_pass({
@@ -567,7 +594,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment },
                 { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
                 { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::SampledFragment }
+                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::SampledFragment },
+                { decal_albedo, RBImageUsage::SampledFragment }
             },
             .writes = { 
                 { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
@@ -578,7 +606,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 
                 if (ctx.bind_pipeline(lighting_pipeline))
                 {
-                    ctx.bind(camera_resource, light_resource, hdr_color_output_resource, gbuffer_resource, shadow_resource);
+                    ctx.bind(camera_resource, light_resource, hdr_color_output_resource, gbuffer_resource, dbuffer_resource, shadow_resource);
                 }
                 
                 ctx.draw_fullscreen();
@@ -606,24 +634,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         });
         
     
-      
-        add_pass({
-            .name = Names::pass_geometry_translucent,
-            .reads = {
-                 { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
-            },
-            .writes = { 
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },  
-                 { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
-            },
-            .execute = [this] (RenderGraphContext& ctx)
-            {
-                PROFILE("Translucent");
-                    
-                draw_scene(ctx);
-            },
-            .num_layers = num_pass_instances
-        });
         
         
         add_pass({
@@ -873,6 +883,8 @@ void GenericRenderGraph::prepare_geometry_resources(
 
             if (reflection_capture)
             {
+                
+                
                 reflection_resource->update_image(
                     "u_irradiance",
                     renderer->get_cubemap(reflection_capture->irradiance),
@@ -1162,6 +1174,10 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
             ctx.bind(camera_resource, mesh_table_resource,
                      shadow_resource, light_resource, reflection_resource, pbr_material_table_resource, textures_resource,
                      primitive_table_resource);
+            if (ctx.pass_name == Names::pass_geometry_translucent)
+            {
+                ctx.bind(hdr_color_output_resource);
+            }
         }       
         
         ModelPushConstants pc;

@@ -139,6 +139,7 @@ public:
     
     std::vector<RGTextureHandle> gbuffer;
     std::vector<RGTextureHandle> gbuffer_hist;
+    RGTextureHandle decal_albedo;
     
     // RGTextureHandle g_depth;
     // RGTextureHandle g_normal;
@@ -159,6 +160,7 @@ public:
     
     RenderResource* camera_resource = nullptr;
     RenderResource* gbuffer_resource = nullptr;
+    RenderResource* dbuffer_resource = nullptr;
     RenderResource* light_resource = nullptr;
     RenderResource* shadow_resource = nullptr;
     RenderResource* reflection_resource = nullptr;

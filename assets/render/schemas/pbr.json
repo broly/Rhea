@@ -162,7 +162,7 @@
 				},
 				"fragment": {
 					"shader": "lighting.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "gbuffer", "hdr_color_output"]
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "gbuffer", "dbuffer", "hdr_color_output"]
 				}
 			},
 			"depth_write": false,
