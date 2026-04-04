@@ -96,6 +96,19 @@ export struct Transform {
         return Transform();
     }
     
+    std::string to_string() const
+    {
+        std::string result;
+        
+        result += "{";
+        result += "\"position\": { \"x\": " + std::to_string(position.x) + ", \"y\": " + std::to_string(position.y) + ", \"z\": " + std::to_string(position.z) + "}";
+        result += ", ";
+        result += "\"rotation\": { \"x\": " + std::to_string(rotation.x) + ", \"y\": " + std::to_string(rotation.y) + ", \"z\": " + std::to_string(rotation.z) + ", \"w\": " + std::to_string(rotation.w) + "}";
+        result += "}";
+        
+        return result;
+    }
+    
     static Transform from_string(const std::string& input)
     {
         

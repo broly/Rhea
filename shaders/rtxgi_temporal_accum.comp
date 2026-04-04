@@ -7,7 +7,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 size = imageSize(u_hdr_color_present_storage[0]);
+    ivec2 size = imageSize(u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI]);
 
     if (any(greaterThanEqual(gid, size)))
         return;

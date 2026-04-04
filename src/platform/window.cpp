@@ -56,7 +56,8 @@ void set_input(Input* input) {
 static void key_callback(GLFWwindow* w, int key, int scancode, int action, int mods) {
     if (!g_input) 
         return;
-    g_input->set_key(GLFW_KEYS[key], action != GLFW_RELEASE);
+    if (!mods)
+        g_input->set_key(GLFW_KEYS[key], action != GLFW_RELEASE);
 }
 
 static void mouse_callback(GLFWwindow* w, double x, double y) {

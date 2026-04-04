@@ -150,6 +150,19 @@ export namespace reflect::json
     template<typename T>
     void do_serialize_json_value(T& target, const Json::Value& value, const SerializationContext& context)
     {
+
+        if constexpr (requires { serialize_json_value(target, value, context); })
+        {
+            // visit_serialize(value, target, is_loading);
+            // if constexpr (!requires { serialize_json_value(target, value); })
+            // {
+            //     ReflectionInfo<T>::reflected;
+            // }
+            // static_assert(requires { serialize_json_value(target, value); });
+            serialize_json_value(target, value, context);
+            return;
+        }
+        
         if constexpr (std::is_enum_v<T> && reflect::is_reflected_v<T>)
         {
             std::string value_str = value.asString();
@@ -277,16 +290,7 @@ export namespace reflect::json
             
                 do_serialize_json_value(it->second, json_value, context);
             }
-        } else if constexpr (requires { serialize_json_value(target, value, context); })
-        {
-            // visit_serialize(value, target, is_loading);
-            // if constexpr (!requires { serialize_json_value(target, value); })
-            // {
-            //     ReflectionInfo<T>::reflected;
-            // }
-            // static_assert(requires { serialize_json_value(target, value); });
-            serialize_json_value(target, value, context);
-        }
+        } 
     }
 
     template<typename T>

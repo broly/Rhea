@@ -20,6 +20,21 @@ export struct Extent
         return !(*this == other);
     }
     
+    constexpr Extent operator/(const uint32_t d) const
+    {
+        return Extent{width / d, height / d};
+    }
+    
+    constexpr Extent operator/(const float d) const
+    {
+        return Extent{(uint32_t)(width / d), (uint32_t)(height / d)};
+    }
+    
+    constexpr Extent operator*(const float m) const
+    {
+        return Extent{(uint32_t)(width * m), (uint32_t)(height * m)};
+    }
+    
     constexpr bool is_zero() const
     {
         return width == 0 || height == 0;

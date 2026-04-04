@@ -20,4 +20,6 @@ public:
     std::shared_ptr<RhActor> camera_actor = nullptr;
     std::shared_ptr<RhActor> dir_light_actor = nullptr;
     double last_rg_switch_time = 0.f;
+    double last_cam_key_time = 0.f;
+    double first_cam_key_time = 0.f;
 };

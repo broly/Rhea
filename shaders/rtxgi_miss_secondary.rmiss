@@ -19,11 +19,13 @@ void main()
 
     float t = 0.5 * (dir.y + 1.0);
 
-    vec3 sky = mix(
-        vec3(0.1, 0.15, 0.3),
-        vec3(0.7, 0.8, 1.0),
-        t
-    );
+    // vec3 sky = mix(
+    //     vec3(0.05, 0.0525, 0.15),
+    //     vec3(0.7, 0.8, 1.0),
+    //     t
+    // );
+    
+    vec3 sky = vec3(0.0, 0.0, 0.0);
 
     payload.radiance += payload.throughput * sky;
 }

@@ -36,8 +36,10 @@ export namespace glm
     using glm::lookAt;
     using glm::scale;
     using glm::radians;
+    using glm::degrees;
     using glm::min;
     using glm::max;
+    using glm::mix;
     using glm::operator*;
     using glm::operator/;
     using glm::operator+;
@@ -88,4 +90,5 @@ export namespace glm
     using glm::lerp;
     using glm::slerp;
     using glm::row;
+    using glm::eulerAngles;
 }

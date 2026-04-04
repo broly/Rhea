@@ -61,7 +61,7 @@ void main()
     // ---------- MATERIAL ----------
     GPUMaterial mat = get_material(primitive_info.material_id);
     vec3 albedo = get_base_color(mat, uv).rgb;
-    vec3 emissive = get_emissive(mat, uv).rgb;
+    vec3 emissive = get_emissive(mat, uv).rgb * 25;
 
     // =====================================================
     // EMISSION

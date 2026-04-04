@@ -45,6 +45,13 @@ public:
         return actors;
     }
     
+    template<typename T>
+    std::shared_ptr<T> find_actor_by_name(const std::string& name)
+    {
+        return std::static_pointer_cast<T>(find_actor_by_name(name));
+    }
+    
+    
     std::shared_ptr<RhActor> find_actor_by_name(const std::string& name);
 
     std::vector<std::unique_ptr<WorldScript>> scripts;

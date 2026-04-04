@@ -7,11 +7,24 @@ import <string_view>;
 import <functional>;
 import name;
 import type_id;
+import <string>;
+import container_traits;
 
 export namespace reflect
 {
+    enum class TypeKind
+    {
+        value,
+        array,
+        map,
+        set,
+        shared_ptr,
+        unknown,
+    };
+    
     namespace detail
     {
+        
         template<auto PtrToMember, FixedString Name>
         struct NamedField
         {
@@ -65,6 +78,7 @@ export namespace reflect
         Name name;
         TypeId id;
         ptrdiff_t offset;
+        TypeKind kind = TypeKind::unknown;
         
         void* get_value_ptr(void* struct_ptr) const
         {
@@ -151,13 +165,31 @@ export namespace reflect
     }
     
     template<typename T, typename U>
-    constexpr size_t get_offset(U T::* member_ptr) 
+    constexpr ptrdiff_t get_offset(U T::* member_ptr) 
     {
-        return (size_t)&(((T*)nullptr)->*member_ptr);
+        return (ptrdiff_t)&(((T*)nullptr)->*member_ptr);
     }
     
     template<typename T, auto FieldPtr>
     using field_type_t = decltype(T{}.*FieldPtr);
+    
+    template<typename T>
+    consteval TypeKind type_kind_of()
+    {
+        using Type = std::decay_t<T>;
+        if (std::is_array_v<Type>)
+            return TypeKind::array;
+        if (is_map_v<Type>)
+            return TypeKind::map;
+        if (is_set_v<Type>)
+            return TypeKind::set;
+        if (std::is_arithmetic_v<Type> || std::is_same_v<Type, std::string> || std::is_same_v<Type, Name>)
+            return TypeKind::value;
+        return TypeKind::unknown;
+    }
+    
+    template<typename T>
+    constexpr TypeKind type_kind_v = type_kind_of<T>();
     
     template<typename T>
     bool register_type_runtime_info(bool opaque)
@@ -167,11 +199,13 @@ export namespace reflect
         if (!opaque)
         {
             visit<T>([&fields] <auto PtrToField, FixedString name> () {
-                FieldRuntimeReflectionInfo field( 
-                    (const char*)name, 
-                    get_type_id<field_type_t<T, PtrToField>>(), 
-                    get_offset(PtrToField)
-                );
+                using FieldType = field_type_t<T, PtrToField>;
+                FieldRuntimeReflectionInfo field{ 
+                    .name =   (const char*)name, 
+                    .id = get_type_id<FieldType>(), 
+                    .offset = get_offset(PtrToField),
+                    .kind = type_kind_v<FieldType>
+                };
                 fields.push_back(field);
             });
         }

@@ -19,6 +19,11 @@ public:
         return transform(t);
     }
     
+    static AABB zero()
+    {
+        return AABB(glm::vec3{0}, glm::vec3{0});
+    }
+    
     
     AABB& operator*=(const Transform& t)
     {

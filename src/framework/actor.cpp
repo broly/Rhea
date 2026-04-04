@@ -136,8 +136,9 @@ Transform RhActor::get_transform() const
 
 AABB RhActor::get_aabb() const
 {
-    auto t = find_component<RhComp_Renderable>();
-    return t->get_aabb();
+    if (auto t = find_component<RhComp_Renderable>())
+        return t->get_aabb();
+    return AABB::zero();
 }
 
 std::shared_ptr<RhComponent> RhActor::find_component_by_name(const std::string& name)

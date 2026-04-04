@@ -1,7 +1,6 @@
 {
     "name": "Scene",
     "actors": [
-	
 		{
 			"name": "viewer",
 			"class": "RhActor",
@@ -24,6 +23,162 @@
 					}
 				}
 			]
+		},
+		{
+			"name": "RAIL",
+			"class": "Rail",
+			
+			"components": [
+			],
+			"fields": {
+				"time_dilation": 1,
+				"samples": {
+					"cam": [
+
+
+
+{"timestamp_seconds": 0,"position": { "x": 5.72674, "y": 1.97389, "z": 2.85755 } , "rotation": { "x": -0.035713, "y": 0.454582, "z": 0.0182451, "w": 0.889802 } },
+{"timestamp_seconds": 6.643,"position": { "x": 5.76375, "y": 1.40572, "z": 2.88432 } , "rotation": { "x": -0.0247277, "y": 0.444731, "z": 0.0122841, "w": 0.895238 } },
+{"timestamp_seconds": 25.688,"position": { "x": 1.12758, "y": 7.78239, "z": -4.14963 } , "rotation": { "x": 0.132308, "y": 0.620422, "z": -0.107225, "w": 0.765554 } },
+{"timestamp_seconds": 30.157,"position": { "x": -1.36406, "y": 7.2485, "z": -4.56806 } , "rotation": { "x": -0.0249485, "y": 0.766043, "z": 0.0297868, "w": 0.641613 } },
+{"timestamp_seconds": 36.229,"position": { "x": -3.47548, "y": 7.32401, "z": -1.26633 } , "rotation": { "x": 0.283608, "y": 0.664887, "z": -0.303834, "w": 0.620627 } },
+{"timestamp_seconds": 43.928,"position": { "x": 4.8659, "y": 0.923717, "z": -0.335115 } , "rotation": { "x": 0.188268, "y": 0.695895, "z": -0.197199, "w": 0.664377 } },
+{"timestamp_seconds": 52.203,"position": { "x": -6.32738, "y": 3.00247, "z": 0.658109 } , "rotation": { "x": -0.0262977, "y": 0.685226, "z": -0.0247718, "w": -0.727434 } },
+{"timestamp_seconds": 59.026,"position": { "x": -1.46675, "y": 1.60347, "z": 3.65668 } , "rotation": { "x": 0.0583936, "y": 0.866932, "z": 0.104635, "w": -0.483809 } },
+{"timestamp_seconds": 62.756,"position": { "x": 2.98004, "y": 1.97479, "z": 4.39844 } , "rotation": { "x": 0.0315623, "y": 0.886491, "z": 0.0611444, "w": -0.457601 } },
+{"timestamp_seconds": 64.948,"position": { "x": 7.35724, "y": 2.01993, "z": 4.14894 } , "rotation": { "x": -0.0363457, "y": 0.913402, "z": 0.0836854, "w": 0.396702 } },
+{"timestamp_seconds": 66.133,"position": { "x": 5.92441, "y": 1.2676, "z": 2.2939 } , "rotation": { "x": 0.00108777, "y": 0.998305, "z": -0.0198544, "w": 0.0546945 } },
+{"timestamp_seconds": 67.783,"position": { "x": 5.57477, "y": 1.81248, "z": 0.531918 } , "rotation": { "x": 0.254258, "y": 0.641306, "z": -0.238564, "w": 0.683495 } },
+{"timestamp_seconds": 80,"position": { "x": 5.57477, "y": 1.81248, "z": 0.531918 } , "rotation": { "x": 0.0302001, "y": 0.67818, "z": -0.0279131, "w": 0.733745 } }
+
+							//{"timestamp_seconds": 0.964,  "position": { "x": 7.804476, "y": 1.001801, "z": 1.158290}, "rotation": { "x": 0.090008, "y": 0.471286, "z": -0.048422, "w": 0.876038}},
+							//{"timestamp_seconds": 2, 	  "position": { "x": 7.804476, "y": 1.001801, "z": 1.158290}, "rotation": { "x": 0.090008, "y": 0.471286, "z": -0.048422, "w": 0.876038}},
+							//{"timestamp_seconds": 6.446,  "position": { "x": 4.563946, "y": 1.227012, "z": -0.433779}, "rotation": { "x": 0.013683, "y": 0.529900, "z": -0.008551, "w": 0.847907}},
+							//{"timestamp_seconds": 11.499,  "position": { "x": 2.951869, "y": 6.432955, "z": -1.377214}, "rotation": { "x": 0.040882, "y": 0.411736, "z": -0.018493, "w": 0.910198}},
+							//{"timestamp_seconds": 14.646, "position": { "x": 0.151221, "y": 6.824721, "z": -4.400869}, "rotation": { "x": 0.032213, "y": 0.452425, "z": -0.016356, "w": 0.891070}},
+							//{"timestamp_seconds": 16.918, "position": { "x": 0.151221, "y": 6.824721, "z": -4.400869}, "rotation": { "x": 0.021352, "y": 0.699272, "z": -0.020904, "w": 0.714231}},
+							//{"timestamp_seconds": 18.699, "position": { "x": -3.072378, "y": 7.017664, "z": -4.464562}, "rotation": { "x": 0.021325, "y": 0.700164, "z": -0.020931, "w": 0.713356}},
+							//{"timestamp_seconds": 23.332, "position": { "x": -4.721265, "y": 7.086880, "z": -3.701910}, "rotation": { "x": 0.037935, "y": 0.950672, "z": -0.129015, "w": 0.279534}},
+							//{"timestamp_seconds": 26.139, "position": { "x": -3.609288, "y": 7.734954, "z": -1.083545}, "rotation": { "x": 0.297136, "y": 0.665671, "z": -0.329711, "w": 0.599903}},
+							//{"timestamp_seconds": 27.802, "position": { "x": -0.948375, "y": 4.473551, "z": 0.479061}, "rotation": { "x": 0.297136, "y": 0.665671, "z": -0.329711, "w": 0.599903}},
+							//{"timestamp_seconds": 32.374, "position": { "x": 1.643689, "y": 3.437461, "z": -0.213343}, "rotation": { "x": 0.297136, "y": 0.665671, "z": -0.329711, "w": 0.599903}},
+							//{"timestamp_seconds": 35.959, "position": { "x": 8.383001, "y": 1.540356, "z": -0.193173}, "rotation": { "x": -0.004685, "y": 0.941077, "z": 0.013049, "w": 0.337909}},
+							//{"timestamp_seconds": 40.403, "position": { "x": 0.666438, "y": 1.816209, "z": -0.521640}, "rotation": { "x": 0.007799, "y": 0.713692, "z": -0.007948, "w": 0.700371}}
+					],
+					"light": [
+							{
+								"timestamp_seconds": 0.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -75.9915, 
+									"yaw": 51.2847, 
+									"roll": 0
+								},
+								"color": {"x": 18, "y": 18, "z": 10, "w": 1}
+							},
+							{
+								"timestamp_seconds": 20.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -25.2584,
+									"yaw": 52.834,
+									"roll": 0
+								},
+								"color": {"x": 10, "y": 2, "z": 0, "w": 1}
+							},
+							{
+								"timestamp_seconds": 20.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -75.9915, 
+									"yaw": 51.2847, 
+									"roll": 0
+								},
+								"color": {"x": 18, "y": 18, "z": 10, "w": 1}
+							},
+							{
+								"timestamp_seconds": 40.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -25.2584,
+									"yaw": 52.834,
+									"roll": 0
+								},
+								"color": {"x": 10, "y": 2, "z": 0, "w": 1}
+							},
+							{
+								"timestamp_seconds": 40.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -75.9915, 
+									"yaw": 51.2847, 
+									"roll": 0
+								},
+								"color": {"x": 18, "y": 18, "z": 10, "w": 1}
+							},
+							{
+								"timestamp_seconds": 60.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -25.2584,
+									"yaw": 52.834,
+									"roll": 0
+								},
+								"color": {"x": 10, "y": 2, "z": 0, "w": 1}
+							},
+							{
+								"timestamp_seconds": 60.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -75.9915, 
+									"yaw": 51.2847, 
+									"roll": 0
+								},
+								"color": {"x": 18, "y": 18, "z": 10, "w": 1}
+							},
+							{
+								"timestamp_seconds": 80.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -25.2584,
+									"yaw": 52.834,
+									"roll": 0
+								},
+								"color": {"x": 15, "y": 2, "z": 0, "w": 1}
+							},
+							{
+								"timestamp_seconds": 80.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -75.9915, 
+									"yaw": 51.2847, 
+									"roll": 0
+								},
+								"color": {"x": 18, "y": 18, "z": 10, "w": 1}
+							},
+							{
+								"timestamp_seconds": 100.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -25.2584,
+									"yaw": 52.834,
+									"roll": 0
+								},
+								"color": {"x": 15, "y": 2, "z": 0, "w": 1}
+							}
+					]
+				}
+			}
 		},
 		{
 			"name": "light0",
@@ -153,7 +308,7 @@
 								"normal": "TEXTURE(textures/lymphocyte/Lymphocyte_N.png)",
 								"orm": "TEXTURE(textures/lymphocyte/Lymphocyte_ORM.png)",
 								"base_color_factor": 1.0,
-								"emissive_factor": 0.3,
+								"emissive_factor": 25.3,
 								"occlusion_factor": 1.0,
 								"roughness_factor": 1.0,
 								"metallic_factor": 1.0

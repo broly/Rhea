@@ -3,6 +3,9 @@ export module rhmath:vec;
 import glm;
 import reflect;
 
+import <json/value.h>;
+import rhobject;
+#include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 
 export struct vec2
@@ -97,6 +100,12 @@ export struct vec4
     {
         return glm_type(x, y, z, w);
     }
+    
+    
+    auto glm() const
+    {
+        return glm_type(x, y, z, w);
+    }
 };
 REFLECT_STRUCT(vec4,
     x, y, z, w);
@@ -136,6 +145,47 @@ export struct quat
 };
 REFLECT_STRUCT(quat,
     x, y, z, w);
+
+export void serialize_json_value(quat& target, const Json::Value& value, const SerializationContext& context)
+{
+    auto kind =  value.find("__kind__");
+    if (kind)
+    {
+        std::string parsed_kind = kind->asString();
+        if (parsed_kind == "euler_rad")
+        {
+            auto yaw = value.find("yaw");
+            auto pitch = value.find("pitch");
+            auto roll = value.find("roll");
+
+            glm::vec3 euler(
+                pitch ? pitch->asFloat() : 0.0f, // X
+                yaw   ? yaw->asFloat()   : 0.0f, // Y
+                roll  ? roll->asFloat()  : 0.0f  // Z
+            );
+
+            target = glm::quat(euler);
+            return;
+        }
+        if (parsed_kind == "euler_deg")
+        {
+            auto yaw = value.find("yaw");
+            auto pitch = value.find("pitch");
+            auto roll = value.find("roll");
+
+            glm::vec3 euler(
+                pitch ? glm::radians(pitch->asFloat()) : 0.0f,
+                yaw   ? glm::radians(yaw->asFloat())   : 0.0f,
+                roll  ? glm::radians(roll->asFloat())  : 0.0f
+            );
+
+            target = glm::quat(euler);
+            return;
+        }
+    }
+    auto names = value.getMemberNames();
+    reflect::json::visit_serialize(value, target, context);
+}
 
 
 export struct mat4 
