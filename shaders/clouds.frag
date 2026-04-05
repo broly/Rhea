@@ -2,6 +2,7 @@
 
 #include "definitions.glsl"
 #include "math.glsl"
+#include "resources/gbuffer.glsl"
 #include "resources/camera.glsl"
 
 // ================== INPUT ==================
@@ -43,7 +44,6 @@ layout(set = SET_CLOUDS, binding = BINDING_UBO_CLOUDS) uniform CloudsUBO
 
 // ================== TEXTURES =================
 layout(set = SET_CLOUDS, binding = BINDING_SAMPLER_NOISE) uniform sampler2D u_noise;
-layout(set = SET_CLOUDS, binding = BINDING_SAMPLER_DEPTH) uniform sampler2D u_depth;
 
 
 
@@ -51,18 +51,6 @@ layout(set = SET_CLOUDS, binding = BINDING_SAMPLER_DEPTH) uniform sampler2D u_de
 float saturate(float x)
 {
     return clamp(x, 0.0, 1.0);
-}
-
-vec3 reconstruct_world_pos(vec2 uv, float depth)
-{
-    vec2 ndc = uv * 2.0 - 1.0;
-
-    vec4 clip = vec4(ndc, depth, 1.0);
-    vec4 view = inverse(camera_ubo.proj) * clip;
-    view /= view.w;
-
-    vec4 world = inverse(camera_ubo.view) * view;
-    return world.xyz;
 }
 
 vec3 get_view_ray(vec2 uv)
@@ -123,7 +111,7 @@ float sample_cloud_density(vec3 world_pos, vec3 ray_dir)
 
 void main()
 {
-    float depth = texture(u_depth, v_uv).r;
+    float depth = get_gbuffer_DEPTH(v_uv).r;
 
     if (depth < 0.9999)
         discard;

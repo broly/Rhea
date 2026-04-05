@@ -22,7 +22,7 @@
 				},
 				"fragment": {
 					"shader": "clouds.frag",
-					"resources": ["camera", "clouds"]
+					"resources": ["camera", "clouds", "gbuffer"]
 				}
 			},
 			"color_attachments": [

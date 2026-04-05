@@ -703,10 +703,10 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     prepare_geometry_resources(ctx);
     
     
-    prepare_clouds_pass(ctx);
     prepare_wireframe_pass(ctx);
     prepare_ssr(ctx);
     prepare_raytracing(ctx);
+    prepare_clouds_pass(ctx);
 }
 
 void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
@@ -1234,7 +1234,7 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
     
     if (ctx.bind_pipeline(clouds_pipeline))
     {
-        ctx.bind(camera_resource, clouds_resource);
+        ctx.bind(camera_resource, clouds_resource, gbuffer_resource);
     }
     ctx.draw_fullscreen();
 
