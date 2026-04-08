@@ -3,27 +3,20 @@
 
 #include "rtx/ray_payload.glsl"
 
+#if 0
+    // stub
+    #define rayPayloadInEXT
+#endif
+
 layout(location = RTXGI_RAY_PAYLOAD_RAY) 
 rayPayloadInEXT RayPayload payload;
 
-layout(push_constant) 
-uniform RTXGIPushConstants
-{
-    uint frame;
-    float intensity;
-} pc;
 
 void main()
 {
     vec3 dir = normalize(gl_WorldRayDirectionEXT);
 
     float t = 0.5 * (dir.y + 1.0);
-
-    // vec3 sky = mix(
-    //     vec3(0.05, 0.0525, 0.15),
-    //     vec3(0.7, 0.8, 1.0),
-    //     t
-    // );
     
     vec3 sky = vec3(0.0, 0.0, 0.0);
 

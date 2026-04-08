@@ -3,6 +3,8 @@
 
 #include "utils/math.glsl"
 
+
+
 uint wang_hash(uint seed)
 {
     seed = (seed ^ 61u) ^ (seed >> 16u);

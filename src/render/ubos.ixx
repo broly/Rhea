@@ -83,6 +83,7 @@ export struct RTXGIPushConstants
 {
     uint32_t frame;
     float intensity;
+    uint32_t spp;
 };
 REFLECT_STRUCT_RUNTIME(RTXGIPushConstants,
     frame, intensity);

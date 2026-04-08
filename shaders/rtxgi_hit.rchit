@@ -3,6 +3,12 @@
 
 #include "rtx/ray_payload.glsl"
 
+
+#if 0
+    // stub
+    #define rayPayloadInEXT
+#endif
+
 layout(location = RTXGI_RAY_PAYLOAD_SHADOW) 
 rayPayloadInEXT ShadowPayload payload;
 

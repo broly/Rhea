@@ -31,7 +31,7 @@
 			"components": [
 			],
 			"fields": {
-				"time_dilation": 1,
+				"time_dilation": 0.5,
 				"samples": {
 					"cam": [
 
@@ -75,7 +75,7 @@
 									"yaw": 51.2847, 
 									"roll": 0
 								},
-								"color": {"x": 18, "y": 18, "z": 10, "w": 1}
+								"color": {"x": 8, "y": 8, "z": 5, "w": 1}
 							},
 							{
 								"timestamp_seconds": 20.0,  

@@ -10,10 +10,20 @@
 #include "resources/light.glsl"
 #include "resources/tlas.glsl"
 
+#include "push_constants/rtxgi_push_constants.glsl"
+
 #include "rtx/ray_payload.glsl"
 #include "rtx/rng.glsl"
 
 #include "rtx/sbt.glsl"
+
+
+#if 0
+    // stub
+    #define rayPayloadInEXT
+    #define rayPayloadEXT
+    #define hitAttributeEXT
+#endif
 
 layout(location = RTXGI_RAY_PAYLOAD_RAY) 
 rayPayloadInEXT RayPayload payload;
@@ -23,12 +33,6 @@ rayPayloadEXT ShadowPayload shadow_payload;
 
 hitAttributeEXT 
 vec2 attribs;
-
-layout(push_constant) uniform RTXGIPushConstants
-{
-    uint frame;
-    float intensity;
-} pc;
 
 void main()
 {
@@ -112,7 +116,7 @@ void main()
     const int MAX_BOUNCES = 4;
 
     if (payload.depth >= MAX_BOUNCES)
-    return;
+        return;
 
     // =====================================================
     // RANDOM
@@ -169,7 +173,6 @@ void main()
         dir,
         10000.0,
         RTXGI_RAY_PAYLOAD_RAY
-    
     );
 
 }

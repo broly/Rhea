@@ -10,15 +10,16 @@
 #include "rtx/ray_payload.glsl"
 #include "rtx/rng.glsl"
 
+#include "push_constants/rtxgi_push_constants.glsl"
+
+
+#if 0
+    // stub
+    #define rayPayloadEXT
+#endif
+
 layout(location = RTXGI_RAY_PAYLOAD_RAY) 
 rayPayloadEXT RayPayload payload;
-
-layout(push_constant) 
-uniform RTXGIPushConstants
-{
-    uint frame;
-    float intensity;
-} pc;
 
 void main()
 {
@@ -31,7 +32,7 @@ void main()
     vec3 N = normalize(get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0);
 
     if (length(world_pos) < 0.0001)
-    return;
+        return;
 
     uint seed = wang_hash(
         uint(pixel.x) +
@@ -57,11 +58,5 @@ void main()
         RTXGI_RAY_PAYLOAD_RAY
     );
 
-//    vec3 prev = imageLoad(u_hdr_color_present, pixel).rgb;
-//
-//    float alpha = 1.0 / float(pc.frame + 1);
-//    vec3 color = mix(prev, payload.radiance * pc.intensity, alpha);
-//
-//    imageStore(u_hdr_color_present, pixel, vec4(color, 1.0));
     imageStore(u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI], pixel, vec4(payload.radiance * pc.intensity, 1.0));
 }

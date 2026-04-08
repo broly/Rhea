@@ -1,6 +1,8 @@
 #ifndef RTX_RAY_PAYLOAD
 #define RTX_RAY_PAYLOAD
 
+
+
 #define RTXGI_RAY_PAYLOAD_RAY 0
 struct RayPayload
 {

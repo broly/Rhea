@@ -975,16 +975,17 @@ void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
     clouds_ubo.planet_center = { 0, 0, 0, 0 };        // flat world
     clouds_ubo.cloud_base    = { 150.0f, 400.0f, 0.3f, 1.0f };
 
-    clouds_ubo.sun_direction = { -0.4f, 0.8f, -0.3f, 0.0f };
-    clouds_ubo.sun_color     = { 1.0f, 0.98f, 0.95f, 15.0f };
+    
+    clouds_ubo.sun_direction = glm::vec4{ normalize(glm::vec3(-0.4f, 0.8f, -0.3f)), 0.0f };
+    clouds_ubo.sun_color     = { 2.0f, 1.98f, 0.7f, 15.0f };
 
-    clouds_ubo.cloud_color   = { 1.0f, 1.0f, 1.0f, 1.0f };
+    clouds_ubo.cloud_color   = { 1.5f, 1.5f, 1.0f, 1.0f };
 
     clouds_ubo.scattering = { 1.0f, 0.4f, 0.25f, 0.0f };
 
     clouds_ubo.wind          = { 0.02f, 0.0f, 0.01f, 0.0 };
     
-    clouds_ubo.sky_ambient = { 0.45f, 0.55f, 0.7f, 0.0f };
+    clouds_ubo.sky_ambient = { 0.45f, 1.65f, 2.7f, 0.0f };
     clouds_ubo.horizon_color = { 0.8f, 0.9f, 1.0f, 0.0f };
     
     clouds_resource->update_uniform_buffer(
