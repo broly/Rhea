@@ -4,7 +4,6 @@
 #include "utils/math.glsl"
 
 
-
 uint wang_hash(uint seed)
 {
     seed = (seed ^ 61u) ^ (seed >> 16u);
@@ -15,10 +14,23 @@ uint wang_hash(uint seed)
     return seed;
 }
 
-float rand(inout uint seed)
+uint rng_state_init(ivec2 pixel, uint frame, uint smpl)
 {
-    seed = wang_hash(seed);
-    return float(seed) / float(0xffffffffu);
+    uint s = 
+        uint(pixel.x) * 1973u +
+        uint(pixel.y) * 9277u +
+        frame * 26699u + 
+        smpl * 104729u;
+
+    return wang_hash(wang_hash(s));
+}
+
+float rng_state_rand(inout uint state)
+{
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    return float(state) * (1.0 / 4294967296.0);
 }
 
 vec3 sample_cosine_hemisphere(vec3 N, float u1, float u2)
@@ -39,10 +51,10 @@ vec3 sample_cosine_hemisphere(vec3 N, float u1, float u2)
 }
 
 // Cosine hemisphere sampling
-vec3 cosine_sample(vec3 N, in uint seed)
+vec3 cosine_sample(vec3 N, inout uint rng_state)
 {
-    float r1 = rand(seed);
-    float r2 = rand(seed);
+    float r1 = rng_state_rand(rng_state);
+    float r2 = rng_state_rand(rng_state);
 
     float phi = 2.0 * 3.14159265 * r1;
     float cosTheta = sqrt(1.0 - r2);

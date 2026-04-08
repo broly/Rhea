@@ -9,6 +9,7 @@ struct RayPayload
     vec3 radiance;
     vec3 throughput;
     uint depth;
+    uint rng_state;
 };
 
 #define RTXGI_RAY_PAYLOAD_SHADOW 1

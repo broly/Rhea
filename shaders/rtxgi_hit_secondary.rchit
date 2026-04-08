@@ -110,39 +110,19 @@ void main()
             }
         }
     }
-    // =====================================================
-    // STOP
-    // =====================================================
+    
     const int MAX_BOUNCES = 4;
 
     if (payload.depth >= MAX_BOUNCES)
         return;
 
-    // =====================================================
-    // RANDOM
-    // =====================================================
-    uint seed = wang_hash(
-        uint(gl_LaunchIDEXT.x) * 1973u +
-        uint(gl_LaunchIDEXT.y) * 9277u +
-        uint(payload.depth) * 26699u +
-        pc.frame * 374761393u
-    );
 
-    vec3 dir = cosine_sample(N, seed);
+    vec3 dir = cosine_sample(N, payload.rng_state);
 
-    // =====================================================
-    // THROUGHPUT
-    // =====================================================
     payload.throughput *= albedo;
 
-    // =====================================================
-    // GI BOOST (умеренный!)
-    // =====================================================
     payload.throughput *= 1.5;
 
-    // =====================================================
-    // RUSSIAN ROULETTE
-    // =====================================================
     if (payload.depth >= 2)
     {
         float p = max(payload.throughput.r,
@@ -150,8 +130,8 @@ void main()
 
         p = clamp(p, 0.1, 1.0);
 
-        if (rand(seed) > p)
-        return;
+        if (rng_state_rand(payload.rng_state) > p)
+            return;
 
         payload.throughput /= p;
     }

@@ -7,6 +7,7 @@
 #include "resources/gbuffer.glsl"
 #include "resources/hdr_color_storage.glsl"
 
+#include "rtx/sbt.glsl"
 #include "rtx/ray_payload.glsl"
 #include "rtx/rng.glsl"
 
@@ -26,37 +27,53 @@ void main()
     ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
     ivec2 size  = ivec2(gl_LaunchSizeEXT.xy);
 
-    vec2 uv = (vec2(pixel) + 0.5) / vec2(size);
+    vec3 final_color = vec3(0.0);
 
-    vec3 world_pos = get_gbuffer_POSITION(uv).xyz;
-    vec3 N = normalize(get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0);
+    for (uint i = 0; i < pc.spp; ++i)
+    {
+        payload.radiance   = vec3(0.0);
+        payload.throughput = vec3(1.0);
+        payload.depth      = 0;
 
-    if (length(world_pos) < 0.0001)
-        return;
+        payload.rng_state = rng_state_init(pixel, pc.frame, i);
 
-    uint seed = wang_hash(
-        uint(pixel.x) +
-        uint(pixel.y) * 4096u +
-        pc.frame * 16777619u
+        vec2 jitter = vec2(
+            rng_state_rand(payload.rng_state),
+            rng_state_rand(payload.rng_state)
+        );
+
+        vec2 uv = (vec2(pixel) + jitter) / vec2(size);
+
+        vec3 world_pos = get_gbuffer_POSITION(uv).xyz;
+        vec3 N = normalize(get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0);
+
+        if (length(world_pos) < 0.0001)
+            continue;
+
+        vec3 dir = cosine_sample(N, payload.rng_state);
+
+        traceRayEXT(
+            u_tlas,
+            gl_RayFlagsOpaqueEXT,
+            0xFF,
+            RTXGI_HIT_SECONDARY,
+            RTXGI_DEFAULT_STRIDE,
+            RTXGI_MISS_SECONDARY,
+            world_pos + N * 0.001,
+            0.001,
+            dir,
+            10000.0,
+            RTXGI_RAY_PAYLOAD_RAY
+        );
+
+        final_color += payload.radiance;
+    }
+
+    final_color /= float(pc.spp);
+
+    imageStore(
+        u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI],
+        pixel,
+        vec4(final_color * pc.intensity, 1.0)
     );
-
-    payload.radiance   = vec3(0.0);
-    payload.throughput = vec3(1.0);
-    payload.depth      = 0;
-
-    vec3 dir = cosine_sample(N, seed);
-
-    traceRayEXT(
-        u_tlas,
-        gl_RayFlagsOpaqueEXT,
-        0xFF,
-        1, 1, 1,
-        world_pos + N * 0.001,
-        0.001,
-        dir,
-        10000.0,
-        RTXGI_RAY_PAYLOAD_RAY
-    );
-
-    imageStore(u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI], pixel, vec4(payload.radiance * pc.intensity, 1.0));
 }

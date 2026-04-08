@@ -1401,6 +1401,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
     RTXGIPushConstants pc{};
     pc.frame = frame_index;
     pc.intensity = 1.0f;
+    pc.spp = 1;
 
     ctx.backend.push_constants(
         ctx.cmd,
