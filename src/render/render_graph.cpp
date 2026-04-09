@@ -101,6 +101,25 @@ void RGTexture::reset_layout()
     }
 }
 
+void RenderGraphContext::compute(const ComputeWorkgroups& workgroups) const
+{
+    checkf(render_graph.get_current_pass().type == RenderPassType::compute,
+        "could not dispatch in non-compute pass");
+    backend.compute(cmd, workgroups);
+}
+
+void RenderGraphContext::trace_rays(PipelineObject* pipeline, const Extent& extent, uint32_t depth) const
+{
+    checkf(render_graph.get_current_pass().type == RenderPassType::rtx,
+        "could not trace rays in non-raytrace pass");
+    backend.trace_rays(
+        cmd,
+        pipeline,
+        extent,
+        depth
+    );
+}
+
 void RenderGraphContext::copy_img(const CopyImageParams& params) const
 {
     backend.copy_image(cmd, params);
@@ -212,6 +231,18 @@ RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
     RGPassId id{ static_cast<uint32_t>(passes.size()) };
     passes.push_back(std::move(pass));
     return id;
+}
+
+const RenderGraphPass& RenderGraph::get_current_pass() const
+{
+    for (auto& pass : passes)
+    {
+        if (pass.name == current_pass_name)
+        {
+            return pass;
+        }
+    }
+    unreachable("No such pass");
 }
 
 static RBImageLayout initial_layout_from_usage(RBImageUsage usage)

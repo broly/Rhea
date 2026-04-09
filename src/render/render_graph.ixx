@@ -173,15 +173,15 @@ public:
         backend.push_constants(cmd, std::forward<T>(value));
     }
     
-    void compute(const ComputeWorkgroups& workgroups = {})
-    {
-        backend.compute(cmd, workgroups);
-    }
+    void compute(const ComputeWorkgroups& workgroups = {}) const;
     
+    void trace_rays(PipelineObject* pipeline, const Extent& extent, uint32_t depth) const;
+
     void draw_indexed(size_t size) const
     {
         backend.draw_indexed(cmd, size);
     }
+    
     
     void bind_mesh(MeshPrimHandle mesh) const
     {
@@ -225,6 +225,8 @@ public:
     RGTextureHandle duplicate_texture(RGTextureHandle in_texture_handle, Name name);
 
     RGPassId add_pass(RenderGraphPass&& pass);
+    
+    const RenderGraphPass& get_current_pass() const;
 
     void compile();
     void execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback);

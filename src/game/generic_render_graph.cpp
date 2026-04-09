@@ -474,6 +474,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
                 ctx.compute(workgroups);
             },
+            .type = RenderPassType::compute
         });
         
         add_pass({
@@ -495,6 +496,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
                 ctx.compute(workgroups);
             },
+            .type = RenderPassType::compute
         });
         
         add_pass({
@@ -515,6 +517,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
                 ctx.compute(workgroups);
             },
+            .type = RenderPassType::compute
         });
         
         add_pass({
@@ -539,6 +542,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
                 ctx.compute(workgroups);
             },
+            .type = RenderPassType::compute
         });
         
         add_copy_pass("COPY_RTXGI_ACCUM_TO_HISTORY",
@@ -1407,13 +1411,9 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
         ctx.cmd,
         pc
     );
+    
+    ctx.trace_rays(rtx_gi_pipeline, resolution, 1);
 
-    ctx.backend.trace_rays(
-        ctx.cmd,
-        rtx_gi_pipeline,
-        {resolution.width, resolution.height},
-        1
-    );
 }
 
 void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong)
