@@ -49,7 +49,7 @@ REFLECT_ENUM(RBImageLayout,
 
 
 
-export enum class RBImageUsage
+export enum class RBImageUsageType
 {
     Undefined,
 
@@ -68,7 +68,7 @@ export enum class RBImageUsage
 
     Present
 };
-REFLECT_ENUM(RBImageUsage,
+REFLECT_ENUM(RBImageUsageType,
     Undefined,
     ColorAttachment,
     DepthStencilAttachment,
@@ -100,6 +100,25 @@ export enum class RBStoreOp
 };
 REFLECT_ENUM(RBStoreOp,
     Store, DontCare);
+
+
+export enum class RenderPassType
+{
+    graphics,
+    compute,
+    rtx,
+    transfer,
+    present,
+};
+
+struct RGResourceUsage
+{
+    RBImageUsageType usage;
+    RenderPassType pass_type;
+    
+    bool load;
+    bool store;
+};
 
 
 export struct MeshTableInfo
@@ -363,7 +382,7 @@ export
         RBImageHandle image;
         RBLoadOp load;
         RBStoreOp store;
-        RBImageUsage usage;
+        RBImageUsageType usage;
         uint32_t layer = 0;
         uint32_t mip_level = 0;
         bool depth_attachment = false;
@@ -410,15 +429,17 @@ export
     
     struct ImageBarrierParams
     {
+        Name debug_pass_name;
         RBImageHandle image = {};
-        RBImageLayout before = RBImageLayout::undefined;
-        RBImageLayout after = RBImageLayout::undefined;
-        RBImageUsage src_usage = RBImageUsage::Undefined;
-        RBImageUsage dst_usage = RBImageUsage::Undefined;
+        RBImageUsageType src_usage = RBImageUsageType::Undefined;
+        RBImageUsageType dst_usage = RBImageUsageType::Undefined;
+        RenderPassType pass_type;
         uint32_t base_layer = 0;
         uint32_t base_mip = 0;
         uint32_t layer_count = 0;
         uint32_t mip_count = 0;
         bool log = false;
+        bool load = false;
+        bool store = false;
     };
 }

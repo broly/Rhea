@@ -32,7 +32,7 @@ struct RenderPassAttachmentInfo
     RBFormat format;
     RBLoadOp load_op;
     RBStoreOp store_op;
-    RBImageUsage usage;
+    RBImageUsageType usage;
     uint32_t layer = 0;
     uint32_t mip_level = 0;
     bool is_swapchain = false;

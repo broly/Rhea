@@ -77,7 +77,6 @@ namespace vk
         bool framebuffer_resized = false;
         std::vector<VkSemaphore> render_finished_per_image;
 
-
         std::array<VkSemaphore, MAX_FRAMES_IN_FLIGHT> render_finished_per_frame;
     };
 }

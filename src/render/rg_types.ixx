@@ -67,8 +67,8 @@ export
     
     struct BarrierInfo
     {
-        RBImageUsage src_usage = RBImageUsage::Undefined;
-        RBImageUsage dst_usage;
+        RBImageUsageType src_usage = RBImageUsageType::Undefined;
+        RBImageUsageType dst_usage;
         bool is_transition;
     };
 
@@ -78,10 +78,10 @@ export
         std::optional<BarrierInfo> after_pass;  // will be read as: attachment -> (Sampled, Present, Storage)
     };
 
-    struct RGImageUse
+    struct RBImageUsage
     {
         RGTextureHandle texture;
-        RBImageUsage    usage;
+        RBImageUsageType usage_type;
         RBLoadOp load_op = RBLoadOp::Load;
         RBStoreOp store_op = RBStoreOp::Store;
     };

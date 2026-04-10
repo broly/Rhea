@@ -45,7 +45,7 @@ void BrdfLutCaptureRenderGraph::build_passes(const std::map<Name, bool>& paramet
    // Pass: compute BRDF LUT
    add_pass({
        .name = "IBL_BRDF_LUT",
-       .writes = { { brdf_lut, RBImageUsage::ColorAttachment, RBLoadOp::Clear } },
+       .writes = { { brdf_lut, RBImageUsageType::ColorAttachment, RBLoadOp::Clear } },
        .execute = [this](RenderGraphContext& ctx) {
            todo();
            // ctx.backend.bind_pipeline(ctx.cmd, brdf_lut_pipeline);

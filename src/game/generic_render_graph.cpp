@@ -355,7 +355,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "ShadowMap",
             .writes = {
-                { shadow_map, RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear }
+                { shadow_map, RBImageUsageType::DepthStencilAttachment, RBLoadOp::Clear }
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
@@ -369,10 +369,10 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                .name = "ShadowDebug",
                .condition = [this] () { return renderer->get_render_flag(Names::debug_shadow); },
                .reads = {
-                   { shadow_map, RBImageUsage::SampledFragment }
+                   { shadow_map, RBImageUsageType::SampledFragment }
                },
                .writes = {
-                   { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                   { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
                },
                .execute = [this] (RenderGraphContext& ctx)
                {
@@ -406,15 +406,15 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .reads = {
             },
             .writes = { 
-                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
-                { gbuffer[GBUFFER_SLOT_EMISSIVE], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsageType::DepthStencilAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+                { gbuffer[GBUFFER_SLOT_EMISSIVE], RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
@@ -431,14 +431,14 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "RTXGI",
             .reads = {
-                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsageType::SampledFragment },
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::StorageImage }
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsageType::StorageImage }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -454,15 +454,15 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "RTXGI_REPROJECT",
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsageType::SampledFragment },
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment },
 
-                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
-                { gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsageType::SampledFragment },
+                { gbuffer_hist[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsageType::SampledFragment },
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -481,11 +481,11 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "RTXGI_TEMPORAL_ACCUM",
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsage::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], RBImageUsageType::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], RBImageUsageType::SampledFragment },
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -503,10 +503,10 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "RTXGI_MOMENTS",
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment }
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment }
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -524,14 +524,14 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "RTXGI_SPATIAL",
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsage::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsageType::SampledFragment },
 
-                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsageType::SampledFragment },
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -556,8 +556,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_copy_pass("COPY_gbuffer_world_normal_to_history", 
             gbuffer[GBUFFER_SLOT_WORLD_NORMAL], gbuffer_hist[GBUFFER_SLOT_WORLD_NORMAL]);
         
-        add_copy_pass("COPY_gbuffer_depth_to_history", 
-            gbuffer[GBUFFER_SLOT_DEPTH], gbuffer_hist[GBUFFER_SLOT_DEPTH]);
+        // add_copy_pass("COPY_gbuffer_depth_to_history", 
+        //     gbuffer[GBUFFER_SLOT_DEPTH], gbuffer_hist[GBUFFER_SLOT_DEPTH]);
         
         add_copy_pass("COPY_gbuffer_position_to_history", 
             gbuffer[GBUFFER_SLOT_POSITION], gbuffer_hist[GBUFFER_SLOT_POSITION]);
@@ -571,11 +571,11 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = Names::pass_geometry_translucent,
             .reads = {
-                 { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },    
+                 { brdf_lut, RBImageUsageType::SampledFragment, RBLoadOp::Load },    
             },
             .writes = { 
-                { decal_albedo, RBImageUsage::ColorAttachment, RBLoadOp::Clear },  
-                 { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::DepthStencilAttachment, RBLoadOp::Load },
+                { decal_albedo, RBImageUsageType::ColorAttachment, RBLoadOp::Clear },  
+                 { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsageType::DepthStencilAttachment, RBLoadOp::Load },
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
@@ -590,21 +590,21 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = Names::pass_lighting,
             .reads = {
-                {  shadow_map, RBImageUsage::SampledFragment },
-                { brdf_lut, RBImageUsage::SampledFragment, RBLoadOp::Load },
-                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_EMISSIVE], RBImageUsage::SampledFragment },
-                { decal_albedo, RBImageUsage::SampledFragment }
+                {  shadow_map, RBImageUsageType::SampledFragment },
+                { brdf_lut, RBImageUsageType::SampledFragment, RBLoadOp::Load },
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_MOTION_VECTORS], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_EMISSIVE], RBImageUsageType::SampledFragment },
+                { decal_albedo, RBImageUsageType::SampledFragment }
             },
             .writes = { 
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Clear },
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
@@ -623,11 +623,11 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "Clouds",
             .reads = {
-                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-                { noise_texture, RBImageUsage::SampledFragment }
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsageType::SampledFragment },
+                { noise_texture, RBImageUsageType::SampledFragment }
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::ColorAttachment, RBLoadOp::Load },
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Load },
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
@@ -645,13 +645,13 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "SSR",
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment },
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_DEPTH], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_NORMAL], RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment },
             },
             .writes = {
-                { ssr_texture, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                { ssr_texture, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -664,12 +664,12 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "SSRComposite",
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
-                { ssr_texture, RBImageUsage::SampledFragment },
-                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsage::SampledFragment }
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::SampledFragment },
+                { ssr_texture, RBImageUsageType::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment }
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::ColorAttachment, RBLoadOp::Load }
+                { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsageType::ColorAttachment, RBLoadOp::Load }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -680,10 +680,10 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         add_pass({
             .name = "COPY_ssr_compose_to_hdr_base",
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsage::TransferSrc }
+                { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsageType::TransferSrc }
             },
             .writes = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::TransferDst, RBLoadOp::Load }
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::TransferDst, RBLoadOp::Load }
             },
             .execute = [this](RenderGraphContext& ctx)
             {
@@ -1424,10 +1424,10 @@ void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTexture
     add_pass({
         .name = name,
         .reads = {
-            { src, RBImageUsage::TransferSrc }
+            { src, RBImageUsageType::TransferSrc }
         },
         .writes = {
-            { dst, RBImageUsage::TransferDst, RBLoadOp::Load }
+            { dst, RBImageUsageType::TransferDst, RBLoadOp::Load }
         },
         .execute = [this, src, dst, ping_pong](RenderGraphContext& ctx)
         {

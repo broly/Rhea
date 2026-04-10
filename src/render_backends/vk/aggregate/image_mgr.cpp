@@ -24,7 +24,8 @@ RBImageHandle vk::ImageManager::register_swapchain_image(
     LogVkImageManager.Log("Register swapchain image: %p", image);
     VkImageView view;
     
-    Name image_name = std::string("[SWAPCHAIN_IMAGE_ ") + std::to_string(image_index) + "]";
+    Name image_name = std::string("[SWAPCHAIN_IMAGE_") + std::to_string(image_index) + "]";
+    Name image_view_name = std::string("[SWAPCHAIN_IMAGE_") + std::to_string(image_index) + "_VIEW]";
 
     VkImageViewCreateInfo ivci{
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
@@ -47,6 +48,8 @@ RBImageHandle vk::ImageManager::register_swapchain_image(
         nullptr,
         &view));
     
+    debug_object_tracker.register_object((uint32_t)view, image_view_name);
+    
     uint32_t id = 0;
     
     if (!old_image_handle.has_value())
@@ -68,8 +71,8 @@ RBImageHandle vk::ImageManager::register_swapchain_image(
     res.format = surface_format.format;
     res.extent.width  = vk_extent.width;
     res.extent.height = vk_extent.height;
-    res.subresource_layouts.resize(1);
-    res.subresource_layouts[0].resize(1, VK_IMAGE_LAYOUT_UNDEFINED);
+    res.num_layers = 1;
+    res.init_states();
     
     
     
@@ -121,10 +124,15 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
     view_info.subresourceRange = {
         aspect, 0, 1, 0, 1
     };
-    view_info.subresourceRange.layerCount = is_cubemap ? 6 : 1;
-    view_info.subresourceRange.baseArrayLayer = is_cubemap ? 0 : layer_index;
+    
+    const uint32_t layer_count = is_cubemap ? 6 : 1;
+    const uint32_t mip_level_count = num_mips == 0 ? image_resource.mip_levels : num_mips;
+    const uint32_t array_layer_index = is_cubemap ? 0 : layer_index;
+    
+    view_info.subresourceRange.layerCount = layer_count;
+    view_info.subresourceRange.baseArrayLayer = array_layer_index;
     view_info.subresourceRange.baseMipLevel = mip_level;
-    view_info.subresourceRange.levelCount = num_mips == 0 ? image_resource.mip_levels : num_mips;
+    view_info.subresourceRange.levelCount = mip_level_count;
     if (is_cubemap)
     {
         view_info.subresourceRange.levelCount = 1;
@@ -133,6 +141,17 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
 
     VkImageView view;
     VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &view));
+    
+    const std::string array_subresources = layer_count == 1 ? 
+        std::string("[") + std::to_string(array_layer_index) + "]" :
+        std::string("[") + std::to_string(array_layer_index) + ".." + std::to_string(array_layer_index + layer_count) + "]";
+    
+    const std::string mip_subresources = mip_level_count == 1 ? 
+        std::string("[") + std::to_string(mip_level) + "]" :
+        std::string("[") + std::to_string(mip_level) + ".." + std::to_string(mip_level + mip_level_count) + "]";
+    
+    const Name image_view_name = image_resource.debug_name.to_string() + array_subresources + mip_subresources;
+    debug_object_tracker.register_object((uint64_t)view, image_view_name);
     
     if (!is_cubemap)
         image_resource.set_img_view(view, layer_index, mip_level);
@@ -184,11 +203,7 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     res.mip_levels = desc.mip_levels;
     res.num_layers = desc.get_num_layers();
     res.usage = desc.usage;
-    res.subresource_layouts.resize(res.num_layers);
-    for (auto& layer : res.subresource_layouts)
-    {
-        layer.resize(res.mip_levels, VK_IMAGE_LAYOUT_UNDEFINED);
-    }
+    res.init_states();
 
 
     VkImageUsageFlags vk_usage = 0;
@@ -380,10 +395,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     {
         ImageBarrierParams params_before_copy;
         params_before_copy.image = image;
-        params_before_copy.before = RBImageLayout::undefined;
-        params_before_copy.after = RBImageLayout::transfer_dst_optimal;
-        params_before_copy.src_usage = RBImageUsage::Undefined;
-        params_before_copy.dst_usage = RBImageUsage::TransferDst;
+        params_before_copy.src_usage = RBImageUsageType::Undefined;
+        params_before_copy.dst_usage = RBImageUsageType::TransferDst;
         transition_image(cmd, params_before_copy);
     
         VkBufferImageCopy copy{};
@@ -420,10 +433,8 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         {
             ImageBarrierParams params_after_gen;
             params_after_gen.image = image;
-            params_after_gen.before = RBImageLayout::transfer_dst_optimal;
-            params_after_gen.after = texture_creation_info.current_layout;
-            params_after_gen.src_usage = RBImageUsage::TransferDst;
-            params_after_gen.dst_usage = RBImageUsage::SampledFragment;  // TODO
+            params_after_gen.src_usage = RBImageUsageType::TransferDst;
+            params_after_gen.dst_usage = RBImageUsageType::SampledFragment;  // TODO
 
             transition_image(cmd, params_after_gen);
         }
@@ -500,10 +511,8 @@ RBImageHandle vk::ImageManager::create_fallback_texture(const Texture& tex,
     {
         ImageBarrierParams params_before_copy;
         params_before_copy.image = image;
-        params_before_copy.before = RBImageLayout::undefined;
-        params_before_copy.after = RBImageLayout::transfer_dst_optimal;
-        params_before_copy.src_usage = RBImageUsage::Undefined;
-        params_before_copy.dst_usage = RBImageUsage::TransferDst;
+        params_before_copy.src_usage = RBImageUsageType::Undefined;
+        params_before_copy.dst_usage = RBImageUsageType::TransferDst;
         transition_image(cmd, params_before_copy);
 
         VkBufferImageCopy copy{};
@@ -521,10 +530,8 @@ RBImageHandle vk::ImageManager::create_fallback_texture(const Texture& tex,
             
         ImageBarrierParams params_after_copy;
         params_after_copy.image = image;
-        params_after_copy.before = RBImageLayout::transfer_dst_optimal;
-        params_after_copy.after = RBImageLayout::shader_read_only_optimal;
-        params_after_copy.src_usage = RBImageUsage::Undefined;
-        params_after_copy.dst_usage = RBImageUsage::SampledFragment;  // TODO
+        params_after_copy.src_usage = RBImageUsageType::Undefined;
+        params_after_copy.dst_usage = RBImageUsageType::SampledFragment;  // TODO
 
         transition_image(cmd, params_after_copy); 
     });
@@ -654,11 +661,9 @@ RBImageHandle vk::ImageManager::create_cubemap(
         // =========================
         ImageBarrierParams before{};
         before.image = image;
-        before.before = RBImageLayout::undefined;
-        before.after  = RBImageLayout::transfer_dst_optimal;
 
-        before.src_usage = RBImageUsage::Undefined;
-        before.dst_usage = RBImageUsage::TransferDst;
+        before.src_usage = RBImageUsageType::Undefined;
+        before.dst_usage = RBImageUsageType::TransferDst;
 
         transition_image(cmd, before);
 
@@ -675,14 +680,8 @@ RBImageHandle vk::ImageManager::create_cubemap(
 
         ImageBarrierParams after{};
         after.image = image;
-        after.before = RBImageLayout::transfer_dst_optimal;
-        after.after  =
-            texture_creation_info.current_layout != RBImageLayout::undefined
-            ? texture_creation_info.current_layout
-            : RBImageLayout::shader_read_only_optimal;
-
-        after.src_usage = RBImageUsage::TransferDst; 
-        after.dst_usage = RBImageUsage::SampledFragment;
+        after.src_usage = RBImageUsageType::TransferDst; 
+        after.dst_usage = RBImageUsageType::SampledFragment;
 
         transition_image(cmd, after);
     });
@@ -702,8 +701,11 @@ void vk::ImageManager::perform_image_copy(RBCommandList cmd, const CopyImagePara
     const auto& src_resource = get_image_resource(params.source);
     const auto& dst_resource = get_image_resource(params.dest);
 
-    const VkImageLayout current_src_layout = src_resource.get_layout(params.src_layer, params.src_mip);
-    const VkImageLayout current_dst_layout = dst_resource.get_layout(params.dst_layer, params.dst_mip);
+    const auto current_src_state = src_resource.get_state(params.src_layer, params.src_mip);
+    const auto current_dst_state = dst_resource.get_state(params.dst_layer, params.dst_mip);
+    
+    const auto current_src_layout = current_src_state.layout;
+    const auto current_dst_layout = current_dst_state.layout;
     
     LogVkImageManager.Log<Verbose>("Copying image '%s' (%p) -> '%s' (%p). Source layout: %s, Dest layout: %s",
         src_resource.debug_name.to_string().c_str(), src_resource.image,
@@ -751,33 +753,57 @@ void vk::ImageManager::transition_image(
     RBCommandList cmd,
     const ImageBarrierParams& params) const
 {
+    
     auto& img = get_image_resource(params.image);
+    
+    
+    if (params.debug_pass_name == "GeometryTranslucent" && img.debug_name == "RG_g_depth[0][0]")
+    {
+        __nop();
+    }
+    
     VkImage vk_img = img.image;
 
     uint32_t layer_count = params.layer_count ? params.layer_count : img.num_layers;
     uint32_t mip_count   = params.mip_count   ? params.mip_count   : img.mip_levels;
 
-    auto src = vk::to_vk_state(params.src_usage);
-    auto dst = vk::to_vk_state(params.dst_usage);
-    
-    if (params.src_usage == RBImageUsage::Undefined)
+    ImageSubresourceState sub = img.get_state(params.base_layer, params.base_mip);
+
+    ImageState src = to_vk_state(sub.usage, params.pass_type);
+    ImageState dst = to_vk_state(params.dst_usage, params.pass_type);
+
+    VkImageLayout old_layout = sub.layout;
+    VkImageLayout new_layout = dst.layout;
+
+    // Skip barrier
+    if (old_layout == new_layout &&
+        sub.usage == params.dst_usage)
     {
-        src.stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-        src.access = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+        return;
     }
 
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 
-    barrier.oldLayout = vk::to_vk_layout(params.before);
-    barrier.newLayout = vk::to_vk_layout(params.after);
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
 
-    barrier.srcAccessMask = src.access;
+    // Undefined = no dependency
+    if (sub.usage == RBImageUsageType::Undefined)
+    {
+        barrier.srcAccessMask = 0;
+    }
+    else
+    {
+        barrier.srcAccessMask = src.access;
+    }
+
     barrier.dstAccessMask = dst.access;
 
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = vk_img;
 
+    // aspect mask
     if (vk::is_depth_format(img.format))
     {
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -796,38 +822,33 @@ void vk::ImageManager::transition_image(
     barrier.subresourceRange.layerCount     = layer_count;
 
     VkPipelineStageFlags src_stage =
-        (params.src_usage == RBImageUsage::Undefined)
+        (sub.usage == RBImageUsageType::Undefined)
         ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
         : src.stage;
 
-    VkAccessFlags src_access =
-        (params.src_usage == RBImageUsage::Undefined)
-        ? 0
-        : src.access;
-
-    barrier.srcAccessMask = src_access;
+    VkPipelineStageFlags dst_stage = dst.stage;
 
     vkCmdPipelineBarrier(
         cmd.as<VkCommandBuffer>(),
         src_stage,
-        dst.stage,
+        dst_stage,
         0,
         0, nullptr,
         0, nullptr,
         1, &barrier
     );
-
-    img.set_layout(barrier.newLayout,
-                   params.base_layer,
-                   layer_count,
-                   params.base_mip,
-                   mip_count);
+    
+    sub.layout = new_layout;
+    sub.usage = params.dst_usage;
+    sub.stage = dst_stage;
+    sub.access = dst.access;
+    img.set_state(sub, params.base_layer, layer_count, params.base_mip, mip_count);
 }
 
 VkImageLayout vk::ImageManager::get_image_layout(RBImageHandle image, uint32_t layer, uint32_t mip)
 {
     auto& image_res = get_image_resource(image);
-    return image_res.get_layout(layer, mip);
+    return image_res.get_state(layer, mip).layout;
 }
 
 void vk::ImageManager::create_staging_buffer(
@@ -1049,7 +1070,11 @@ void vk::ImageManager::generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
     
-        res.set_layout(barrier.newLayout, 0, 1, i, 1);
+        ImageSubresourceState state;
+        state.layout = barrier.newLayout;
+        state.stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        state.access = barrier.dstAccessMask;
+        res.set_state(state, 0, 1, i, 1);
     }
     
 }
@@ -1225,10 +1250,8 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
     {
         ImageBarrierParams params;
         params.image = img;
-        params.before = RBImageLayout::undefined;
-        params.after = RBImageLayout::transfer_dst_optimal;
-        params.src_usage = RBImageUsage::Undefined;
-        params.dst_usage = RBImageUsage::TransferDst;
+        params.src_usage = RBImageUsageType::Undefined;
+        params.dst_usage = RBImageUsageType::TransferDst;
         transition_image(cmd, params);
 
         vkCmdCopyImageToBuffer(

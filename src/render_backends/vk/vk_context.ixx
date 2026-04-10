@@ -54,6 +54,16 @@ namespace vk
         VkFence in_flight;              // image is used by which frame
     };
     
+    struct ImageSubresourceState
+    {
+        RBImageUsageType usage = RBImageUsageType::Undefined;
+        RenderPassType pass_type = RenderPassType::graphics;
+
+        VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkPipelineStageFlags stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkAccessFlags access = 0;
+    };
+    
     struct ImageResource
     {
         Name debug_name = "";
@@ -65,6 +75,25 @@ namespace vk
         std::vector<VkImageView> views = {};
         bool destroyed = false;
         
+        void init_states()
+        {
+            subresources.resize(num_layers);
+            for (uint32_t l = 0; l < num_layers; ++l)
+            {
+                subresources[l].resize(mip_levels);
+
+                for (uint32_t m = 0; m < mip_levels; ++m)
+                {
+                    subresources[l][m] = {
+                        .usage = RBImageUsageType::Undefined,
+                        .pass_type = RenderPassType::graphics,
+                        .layout = VK_IMAGE_LAYOUT_UNDEFINED,
+                        .stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        .access = 0
+                    };
+                }
+            }
+        }
         
         uint32_t get_array_index(uint32_t layer_index = 0, uint32_t mip_index = 0) const
         {
@@ -127,29 +156,40 @@ namespace vk
             return cubemap_view;
         }
         
-        VkImageLayout get_layout(uint32_t layer, uint32_t mip) const
+        const ImageSubresourceState& get_state(uint32_t layer, uint32_t mip) const
         {
-            return subresource_layouts[layer][mip];
+            checkf(!destroyed, "Image has been destroyed");
+            checkf(layer < num_layers, "Layer out of bounds");
+            checkf(mip < mip_levels, "Mip out of bounds");
+
+            return subresources[layer][mip];
         }
         
-        void set_layout(VkImageLayout in_layout, 
-            uint32_t in_layer = 0, uint32_t in_num_layers = 0, 
-            uint32_t in_mip = 0, uint32_t in_num_mips = 0) const
+        
+        ImageSubresourceState& get_mutable_state(uint32_t layer, uint32_t mip) const
         {
-            
-            if (in_num_layers == 0)
-                in_num_layers = num_layers;
-            
-            if (in_num_mips == 0)
-                in_num_mips = mip_levels;
-            
-            
-            
-            for (uint32_t layer_index = 0; layer_index < in_num_layers; ++layer_index)
+            checkf(!destroyed, "Image has been destroyed");
+            checkf(layer < num_layers, "Layer out of bounds");
+            checkf(mip < mip_levels, "Mip out of bounds");
+
+            return subresources[layer][mip];
+        }
+        
+        void set_state(const ImageSubresourceState& new_state,
+               uint32_t base_layer = 0, uint32_t layer_count = 1,
+               uint32_t base_mip = 0, uint32_t mip_count = 1) const
+        {
+            if (layer_count == 0)
+                layer_count = num_layers;
+
+            if (mip_count == 0)
+                mip_count = mip_levels;
+
+            for (uint32_t l = 0; l < layer_count; ++l)
             {
-                for (uint32_t mip_index = 0; mip_index < in_num_mips; ++mip_index)
+                for (uint32_t m = 0; m < mip_count; ++m)
                 {
-                    subresource_layouts[layer_index + in_layer][mip_index + in_mip] = in_layout;
+                    subresources[base_layer + l][base_mip + m] = new_state;
                 }
             }
         }
@@ -166,6 +206,6 @@ namespace vk
         uint32_t num_layers = 1;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
         
-        mutable std::vector<std::vector<VkImageLayout>> subresource_layouts;
+        mutable std::vector<std::vector<ImageSubresourceState>> subresources;
     };
 }

@@ -46,14 +46,14 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },
-                { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsage::SampledFragment },                
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsage::SampledFragment },                
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsage::SampledFragment },                
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsage::SampledFragment },                
+                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::SampledFragment },
+                { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsageType::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsageType::SampledFragment },                
             },
             .writes = {
-                { swapchain_color, RBImageUsage::ColorAttachment, RBLoadOp::Clear }
+                { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this] (RenderGraphContext& ctx)
             {

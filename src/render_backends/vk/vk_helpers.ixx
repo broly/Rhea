@@ -367,37 +367,37 @@ export namespace vk
         VkAccessFlags access;
     };
     
-    VkImageLayout to_attachment_layout(RBImageUsage usage, bool is_swapchain, bool final_layout)
+    VkImageLayout to_attachment_layout(RBImageUsageType usage, bool is_swapchain, bool final_layout)
     {
         switch (usage)
         {
-        case RBImageUsage::ColorAttachment:
+        case RBImageUsageType::ColorAttachment:
             return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        case RBImageUsage::DepthStencilAttachment:
+        case RBImageUsageType::DepthStencilAttachment:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        case RBImageUsage::DepthStencilReadOnly:
+        case RBImageUsageType::DepthStencilReadOnly:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
-        case RBImageUsage::Sampled:    
-        case RBImageUsage::SampledFragment:
-        case RBImageUsage::SampledVertex:
+        case RBImageUsageType::Sampled:    
+        case RBImageUsageType::SampledFragment:
+        case RBImageUsageType::SampledVertex:
             return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        case RBImageUsage::TransferSrc:
+        case RBImageUsageType::TransferSrc:
             return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
-        case RBImageUsage::TransferDst:
+        case RBImageUsageType::TransferDst:
             return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
-        case RBImageUsage::Present:
+        case RBImageUsageType::Present:
             return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
             
-        case RBImageUsage::StorageImage:
+        case RBImageUsageType::StorageImage:
             return VK_IMAGE_LAYOUT_GENERAL;
 
-        case RBImageUsage::Undefined:
+        case RBImageUsageType::Undefined:
             return VK_IMAGE_LAYOUT_UNDEFINED;
 
         default:
@@ -406,17 +406,17 @@ export namespace vk
         }
     }
     
-    VkImageLayout to_subpass_layout(RBImageUsage usage)
+    VkImageLayout to_subpass_layout(RBImageUsageType usage)
     {
         switch (usage)
         {
-        case RBImageUsage::ColorAttachment:
+        case RBImageUsageType::ColorAttachment:
             return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        case RBImageUsage::DepthStencilAttachment:
+        case RBImageUsageType::DepthStencilAttachment:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        case RBImageUsage::DepthStencilReadOnly:
+        case RBImageUsageType::DepthStencilReadOnly:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
         default:
@@ -425,25 +425,25 @@ export namespace vk
         }
     }
 
-    VkImageLayout to_final_layout(RBImageUsage usage, bool is_swapchain)
+    VkImageLayout to_final_layout(RBImageUsageType usage, bool is_swapchain)
     {
         if (is_swapchain)
             return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
         switch (usage)
         {
-        case RBImageUsage::ColorAttachment:
+        case RBImageUsageType::ColorAttachment:
             return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        case RBImageUsage::DepthStencilAttachment:
+        case RBImageUsageType::DepthStencilAttachment:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        case RBImageUsage::DepthStencilReadOnly:
+        case RBImageUsageType::DepthStencilReadOnly:
             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
-        case RBImageUsage::Sampled:    
-        case RBImageUsage::SampledFragment:
-        case RBImageUsage::SampledVertex:
+        case RBImageUsageType::Sampled:    
+        case RBImageUsageType::SampledFragment:
+        case RBImageUsageType::SampledVertex:
             return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         default:
@@ -494,62 +494,139 @@ export namespace vk
             unreachable("wrong layout");
         }
     }
-    
-    ImageState to_vk_state(RBImageUsage usage)
+    ImageState to_vk_state(
+        RBImageUsageType usage,
+        RenderPassType pass_type)
     {
         switch (usage)
         {
-        case RBImageUsage::ColorAttachment:
+        case RBImageUsageType::ColorAttachment:
             return {
-                .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .stage  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
             };
 
-        case RBImageUsage::DepthStencilAttachment:
+        case RBImageUsageType::DepthStencilAttachment:
             return {
-                .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                .stage  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                          VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
             };
 
-        case RBImageUsage::SampledFragment:
+        case RBImageUsageType::DepthStencilReadOnly:
             return {
-                .stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                .stage  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                          VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+            };
+
+        case RBImageUsageType::SampledFragment:
+            return {
+                .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .stage  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 .access = VK_ACCESS_SHADER_READ_BIT
             };
 
-        case RBImageUsage::Sampled:
+        case RBImageUsageType::SampledVertex:
             return {
-                .stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .stage  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                 .access = VK_ACCESS_SHADER_READ_BIT
             };
 
-        case RBImageUsage::StorageImage:
-            return {
-                .stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                .access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
-            };
+        case RBImageUsageType::Sampled:
+        {
+            VkPipelineStageFlags stage = 0;
 
-        case RBImageUsage::TransferDst:
+            switch (pass_type)
+            {
+            case RenderPassType::graphics:
+                stage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                break;
+
+            case RenderPassType::compute:
+                stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+                break;
+
+            case RenderPassType::rtx:
+                stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+                break;
+
+            default:
+                stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                break;
+            }
+
             return {
-                .stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .stage  = stage,
+                .access = VK_ACCESS_SHADER_READ_BIT
+            };
+        }
+
+        case RBImageUsageType::StorageImage:
+        {
+            VkPipelineStageFlags stage = 0;
+
+            switch (pass_type)
+            {
+            case RenderPassType::graphics:
+                stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                break;
+
+            case RenderPassType::compute:
+                stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+                break;
+
+            case RenderPassType::rtx:
+                stage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+                break;
+
+            default:
+                stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                break;
+            }
+
+            return {
+                .layout = VK_IMAGE_LAYOUT_GENERAL,
+                .stage  = stage,
+                .access = VK_ACCESS_SHADER_READ_BIT |
+                          VK_ACCESS_SHADER_WRITE_BIT
+            };
+        }
+
+        case RBImageUsageType::TransferDst:
+            return {
+                .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .stage  = VK_PIPELINE_STAGE_TRANSFER_BIT,
                 .access = VK_ACCESS_TRANSFER_WRITE_BIT
             };
 
-        case RBImageUsage::TransferSrc:
+        case RBImageUsageType::TransferSrc:
             return {
-                .stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                .layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .stage  = VK_PIPELINE_STAGE_TRANSFER_BIT,
                 .access = VK_ACCESS_TRANSFER_READ_BIT
             };
 
-        case RBImageUsage::Present:
+        case RBImageUsageType::Present:
             return {
-                .stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                .layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .stage  = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                 .access = 0
             };
 
+        case RBImageUsageType::Undefined:
         default:
             return {
-                .stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                .layout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .stage  = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                 .access = 0
             };
         }

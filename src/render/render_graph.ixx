@@ -15,13 +15,6 @@ import :rg_params;
 
 constexpr uint8_t MAX_ALLOWED_FRAMES_IN_FLIGHT = 5;
 
-export enum class RenderPassType
-{
-    graphics,
-    compute,
-    rtx,
-    transfer,
-};
 
 
 export struct RenderGraphPass
@@ -32,8 +25,8 @@ export struct RenderGraphPass
     
     bool enabled = true;
     
-    std::vector<RGImageUse> reads;
-    std::vector<RGImageUse> writes;
+    std::vector<RBImageUsage> reads;
+    std::vector<RBImageUsage> writes;
 
     std::function<void(class RenderGraphContext&)> execute;
     
@@ -53,21 +46,22 @@ struct RGTexture
 
     RGTextureDesc desc;
     std::optional<RBImageHandle> image = std::nullopt;
-        
-    std::array<
-        std::vector<std::vector<RBImageLayout>>,
-        MAX_ALLOWED_FRAMES_IN_FLIGHT
-    > current_layouts;
+    
+    // DEPRECATED
+    // std::array<
+    //     std::vector<std::vector<RBImageLayout>>,
+    //     MAX_ALLOWED_FRAMES_IN_FLIGHT
+    // > current_layouts;
     
     std::array<
-        std::vector<std::vector<RBImageUsage>>,
+        std::vector<std::vector<RBImageUsageType>>,
         MAX_ALLOWED_FRAMES_IN_FLIGHT
     > current_usage;
     
     RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
     RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t layer_index = 0, uint32_t mip_index = 0) const;
 
-    RBImageUsage get_usage(uint32_t frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
+    RBImageUsageType get_usage(uint32_t frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
     
     
     bool should_create_image() const
@@ -78,7 +72,7 @@ struct RGTexture
     bool allows_barrier(RBFrameHandle frame) const
     {
         if (is_imported())
-            return current_usage[frame][0][0] != RBImageUsage::Undefined;
+            return current_usage[frame][0][0] != RBImageUsageType::Undefined;
         return true;
     }
     
@@ -90,10 +84,13 @@ struct RGTexture
     void memory_barrier(
         RBCommandList cmd,
         RenderBackend& backend,
-        RBImageUsage next,
+        Name debug_pass_name,
+        RenderPassType pass_type,
+        RBImageUsageType src_usage,
+        RBImageUsageType dst_usage,
         RBFrameHandle frame,
-        uint32_t layer = 0,
-        uint32_t mip = 0);
+        uint32_t layer,
+        uint32_t mip);
     
     bool is_swapchain() const
     {
@@ -235,26 +232,6 @@ public:
     void compile();
     void execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback);
     
-    static std::optional<RBImageUsage> find_next_usage(
-        const std::vector<RenderGraphPass>& passes,
-        size_t current_pass_index,
-        RGTextureHandle tex)
-    {
-        for (size_t i = current_pass_index + 1; i < passes.size(); ++i)
-        {
-            const auto& pass = passes[i];
-
-            for (const auto& read : pass.reads)
-                if (read.texture.id == tex.id)
-                    return read.usage;
-
-            for (const auto& write : pass.writes)
-                if (write.texture.id == tex.id)
-                    return write.usage;
-        }
-        return std::nullopt;
-    }
-
     std::optional<RBImageHandle> get_image_by_name(Name name)
     {
         for (auto& texture : textures)

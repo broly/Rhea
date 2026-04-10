@@ -528,6 +528,8 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
     VkRenderPass rp;
     VK_CHECK(vkCreateRenderPass(instance.get_device(), &rpci, nullptr, &rp));
     
+    debug_object_tracker.register_object((uint64_t)rp, fb.pass.to_string());
+    
     LogRBRenderPass.Log<Display>("Render pass %p created (%s)", rp, fb.pass.to_string().c_str());
     for (int i = 0; auto& attachment : attachments)
     {
