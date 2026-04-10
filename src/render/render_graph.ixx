@@ -54,16 +54,20 @@ struct RGTexture
     RGTextureDesc desc;
     std::optional<RBImageHandle> image = std::nullopt;
         
-    // current_layouts[frame][layer][mip]
     std::array<
         std::vector<std::vector<RBImageLayout>>,
         MAX_ALLOWED_FRAMES_IN_FLIGHT
     > current_layouts;
     
+    std::array<
+        std::vector<std::vector<RBImageUsage>>,
+        MAX_ALLOWED_FRAMES_IN_FLIGHT
+    > current_usage;
+    
     RBImageHandle get_image(RenderBackend& backend, RBFrameHandle frame) const;
     RBImageView get_image_view(RenderBackend& backend, RBFrameHandle frame, uint32_t layer_index = 0, uint32_t mip_index = 0) const;
-    
-    RBImageLayout get_layout( uint32_t frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
+
+    RBImageUsage get_usage(uint32_t frame, uint32_t array_index = 0, uint32_t mip_index = 0) const;
     
     
     bool should_create_image() const
@@ -74,7 +78,7 @@ struct RGTexture
     bool allows_barrier(RBFrameHandle frame) const
     {
         if (is_imported())
-            return current_layouts[frame][0][0] != RBImageLayout::undefined;
+            return current_usage[frame][0][0] != RBImageUsage::Undefined;
         return true;
     }
     
@@ -86,7 +90,7 @@ struct RGTexture
     void memory_barrier(
         RBCommandList cmd,
         RenderBackend& backend,
-        RBImageLayout next,
+        RBImageUsage next,
         RBFrameHandle frame,
         uint32_t layer = 0,
         uint32_t mip = 0);

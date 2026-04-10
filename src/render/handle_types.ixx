@@ -413,6 +413,8 @@ export
         RBImageHandle image = {};
         RBImageLayout before = RBImageLayout::undefined;
         RBImageLayout after = RBImageLayout::undefined;
+        RBImageUsage src_usage = RBImageUsage::Undefined;
+        RBImageUsage dst_usage = RBImageUsage::Undefined;
         uint32_t base_layer = 0;
         uint32_t base_mip = 0;
         uint32_t layer_count = 0;

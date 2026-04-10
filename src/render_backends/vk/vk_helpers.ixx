@@ -459,73 +459,99 @@ export namespace vk
         return current_layout;
     }
     
-    ImageState to_vk_state(RBImageLayout layout)
+    VkImageLayout to_vk_layout(RBImageLayout layout)
     {
         switch (layout)
         {
         case RBImageLayout::color_attachment_optimal:
-            return {
-                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-            };
+            return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         case RBImageLayout::depth_stencil_attachment_optimal:
-            return {
-                .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-            };
+            return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         case RBImageLayout::depth_stencil_read_only_optimal:
-            return {
-                .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-                .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_SHADER_READ_BIT
-            };
+            return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
         case RBImageLayout::shader_read_only_optimal:
+            return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        case RBImageLayout::transfer_dst_optimal:
+            return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+        case RBImageLayout::transfer_src_optimal:
+            return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+        case RBImageLayout::transfer_present:
+            return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        case RBImageLayout::general:
+            return VK_IMAGE_LAYOUT_GENERAL;
+
+        case RBImageLayout::undefined:
+            return VK_IMAGE_LAYOUT_UNDEFINED;
+
+        default:
+            unreachable("wrong layout");
+        }
+    }
+    
+    ImageState to_vk_state(RBImageUsage usage)
+    {
+        switch (usage)
+        {
+        case RBImageUsage::ColorAttachment:
             return {
-                .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+            };
+
+        case RBImageUsage::DepthStencilAttachment:
+            return {
+                .stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                .access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+            };
+
+        case RBImageUsage::SampledFragment:
+            return {
+                .stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 .access = VK_ACCESS_SHADER_READ_BIT
             };
 
-        case RBImageLayout::transfer_dst_optimal:
+        case RBImageUsage::Sampled:
             return {
-                .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                .access = VK_ACCESS_SHADER_READ_BIT
+            };
+
+        case RBImageUsage::StorageImage:
+            return {
+                .stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+            };
+
+        case RBImageUsage::TransferDst:
+            return {
                 .stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
                 .access = VK_ACCESS_TRANSFER_WRITE_BIT
             };
-            
-        case RBImageLayout::transfer_src_optimal:
+
+        case RBImageUsage::TransferSrc:
             return {
-                .layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
                 .access = VK_ACCESS_TRANSFER_READ_BIT
             };
 
-        case RBImageLayout::transfer_present:
+        case RBImageUsage::Present:
             return {
-                .layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                .stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                 .access = 0
             };
 
-        case RBImageLayout::general:
+        default:
             return {
-                .layout = VK_IMAGE_LAYOUT_GENERAL,
-                .stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                .access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
-            };
-        case RBImageLayout::undefined:
-            return {
-                .layout = VK_IMAGE_LAYOUT_UNDEFINED,
                 .stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                 .access = 0
             };
-        default:
-            unreachable("wrong code path");
         }
     }
     

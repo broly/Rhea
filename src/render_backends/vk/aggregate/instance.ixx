@@ -5,11 +5,17 @@ import <vulkan/vulkan_core.h>;
 import <glfw/glfw3.h>;
 import :context;
 
+import :debug_object_tracker;
+
 namespace vk
 {
     export class Instance
     {
     public:
+        Instance(VkDebugObjectTracker& in_debug_object_tracker)
+            : debug_object_tracker(in_debug_object_tracker)
+        {}
+        
         void init(GLFWwindow* window);
         void match_queue_families();
         
@@ -39,18 +45,18 @@ namespace vk
     public:
         
         
-        
-        VkInstance instance;
-        VkDevice device;
-        VkPhysicalDevice physical_device;
-        VkQueue graphics_queue;
-        VkQueue present_queue;
+        VkDebugObjectTracker& debug_object_tracker;
+        VkInstance instance = VK_NULL_HANDLE;
+        VkDevice device = VK_NULL_HANDLE;
+        VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+        VkQueue graphics_queue = VK_NULL_HANDLE;
+        VkQueue present_queue = VK_NULL_HANDLE;
         QueueFamilies queues;
         
-        VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props;
+        VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props {};
     
         uint32_t queues_indices[MAX_QUEUES];
-        VkSurfaceKHR surface;
-        GLFWwindow* window;
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
+        GLFWwindow* window = nullptr;
     };
 }

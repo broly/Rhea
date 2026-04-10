@@ -17,16 +17,19 @@ namespace vk
     export class ImageManager
     {
     public:
-        ImageManager(vk::Instance& in_instance, vk::ImmediateCommandPool& in_immediate_command_pool, vk::Debug& in_debug)
+        ImageManager(vk::Instance& in_instance, vk::ImmediateCommandPool& in_immediate_command_pool, vk::Debug& in_debug,
+            vk::VkDebugObjectTracker& in_debug_object_tracker)
             : instance{in_instance}
             , immediate_command_pool(in_immediate_command_pool)
             , debug(in_debug)
+            , debug_object_tracker(in_debug_object_tracker)
         {}
         
         RBImageHandle register_swapchain_image(
             VkExtent2D vk_extent, 
             const VkSurfaceFormatKHR& surface_format,
             VkImage image,
+            uint32_t image_index,
             std::optional<RBImageHandle> old_image_handle = std::nullopt);
         
         void unregister_swapchain_image(RBImageHandle image_handle);
@@ -47,6 +50,7 @@ namespace vk
         vk::Instance& instance;
         vk::ImmediateCommandPool& immediate_command_pool;
         vk::Debug& debug;
+        vk::VkDebugObjectTracker& debug_object_tracker;
         
         std::vector<vk::ImageResource> image_resources;
         

@@ -398,6 +398,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Present,
             .external = true,
             .swapchain_image = true,
+            .num_frames = (uint8_t)backend->get_num_images_in_flight()
         });
         
         add_pass({
@@ -599,6 +600,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 { gbuffer[GBUFFER_SLOT_POSITION], RBImageUsage::SampledFragment },
                 { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsage::SampledFragment },
                 { gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], RBImageUsage::SampledFragment },
+                { gbuffer[GBUFFER_SLOT_EMISSIVE], RBImageUsage::SampledFragment },
                 { decal_albedo, RBImageUsage::SampledFragment }
             },
             .writes = { 

@@ -19,7 +19,7 @@ constexpr const char* VALIDATION_LAYERS[] = {
 };
 
 
-#define ENABLE_CUSTOM_VALIDATION_OUTPUT 0
+#define ENABLE_CUSTOM_VALIDATION_OUTPUT 1
 
 void vk::Instance::init(GLFWwindow* in_window)
 {
@@ -78,6 +78,7 @@ void vk::Instance::init(GLFWwindow* in_window)
         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
     debug_create_info.pfnUserCallback = &vk::Instance::debug_callback;
+    debug_create_info.pUserData = this;
     debug_create_info.pNext = &validationFeatures;
     
     ici.pNext = &debug_create_info;
@@ -217,7 +218,7 @@ void vk::Instance::init(GLFWwindow* in_window)
         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
     create_info.pfnUserCallback = debug_callback;
-    create_info.pUserData = nullptr;
+    create_info.pUserData = this;
     
     VkResult res = vk_ext::vkCreateDebugUtilsMessengerEXT(
         instance,
@@ -286,8 +287,10 @@ VkBool32 vk::Instance::debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT mes
 {
     if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
     {
+        vk::Instance* instance_ptr = static_cast<vk::Instance*>(pUserData);
         auto message = pCallbackData->pMessage;
-        std::cerr << "[VULKAN VALIDATION ERROR]\n" << message << std::endl;
+        auto processed_message = instance_ptr->debug_object_tracker.process_message(message);
+        std::cerr << "[VULKAN VALIDATION ERROR]\n" << processed_message << std::endl;
         // __debugbreak();
     }
     return VK_FALSE;

@@ -11,6 +11,39 @@ import :renderer;
 #include "common/assertion_macros.h"
 
 
+static RBImageLayout initial_layout_from_usage(RBImageUsage usage)
+{
+    
+    switch (usage)
+    {
+    case RBImageUsage::ColorAttachment:
+        return RBImageLayout::color_attachment_optimal;
+
+    case RBImageUsage::DepthStencilAttachment:
+        return RBImageLayout::depth_stencil_attachment_optimal;
+
+        // Depth read-only attachments are NOT used anymore
+        // Depth read-only is a pipeline state
+    case RBImageUsage::Sampled:
+    case RBImageUsage::SampledFragment:
+        return RBImageLayout::shader_read_only_optimal;
+
+    case RBImageUsage::StorageImage:
+        return RBImageLayout::general;
+        
+    case RBImageUsage::TransferDst:
+        return RBImageLayout::transfer_dst_optimal;
+    case RBImageUsage::TransferSrc:
+        return RBImageLayout::transfer_src_optimal;
+
+    case RBImageUsage::Present:
+        return RBImageLayout::transfer_present;
+
+    default:
+        return RBImageLayout::undefined;
+    }
+}
+
 RGTexture::RGTexture(const RGTextureDesc& in_desc)
     : desc(in_desc)
 {
@@ -18,11 +51,18 @@ RGTexture::RGTexture(const RGTextureDesc& in_desc)
 
     if (desc.dimension == TextureDimension::Cube)
         checkf(desc.num_layers == 6, "Cubemap texture array layers should be always 6");
+    
 
     for (uint32_t f = 0; f < MAX_ALLOWED_FRAMES_IN_FLIGHT; ++f)
     {
+        current_usage[f].resize(desc.num_layers);
         current_layouts[f].resize(desc.num_layers);
 
+        for (uint32_t l = 0; l < desc.num_layers; ++l)
+        {
+            current_usage[f][l].resize(desc.num_mip_levels, RBImageUsage::Undefined);
+        }
+        
         for (uint32_t l = 0; l < desc.num_layers; ++l)
         {
             current_layouts[f][l].resize(desc.num_mip_levels, RBImageLayout::undefined);
@@ -42,46 +82,68 @@ RBImageView RGTexture::get_image_view(RenderBackend& backend, RBFrameHandle fram
     return backend.get_image_view(get_image(backend, frame), layer_index, mip_index);
 }
 
-RBImageLayout RGTexture::get_layout(uint32_t frame, uint32_t array_index, uint32_t mip_index) const
+RBImageUsage RGTexture::get_usage(uint32_t frame, uint32_t array_index, uint32_t mip_index) const
 {
-    return current_layouts[frame][array_index][mip_index];
+    return current_usage[frame][array_index][mip_index];
 }
 
 void RGTexture::memory_barrier(
     RBCommandList cmd,
     RenderBackend& backend,
-    RBImageLayout next,
+    RBImageUsage next_usage,
     RBFrameHandle frame,
     uint32_t layer,
     uint32_t mip)
 {
-    if (is_swapchain())
-        return;
-
-    checkf(next != RBImageLayout::undefined, "wrong state");
-
+    auto& current_layout = current_layouts[frame][layer][mip];
+    auto& current_usage_ref = current_usage[frame][layer][mip];
+    
+    
     RBImageHandle img_handle =
         desc.swapchain_image
         ? backend.get_swapchain_image(frame)
         : *image;
 
-    auto& current_layout = current_layouts[frame][layer][mip];
-
-    if (current_layout == next)
+    RBImageLayout next_layout = initial_layout_from_usage(next_usage);
+    if (current_layout == next_layout && current_usage_ref == next_usage)
         return;
-    
+
     ImageBarrierParams params;
     params.image = img_handle;
     params.before = current_layout;
-    params.after = next;
+    params.after = next_layout;
+    params.src_usage = current_usage_ref;
+    params.dst_usage = next_usage;
     params.base_layer = layer;
     params.base_mip = mip;
-    params.mip_count = 1;
     params.layer_count = 1;
+    params.mip_count = 1;
+    
+    if (is_swapchain())
+    {
+        ImageBarrierParams params;
+        params.image = img_handle;
+
+        params.before = RBImageLayout::transfer_present;
+        params.src_usage = RBImageUsage::Present;
+
+        params.after = next_layout;
+        params.dst_usage = next_usage;
+
+        params.base_layer = layer;
+        params.base_mip = mip;
+        params.layer_count = 1;
+        params.mip_count = 1;
+
+        backend.transition_image(cmd, params);
+
+        return;
+    }
 
     backend.transition_image(cmd, params);
 
-    current_layout = next;
+    current_layout = next_layout;
+    current_usage_ref = next_usage;
 }
 
 void RGTexture::reset_layout()
@@ -93,9 +155,15 @@ void RGTexture::reset_layout()
             for (uint32_t mip = 0; mip < desc.num_mip_levels; ++mip)
             {
                 if (is_swapchain())
-                    current_layouts[frame][layer][mip] = RBImageLayout::transfer_present;
-                else
+                {
+                    current_usage[frame][layer][mip] = RBImageUsage::Undefined;
                     current_layouts[frame][layer][mip] = RBImageLayout::undefined;
+                }
+                else
+                {
+                    // current_usage[frame][layer][mip] = RBImageUsage::Undefined;
+                    // current_layouts[frame][layer][mip] = RBImageLayout::undefined;
+                }
             }
         }
     }
@@ -245,38 +313,6 @@ const RenderGraphPass& RenderGraph::get_current_pass() const
     unreachable("No such pass");
 }
 
-static RBImageLayout initial_layout_from_usage(RBImageUsage usage)
-{
-    
-    switch (usage)
-    {
-    case RBImageUsage::ColorAttachment:
-        return RBImageLayout::color_attachment_optimal;
-
-    case RBImageUsage::DepthStencilAttachment:
-        return RBImageLayout::depth_stencil_attachment_optimal;
-
-        // Depth read-only attachments are NOT used anymore
-        // Depth read-only is a pipeline state
-    case RBImageUsage::Sampled:
-    case RBImageUsage::SampledFragment:
-        return RBImageLayout::shader_read_only_optimal;
-
-    case RBImageUsage::StorageImage:
-        return RBImageLayout::general;
-        
-    case RBImageUsage::TransferDst:
-        return RBImageLayout::transfer_dst_optimal;
-    case RBImageUsage::TransferSrc:
-        return RBImageLayout::transfer_src_optimal;
-
-    case RBImageUsage::Present:
-        return RBImageLayout::transfer_present;
-
-    default:
-        return RBImageLayout::undefined;
-    }
-}
 
 static RBImageLayout final_layout_from_usage(RBImageUsage usage)
 {
@@ -372,13 +408,13 @@ void RenderGraph::compile()
                                               : initial_layout_from_usage(read.usage);
             
             pass.pass_barriers[read.texture].before_pass = BarrierInfo{
-                .layout = before_layout,
+                .dst_usage = read.usage,
             };
         }
         for (auto& write : pass.writes)
         {
             pass.pass_barriers[write.texture].before_pass = BarrierInfo{
-                .layout = initial_layout_from_usage(write.usage),
+                .dst_usage = write.usage,
             };
         }
     }
@@ -401,7 +437,7 @@ void RenderGraph::compile()
                 continue;
 
             pass.pass_barriers[write.texture].after_pass = BarrierInfo{
-                .layout = after_layout
+                .dst_usage = *next_usage
             };
         }
     }
@@ -436,8 +472,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     ctx.frame = frame;
 
     // Initialize external images (swapchain)
-    // for (auto& tex : textures)
-    //     tex.reset_layout();  // for swapchain: transfer_present
+    for (auto& tex : textures)
+        tex.reset_layout();  // for swapchain: transfer_present
     
     ctx.is_preparing = true;
     prepare_resources(ctx);
@@ -455,7 +491,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
             auto& texture = textures[tex.id];
             if (barrier.before_pass && texture.allows_barrier(ctx.frame))
                 for (uint32_t layer = 0; layer < texture.get_layers_count(); layer++)
-                    texture.memory_barrier(cmd, *backend, barrier.before_pass->layout, frame, layer);
+                    texture.memory_barrier(cmd, *backend, barrier.before_pass->dst_usage, frame, layer);
         }
         
         for (uint32_t layer_id = 0; layer_id < pass.num_layers; ++layer_id)
@@ -532,12 +568,12 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         {
             if (barrier.after_pass)
                 for (uint32_t layer = 0; layer < textures[tex.id].get_layers_count(); layer++)
-                    textures[tex.id].memory_barrier(cmd, *backend, barrier.after_pass->layout, frame, layer);
+                    textures[tex.id].memory_barrier(cmd, *backend, barrier.after_pass->dst_usage, frame, layer);
         }
     }
 
     if (auto tex = get_swapchain_texture())
-        tex->memory_barrier(cmd, *backend, RBImageLayout::transfer_present, frame);
+        tex->memory_barrier(cmd, *backend, RBImageUsage::Present, frame);
     
     if (callback)
     {

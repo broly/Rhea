@@ -8,6 +8,7 @@ import <unordered_map>;
 import glm;
 
 import :instance;
+import :debug_object_tracker;
 import :swapchain_control;
 import :buffer_mgr;
 import :context;
@@ -169,10 +170,11 @@ private: // internal section
     VkFormat get_image_format(RBImageHandle handle) const;
 
 public:   /// Aggregate section. These objects have same lifetime with render backend. use refs
-    vk::Instance instance {};
+    vk::VkDebugObjectTracker debug_object_tracker;
+    vk::Instance instance {debug_object_tracker};
     vk::Debug debug {};
     vk::ImmediateCommandPool immediate_command_pool{instance};
-    vk::ImageManager image_manager {instance, immediate_command_pool, debug}; // holds refs
+    vk::ImageManager image_manager {instance, immediate_command_pool, debug, debug_object_tracker}; // holds refs
     vk::SamplerManager sampler_manager {instance};
     vk::SwapchainControl swapchain {instance, image_manager, sampler_manager, debug};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};

@@ -111,6 +111,7 @@ void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
                 vk_extent,
                 surface_format,
                 images[i],
+                i,
                 has_swapchain_images ? std::optional{old_image_handle} : std::nullopt);
     }
     

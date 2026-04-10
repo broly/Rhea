@@ -67,7 +67,8 @@ export
     
     struct BarrierInfo
     {
-        RBImageLayout layout;
+        RBImageUsage src_usage = RBImageUsage::Undefined;
+        RBImageUsage dst_usage;
         bool is_transition;
     };
 
