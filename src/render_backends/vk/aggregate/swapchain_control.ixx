@@ -5,6 +5,7 @@ import :instance;
 import :image_mgr;
 import assets;
 import :sampler_mgr;
+import :debug_object_tracker;
 import :debug;
 import <vulkan/vulkan_core.h>;
 
@@ -22,7 +23,8 @@ namespace vk
     class SwapchainControl
     {
     public:
-        SwapchainControl(vk::Instance& in_instance, vk::ImageManager& in_texture_manager, vk::SamplerManager& in_sampler_manager, vk::Debug& in_debug)
+        SwapchainControl(vk::Instance& in_instance, vk::ImageManager& in_texture_manager, 
+            vk::SamplerManager& in_sampler_manager, vk::Debug& in_debug, vk::VkDebugObjectTracker& in_debug_tracker)
             : swapchain(VK_NULL_HANDLE)
             , image_manager(in_texture_manager)
             , vk_extent()
@@ -30,6 +32,7 @@ namespace vk
             , instance(in_instance)
             , sampler_manager(in_sampler_manager)
             , debug(in_debug)
+            , debug_object_tracker(in_debug_tracker)
         {
         }
 
@@ -58,6 +61,7 @@ namespace vk
         
         VkSurfaceFormatKHR surface_format;
         
+        vk::VkDebugObjectTracker& debug_object_tracker;
         vk::Instance& instance;
         vk::ImageManager& image_manager;
         vk::SamplerManager& sampler_manager;

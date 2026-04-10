@@ -288,9 +288,18 @@ void vk::SwapchainControl::create_sync_objects()
 
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &frames[i].image_available));
-        VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &render_finished_per_frame[i]));
-        VK_CHECK(vkCreateFence(instance.device, &fence_ci, nullptr, &frames[i].in_flight));
+        VkSemaphore& image_available = frames[i].image_available;
+        VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &image_available));
+        debug_object_tracker.register_object(image_available, std::string("image_available_") + std::to_string(i));
+        
+        VkSemaphore& render_finished = render_finished_per_frame[i];
+        VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &render_finished));
+        debug_object_tracker.register_object(render_finished, std::string("render_finished_per_frame_") + std::to_string(i));
+        
+        VkFence& in_flight = frames[i].in_flight;
+        VK_CHECK(vkCreateFence(instance.device, &fence_ci, nullptr, &in_flight));
+        debug_object_tracker.register_object(in_flight, std::string("in_flight_") + std::to_string(i));
+        
     }
 }
 

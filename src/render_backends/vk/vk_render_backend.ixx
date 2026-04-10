@@ -176,7 +176,7 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::ImmediateCommandPool immediate_command_pool{instance};
     vk::ImageManager image_manager {instance, immediate_command_pool, debug, debug_object_tracker}; // holds refs
     vk::SamplerManager sampler_manager {instance};
-    vk::SwapchainControl swapchain {instance, image_manager, sampler_manager, debug};  // holds refs
+    vk::SwapchainControl swapchain {instance, image_manager, sampler_manager, debug, debug_object_tracker};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
     vk::BufferManager buffer_manager {instance, instance.device, instance.physical_device, swapchain, immediate_command_pool}; // holds refs
     vk::MeshManager mesh_manager{instance, immediate_command_pool, buffer_manager};

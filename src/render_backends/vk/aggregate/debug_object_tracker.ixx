@@ -18,6 +18,13 @@ namespace vk
             object_names.insert({object_address, object_name});
         }
         
+        template<typename T>
+        requires (sizeof(T) == sizeof(uint64_t) && !std::is_same_v<T, uint64_t>)
+        void register_object(T object_address, Name object_name)
+        {
+            register_object((uint64_t)object_address, object_name);
+        }
+        
         void unregister_object(uint64_t object_address)
         {
             object_names.erase(object_address);
