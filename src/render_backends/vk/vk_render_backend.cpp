@@ -108,78 +108,6 @@ void VkRenderBackend::update_tlas(RBDescriptorSet set, uint32_t binding, RBAccel
 }
 
 
-void VkRenderBackend::create_depth_resources()
-{
-    VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
-    swapchain.depth_format = depth_format;
-
-    VkImageCreateInfo image_ci{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.extent = {
-        swapchain.vk_extent.width,
-        swapchain.vk_extent.height,
-        1
-    };
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.format = depth_format;
-    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VK_CHECK(vkCreateImage(
-        instance.get_device(), &image_ci, nullptr, &swapchain.depth_image
-    ));
-    
-
-    VkMemoryRequirements mem_req;
-    vkGetImageMemoryRequirements(
-        instance.get_device(), swapchain.depth_image, &mem_req
-    );
-
-    VkMemoryAllocateInfo alloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    alloc.allocationSize = mem_req.size;
-    alloc.memoryTypeIndex =
-        vk::find_memory_type(
-            instance.get_physical_device(),
-            mem_req.memoryTypeBits,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        );
-
-    VK_CHECK(vkAllocateMemory(
-        instance.get_device(), &alloc, nullptr, &swapchain.depth_memory
-    ));
-
-    VK_CHECK(vkBindImageMemory(
-        instance.get_device(),
-        swapchain.depth_image,
-        swapchain.depth_memory,
-        0
-    ));
-
-    VkImageViewCreateInfo view_ci{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-    view_ci.image = swapchain.depth_image;
-    view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_ci.format = depth_format;
-    view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    view_ci.subresourceRange.baseMipLevel = 0;
-    view_ci.subresourceRange.levelCount = 1;
-    view_ci.subresourceRange.baseArrayLayer = 0;
-    view_ci.subresourceRange.layerCount = 1;
-
-    VK_CHECK(vkCreateImageView(
-        instance.get_device(),
-        &view_ci,
-        nullptr,
-        &swapchain.depth_image_view
-    ));
-    
-    LogVkSamplerManager.Log("Created depth image: %p. View: %p", 
-        swapchain.depth_image, swapchain.depth_image_view);
-}
-
 void VkRenderBackend::compute(RBCommandList cmd, const ComputeWorkgroups& workgroups)
 {
     auto [x, y, z] = workgroups;
@@ -189,30 +117,6 @@ void VkRenderBackend::compute(RBCommandList cmd, const ComputeWorkgroups& workgr
 VkImageSubresourceRange VkRenderBackend::full_subresource_range(RBImageHandle image)
 {
     return image_manager.full_subresource_range(image);
-}
-
-
-void VkRenderBackend::destroy_depth_resources()
-{
-    VkDevice device = instance.get_device();
-
-    if (swapchain.depth_image_view != VK_NULL_HANDLE)
-    {
-        vkDestroyImageView(device, swapchain.depth_image_view, nullptr);
-        swapchain.depth_image_view = VK_NULL_HANDLE;
-    }
-
-    if (swapchain.depth_image != VK_NULL_HANDLE)
-    {
-        vkDestroyImage(device, swapchain.depth_image, nullptr);
-        swapchain.depth_image = VK_NULL_HANDLE;
-    }
-
-    if (swapchain.depth_memory != VK_NULL_HANDLE)
-    {
-        vkFreeMemory(device, swapchain.depth_memory, nullptr);
-        swapchain.depth_memory = VK_NULL_HANDLE;
-    }
 }
 
 
@@ -707,9 +611,7 @@ void VkRenderBackend::init(RBWindowHandle in_window)
     swapchain.create();
     immediate_command_pool.init();
     
-    create_depth_resources();
     create_command_pool();
-    // create_pipeline();
     create_frame_sync_objects();
 }
 
@@ -831,8 +733,6 @@ bool VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
     if (!result)
     {
         framebuffer_manager.destroy_framebuffers();
-        destroy_depth_resources();
-        create_depth_resources();
     }
     return result;
 }

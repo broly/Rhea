@@ -20,19 +20,13 @@ void vk::SwapchainControl::create()
 
 void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
 {
-    vk::SwapchainSupport support =
-        vk::query_swapchain_support(
-            instance.physical_device,
-            instance.surface);
+    vk::SwapchainSupport support = vk::query_swapchain_support(instance.physical_device, instance.surface);
 
-    surface_format =
-        vk::choose_surface_format(support.formats);
+    surface_format = vk::choose_surface_format(support.formats);
 
-    VkPresentModeKHR present_mode =
-        vk::choose_present_mode(support.present_modes);
+    VkPresentModeKHR present_mode = vk::choose_present_mode(support.present_modes);
 
-    vk_extent =
-        vk::choose_extent(support.caps, instance.window);
+    vk_extent = vk::choose_extent(support.caps, instance.window);
 
     const Extent extent = {
         vk_extent.width,
@@ -106,16 +100,13 @@ void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
     for (uint32_t i = 0; i < count; ++i)
     {
         auto old_image_handle = swapchain_image_handles[i];
-        swapchain_image_handles[i] =
-            image_manager.register_swapchain_image(
+        swapchain_image_handles[i] = image_manager.register_swapchain_image(
                 vk_extent,
                 surface_format,
                 images[i],
                 i,
                 has_swapchain_images ? std::optional{old_image_handle} : std::nullopt);
     }
-    
-    // images_in_flight.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
     
     render_finished_per_image.resize(swapchain_image_handles.size());
 
@@ -243,26 +234,6 @@ void vk::SwapchainControl::advance_frame()
 
 void vk::SwapchainControl::cleanup()
 {
-
-    // --- Depth resources ---
-    if (depth_image_view != VK_NULL_HANDLE)
-    {
-        vkDestroyImageView(instance.device, depth_image_view, nullptr);
-    }
-
-    if (depth_image != VK_NULL_HANDLE)
-    {
-        vkDestroyImage(instance.device, depth_image, nullptr);
-    }
-
-    if (depth_memory != VK_NULL_HANDLE)
-    {
-        vkFreeMemory(instance.device, depth_memory, nullptr);
-    }
-
-    depth_image = VK_NULL_HANDLE;
-    depth_image_view = VK_NULL_HANDLE;
-    depth_memory = VK_NULL_HANDLE;
 
     // --- Swapchain ---
     if (swapchain != VK_NULL_HANDLE)

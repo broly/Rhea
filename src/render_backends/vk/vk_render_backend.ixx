@@ -156,14 +156,11 @@ public:   /// API Section
     void create_descriptor_pool();
     void create_command_pool();
     void cleanup_swapchain();
-    void create_depth_resources();
     void compute(RBCommandList cmd, const ComputeWorkgroups& workgroups) override;
     
     VkImageSubresourceRange full_subresource_range(RBImageHandle image);
 
 private: // internal section
-    
-    void destroy_depth_resources();
 
     vk::DescriptorSetLayoutData get_vk_descriptor_set_layout(RBDescriptorSetLayout rb_handle);
 

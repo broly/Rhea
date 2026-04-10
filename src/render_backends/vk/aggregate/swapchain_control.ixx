@@ -53,11 +53,6 @@ namespace vk
         VkSwapchainKHR swapchain = VK_NULL_HANDLE;
         VkExtent2D vk_extent;
     
-        VkImage depth_image = VK_NULL_HANDLE;
-        VkDeviceMemory depth_memory = VK_NULL_HANDLE;
-        VkImageView depth_image_view = VK_NULL_HANDLE;
-        VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
-        
         
         VkSurfaceFormatKHR surface_format;
         
