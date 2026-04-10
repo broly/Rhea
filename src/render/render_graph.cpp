@@ -658,19 +658,6 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
             }
         }
     }
-    if (auto tex = get_swapchain_texture())
-    {
-        tex->memory_barrier(
-            cmd,
-            *backend,
-            "PRESENT",
-            RenderPassType::present,
-            tex->get_usage(frame),
-            RBImageUsageType::Present,
-            frame,
-            0
-        );
-    }
     
     if (callback)
     {
