@@ -32,6 +32,8 @@
 			],
 			"fields": {
 				"time_dilation": 0.5,
+				"fixed_timestep": true,
+				"timestep": 7.33,
 				"samples": {
 					"cam": [
 

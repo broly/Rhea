@@ -20,7 +20,7 @@ void main()
     vec2 uv = (vec2(gid) + 0.5) / vec2(size);
 
     vec3 c = texture(
-        u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
+        u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI],
         uv
     ).rgb;
 

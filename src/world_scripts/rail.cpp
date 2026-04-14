@@ -6,8 +6,10 @@ void Rail::tick(const double dt)
 
     if (!active || samples.empty())
         return;
+    
+    const double delta = fixed_timestep ? timestep.value() : dt;
 
-    accumulated_time += dt * time_dilation;
+    accumulated_time += delta * time_dilation;
 
     float t = get_passed_time();
 

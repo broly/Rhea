@@ -17,8 +17,8 @@ import texture_format;
 import :constants;
 import :names;
 import :debug_line;
-import <set>;
 import <algorithm>;
+import <set>;
 
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
@@ -1415,7 +1415,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
     RTXGIPushConstants pc{};
     pc.frame = frame_index;
     pc.intensity = 1.0f;
-    pc.spp = 1;
+    pc.spp = 50;
 
     ctx.backend.push_constants(
         ctx.cmd,

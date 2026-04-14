@@ -39,6 +39,10 @@ public:
     
     float time_dilation = 1.0f;
     
+    bool fixed_timestep = false;
+    
+    std::optional<float> timestep = std::nullopt;
+    
     void tick(const double dt) override;
     
     void startup();
@@ -59,4 +63,4 @@ public:
     std::map<Name, RailCallback> on_tick_map;
 };
 REFLECT_OBJECT_FIELDS(Rail, RhActor,
-    samples, time_dilation);
+    samples, time_dilation, fixed_timestep, timestep);

@@ -44,7 +44,7 @@ void Engine::run()
     
     
     world->set_clock(clock);
-    world->add_script<WorldScript_RotateAroundObject>(); // TODO hardcoded
+    world->add_script<WorldScript_VariousThings>(); // TODO hardcoded
     
     world->init();    
 

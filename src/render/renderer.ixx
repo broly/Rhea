@@ -69,6 +69,11 @@ public:  // public API
     {
         return material_manager;
     }
+    
+    void set_num_runs_per_frame(uint8_t num)
+    {
+        main_render_graph_num_runs = num;
+    }
 protected:  // internal functions
     
     void load_schemas();
@@ -110,6 +115,8 @@ protected:  // textures
     std::vector<RenderGraphJob> rg_once_jobs;
     
     bool main_render_graph_needs_rebuild = false;
+    
+    uint8_t main_render_graph_num_runs = 1;
     
 
     

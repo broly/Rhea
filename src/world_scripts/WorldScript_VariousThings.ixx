@@ -4,7 +4,7 @@ import framework;
 import glm;
 import <memory>;
 
-export class WorldScript_RotateAroundObject : public WorldScript
+export class WorldScript_VariousThings : public WorldScript
 {
 public:
     void tick(double dt) override;

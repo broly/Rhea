@@ -11,7 +11,7 @@ import rhcomponents;
 import game;
 import rail;
 
-void WorldScript_RotateAroundObject::tick(double dt)
+void WorldScript_VariousThings::tick(double dt)
 {
     if (!camera_actor)
         camera_actor = world->find_actor_by_name("viewer");
@@ -34,6 +34,9 @@ void WorldScript_RotateAroundObject::tick(double dt)
     
     auto rail = world->find_actor_by_name<Rail>("rail");
     
+    
+    RhGlobals::engine->renderer->set_flag("reset_temporal_accum", true, false, true);
+    
     if (!do_once)
     {
         rail->add_on_tick("cam", [=] (const RailSampleData& d)
@@ -50,6 +53,7 @@ void WorldScript_RotateAroundObject::tick(double dt)
             light->color = d.color;
             light->update_scene_proxy();
         });
+        rail->startup();
         
         do_once = true;
         
@@ -79,6 +83,8 @@ void WorldScript_RotateAroundObject::tick(double dt)
         t.rotation = qrot;
         
         camera_actor->set_transform(t);
+        
+        RhGlobals::engine->renderer->set_num_runs_per_frame(10);
         // dir_light_actor->set_transform(t);
     }
     
