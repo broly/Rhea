@@ -39,7 +39,7 @@ public:
     void trigger_aux_rg_once(Name aux_rg_name, const RenderGraphParameters& params, RGPostRenderCallback callback);
 
 public:  // public API
-    void set_flag(Name name, bool value, bool needs_rebuild = false);
+    void set_flag(Name name, bool value, bool needs_rebuild = false, bool one_time = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
 
     RBImageHandle create_texture_from_asset(TextureHandle handle, bool generate_mips = true, 

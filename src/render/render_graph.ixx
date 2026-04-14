@@ -280,7 +280,7 @@ public:
     RGTexture* get_swapchain_texture();
     
 
-    void set_flag(Name name, bool value, bool needs_rebuild = false);
+    void set_flag(Name name, bool value, bool needs_rebuild = false, bool one_time = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
     bool get_render_flag(Name name) const;
     
@@ -292,5 +292,6 @@ public:
     
 protected: // dynamic info
     std::map<Name, bool> render_flags;
+    std::map<Name, bool> one_time_render_flags;
 };
 REFLECT_OBJECT(RenderGraph, RhObject);

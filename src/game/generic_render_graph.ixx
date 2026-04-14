@@ -141,16 +141,6 @@ public:
     std::vector<RGTextureHandle> gbuffer_hist;
     RGTextureHandle decal_albedo;
     
-    // RGTextureHandle g_depth;
-    // RGTextureHandle g_normal;
-    // RGTextureHandle g_world_normal;
-    // RGTextureHandle g_motion_vectors;
-    // RGTextureHandle g_roughness;
-    // RGTextureHandle g_albedo;
-    // RGTextureHandle g_position;
-    
-    
-    //RGTextureHandle history_hdr;
     RGTextureHandle ssr_texture;
     uint32_t history_index = 0;
     

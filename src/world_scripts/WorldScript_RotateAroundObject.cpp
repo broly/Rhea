@@ -179,6 +179,10 @@ void WorldScript_RotateAroundObject::tick(double dt)
         rail->startup();
         handled = true;
     }
+    if (input->is_key_down(Key::B))
+    {
+        RhGlobals::engine->renderer->set_flag("reset_temporal_accum", true, false, true);
+    }
     if (input->is_key_down(Key::Z))
     {
         if (first_cam_key_time == 0.0f)

@@ -179,7 +179,7 @@
 			},
 			"push_constants": [
 				{
-					"type": "PushRTXGIAccum",
+					"type": "TemporalAccumPC",
 					"name": "pc",
 					"stages": [
 						"compute"

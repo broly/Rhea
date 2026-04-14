@@ -253,9 +253,9 @@ void Renderer::load_resources()
     }
 }
 
-void Renderer::set_flag(Name name, bool value, bool needs_rebuild)
+void Renderer::set_flag(Name name, bool value, bool needs_rebuild, bool one_time)
 {
-    main_render_graph->set_flag(name, value);
+    main_render_graph->set_flag(name, value, needs_rebuild, one_time);
 }
 
 void Renderer::toggle_flag(Name name, bool needs_rebuild)

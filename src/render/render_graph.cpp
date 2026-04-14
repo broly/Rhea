@@ -667,6 +667,8 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     
     end_frame();
     
+    one_time_render_flags.clear();
+    
     frame_index++;
 }
 
@@ -739,9 +741,13 @@ RGTexture* RenderGraph::get_swapchain_texture()
     return nullptr;
 }
 
-void RenderGraph::set_flag(Name name, bool value, bool needs_rebuild)
+
+void RenderGraph::set_flag(Name name, bool value, bool needs_rebuild, bool one_time)
 {
-    render_flags[name] = value;
+    if (one_time)
+        one_time_render_flags[name] = value;
+    else
+        render_flags[name] = value;
 }
 
 void RenderGraph::toggle_flag(Name name, bool needs_rebuild)

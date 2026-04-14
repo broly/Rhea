@@ -61,14 +61,12 @@ REFLECT_STRUCT_RUNTIME(PushRTXGIValidate,
     normal_threshold);
 
 
-export struct PushRTXGIAccum
+export struct TemporalAccumPC
 {
-    glm::vec2 resolution;
-    float alpha;
+    bool reset;
 };
-REFLECT_STRUCT_RUNTIME(PushRTXGIAccum,
-    resolution, 
-    alpha);
+REFLECT_STRUCT_RUNTIME(TemporalAccumPC,
+    reset);
 
 
 export struct PushRTXGISpatial

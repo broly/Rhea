@@ -495,6 +495,14 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
                 }
                 auto extent = backend->get_swapchain_extent();
                 ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
+                TemporalAccumPC pc;
+                pc.reset = false;
+                if (one_time_render_flags.contains("reset_temporal_accum"))
+                {
+                    if (one_time_render_flags["reset_temporal_accum"])
+                        pc.reset = true;
+                }
+                ctx.push_constants(pc);
                 ctx.compute(workgroups);
             },
             .type = RenderPassType::compute
