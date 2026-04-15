@@ -1,0 +1,65 @@
+{
+	"name": "garland",
+	"class": "RhActor",
+	"components": [
+		{
+			"name": "mesh",
+			"class": "RhComp_StaticMesh",
+			"fields": {
+				"transform": {
+					"position": { "x": 0, "y": 0, "z": 0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
+					"scale": { "x": 1.0, "y": 1.0, "z": 1.0}
+				},
+				"mesh": "meshes/garland/Garland.glb",
+				"mats": [
+					{
+						"model": "pbr",
+						"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/plain/blue.png)",
+								"emissive": "TEXTURE(textures/plain/blue.png)",
+								"normal": "TEXTURE(textures/plain/normal.png)",
+								"orm": "TEXTURE(textures/plain/black.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 1.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+					},
+					{
+						"model": "pbr",
+						"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/plain/blue.png)",
+								"emissive": "TEXTURE(textures/plain/blue.png)",
+								"normal": "TEXTURE(textures/plain/normal.png)",
+								"orm": "TEXTURE(textures/plain/black.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 1.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+					},
+					{
+						"model": "pbr",
+						"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/plain/blue.png)",
+								"emissive": "TEXTURE(textures/plain/blue.png)",
+								"normal": "TEXTURE(textures/plain/normal.png)",
+								"orm": "TEXTURE(textures/plain/black.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 1.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+					}
+				]
+			}
+		}
+	]
+}

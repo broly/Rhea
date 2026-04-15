@@ -46,7 +46,11 @@ void Renderer::execute()
     checkf(main_render_graph != nullptr, "RenderGraph not initialized. Please create and initialize RenderGraph in your GameRenderer::init");
     
     for (uint8_t i = 0; i < main_render_graph_num_runs; i++)
-        execute_graph(main_render_graph);
+    {
+        RenderGraphParameters params;
+        params.render_id = i;
+        execute_graph(main_render_graph, params);
+    }
     
     if (main_render_graph_needs_rebuild)
     {

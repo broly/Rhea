@@ -228,7 +228,7 @@
 		},
 		{
 			"name": "lymphocyte_LIGHT0",
-			"ref": "actors/lymphocyte.json",
+			"__ref__": "actors/lymphocyte.json",
 			
 			"components": [
 				{
@@ -250,6 +250,70 @@
 								"emissive": "TEXTURE(textures/lymphocyte/Lymphocyte_E.png)",
 								"normal": "TEXTURE(textures/lymphocyte/Lymphocyte_N.png)",
 								"orm": "TEXTURE(textures/lymphocyte/Lymphocyte_ORM.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 18.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"__skip__": true,
+			"name": "GARLANDXXX",
+			"__ref__": "actors/garland.json",
+			
+			"components": [
+				{
+					"name": "garland",
+					"class": "RhComp_StaticMesh",
+					"fields": {
+						"transform": {
+							"position": { "x": 0, "y": 0, "z": 0 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 0 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"mesh_path": "meshes/garland/garland.glb"
+					},
+					"mats": [
+						{
+							"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/plain/red.png)",
+								"emissive": "TEXTURE(textures/plain/red.png)",
+								"normal": "TEXTURE(textures/plain/normal.png)",
+								"orm": "TEXTURE(textures/plain/black.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 18.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+						},
+						{
+							"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/plain/blue.png)",
+								"emissive": "TEXTURE(textures/plain/blue.png)",
+								"normal": "TEXTURE(textures/plain/normal.png)",
+								"orm": "TEXTURE(textures/plain/black.png)",
+								"base_color_factor": 1.0,
+								"emissive_factor": 18.3,
+								"occlusion_factor": 1.0,
+								"roughness_factor": 1.0,
+								"metallic_factor": 1.0
+							}
+						},
+						{
+							"parameters": {
+								"blend_mode": "opaque",
+								"base_color": "TEXTURE(textures/plain/green.png)",
+								"emissive": "TEXTURE(textures/plain/green.png)",
+								"normal": "TEXTURE(textures/plain/normal.png)",
+								"orm": "TEXTURE(textures/plain/black.png)",
 								"base_color_factor": 1.0,
 								"emissive_factor": 18.3,
 								"occlusion_factor": 1.0,
@@ -285,7 +349,7 @@
 		},
 		{
 			"name": "lymphocyte_LIGHT1",
-			"ref": "actors/lymphocyte.json",
+			"__ref__": "actors/lymphocyte.json",
 			
 			"components": [
 				{
@@ -322,7 +386,7 @@
 		},
 		//{
 		//	"name": "lymphocyte",
-		//	"ref": "actors/lymphocyte.json",
+		//	"__ref__": "actors/lymphocyte.json",
 		//	"components": [
 		//		{
 		//			"name": "mesh",
@@ -339,7 +403,7 @@
 		//},
 		{
 			"name": "cube",
-			"ref": "actors/cube.json",
+			"__ref__": "actors/cube.json",
 			
 			"components": [
 				{

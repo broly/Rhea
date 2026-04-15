@@ -11,6 +11,8 @@ import rhcomponents;
 import game;
 import rail;
 
+constexpr bool DO_NN_SAMPLES = true;
+
 void WorldScript_VariousThings::tick(double dt)
 {
     if (!camera_actor)
@@ -35,8 +37,10 @@ void WorldScript_VariousThings::tick(double dt)
     auto rail = world->find_actor_by_name<Rail>("rail");
     
     
-    RhGlobals::engine->renderer->set_flag("reset_temporal_accum", true, false, true);
-    
+    if (DO_NN_SAMPLES)
+    {
+        RhGlobals::engine->renderer->set_flag("reset_temporal_accum", true, false, true);
+    }
     if (!do_once)
     {
         rail->add_on_tick("cam", [=] (const RailSampleData& d)
@@ -53,8 +57,10 @@ void WorldScript_VariousThings::tick(double dt)
             light->color = d.color;
             light->update_scene_proxy();
         });
-        rail->startup();
-        
+        if (DO_NN_SAMPLES)
+        {
+            rail->startup();
+        }
         do_once = true;
         
         t.position = glm::vec3{0.0f, 30.0f, 10.0f};
@@ -84,7 +90,10 @@ void WorldScript_VariousThings::tick(double dt)
         
         camera_actor->set_transform(t);
         
-        RhGlobals::engine->renderer->set_num_runs_per_frame(10);
+        if (DO_NN_SAMPLES)
+        {
+            RhGlobals::engine->renderer->set_num_runs_per_frame(40);
+        }
         // dir_light_actor->set_transform(t);
     }
     

@@ -72,7 +72,16 @@ bool World::load_level(std::string level_path)
     for (const Json::Value& level_actor_json_value : json_actors)
     {
         std::optional<Json::Value> ref_json_value_opt;
-        if (auto ref = level_actor_json_value.find("ref"))
+        
+        if (auto skip_field_ptr = level_actor_json_value.find("__skip__"))
+        {
+            if (skip_field_ptr && skip_field_ptr->asBool())
+            {
+                continue;
+            }
+        }
+        
+        if (auto ref = level_actor_json_value.find("__ref__"))
         {
             auto str = ref->asString();
             auto opt = json_utils::load_json_asset(str);
