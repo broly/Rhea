@@ -32,7 +32,7 @@ public:
     void execute_graph(std::shared_ptr<RenderGraph>& rg, const RenderGraphParameters& params = {}, RGPostRenderCallback callback = nullptr);
     
     std::shared_ptr<RenderGraph> create_render_graph(
-        Name render_graph_name, 
+        const std::string& render_graph_path, 
         const std::map<Name, bool>& parameters, 
         std::optional<Name> aux_graph_name = std::nullopt);
     

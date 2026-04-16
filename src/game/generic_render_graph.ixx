@@ -215,5 +215,8 @@ public:
 
     uint32_t debug_line_capacity = 19440*32;
     
+    bool readback_nn = false;
+    
 };
-REFLECT_OBJECT(GenericRenderGraph, RenderGraph)
+REFLECT_OBJECT_FIELDS(GenericRenderGraph, RenderGraph,
+    readback_nn)

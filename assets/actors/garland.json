@@ -17,8 +17,8 @@
 						"model": "pbr",
 						"parameters": {
 								"blend_mode": "opaque",
-								"base_color": "TEXTURE(textures/plain/blue.png)",
-								"emissive": "TEXTURE(textures/plain/blue.png)",
+								"base_color": "TEXTURE(textures/plain/red.png)",
+								"emissive": "TEXTURE(textures/plain/red.png)",
 								"normal": "TEXTURE(textures/plain/normal.png)",
 								"orm": "TEXTURE(textures/plain/black.png)",
 								"base_color_factor": 1.0,
@@ -47,8 +47,8 @@
 						"model": "pbr",
 						"parameters": {
 								"blend_mode": "opaque",
-								"base_color": "TEXTURE(textures/plain/blue.png)",
-								"emissive": "TEXTURE(textures/plain/blue.png)",
+								"base_color": "TEXTURE(textures/plain/green.png)",
+								"emissive": "TEXTURE(textures/plain/green.png)",
 								"normal": "TEXTURE(textures/plain/normal.png)",
 								"orm": "TEXTURE(textures/plain/black.png)",
 								"base_color_factor": 1.0,

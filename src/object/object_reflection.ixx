@@ -359,7 +359,7 @@ export namespace reflect
         bool is_abstract);
         
     template <typename T>
-    inline bool register_object_class(std::string_view name, std::optional<JsonSerializer>&& Serializer)
+    inline bool register_object_class(std::string_view name, const std::optional<JsonSerializer>& Serializer)
     {
         ObjectFactoryType factory = [name](const ObjectInitData& init_data) -> std::shared_ptr<T>
         {
@@ -387,7 +387,7 @@ export namespace reflect
             std::move(factory), 
             std::move(unique_factory), 
             std::move(class_bases), 
-            std::move(Serializer), 
+            Serializer, 
             std::is_abstract_v<T>);
         return true;
     }

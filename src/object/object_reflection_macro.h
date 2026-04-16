@@ -21,11 +21,21 @@ import dependency_collector;
 #define REFLECT_OBJECT(cls, base, ...) \
     export namespace reflect_inner { \
         static_assert(std::is_base_of<RhObject, cls>::value, "Can't reflect non-RhObject types");\
+        const auto cls##_serialize_lambda = [] (const Json::Value& json_object, RhObject* ObjPtr, const SerializationContext& context) { \
+            auto CastedObjPtr = reinterpret_cast<cls*>(ObjPtr); \
+            base##_serialize_lambda(json_object, ObjPtr, context); \
+        }; \
         const bool cls##_registered = \
             reflect::register_object_class<cls>(\
-                #cls, \
-                std::nullopt \
-            ); \
+            #cls, \
+            [] (const Json::Value& json_object, RhObject* ObjPtr, const SerializationContext& context) -> bool { \
+                using Class = cls;\
+                auto CastedObjPtr = reinterpret_cast<cls*>(ObjPtr); \
+                cls##_serialize_lambda(json_object, ObjPtr, context); \
+                CastedObjPtr->on_serialize(context); \
+                return true; \
+            }\
+        ); \
         REFL_OBJECT_TRAITS(cls, base) \
     } \
     
@@ -36,13 +46,19 @@ import dependency_collector;
     REFLECT_STRUCT(cls, __VA_ARGS__); \
     export namespace reflect_inner { \
         static_assert(std::is_base_of<RhObject, cls>::value, "Can't reflect non-RhObject types");\
+        const auto cls##_serialize_lambda = [] (const Json::Value& json_object, RhObject* ObjPtr, const SerializationContext& context) \
+        {\
+            base##_serialize_lambda(json_object, ObjPtr, context); \
+            auto CastedObjPtr = reinterpret_cast<cls*>(ObjPtr); \
+            reflect::json::visit_serialize(json_object, *CastedObjPtr, context); \
+        };\
         const bool cls##_registered = \
             reflect::register_object_class<cls>(\
                 #cls, \
                     [] (const Json::Value& json_object, RhObject* ObjPtr, const SerializationContext& context) -> bool { \
                         using Class = cls;\
                         auto CastedObjPtr = reinterpret_cast<cls*>(ObjPtr); \
-                        reflect::json::visit_serialize(json_object, *CastedObjPtr, context); \
+                        cls##_serialize_lambda(json_object, CastedObjPtr, context); \
                         CastedObjPtr->on_serialize(context); \
                         return true; \
                     }\

@@ -64,7 +64,7 @@ REFLECT_STRUCT_RUNTIME(PushRTXGIValidate,
 export struct TemporalAccumPC
 {
     bool reset;
-    uint8_t pad[3];
+    uint8_t pad[3] = {0,0,0};
 };
 REFLECT_STRUCT_RUNTIME(TemporalAccumPC,
     reset);

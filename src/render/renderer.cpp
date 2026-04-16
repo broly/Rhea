@@ -33,12 +33,12 @@ void Renderer::init(RBWindowHandle in_window)
     auto value = json_utils::load_json_asset(engine_config_path);
     checkf(value.has_value(), "could not load render/renderer.json");
     
-    Json::Value const* render_graph_class_value = value->find("graph_class");
-    checkf(render_graph_class_value != nullptr, "graph_class section is empty");
+    Json::Value const* render_graph_path_value = value->find("render_graph_path");
+    checkf(render_graph_path_value != nullptr, "graph_class section is empty");
     
-    main_render_graph_name = render_graph_class_value->asString();
+    auto render_graph_rel_path = render_graph_path_value->asString();
     
-    main_render_graph = create_render_graph(main_render_graph_name, {});
+    main_render_graph = create_render_graph(render_graph_rel_path, {});
 }
 
 void Renderer::execute()
@@ -116,23 +116,21 @@ void Renderer::execute_graph(
 
 }
 
-std::shared_ptr<RenderGraph> Renderer::create_render_graph(Name render_graph_name,
+std::shared_ptr<RenderGraph> Renderer::create_render_graph(const std::string& render_graph_path,
     const std::map<Name, bool>& parameters, std::optional<Name> aux_graph_name)
 {
-    
-    auto reflection_info = reflect::find_object_reflection_info(render_graph_name);
-    checkf(reflection_info != nullptr, "Could not find render graph class");
-    
-    auto result = reflection_info->instantiate<RenderGraph>();
-    result->setup(render_backend, shared_from_this());
-    result->init_resources(parameters);
-    result->build_passes(parameters);
-    result->compile();
+    auto rg_path = paths::get_assets_path() / render_graph_path;
+    SerializationContext ctx;
+    auto graph = json_object::load_object<RenderGraph>(rg_path, ctx);
+    graph->setup(render_backend, shared_from_this());
+    graph->init_resources(parameters);
+    graph->build_passes(parameters);
+    graph->compile();
     
     if (aux_graph_name.has_value())
-        aux_graphs.insert({*aux_graph_name, result});
+        aux_graphs.insert({*aux_graph_name, graph});
     
-    return result;
+    return graph;
 }
 
 void Renderer::trigger_aux_rg_once(Name aux_rg_name, const RenderGraphParameters& params, RGPostRenderCallback callback)
