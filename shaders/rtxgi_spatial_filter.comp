@@ -14,7 +14,7 @@ const uint RADIUS = 5;
 
 vec3 stabilize(vec3 filtered, vec3 center, float valid)
 {
-    float boost = mix(0.2, 0.8, valid);
+    float boost = mix(0.0, 0.3, valid);
     return mix(filtered, center, boost);
 }
 
@@ -28,32 +28,30 @@ void main()
         return;
 
     vec2 texel = 1.0 / vec2(size);
-    vec2 uv = (vec2(gid) + 0.5) * texel;
+    vec2 uv    = (vec2(gid) + 0.5) * texel;
 
     SVGFPixelData center = svgf_pixel_data_fetch(uv);
-    
-    float radiusScale = mix(2.0, 1.0, center.valid);
-    int r = int(float(RADIUS) * radiusScale);
+
+    int r = int(RADIUS);
 
     ClampData cd = computeClamp(uv, texel, r);
 
     vec3 minClamp, maxClamp;
     computeClampBounds(cd, center.valid, minClamp, maxClamp);
 
-    
     vec3 filtered = bilateralFilter(
         uv, texel, r,
         center,
         minClamp,
         maxClamp
     );
+
     
     vec3 result = stabilize(filtered, center.color, center.valid);
 
-    
     imageStore(
         u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_FILTERED],
         gid,
-        vec4(vec3(filtered), 1.0)
+        vec4(result, 1.0)
     );
 }

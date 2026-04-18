@@ -6,11 +6,77 @@ layout(local_size_x = 16, local_size_y = 16) in;
 #include "resources/gbuffer.glsl"
 #include "resources/camera.glsl"
 
-#include "rtx/validation.glsl"
+#include "rtx/svgf_validation.glsl"
+
+vec4 fetch_history_bilinear_validated(
+    vec2 prev_uv,
+    vec2 tex_size,
+    float curr_depth,
+    vec3  curr_N
+)
+{
+    vec2 px       = prev_uv * tex_size - 0.5;
+    vec2 px_floor = floor(px);
+    vec2 frac_uv  = px - px_floor;
+
+    vec2 uv00 = (px_floor + vec2(0.5, 0.5)) / tex_size;
+    vec2 uv10 = (px_floor + vec2(1.5, 0.5)) / tex_size;
+    vec2 uv01 = (px_floor + vec2(0.5, 1.5)) / tex_size;
+    vec2 uv11 = (px_floor + vec2(1.5, 1.5)) / tex_size;
+
+    float w00 = (1.0 - frac_uv.x) * (1.0 - frac_uv.y);
+    float w10 =        frac_uv.x  * (1.0 - frac_uv.y);
+    float w01 = (1.0 - frac_uv.x) *        frac_uv.y;
+    float w11 =        frac_uv.x  *         frac_uv.y;
+
+    vec4 h00 = textureLod(u_hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], uv00, 0.0);
+    vec4 h10 = textureLod(u_hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], uv10, 0.0);
+    vec4 h01 = textureLod(u_hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], uv01, 0.0);
+    vec4 h11 = textureLod(u_hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], uv11, 0.0);
+
+    float d00 = get_gbuffer_hist_LINEAR_DEPTH(uv00).r;
+    float d10 = get_gbuffer_hist_LINEAR_DEPTH(uv10).r;
+    float d01 = get_gbuffer_hist_LINEAR_DEPTH(uv01).r;
+    float d11 = get_gbuffer_hist_LINEAR_DEPTH(uv11).r;
+
+    float inv_depth = 1.0 / max(curr_depth, 1e-3);
+    float dw00 = exp(-abs(curr_depth - d00) * inv_depth * 8.0);
+    float dw10 = exp(-abs(curr_depth - d10) * inv_depth * 8.0);
+    float dw01 = exp(-abs(curr_depth - d01) * inv_depth * 8.0);
+    float dw11 = exp(-abs(curr_depth - d11) * inv_depth * 8.0);
+
+    vec3 n00 = normalize(get_gbuffer_hist_WORLD_NORMAL(uv00).xyz * 2.0 - 1.0);
+    vec3 n10 = normalize(get_gbuffer_hist_WORLD_NORMAL(uv10).xyz * 2.0 - 1.0);
+    vec3 n01 = normalize(get_gbuffer_hist_WORLD_NORMAL(uv01).xyz * 2.0 - 1.0);
+    vec3 n11 = normalize(get_gbuffer_hist_WORLD_NORMAL(uv11).xyz * 2.0 - 1.0);
+
+    float nw00 = pow(max(dot(curr_N, n00), 0.0), 4.0);
+    float nw10 = pow(max(dot(curr_N, n10), 0.0), 4.0);
+    float nw01 = pow(max(dot(curr_N, n01), 0.0), 4.0);
+    float nw11 = pow(max(dot(curr_N, n11), 0.0), 4.0);
+
+    float tw00 = w00 * dw00 * nw00;
+    float tw10 = w10 * dw10 * nw10;
+    float tw01 = w01 * dw01 * nw01;
+    float tw11 = w11 * dw11 * nw11;
+
+    float wsum = tw00 + tw10 + tw01 + tw11;
+
+    if (wsum < 1e-4)
+    {
+        return vec4(0.0);
+    }
+
+    vec4 result;
+    result.rgb = (h00.rgb * tw00 + h10.rgb * tw10 + h01.rgb * tw01 + h11.rgb * tw11) / wsum;
+    result.a   = (h00.a * tw00 + h10.a * tw10 + h01.a * tw01 + h11.a * tw11) / wsum;
+
+    return result;
+}
 
 void main()
 {
-    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 gid  = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = imageSize(u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI]);
 
     if (any(greaterThanEqual(gid, size)))
@@ -18,20 +84,26 @@ void main()
 
     vec2 uv = (vec2(gid) + 0.5) / vec2(size);
 
-    vec2 motion = get_gbuffer_MOTION_VECTORS(uv).rg;
-    vec2 prev_uv = clamp(uv - motion, vec2(0.0), vec2(1.0));
+    vec2 motion      = get_gbuffer_MOTION_VECTORS(uv).rg;
+    vec2 prev_uv_raw = uv - motion;
+    vec2 prev_uv     = clamp(prev_uv_raw, vec2(0.0), vec2(1.0));
 
-    vec4 history = texture(
-        u_hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
-        prev_uv
+    float curr_depth = get_gbuffer_LINEAR_DEPTH(uv).r;
+    vec3  curr_N     = normalize(get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0);
+
+    vec4 history = fetch_history_bilinear_validated(
+        prev_uv,
+        vec2(size),
+        curr_depth,
+        curr_N
     );
 
-    float valid = compute_valid(uv);
-    
+    float valid  = compute_valid(uv);
+    float hist_w = history.a * valid;
 
     imageStore(
         u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED],
         gid,
-        vec4(history.rgb, history.a * valid)
+        vec4(history.rgb, hist_w)
     );
 }

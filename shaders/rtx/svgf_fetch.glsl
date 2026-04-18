@@ -16,11 +16,10 @@ SVGFPixelData svgf_pixel_data_fetch(vec2 uv)
     );
 
     p.color = accum.rgb;
-    
-    float a = pow(accum.a / 40, 4.0);
-    
-    p.weight = a;
-    p.valid = step(1e-4, p.weight);
+
+    float w = accum.a;
+    p.weight = clamp(w / 32.0, 0.0, 1.0);
+    p.valid  = p.weight;
 
     p.luminance = luminance(p.color);
 
@@ -29,8 +28,9 @@ SVGFPixelData svgf_pixel_data_fetch(vec2 uv)
         uv
     ).rg;
 
-    float variance = max(m.y - m.x * m.x, 1e-5);
-    p.sigma = max(sqrt(variance), 0.2);
+    float variance = max(m.y - m.x * m.x, 0.0);
+    float min_sigma = mix(0.5, 0.05, p.valid);
+    p.sigma = max(sqrt(variance), min_sigma);
 
     p.normal = normalize(
         get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0

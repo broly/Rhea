@@ -35,10 +35,10 @@ void main()
 {
     // vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], v_uv).rgb;
     // vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], v_uv).aaa;
-   // vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], v_uv).rgb;
+    // vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], v_uv).rgb;
 //    float valid = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], v_uv).a;
 //     vec3 hdr_color = vec3(pow(valid / 20, 2.0));
-     vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], v_uv).rgb;
+    vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], v_uv).rgb;
     // exposure
     hdr_color *= 0.6;
     // tonemap

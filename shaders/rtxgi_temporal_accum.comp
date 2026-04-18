@@ -3,6 +3,8 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 #include "resources/hdr_color_output.glsl"
 #include "resources/hdr_color_storage.glsl"
+#include "resources/camera.glsl"
+#include "rtx/svgf_validation.glsl"
 
 layout(push_constant)
 uniform TemporalAccumPC
@@ -23,19 +25,21 @@ void main()
     vec3 current = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], uv).rgb;
     vec4 reproj  = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], uv);
 
-    vec3 history = reproj.rgb;
-    float weight = reproj.a;
+    vec3  history = reproj.rgb;
+    float hist_w  = reproj.a;
 
-    weight = min(weight + 1.0, 50.0);
+    float weight_cap = compute_weight_cap();
 
-    float new_weight = weight + 1.0;
+    hist_w = min(hist_w, weight_cap);
 
-    vec3 result = (history * weight + current) / new_weight;
-    
+    float new_weight = min(hist_w + 1.0, weight_cap);
+
+    vec3 result = mix(current, history, hist_w / new_weight);
+
     if (pc.reset)
     {
-        result = vec3(0.0);
-        new_weight = 0.0;
+        result     = current;
+        new_weight = 1.0;
     }
 
     imageStore(

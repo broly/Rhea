@@ -43,10 +43,10 @@ void computeClampBounds(
     out vec3 maxClamp
 )
 {
-    vec3 mean = 0.5 * (cd.minC + cd.maxC);
+    vec3 mean   = 0.5 * (cd.minC + cd.maxC);
     vec3 extent = 0.5 * (cd.maxC - cd.minC);
 
-    float strength = mix(2.5, 1.2, valid);
+    float strength = mix(3.0, 1.0, valid);
 
     minClamp = mean - extent * strength;
     maxClamp = mean + extent * strength;
