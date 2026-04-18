@@ -41,6 +41,8 @@ public:
 public:  // public API
     void set_flag(Name name, bool value, bool needs_rebuild = false, bool one_time = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
+    
+    void hot_reload();
 
     RBImageHandle create_texture_from_asset(TextureHandle handle, bool generate_mips = true, 
         RBImageLayout initial_layout = RBImageLayout::undefined,

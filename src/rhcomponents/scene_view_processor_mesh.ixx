@@ -33,6 +33,7 @@ export struct RenderPrimitivePassInfo
 {
     std::shared_ptr<MaterialInstance> material_instance;
     std::shared_ptr<PipelineFamily> pipeline_family;
+    ShaderKey shader_key = {};
     PipelineObject* pipeline;
     uint32_t material_index;
 };
@@ -98,6 +99,8 @@ public:
         const Frustum& frustum,
         Name pass_name,
         std::vector<ViewRenderItem>& out_items);
+    
+    virtual void on_hot_reload() override;
 
     std::vector<RenderObject_Mesh> meshes;
     std::vector<RenderId> vacated_mesh_ids;

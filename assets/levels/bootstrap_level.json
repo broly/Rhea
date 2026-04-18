@@ -177,7 +177,18 @@
 									"roll": 0
 								},
 								"color": {"x": 15, "y": 2, "z": 0, "w": 1}
-							}
+							},
+							{
+								"timestamp_seconds": 0.0,  
+								"position": { "x": 0, "y": 0, "z": 0}, 
+								"rotation": { 
+									"__kind__": "euler_deg",
+									"pitch": -60.9915, 
+									"yaw": 51.2847, 
+									"roll": 0
+								},
+								"color": {"x": 12, "y": 12, "z": 8, "w": 1}
+							},
 					]
 				}
 			}

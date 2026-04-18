@@ -97,6 +97,8 @@ public:
     void end_frame() override;
     
     void rebuild_camera_ubo(RenderGraphContext& ctx);
+    
+    virtual void on_pso_built() override;
 
     void prepare_geometry_resources(RenderGraphContext& ctx);
     void prepare_shadow_pass(RenderGraphContext& ctx);
@@ -199,6 +201,7 @@ public:
     std::shared_ptr<PipelineFamily> rtx_gi_temporal_accum_pipeline_family;
     std::shared_ptr<PipelineFamily> rtx_gi_moments_pipeline_family;
     std::shared_ptr<PipelineFamily> rtx_gi_spatial_filter_pipeline_family;
+    std::shared_ptr<PipelineFamily> lighting_pipeline_family;
     
     bool use_swapchain_extent;
     

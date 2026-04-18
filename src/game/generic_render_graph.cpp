@@ -297,42 +297,31 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     
     auto pbr_model = renderer->find_model("pbr");
-    std::shared_ptr<PipelineFamily> lighting_pipeline_family = renderer->query_pipeline_family("Lighting", pbr_model);
-    lighting_pipeline = request_pipeline(lighting_pipeline_family, {});
+    lighting_pipeline_family = renderer->query_pipeline_family("Lighting", pbr_model);
     
     tonemap_pipeline_family = renderer->query_pipeline_family("ToneMapping", tonemap_model);
-    tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
     
     wireframe_pipeline_family = renderer->query_pipeline_family("Wireframe", wireframe_model);
-    wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
     
     shadow_debug_pipeline_family = renderer->query_pipeline_family("ShadowDebug", shadow_debug_model);
-    shadow_debug_pipeline = shadow_debug_pipeline_family->request_pipeline({});
 
     auto ssr_model = renderer->find_model("ssr");
 
     ssr_pipeline_family = renderer->query_pipeline_family("SSR", ssr_model);
-    ssr_pipeline = ssr_pipeline_family->request_pipeline({});
 
-    ssr_composite_pipeline_family = renderer->query_pipeline_family("SSRComposite", ssr_model);
-    ssr_composite_pipeline = ssr_composite_pipeline_family->request_pipeline({});    
+    ssr_composite_pipeline_family = renderer->query_pipeline_family("SSRComposite", ssr_model); 
     
     auto rtxgi_model = renderer->find_model("rtxgi");
     
     rtx_gi_pipeline_family = renderer->query_pipeline_family("RTXGI", rtxgi_model);
-    rtx_gi_pipeline = rtx_gi_pipeline_family->request_pipeline({});
     
     rtx_gi_reproject_pipeline_family = renderer->query_pipeline_family("RTXGI_REPROJECT", rtxgi_model);
-    rtx_gi_reproject_pipeline = rtx_gi_reproject_pipeline_family->request_pipeline({});
     
     rtx_gi_temporal_accum_pipeline_family = renderer->query_pipeline_family("RTXGI_TEMPORAL_ACCUM", rtxgi_model);
-    rtx_gi_temporal_accum_pipeline = rtx_gi_temporal_accum_pipeline_family->request_pipeline({});
     
     rtx_gi_moments_pipeline_family = renderer->query_pipeline_family("RTXGI_MOMENTS", rtxgi_model);
-    rtx_gi_moments_pipeline = rtx_gi_moments_pipeline_family->request_pipeline({});
     
     rtx_gi_spatial_filter_pipeline_family = renderer->query_pipeline_family("RTXGI_SPATIAL_FILTER", rtxgi_model);
-    rtx_gi_spatial_filter_pipeline = rtx_gi_spatial_filter_pipeline_family->request_pipeline({});
     
     
     shadow_map = create_texture({
@@ -348,6 +337,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .frame_size  = debug_line_capacity * sizeof(LineVertex),
         .dynamic = true
     });
+    
+    on_pso_built();
 }
 
 void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
@@ -799,6 +790,21 @@ void GenericRenderGraph::rebuild_camera_ubo(RenderGraphContext& ctx)
     current_camera_ubo = make_camera_ubo(ctx, false, 0);
     current_camera_ubo.prev_proj = prev_proj;
     current_camera_ubo.prev_view = prev_view;
+}
+
+void GenericRenderGraph::on_pso_built()
+{
+    rtx_gi_spatial_filter_pipeline = rtx_gi_spatial_filter_pipeline_family->request_pipeline({});
+    rtx_gi_moments_pipeline = rtx_gi_moments_pipeline_family->request_pipeline({});
+    rtx_gi_temporal_accum_pipeline = rtx_gi_temporal_accum_pipeline_family->request_pipeline({});
+    rtx_gi_reproject_pipeline = rtx_gi_reproject_pipeline_family->request_pipeline({});
+    rtx_gi_pipeline = rtx_gi_pipeline_family->request_pipeline({});
+    ssr_composite_pipeline = ssr_composite_pipeline_family->request_pipeline({});   
+    ssr_pipeline = ssr_pipeline_family->request_pipeline({});
+    shadow_debug_pipeline = shadow_debug_pipeline_family->request_pipeline({});
+    wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
+    tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
+    lighting_pipeline = request_pipeline(lighting_pipeline_family, {});
 }
 
 LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const

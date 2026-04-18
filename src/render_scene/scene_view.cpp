@@ -36,6 +36,14 @@ void SceneView::perform_extraction()
             processor->process();
 }
 
+void SceneView::hot_reload()
+{
+    for (auto& processor : processors)
+    {
+        processor->on_hot_reload();
+    }
+}
+
 void SceneView::submit_raw(SceneViewProcId svp_id, const void* scene_proxy_ptr)
 {
     processors[svp_id]->submit(scene_proxy_ptr);

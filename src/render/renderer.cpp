@@ -267,9 +267,19 @@ void Renderer::toggle_flag(Name name, bool needs_rebuild)
     main_render_graph_needs_rebuild = true;
 }
 
+void Renderer::hot_reload()
+{
+    for (auto [_, pipeline_family] : material_pipeline_families)
+    {
+        pipeline_family->clear_pso_cache();
+    }
+    main_render_graph->on_pso_built();
+    
+}
+
 RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle, bool generate_mips, 
-        RBImageLayout initial_layout,
-        RBImageLayout final_layout)
+                                                  RBImageLayout initial_layout,
+                                                  RBImageLayout final_layout)
 {
     const Texture& data = handle.get();
     

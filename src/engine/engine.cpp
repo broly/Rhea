@@ -63,3 +63,9 @@ void Engine::run()
     }
     window_destroy(window);
 }
+
+void Engine::render_hot_reload()
+{
+    renderer->hot_reload();
+    scene_view->hot_reload();
+}

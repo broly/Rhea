@@ -26,7 +26,7 @@ void main()
     vec3 history = reproj.rgb;
     float weight = reproj.a;
 
-    weight = min(weight, 50.0);
+    weight = min(weight + 1.0, 50.0);
 
     float new_weight = weight + 1.0;
 

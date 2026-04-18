@@ -3,11 +3,14 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 #include "resources/hdr_color_output.glsl"
 #include "resources/hdr_color_storage.glsl"
+#include "resources/gbuffer.glsl"
+#include "rtx/validation.glsl"
 
 float luminance(vec3 c)
 {
     return dot(c, vec3(0.299, 0.587, 0.114));
 }
+
 
 void main()
 {
@@ -20,15 +23,38 @@ void main()
     vec2 uv = (vec2(gid) + 0.5) / vec2(size);
 
     vec3 c = texture(
-        u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI],
+        u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
         uv
     ).rgb;
 
-    float l = luminance(c);
+    float L = luminance(c);
+    float L2 = L * L;
+
+    vec2 prevM = texture(
+        u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS],
+        uv
+    ).rg;
+
+    float M1_prev = prevM.x;
+    float M2_prev = prevM.y;
+
+    float valid = compute_valid(uv);
+
+    // convert to accumulation weight
+    float alpha = mix(0.15, 1.0, valid);
+
+    float M1 = mix(M1_prev, L, alpha);
+    float M2 = mix(M2_prev, L2, alpha);
+
+    float variance = M2 - M1 * M1;
+
+    // clamp noise explosion
+    variance = max(variance, 1e-6);
+    variance = min(variance, 10.0);
 
     imageStore(
         u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_MOMENTS],
         gid,
-        vec4(l, l*l, 0.0, 0.0)
+        vec4(M1, M2, 0.0, 0.0)
     );
 }

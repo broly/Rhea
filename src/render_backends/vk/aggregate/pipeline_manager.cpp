@@ -108,6 +108,25 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
     return result;
 }
 
+void vk::PipelineManager::destroy_pipeline(PipelineObject* pipeline)
+{
+    auto as_vk = static_cast<VkPipelineObject*>(pipeline);
+    if (as_vk->has_pipeline_handle())
+    {
+        pipelines.erase(as_vk->get_pipeline_handle());
+        return;
+    }
+    for (auto it = pending_pipelines.begin(); it != pending_pipelines.end(); ++it)
+    {
+        if (it->get() == pipeline)
+        {
+            pending_pipelines.erase(it);
+            break;
+        }
+    }
+    
+}
+
 VkDescriptorSetLayout vk::PipelineManager::get_empty_descriptor_set()
 {
     if (empty_descriptor_set.has_value())

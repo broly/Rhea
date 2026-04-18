@@ -49,6 +49,8 @@ public:
     requires std::is_base_of_v<SceneViewProxy_Transform, T>
     static inline size_t scene_view_proxy_size_v = sizeof(T);
     
+    virtual void on_hot_reload() {}
+    
     void on_init() override
     {
         if (is_default && type_name != reflect::get_object_type_name<SceneViewProcessor>())

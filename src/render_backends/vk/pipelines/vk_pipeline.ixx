@@ -54,6 +54,11 @@ public:
         return vk_pipeline;
     }
     
+    bool has_pipeline_handle() const
+    {
+        return vk_pipeline != VK_NULL_HANDLE;
+    }
+    
     
     void reflect_shader(const VkShader& shader, ShaderStage stage)
     {

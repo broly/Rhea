@@ -30,6 +30,11 @@ void VkRenderBackend::update_uniform_buffer_impl(RBBufferHandle buffer_handle, s
     buffer_manager.update_any_buffer(buffer_handle, size, data, frame);
 }
 
+void VkRenderBackend::destroy_pipeline(PipelineObject* pipeline)
+{
+    pipeline_manager.destroy_pipeline(pipeline);
+}
+
 void VkRenderBackend::destroy_render_pass_cache()
 {
     render_pass_cache.clear();

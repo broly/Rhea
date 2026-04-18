@@ -116,7 +116,8 @@ void SceneViewProcessor_Mesh::process()
                         rp.passes.emplace(pass_name);
                         auto& info = rp.info_by_pass[pass_name];
                         info.pipeline_family = geom_pipeline_family;
-                        info.pipeline = geom_pipeline_family->request_pipeline(geom_pipeline_family->make_shader_key(instance->material, pass_name));
+                        info.shader_key = geom_pipeline_family->make_shader_key(instance->material, pass_name);
+                        info.pipeline = geom_pipeline_family->request_pipeline(info.shader_key);
                         info.material_instance = instance;
                         if (pass_name != "shadowmap")
                             instance->apply_material_parameters();
@@ -245,5 +246,18 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
         }
 
         out_items.push_back({ &prim, key });
+    }
+}
+
+void SceneViewProcessor_Mesh::on_hot_reload()
+{
+    SceneViewProcessor::on_hot_reload();
+    
+    for (auto& prim : primitives)
+    {
+        for (auto& [_, info] : prim.info_by_pass)
+        {
+            info.pipeline = info.pipeline_family->request_pipeline(info.shader_key);
+        }
     }
 }

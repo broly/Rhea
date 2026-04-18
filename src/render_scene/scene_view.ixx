@@ -42,6 +42,7 @@ public:
         return *reinterpret_cast<T*>(processors[processor_id].get());
     }
     
+    void hot_reload();
     
     void submit_raw(SceneViewProcId svp_id, const void* scene_proxy_ptr);
 

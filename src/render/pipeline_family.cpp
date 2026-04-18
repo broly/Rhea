@@ -428,6 +428,15 @@ const PipelineInfo& PipelineFamily::get_base_pipeline_config() const
     return *info;
 }
 
+void PipelineFamily::clear_pso_cache()
+{
+    for (auto pipeline : pipelines)
+    {
+        backend->destroy_pipeline(pipeline.second);
+    }
+    pipelines.clear();
+}
+
 
 void PipelineFamily::decode_key_to_defines(ShaderKey key, DefinitionMap& out_defines) const
 {

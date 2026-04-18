@@ -99,6 +99,7 @@ public:   /// API Section
     virtual PipelineObject* create_raytrace_pipeline(const PipelineCreateDesc_RayTrace& desc, RBPipelineLayout pipeline_layout) override;
     virtual RBBufferHandle create_uniform_buffer(size_t buffer_size, ResourceUsage usage_type) override;
     virtual void update_uniform_buffer_impl(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame) override;
+    virtual void destroy_pipeline(PipelineObject* pipeline) override;
     void destroy_render_pass_cache() override;
     virtual RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc) override;
     virtual Extent get_swapchain_extent() const override;

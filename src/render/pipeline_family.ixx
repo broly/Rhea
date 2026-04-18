@@ -32,6 +32,8 @@ public:
     RBPipelineLayout get_pipeline_layout() const;
     
     const PipelineInfo& get_base_pipeline_config() const;
+    
+    void clear_pso_cache();
 
 private:
 

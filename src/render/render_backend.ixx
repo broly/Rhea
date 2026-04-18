@@ -105,6 +105,8 @@ public:
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
     virtual ImageReadback readback_image(RBImageHandle img) const = 0;
     
+    virtual void destroy_pipeline(PipelineObject* pipeline) = 0;
+    
     virtual RBVertexBufferHandle create_vertex_buffer(const VertexBufferDesc& desc) = 0;
     virtual void* get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame) = 0;
     virtual void bind_vertex_buffer(RBCommandList cmd, RBVertexBufferHandle handle, RBFrameHandle frame) = 0;

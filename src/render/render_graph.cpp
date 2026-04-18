@@ -728,7 +728,7 @@ void RenderGraph::recompile()
 PipelineObject* RenderGraph::request_pipeline(
     std::shared_ptr<PipelineFamily> pipeline_family, ShaderKey shader_key)
 {
-    assert(!graph_compiled);
+    // assert(!graph_compiled);
     PipelineObject* pipeline = pipeline_family->request_pipeline(shader_key);
     return pipeline;
 }

@@ -19,6 +19,8 @@ public:
     virtual void engine_init();
     
     void run();
+    
+    void render_hot_reload();
 
     platform::window::Window window = nullptr;
     std::shared_ptr<Input> input = nullptr;

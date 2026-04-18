@@ -46,7 +46,7 @@ void WorldScript_VariousThings::tick(double dt)
         rail->add_on_tick("cam", [=] (const RailSampleData& d)
         {
             Transform newt = {d.position, d.rotation};
-            camera_actor->set_transform(newt);
+            // camera_actor->set_transform(newt);
         });
         
         rail->add_on_tick("light", [=] (const RailSampleData& d)
@@ -197,6 +197,16 @@ void WorldScript_VariousThings::tick(double dt)
     if (input->is_key_down(Key::B))
     {
         RhGlobals::engine->renderer->set_flag("reset_temporal_accum", true, false, true);
+    }
+    if (input->is_key_down(Key::R))
+    {
+        const double time = world->get_time_seconds();
+        if (time - last_rg_switch_time < 1.0)
+            return;
+        last_rg_switch_time = time;
+        
+        
+        RhGlobals::engine->render_hot_reload();
     }
     if (input->is_key_down(Key::Z))
     {

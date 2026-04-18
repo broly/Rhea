@@ -195,7 +195,7 @@
 			},
 			"shader_stage": {
 				"shader": "rtxgi_moments.comp",
-				"resources": ["gbuffer", "hdr_color_output", "hdr_color_storage"]
+				"resources": ["camera", "gbuffer", "hdr_color_output", "hdr_color_storage"]
 			},
 			"push_constants": [
 				{

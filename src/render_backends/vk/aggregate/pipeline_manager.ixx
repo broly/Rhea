@@ -50,6 +50,8 @@ namespace vk
         
         RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc);
         
+        void destroy_pipeline(PipelineObject* pipeline);
+        
         VkDescriptorSetLayout get_empty_descriptor_set();
         
         std::shared_ptr<VkRenderResourceInstance> query_single_resource_instance(VkRenderResource* resource, 

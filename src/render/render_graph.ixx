@@ -216,6 +216,7 @@ public:
     virtual void build_passes(const std::map<Name, bool>& parameters) = 0;
     virtual void end_frame() {};
     virtual void prepare_resources(RenderGraphContext& ctx) {};
+    virtual void on_pso_built() {};
     
     RGTextureHandle create_texture(const RGTextureDesc& desc);
     RGTextureHandle create_texture_from_asset(TextureHandle texture, bool generate_mips = true);
