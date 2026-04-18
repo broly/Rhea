@@ -2,6 +2,7 @@
 #define SVGF_VALIDATION
 
 #include "../resources/camera.glsl"
+#include "../resources/gbuffer.glsl"
 
 float camera_rotation_angle()
 {

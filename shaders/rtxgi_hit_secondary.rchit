@@ -121,7 +121,7 @@ void main()
 
     payload.throughput *= albedo;
 
-    payload.throughput *= 1.5;
+    // payload.throughput *= 1.5;
 
     if (payload.depth >= 2)
     {
