@@ -691,6 +691,12 @@ void RenderGraph::rebuild_resources()
             continue;
         }
         
+        if (tex.image.has_value())
+        {
+            backend->destroy_image(*tex.image, true);
+            tex.image.reset();
+        }
+        
         RBImageDesc desc = {
             .name = std::string("RG_") + tex.desc.name.to_string(),
             .extent  = tex.desc.extent,
@@ -720,9 +726,20 @@ void RenderGraph::recompile()
     for (auto& tex : textures)
     {
         if (tex.image && tex.should_create_image())
-            backend->destroy_image(*tex.image, true);
+        {
+            destroy_texture_image(tex);
+        }
     }
     compile();
+}
+
+void RenderGraph::destroy_texture_image(RGTexture& tex) const
+{
+    ensure(tex.image.has_value());
+    if (tex.image.has_value())
+    {
+        destroy_texture_image(tex);
+    }
 }
 
 PipelineObject* RenderGraph::request_pipeline(

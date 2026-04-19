@@ -264,6 +264,8 @@ public:
     void rebuild_resources();
     
     void recompile();
+    
+    void destroy_texture_image(RGTexture& tex) const;
 
     PipelineObject* request_pipeline(
         std::shared_ptr<PipelineFamily> pipeline_family, ShaderKey shader_key);
