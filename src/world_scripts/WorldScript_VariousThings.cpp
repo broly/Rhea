@@ -11,7 +11,7 @@ import rhcomponents;
 import game;
 import rail;
 
-constexpr bool DO_NN_SAMPLES = false;
+constexpr bool DO_NN_SAMPLES = true;
 
 void WorldScript_VariousThings::tick(double dt)
 {

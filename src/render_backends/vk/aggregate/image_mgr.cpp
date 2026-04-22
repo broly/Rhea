@@ -1133,6 +1133,13 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
             out_format = TextureFormat::RGBA32F;
             bytes_per_channel = 4;
             break;
+        
+        
+        case VK_FORMAT_R8G8B8A8_UNORM:
+			todo();
+            out_format = TextureFormat::RGBA16F;
+            bytes_per_channel = 4;
+            break;
 
         default:
             checkf(false, "Unsupported format for image readback");

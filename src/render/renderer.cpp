@@ -49,6 +49,8 @@ void Renderer::execute()
     {
         RenderGraphParameters params;
         params.render_id = i;
+        params.num_runs = main_render_graph_num_runs;
+        params.frame_id = frame_id;
         execute_graph(main_render_graph, params);
     }
     
@@ -68,6 +70,7 @@ void Renderer::execute()
         rg_once_jobs.clear();
     }
     
+    frame_id++;
 }
 
 void Renderer::execute_graph(

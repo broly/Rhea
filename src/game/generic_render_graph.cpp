@@ -19,6 +19,8 @@ import :names;
 import :debug_line;
 import <algorithm>;
 import <set>;
+import dump_exr;
+import paths;
 
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
@@ -697,23 +699,43 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     
     
     
-    if (parameters.contains("nn_dataset") && parameters.at("nn_dataset") == true)
+    if (readback_nn)
     {
         add_pass({
-           .name = "COPY_ssr_compose_to_hdr_base",
+           .name = "readback_nn",
            .reads = {
-               { hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE], RBImageUsageType::TransferSrc }
+               { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::TransferSrc },
+               { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsageType::TransferSrc },
            },
            .writes = {
-               { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::TransferDst, RBLoadOp::Load }
            },
            .execute = [this](RenderGraphContext& ctx)
            {
-               
-               CopyImageParams params;
-               params.source = get_image(hdr_color_present[COLOR_OUTPUT_HDR_INTERMEDIATE]);
-               params.dest = get_image(hdr_color_present[COLOR_OUTPUT_HDR_BASE]);
-               ctx.copy_img(params);
+               if (ctx.params.render_id == ctx.params.num_runs - 1)
+               {
+                   {
+                       ImageReadback readback_data = 
+                        ctx.backend.readback_image(get_image(hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM]));
+                   
+                      std::string fname =  "rtxgi_accum_" + std::to_string(ctx.params.frame_id) + ".exr"; 
+                      exr_dump::save_exr(paths::get_cache_path() / "nn" / fname, 
+                          readback_data.data[0][0].data(), 
+                          readback_data.extent.width,
+                          readback_data.extent.height,
+                          4);
+                   }
+                   {
+                       ImageReadback readback_data = 
+                          ctx.backend.readback_image(get_image(gbuffer[GBUFFER_SLOT_WORLD_NORMAL]));
+                       
+                        std::string fname =  "world_normal_" + std::to_string(ctx.params.frame_id) + ".exr"; 
+                        exr_dump::save_exr(paths::get_cache_path() / "nn" / fname, 
+                            readback_data.data[0][0].data(), 
+                            readback_data.extent.width,
+                            readback_data.extent.height,
+                            4);
+                   }
+               }
            },
            .num_layers = 1,
            .type = RenderPassType::transfer

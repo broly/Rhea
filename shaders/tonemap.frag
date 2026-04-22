@@ -6,44 +6,33 @@
 #include "resources/dbuffer.glsl"
 #include "resources/light.glsl"
 #include "resources/shadow.glsl"
+#include "utils/tonemapping.glsl"
 
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 out_color;
 
-//layout(set = 0, binding = 1) uniform HDRSettings
-//{
-//    float exposure;   // 1.0 = neutral
-//} hdr;
-
-// ACES Filmic Tonemap
-vec3 ACES(vec3 x)
-{
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return clamp((x * (a * x + b)) /
-                 (x * (c * x + d) + e), 0.0, 1.0);
-}
-
 const float NEAR = 0.5;
 const float FAR = 2000;
 
+vec3 exposure(in vec3 v)
+{
+    return v * 0.6;
+}
+
+vec3 gamma(in vec3 v)
+{
+    return pow(v, vec3(1.0 / 3.7));
+}
 
 void main()
 {
-    // vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], v_uv).rgb;
-    // vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], v_uv).aaa;
-    // vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], v_uv).rgb;
-//    float valid = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], v_uv).a;
-//     vec3 hdr_color = vec3(pow(valid / 20, 2.0));
-    vec3 hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], v_uv).rgb;
-    // exposure
-    hdr_color *= 0.6;
-    // tonemap
+    vec3 hdr_color;
+    // hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI], v_uv).rgb;
+     hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], v_uv).rgb;
+    // hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_REPROJECTED], v_uv).aaa;
+    // hdr_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], v_uv).rgb ;
+    hdr_color = exposure(hdr_color);
     vec3 mapped = ACES(hdr_color);
-    // gamma
-    mapped = pow(mapped, vec3(1.0 / 2.8));
+    mapped = gamma(mapped);
     out_color = vec4(mapped, 1.0);
 }

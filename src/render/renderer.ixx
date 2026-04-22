@@ -123,4 +123,6 @@ protected:  // textures
 
     
     std::map<Name, std::shared_ptr<PipelineFamily>> pipeline_families;
+    
+    uint32_t frame_id = 0;
 };

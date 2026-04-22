@@ -181,6 +181,10 @@ file(GLOB_RECURSE JSON_FILES
     CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/render/resources/*.json
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/render/schemas/*.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/render/schemas/*.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/*.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/system/*.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/actors/*.json
 )
 
 source_group("Assets\\JSON" FILES ${JSON_FILES})
