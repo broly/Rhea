@@ -6,6 +6,8 @@ import <vulkan/vulkan_core.h>;
 import <cassert>;
 import profile;
 import :renderer;
+import dump_exr;
+import paths;
 #include "profiling/profile.h"
 
 #include "common/assertion_macros.h"
@@ -295,6 +297,84 @@ RGPassId RenderGraph::add_pass(RenderGraphPass&& pass)
     passes.push_back(std::move(pass));
     return id;
 }
+
+void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
+{
+    std::vector<RBImageUsage> reads;
+    {
+        std::set<uint32_t> seen_texture_ids;
+        for (const auto& e : desc.entries)
+        {
+            if (seen_texture_ids.insert(e.texture.id).second)
+                reads.push_back({ e.texture, RBImageUsageType::TransferSrc });
+        }
+    }
+
+    auto default_condition = [](const RenderGraphParameters& params) -> bool
+    {
+        return params.render_id == params.num_runs - 1;
+    };
+
+    const auto condition_fn = desc.condition ? desc.condition : default_condition;
+
+    std::vector<ExrDumpEntry> entries = desc.entries;
+    std::filesystem::path     subdir  = desc.subdir;
+
+    add_pass({
+        .name    = desc.name,
+        .reads   = std::move(reads),
+        .writes  = {},
+        .execute = [this, entries = std::move(entries), subdir = std::move(subdir), condition_fn]
+                   (RenderGraphContext& ctx)
+        {
+            if (!condition_fn(ctx.params))
+                return;
+
+            const std::filesystem::path out_dir = paths::get_cache_path() / subdir;
+            std::error_code ec;
+            std::filesystem::create_directories(out_dir, ec);
+
+            for (const auto& e : entries)
+            {
+                const RGTexture& rg_tex = textures[e.texture.id];
+
+                RBImageHandle img_handle = get_image(e.texture);
+                ImageReadback readback   = ctx.backend.readback_image(img_handle);
+
+                checkf(e.layer < readback.layers,
+                    "ExrDumpEntry: layer %u out of range (layers=%u) for texture %s",
+                    e.layer, readback.layers, rg_tex.desc.name.to_string().c_str());
+                checkf(e.mip < readback.mips,
+                    "ExrDumpEntry: mip %u out of range (mips=%u) for texture %s",
+                    e.mip, readback.mips, rg_tex.desc.name.to_string().c_str());
+
+                const std::vector<float>& pixels = readback.data[e.layer][e.mip];
+                const Extent mip_extent = ImageReadback::mip_extent(readback.extent, e.mip);
+
+                const uint32_t src_channels = readback.channels;
+                const uint32_t out_channels = (e.out_channels == 0)
+                                              ? src_channels
+                                              : e.out_channels;
+
+                const std::string fname =
+                    e.filename_prefix + "_" + std::to_string(ctx.params.frame_id) + ".exr";
+
+                exr_dump::save_exr_padded(
+                    out_dir / fname,
+                    pixels.data(),
+                    mip_extent.width,
+                    mip_extent.height,
+                    src_channels,
+                    out_channels,
+                    e.placeholder
+                );
+            }
+        },
+        .num_layers = 1,
+        .type  = RenderPassType::transfer
+    });
+}
+
 
 const RenderGraphPass& RenderGraph::get_current_pass() const
 {

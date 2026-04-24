@@ -46,7 +46,7 @@ void WorldScript_VariousThings::tick(double dt)
         rail->add_on_tick("cam", [=] (const RailSampleData& d)
         {
             Transform newt = {d.position, d.rotation};
-            // camera_actor->set_transform(newt);
+            camera_actor->set_transform(newt);
         });
         
         rail->add_on_tick("light", [=] (const RailSampleData& d)

@@ -701,46 +701,41 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     
     if (readback_nn)
     {
-        add_pass({
-           .name = "readback_nn",
-           .reads = {
-               { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::TransferSrc },
-               { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsageType::TransferSrc },
-           },
-           .writes = {
-           },
-           .execute = [this](RenderGraphContext& ctx)
-           {
-               if (ctx.params.render_id == ctx.params.num_runs - 1)
-               {
-                   {
-                       ImageReadback readback_data = 
-                        ctx.backend.readback_image(get_image(hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM]));
-                   
-                      std::string fname =  "rtxgi_accum_" + std::to_string(ctx.params.frame_id) + ".exr"; 
-                      exr_dump::save_exr(paths::get_cache_path() / "nn" / fname, 
-                          readback_data.data[0][0].data(), 
-                          readback_data.extent.width,
-                          readback_data.extent.height,
-                          4);
-                   }
-                   {
-                       ImageReadback readback_data = 
-                          ctx.backend.readback_image(get_image(gbuffer[GBUFFER_SLOT_WORLD_NORMAL]));
-                       
-                        std::string fname =  "world_normal_" + std::to_string(ctx.params.frame_id) + ".exr"; 
-                        exr_dump::save_exr(paths::get_cache_path() / "nn" / fname, 
-                            readback_data.data[0][0].data(), 
-                            readback_data.extent.width,
-                            readback_data.extent.height,
-                            4);
-                   }
-               }
-           },
-           .num_layers = 1,
-           .type = RenderPassType::transfer
-       });
+        add_exr_dump_pass({
+            .name   = "readback_nn",
+            .subdir = "nn",
+            .entries = {
+                {
+                    .texture         = hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
+                    .filename_prefix = "rtxgi_accum",
+                    .out_channels    = 4,
+                },
+                {
+                    .texture         = gbuffer[GBUFFER_SLOT_WORLD_NORMAL],
+                    .filename_prefix = "world_normal",
+                    .out_channels    = 4,
+                },
+                {
+                    .texture         = gbuffer[GBUFFER_SLOT_LINEAR_DEPTH],
+                    .filename_prefix = "linear_depth",
+                    .out_channels    = 0,
+                },
+                {
+                    .texture         = gbuffer[GBUFFER_SLOT_MOTION_VECTORS],
+                    .filename_prefix = "motion_vectors",
+                    .out_channels    = 3,
+                    .placeholder     = 0.0f,
+                },
+                {
+                    .texture         = gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS],
+                    .filename_prefix = "albedo_roughness",
+                    .out_channels    = 0,
+                    .placeholder     = 0.0f,
+                },
+            }
+        });
     }
+
 }
 
 void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)

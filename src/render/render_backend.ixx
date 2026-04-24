@@ -57,7 +57,7 @@ export struct ImageReadback
     uint32_t layers = 1;
     uint32_t mips   = 1;
     TextureFormat format;
-    
+    uint32_t channels = 0;
     static Extent mip_extent(const Extent& base, uint32_t mip)
     {
         return {

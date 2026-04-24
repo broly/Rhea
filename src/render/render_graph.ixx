@@ -205,6 +205,25 @@ public:
 };
 
 
+export struct ExrDumpEntry
+{
+    RGTextureHandle texture;
+    std::string filename_prefix;
+    uint32_t  out_channels = 0;
+    float placeholder = 0.0f;
+    uint32_t layer = 0;
+    uint32_t  mip = 0;
+};
+
+export struct ExrDumpPassDesc
+{
+    Name name;
+    std::filesystem::path subdir = "nn";
+    std::vector<ExrDumpEntry> entries;
+
+    std::function<bool(const RenderGraphParameters&)> condition = {};
+};
+
 export class RenderGraph : public RhObject
 {
 public:
@@ -227,6 +246,8 @@ public:
     RGTextureHandle duplicate_texture(RGTextureHandle in_texture_handle, Name name);
 
     RGPassId add_pass(RenderGraphPass&& pass);
+    
+    void add_exr_dump_pass(const ExrDumpPassDesc& desc);
     
     const RenderGraphPass& get_current_pass() const;
 

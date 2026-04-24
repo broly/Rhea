@@ -1117,42 +1117,42 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
     VkImage  image  = img_resource.image;
     VkFormat format = img_resource.format;
 
-    constexpr uint32_t channels = 4;
+    struct FormatInfo
+    {
+        TextureFormat out_format;
+        uint32_t channels;
+        uint32_t bytes_per_channel;
+        enum class ComponentType { Float16, Float32, Unorm8 } component_type;
+    };
 
-    uint32_t bytes_per_channel = 0;
-    TextureFormat out_format;
+    FormatInfo info{};
 
     switch (format)
     {
         case VK_FORMAT_R16G16B16A16_SFLOAT:
-            out_format = TextureFormat::RGBA16F;
-            bytes_per_channel = 2;
+            info = { TextureFormat::RGBA16F, 4, 2, FormatInfo::ComponentType::Float16 };
             break;
 
         case VK_FORMAT_R32G32B32A32_SFLOAT:
-            out_format = TextureFormat::RGBA32F;
-            bytes_per_channel = 4;
+            info = { TextureFormat::RGBA32F, 4, 4, FormatInfo::ComponentType::Float32 };
             break;
-        
-        
+
+        case VK_FORMAT_R32_SFLOAT:
+            info = { TextureFormat::R32F, 1, 4, FormatInfo::ComponentType::Float32 };
+            break;
+
+        case VK_FORMAT_R16G16_SFLOAT:
+            info = { TextureFormat::RG16F, 2, 2, FormatInfo::ComponentType::Float16 };
+            break;
+
         case VK_FORMAT_R8G8B8A8_UNORM:
-			todo();
-            out_format = TextureFormat::RGBA16F;
-            bytes_per_channel = 4;
+            info = { TextureFormat::RGBA8_UNORM, 4, 1, FormatInfo::ComponentType::Unorm8 };
             break;
 
         default:
-            checkf(false, "Unsupported format for image readback");
+            checkf(false, "Unsupported format for image readback: %i", int(format));
             return {};
     }
-
-    auto mip_extent = [](const Extent& e, uint32_t mip) -> Extent
-    {
-        return {
-            std::max(1u, e.width  >> mip),
-            std::max(1u, e.height >> mip)
-        };
-    };
 
     // ------------------------------------------------------------
     // Calculate layout
@@ -1174,9 +1174,9 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
 
         for (uint32_t mip = 0; mip < mip_count; ++mip)
         {
-            Extent me = mip_extent(base_extent, mip);
-            size_t pixel_count = me.width * me.height;
-            size_t byte_size   = pixel_count * channels * bytes_per_channel;
+            Extent me = ImageReadback::mip_extent(base_extent, mip);
+            size_t pixel_count = size_t(me.width) * me.height;
+            size_t byte_size   = pixel_count * info.channels * info.bytes_per_channel;
 
             mip_infos[layer][mip] = {
                 total_byte_size,
@@ -1195,8 +1195,9 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
     ImageReadback result{};
     result.extent = base_extent;
     result.layers = layers;
-    result.mips   = mip_count;
-    result.format = out_format;
+    result.mips = mip_count;
+    result.format = info.out_format;
+    result.channels = info.channels;
 
     result.data.resize(layers);
 
@@ -1207,8 +1208,8 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
         for (uint32_t mip = 0; mip < mip_count; ++mip)
         {
             const Extent& me = mip_infos[layer][mip].extent;
-            size_t pixel_count = me.width * me.height;
-            result.data[layer][mip].resize(pixel_count * channels);
+            size_t pixel_count = size_t(me.width) * me.height;
+            result.data[layer][mip].resize(pixel_count * info.channels);
         }
     }
 
@@ -1231,10 +1232,10 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
     {
         for (uint32_t mip = 0; mip < mip_count; ++mip)
         {
-            const auto& info = mip_infos[layer][mip];
+            const auto& mi = mip_infos[layer][mip];
 
             VkBufferImageCopy region{};
-            region.bufferOffset = info.offset;
+            region.bufferOffset = mi.offset;
             region.bufferRowLength = 0;
             region.bufferImageHeight = 0;
 
@@ -1244,8 +1245,8 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
             region.imageSubresource.layerCount = 1;
 
             region.imageExtent = {
-                info.extent.width,
-                info.extent.height,
+                mi.extent.width,
+                mi.extent.height,
                 1
             };
 
@@ -1258,7 +1259,7 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
         ImageBarrierParams params;
         params.image = img;
         params.src_usage = RBImageUsageType::Undefined;
-        params.dst_usage = RBImageUsageType::TransferDst;
+        params.dst_usage = RBImageUsageType::TransferSrc;
         transition_image(cmd, params);
 
         vkCmdCopyImageToBuffer(
@@ -1289,27 +1290,39 @@ ImageReadback vk::ImageManager::readback(RBImageHandle img) const
     {
         for (uint32_t mip = 0; mip < mip_count; ++mip)
         {
-            const auto& info = mip_infos[layer][mip];
+            const auto& mi = mip_infos[layer][mip];
 
-            uint8_t* src_bytes =
-                reinterpret_cast<uint8_t*>(mapped) + info.offset;
+            const uint8_t* src_bytes =
+                reinterpret_cast<const uint8_t*>(mapped) + mi.offset;
 
             float* dst = result.data[layer][mip].data();
 
-            size_t pixel_count = info.extent.width * info.extent.height;
-            size_t float_count = pixel_count * channels;
+            const size_t pixel_count = size_t(mi.extent.width) * mi.extent.height;
+            const size_t value_count = pixel_count * info.channels;
 
-            if (format == VK_FORMAT_R32G32B32A32_SFLOAT)
+            switch (info.component_type)
             {
-                memcpy(dst, src_bytes, float_count * sizeof(float));
-            }
-            else // RGBA16F → float
-            {
-                const uint16_t* src =
-                    reinterpret_cast<const uint16_t*>(src_bytes);
-
-                for (size_t i = 0; i < float_count; ++i)
-                    dst[i] = math::half_to_float(src[i]);
+                case FormatInfo::ComponentType::Float32:
+                {
+                    memcpy(dst, src_bytes, value_count * sizeof(float));
+                    break;
+                }
+                case FormatInfo::ComponentType::Float16:
+                {
+                    const uint16_t* src =
+                        reinterpret_cast<const uint16_t*>(src_bytes);
+                    for (size_t i = 0; i < value_count; ++i)
+                        dst[i] = math::half_to_float(src[i]);
+                    break;
+                }
+                case FormatInfo::ComponentType::Unorm8:
+                {
+                    const uint8_t* src = src_bytes;
+                    constexpr float inv_255 = 1.0f / 255.0f;
+                    for (size_t i = 0; i < value_count; ++i)
+                        dst[i] = float(src[i]) * inv_255;
+                    break;
+                }
             }
         }
     }
