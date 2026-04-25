@@ -312,7 +312,7 @@ void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
 
     auto default_condition = [](const RenderGraphParameters& params) -> bool
     {
-        return params.render_id == params.num_runs - 1;
+        return params.render_iter_id == params.num_runs - 1;
     };
 
     const auto condition_fn = desc.condition ? desc.condition : default_condition;
@@ -357,7 +357,7 @@ void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
                                               : e.out_channels;
 
                 const std::string fname =
-                    e.filename_prefix + "_" + std::to_string(ctx.params.frame_id) + ".exr";
+                    e.filename_prefix + "_" + std::to_string(ctx.params.output_frame_id) + "_" + std::to_string(ctx.params.render_iter_id) + ".exr";
 
                 exr_dump::save_exr_padded(
                     out_dir / fname,

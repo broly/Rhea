@@ -48,6 +48,7 @@ namespace vk
         void cleanup();
         void create_sync_objects();
         void wait_for_frame(RBFrameHandle frame_handle);
+        void reset_current_frame();
         void reset_frame_fence(uint32_t frame);
 
         VkSwapchainKHR swapchain = VK_NULL_HANDLE;

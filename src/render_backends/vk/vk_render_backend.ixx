@@ -117,6 +117,7 @@ public:   /// API Section
     virtual void update_tlas(RBDescriptorSet set, uint32_t binding, RBAccelStruct tlas) override;
     virtual void bind_descriptor_set(RBCommandList cmd, int set_index, RBDescriptorSet rb_descriptors, Name debug_name) override;
     virtual RBFrameHandle get_current_frame() const override;
+    virtual void reset_current_frame() override;
     virtual void wait_for_frame(RBFrameHandle frame_handle) override;
     virtual void flush_frame_garbage(RBFrameHandle frame) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;

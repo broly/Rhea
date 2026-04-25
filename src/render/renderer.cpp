@@ -48,9 +48,9 @@ void Renderer::execute()
     for (uint8_t i = 0; i < main_render_graph_num_runs; i++)
     {
         RenderGraphParameters params;
-        params.render_id = i;
+        params.render_iter_id = i;
         params.num_runs = main_render_graph_num_runs;
-        params.frame_id = frame_id;
+        params.output_frame_id = frame_id;
         execute_graph(main_render_graph, params);
     }
     
@@ -85,6 +85,12 @@ void Renderer::execute_graph(
     
     
     auto& backend = *render_backend;
+    
+    if (params.num_runs > 1)
+    {
+        backend.reset_current_frame();
+    }
+    
     RBFrameHandle frame = backend.get_current_frame();
 
     backend.wait_for_frame(frame);

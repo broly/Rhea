@@ -279,6 +279,11 @@ void vk::SwapchainControl::wait_for_frame(uint32_t frame)
     vkWaitForFences(instance.device, 1, &frames[frame].in_flight, VK_TRUE, UINT64_MAX);
 }
 
+void vk::SwapchainControl::reset_current_frame()
+{
+    current_frame = 0;
+}
+
 
 void vk::SwapchainControl::reset_frame_fence(uint32_t frame)
 {

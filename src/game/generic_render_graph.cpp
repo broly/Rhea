@@ -702,6 +702,28 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     if (readback_nn)
     {
         add_exr_dump_pass({
+            .name   = "readback_nn_raw",
+            .subdir = "nn",
+            .entries = {
+                {
+                    .texture         = hdr_color_present[COLOR_OUTPUT_HDR_RTXGI],
+                    .filename_prefix = "rtxgi",
+                    .out_channels    = 4,
+                },
+                {
+                    .texture         = gbuffer[GBUFFER_SLOT_MOTION_VECTORS],
+                    .filename_prefix = "motion_vectors",
+                    .out_channels    = 3,
+                    .placeholder     = 0.0f,
+                },
+            },
+            .condition = [this](const RenderGraphParameters& params) -> bool
+            {
+                return params.render_iter_id == 0 || params.render_iter_id == 1;
+            }
+        });
+        
+        add_exr_dump_pass({
             .name   = "readback_nn",
             .subdir = "nn",
             .entries = {
@@ -721,17 +743,15 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                     .out_channels    = 0,
                 },
                 {
-                    .texture         = gbuffer[GBUFFER_SLOT_MOTION_VECTORS],
-                    .filename_prefix = "motion_vectors",
-                    .out_channels    = 3,
-                    .placeholder     = 0.0f,
-                },
-                {
                     .texture         = gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS],
                     .filename_prefix = "albedo_roughness",
                     .out_channels    = 0,
                     .placeholder     = 0.0f,
                 },
+            },
+            .condition = [this](const RenderGraphParameters& params) -> bool
+            {
+                return params.render_iter_id == params.num_runs - 1;
             }
         });
     }
@@ -807,6 +827,7 @@ void GenericRenderGraph::rebuild_camera_ubo(RenderGraphContext& ctx)
     current_camera_ubo = make_camera_ubo(ctx, false, 0);
     current_camera_ubo.prev_proj = prev_proj;
     current_camera_ubo.prev_view = prev_view;
+    
 }
 
 void GenericRenderGraph::on_pso_built()
@@ -1463,7 +1484,7 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
     RTXGIPushConstants pc{};
     pc.frame = frame_index;
     pc.intensity = 1.0f;
-    pc.spp = std::min(ctx.params.render_id * 10 + 1, 20u);
+    pc.spp = std::min(ctx.params.render_iter_id * 10 + 1, 20u);
 
     ctx.backend.push_constants(
         ctx.cmd,

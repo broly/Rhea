@@ -181,6 +181,11 @@ RBFrameHandle VkRenderBackend::get_current_frame() const
     return swapchain.current_frame;
 }
 
+void VkRenderBackend::reset_current_frame() 
+{
+    swapchain.reset_current_frame();
+}
+
 void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
 {
     PROFILE("wait_for_frame");
