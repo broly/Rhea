@@ -719,7 +719,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             },
             .condition = [this](const RenderGraphParameters& params) -> bool
             {
-                return params.render_iter_id == 0 || params.render_iter_id == 1;
+                return params.render_iter_id < 3;
             }
         });
         
@@ -821,13 +821,20 @@ void GenericRenderGraph::end_frame()
 
 void GenericRenderGraph::rebuild_camera_ubo(RenderGraphContext& ctx)
 {
-    auto prev_proj = current_camera_ubo.proj;
-    auto prev_view = current_camera_ubo.view;
-    
-    current_camera_ubo = make_camera_ubo(ctx, false, 0);
-    current_camera_ubo.prev_proj = prev_proj;
-    current_camera_ubo.prev_view = prev_view;
-    
+    if (ctx.params.render_iter_id == 0)
+    {
+        const auto prev_proj = current_camera_ubo.proj;
+        const auto prev_view = current_camera_ubo.view;
+        
+        current_camera_ubo = make_camera_ubo(ctx, false, 0);
+        current_camera_ubo.prev_proj = prev_proj;
+        current_camera_ubo.prev_view = prev_view;
+    }
+    else
+    {
+        current_camera_ubo.prev_proj = current_camera_ubo.proj;
+        current_camera_ubo.prev_view = current_camera_ubo.view;
+    }
 }
 
 void GenericRenderGraph::on_pso_built()
