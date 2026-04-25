@@ -83,6 +83,27 @@ namespace vk
         ImageReadback readback(RBImageHandle img) const;
         
         
+    public:
+        struct PendingReadback
+        {
+            VkBuffer       buffer = VK_NULL_HANDLE;
+            VkDeviceMemory memory = VK_NULL_HANDLE;
+            size_t         total_byte_size = 0;
+            Extent         base_extent{};
+            uint32_t       layers = 1;
+            uint32_t       mips = 1;
+            TextureFormat  out_format{};
+            uint32_t       channels = 0;
+            enum class ComponentType { Float16, Float32, Unorm8 } component_type{};
+
+            struct MipInfo { size_t offset; Extent extent; size_t byte_size; };
+            std::vector<std::vector<MipInfo>> mip_infos;
+        };
+
+        PendingReadback enqueue_readback(RBCommandList cmd, RBImageHandle img);
+
+        ImageReadback finalize_readback(PendingReadback&& pending) const;
+        
         VkFormat get_image_format(RBImageHandle handle) const;
 
         Extent default_extent;

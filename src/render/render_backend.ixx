@@ -15,6 +15,8 @@ import :gpu_types;
 
 import assets;
 
+// Pending readback handle: opaque readback queue index
+export struct PendingReadbackHandle { uint64_t id = 0; };
 
 struct RenderGraphPass;
 export class RenderBackend;
@@ -105,6 +107,13 @@ public:
     virtual void advance_frame() = 0;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
     virtual ImageReadback readback_image(RBImageHandle img) const = 0;
+    
+
+    // Add image readback to queue
+    virtual PendingReadbackHandle enqueue_image_readback(RBCommandList cmd, RBImageHandle img) = 0;
+
+    // Read data from readback
+    virtual ImageReadback finalize_readback(PendingReadbackHandle handle) = 0;
     
     virtual void destroy_pipeline(PipelineObject* pipeline) = 0;
     

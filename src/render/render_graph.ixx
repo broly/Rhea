@@ -317,5 +317,19 @@ public:
 protected: // dynamic info
     std::map<Name, bool> render_flags;
     std::map<Name, bool> one_time_render_flags;
+    
+    
+private:
+    struct PendingExrSave
+    {
+        PendingReadbackHandle readback;
+        std::filesystem::path full_path;
+        ExrDumpEntry entry;
+    };
+    std::vector<PendingExrSave> pending_exr_saves;
+
+public:
+    // Call after each execute
+    void flush_pending_exr_saves();
 };
 REFLECT_OBJECT(RenderGraph, RhObject);

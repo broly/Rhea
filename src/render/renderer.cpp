@@ -94,6 +94,12 @@ void Renderer::execute_graph(
     RBFrameHandle frame = backend.get_current_frame();
 
     backend.wait_for_frame(frame);
+    
+    backend.reset_frame_fence(frame);
+
+    rg->flush_pending_exr_saves();
+
+    backend.flush_frame_garbage(frame);
 
     backend.reset_frame_fence(frame);
 

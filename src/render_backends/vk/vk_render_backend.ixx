@@ -197,4 +197,24 @@ public:   /// cache and state section:
     
     std::unordered_map<RenderPassDesc, VkRenderPass, RenderPassDescHash> render_pass_cache;
     VkRenderPass current_render_pass = VK_NULL_HANDLE;
+    
+    
+private:
+    struct PendingReadbackEntry
+    {
+        uint64_t id;
+        RBFrameHandle frame_when_recorded;
+        RBFrameHandle frame_epoch_at_record;
+        uint8_t       output_frame_id;
+        vk::ImageManager::PendingReadback pending;
+    };
+    std::vector<PendingReadbackEntry> pending_readbacks;
+    uint64_t next_pending_id = 1;
+
+    std::array<uint64_t, vk::MAX_FRAMES_IN_FLIGHT> frame_epoch{}; // 0,0
+    std::array<uint64_t, vk::MAX_FRAMES_IN_FLIGHT> frame_epoch_at_record{};
+
+public:
+    PendingReadbackHandle enqueue_image_readback(RBCommandList cmd, RBImageHandle img) override;
+    ImageReadback finalize_readback(PendingReadbackHandle handle) override;
 };

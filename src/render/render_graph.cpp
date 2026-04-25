@@ -304,10 +304,8 @@ void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
     {
         std::set<uint32_t> seen_texture_ids;
         for (const auto& e : desc.entries)
-        {
             if (seen_texture_ids.insert(e.texture.id).second)
                 reads.push_back({ e.texture, RBImageUsageType::TransferSrc });
-        }
     }
 
     auto default_condition = [](const RenderGraphParameters& params) -> bool
@@ -327,8 +325,7 @@ void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
         .execute = [this, entries = std::move(entries), subdir = std::move(subdir), condition_fn]
                    (RenderGraphContext& ctx)
         {
-            if (!condition_fn(ctx.params))
-                return;
+            if (!condition_fn(ctx.params)) return;
 
             const std::filesystem::path out_dir = paths::get_cache_path() / subdir;
             std::error_code ec;
@@ -336,45 +333,26 @@ void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
 
             for (const auto& e : entries)
             {
-                const RGTexture& rg_tex = textures[e.texture.id];
-
                 RBImageHandle img_handle = get_image(e.texture);
-                ImageReadback readback   = ctx.backend.readback_image(img_handle);
+                PendingReadbackHandle readback_handle =
+                    ctx.backend.enqueue_image_readback(ctx.cmd, img_handle);
 
-                checkf(e.layer < readback.layers,
-                    "ExrDumpEntry: layer %u out of range (layers=%u) for texture %s",
-                    e.layer, readback.layers, rg_tex.desc.name.to_string().c_str());
-                checkf(e.mip < readback.mips,
-                    "ExrDumpEntry: mip %u out of range (mips=%u) for texture %s",
-                    e.mip, readback.mips, rg_tex.desc.name.to_string().c_str());
-
-                const std::vector<float>& pixels = readback.data[e.layer][e.mip];
-                const Extent mip_extent = ImageReadback::mip_extent(readback.extent, e.mip);
-
-                const uint32_t src_channels = readback.channels;
-                const uint32_t out_channels = (e.out_channels == 0)
-                                              ? src_channels
-                                              : e.out_channels;
 
                 const std::string fname =
-                    e.filename_prefix + "_" + std::to_string(ctx.params.output_frame_id) + "_" + std::to_string(ctx.params.render_iter_id) + ".exr";
+                    e.filename_prefix + "_" + std::to_string(ctx.params.output_frame_id)
+                    + "_" + std::to_string(ctx.params.render_iter_id) + ".exr";
 
-                exr_dump::save_exr_padded(
-                    out_dir / fname,
-                    pixels.data(),
-                    mip_extent.width,
-                    mip_extent.height,
-                    src_channels,
-                    out_channels,
-                    e.placeholder
-                );
+                pending_exr_saves.push_back({
+                    .readback  = readback_handle,
+                    .full_path = out_dir / fname,
+                    .entry     = e,
+                });
             }
         },
         .num_layers = 1,
         .type  = RenderPassType::transfer
     });
 }
-
 
 const RenderGraphPass& RenderGraph::get_current_pass() const
 {
@@ -587,6 +565,33 @@ bool is_attachment(RBImageUsageType usage)
     default:
         return false;
     }
+}
+
+
+void RenderGraph::flush_pending_exr_saves()
+{
+    if (pending_exr_saves.empty()) return;
+
+    for (auto& job : pending_exr_saves)
+    {
+        ImageReadback readback = backend->finalize_readback(job.readback);
+
+        const auto& e = job.entry;
+        checkf(e.layer < readback.layers, "...");
+        checkf(e.mip   < readback.mips,   "...");
+
+        const std::vector<float>& pixels = readback.data[e.layer][e.mip];
+        const Extent mip_extent = ImageReadback::mip_extent(readback.extent, e.mip);
+
+        const uint32_t src_channels = readback.channels;
+        const uint32_t out_channels = (e.out_channels == 0) ? src_channels : e.out_channels;
+
+        exr_dump::save_exr_padded(
+            job.full_path, pixels.data(),
+            mip_extent.width, mip_extent.height,
+            src_channels, out_channels, e.placeholder);
+    }
+    pending_exr_saves.clear();
 }
 
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback)

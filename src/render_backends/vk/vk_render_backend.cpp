@@ -190,6 +190,7 @@ void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
 {
     PROFILE("wait_for_frame");
     swapchain.wait_for_frame(frame_handle);
+    frame_epoch[frame_handle]++;
 }
 
 void VkRenderBackend::flush_frame_garbage(RBFrameHandle frame)
@@ -466,6 +467,34 @@ RBRenderPass VkRenderBackend::get_or_create_render_pass(const FramebufferDesc& f
 VkFormat VkRenderBackend::get_image_format(RBImageHandle handle) const
 {
     return image_manager.get_image_format(handle);
+}
+
+
+PendingReadbackHandle VkRenderBackend::enqueue_image_readback(
+    RBCommandList cmd, RBImageHandle img)
+{
+    auto pending = image_manager.enqueue_readback(cmd, img);
+
+    PendingReadbackEntry entry{};
+    entry.id      = next_pending_id++;
+    entry.frame_when_recorded = swapchain.current_frame;
+    entry.frame_epoch_at_record = frame_epoch[swapchain.current_frame];
+    entry.pending = std::move(pending);
+
+    pending_readbacks.push_back(std::move(entry));
+    return PendingReadbackHandle{ entry.id };
+}
+
+ImageReadback VkRenderBackend::finalize_readback(PendingReadbackHandle handle)
+{
+    auto it = std::find_if(pending_readbacks.begin(), pending_readbacks.end(),
+        [handle](const PendingReadbackEntry& e) { return e.id == handle.id; });
+    checkf(it != pending_readbacks.end(), "PendingReadback with id %llu not found", 
+        (unsigned long long)handle.id);
+
+    ImageReadback result = image_manager.finalize_readback(std::move(it->pending));
+    pending_readbacks.erase(it);
+    return result;
 }
 
 

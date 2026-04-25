@@ -182,6 +182,177 @@ VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)
     return fetch_image_view_generic(image_handle, 0, 0, 0, true);
 }
 
+
+vk::ImageManager::PendingReadback vk::ImageManager::enqueue_readback(RBCommandList cmd_list, RBImageHandle img)
+{
+    const vk::ImageResource& img_resource = get_image_resource(img);
+
+    const uint32_t layers    = img_resource.num_layers;
+    const uint32_t mip_count = img_resource.mip_levels;
+    const Extent base_extent = img_resource.extent;
+
+    VkImage  image  = img_resource.image;
+    VkFormat format = img_resource.format;
+
+    // ---------- Format info ----------
+    PendingReadback pending{};
+    pending.base_extent = base_extent;
+    pending.layers      = layers;
+    pending.mips        = mip_count;
+
+    uint32_t bytes_per_channel = 0;
+
+    switch (format)
+    {
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            pending.out_format = TextureFormat::RGBA16F;
+            pending.channels = 4; bytes_per_channel = 2;
+            pending.component_type = PendingReadback::ComponentType::Float16;
+            break;
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            pending.out_format = TextureFormat::RGBA32F;
+            pending.channels = 4; bytes_per_channel = 4;
+            pending.component_type = PendingReadback::ComponentType::Float32;
+            break;
+        case VK_FORMAT_R32_SFLOAT:
+            pending.out_format = TextureFormat::R32F;
+            pending.channels = 1; bytes_per_channel = 4;
+            pending.component_type = PendingReadback::ComponentType::Float32;
+            break;
+        case VK_FORMAT_R16G16_SFLOAT:
+            pending.out_format = TextureFormat::RG16F;
+            pending.channels = 2; bytes_per_channel = 2;
+            pending.component_type = PendingReadback::ComponentType::Float16;
+            break;
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            pending.out_format = TextureFormat::RGBA8_UNORM;
+            pending.channels = 4; bytes_per_channel = 1;
+            pending.component_type = PendingReadback::ComponentType::Unorm8;
+            break;
+        default:
+            checkf(false, "Unsupported format for image readback: %i", int(format));
+            return pending;
+    }
+
+    // ---------- Mip layout ----------
+    pending.mip_infos.resize(layers);
+    for (uint32_t layer = 0; layer < layers; ++layer)
+    {
+        pending.mip_infos[layer].resize(mip_count);
+        for (uint32_t mip = 0; mip < mip_count; ++mip)
+        {
+            Extent me = ImageReadback::mip_extent(base_extent, mip);
+            size_t pixel_count = size_t(me.width) * me.height;
+            size_t byte_size   = pixel_count * pending.channels * bytes_per_channel;
+
+            pending.mip_infos[layer][mip] = { pending.total_byte_size, me, byte_size };
+            pending.total_byte_size += byte_size;
+        }
+    }
+
+    // ---------- Staging buffer ----------
+    create_staging_buffer(pending.total_byte_size, pending.buffer, pending.memory);
+
+    // ---------- Copy regions ----------
+    std::vector<VkBufferImageCopy> regions;
+    regions.reserve(layers * mip_count);
+
+    for (uint32_t layer = 0; layer < layers; ++layer)
+    {
+        for (uint32_t mip = 0; mip < mip_count; ++mip)
+        {
+            const auto& mi = pending.mip_infos[layer][mip];
+
+            VkBufferImageCopy region{};
+            region.bufferOffset = mi.offset;
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.mipLevel = mip;
+            region.imageSubresource.baseArrayLayer = layer;
+            region.imageSubresource.layerCount = 1;
+            region.imageExtent = { mi.extent.width, mi.extent.height, 1 };
+            regions.push_back(region);
+        }
+    }
+
+    VkCommandBuffer vk_cmd = cmd_list.as<VkCommandBuffer>();
+
+    vkCmdCopyImageToBuffer(
+        vk_cmd,
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        pending.buffer,
+        static_cast<uint32_t>(regions.size()),
+        regions.data()
+    );
+
+    return pending;
+}
+
+ImageReadback vk::ImageManager::finalize_readback(PendingReadback&& pending) const
+{
+    ImageReadback result{};
+    result.extent   = pending.base_extent;
+    result.layers   = pending.layers;
+    result.mips     = pending.mips;
+    result.format   = pending.out_format;
+    result.channels = pending.channels;
+
+    result.data.resize(pending.layers);
+    for (uint32_t layer = 0; layer < pending.layers; ++layer)
+    {
+        result.data[layer].resize(pending.mips);
+        for (uint32_t mip = 0; mip < pending.mips; ++mip)
+        {
+            const Extent& me = pending.mip_infos[layer][mip].extent;
+            size_t pixel_count = size_t(me.width) * me.height;
+            result.data[layer][mip].resize(pixel_count * pending.channels);
+        }
+    }
+
+    void* mapped = nullptr;
+    VK_CHECK(vkMapMemory(instance.device, pending.memory, 0, pending.total_byte_size, 0, &mapped));
+
+    for (uint32_t layer = 0; layer < pending.layers; ++layer)
+    {
+        for (uint32_t mip = 0; mip < pending.mips; ++mip)
+        {
+            const auto& mi = pending.mip_infos[layer][mip];
+            const uint8_t* src_bytes = reinterpret_cast<const uint8_t*>(mapped) + mi.offset;
+            float* dst = result.data[layer][mip].data();
+            const size_t pixel_count = size_t(mi.extent.width) * mi.extent.height;
+            const size_t value_count = pixel_count * pending.channels;
+
+            switch (pending.component_type)
+            {
+                case PendingReadback::ComponentType::Float32:
+                    memcpy(dst, src_bytes, value_count * sizeof(float));
+                    break;
+                case PendingReadback::ComponentType::Float16:
+                {
+                    const uint16_t* src = reinterpret_cast<const uint16_t*>(src_bytes);
+                    for (size_t i = 0; i < value_count; ++i)
+                        dst[i] = math::half_to_float(src[i]);
+                    break;
+                }
+                case PendingReadback::ComponentType::Unorm8:
+                {
+                    const uint8_t* src = src_bytes;
+                    constexpr float inv_255 = 1.0f / 255.0f;
+                    for (size_t i = 0; i < value_count; ++i)
+                        dst[i] = float(src[i]) * inv_255;
+                    break;
+                }
+            }
+        }
+    }
+
+    vkUnmapMemory(instance.device, pending.memory);
+    vkDestroyBuffer(instance.device, pending.buffer, nullptr);
+    vkFreeMemory(instance.device, pending.memory, nullptr);
+
+    return result;
+}
+
 RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
 {
     Extent extent = desc.extent;
