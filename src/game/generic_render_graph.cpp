@@ -707,19 +707,19 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .entries = {
                 {
                     .texture         = hdr_color_present[COLOR_OUTPUT_HDR_RTXGI],
-                    .filename_prefix = "rtxgi",
+                    .subdir = "noisy",
                     .out_channels    = 4,
                 },
                 {
                     .texture         = gbuffer[GBUFFER_SLOT_MOTION_VECTORS],
-                    .filename_prefix = "motion_vectors",
+                    .subdir = "mvec",
                     .out_channels    = 3,
                     .placeholder     = 0.0f,
                 },
             },
             .condition = [this](const RenderGraphParameters& params) -> bool
             {
-                return params.render_iter_id < 3;
+                return params.render_iter_id == 0 && get_render_flag("do_readback_nn");
             }
         });
         
@@ -729,29 +729,34 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .entries = {
                 {
                     .texture         = hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM],
-                    .filename_prefix = "rtxgi_accum",
+                    .subdir = "reference",
                     .out_channels    = 4,
                 },
                 {
                     .texture         = gbuffer[GBUFFER_SLOT_WORLD_NORMAL],
-                    .filename_prefix = "world_normal",
+                    .subdir = "normal",
                     .out_channels    = 4,
                 },
                 {
                     .texture         = gbuffer[GBUFFER_SLOT_LINEAR_DEPTH],
-                    .filename_prefix = "linear_depth",
-                    .out_channels    = 0,
+                    .subdir = "depth",
+                    .out_channels    = 1,
+                },
+                {
+                    .texture         = gbuffer[GBUFFER_SLOT_EMISSIVE],
+                    .subdir = "emissive",
+                    .out_channels    = 4,
                 },
                 {
                     .texture         = gbuffer[GBUFFER_SLOT_ALBEDO_ROUGHNESS],
-                    .filename_prefix = "albedo_roughness",
+                    .subdir = "albedo",
                     .out_channels    = 0,
                     .placeholder     = 0.0f,
                 },
             },
             .condition = [this](const RenderGraphParameters& params) -> bool
             {
-                return params.render_iter_id == params.num_runs - 1;
+                return params.render_iter_id == params.num_runs - 1 && get_render_flag("do_readback_nn");
             }
         });
     }

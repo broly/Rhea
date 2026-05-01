@@ -153,6 +153,11 @@ void Renderer::trigger_aux_rg_once(Name aux_rg_name, const RenderGraphParameters
     rg_once_jobs.push_back({aux_rg_name, params, callback});
 }
 
+void Renderer::set_frame(uint32_t f)
+{
+    frame_id = f;
+}
+
 void Renderer::load_schemas()
 {
     auto dir = paths::get_assets_path() / "render" / "schemas";

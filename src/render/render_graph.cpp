@@ -337,14 +337,14 @@ void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
                 PendingReadbackHandle readback_handle =
                     ctx.backend.enqueue_image_readback(ctx.cmd, img_handle);
 
+                std::filesystem::create_directories(out_dir/ e.subdir, ec);
 
                 const std::string fname =
-                    e.filename_prefix + "_" + std::to_string(ctx.params.output_frame_id)
-                    + "_" + std::to_string(ctx.params.render_iter_id) + ".exr";
+                    e.filename_prefix + "_" + std::to_string(ctx.params.output_frame_id) + ".exr";
 
                 pending_exr_saves.push_back({
                     .readback  = readback_handle,
-                    .full_path = out_dir / fname,
+                    .full_path = out_dir / e.subdir / fname,
                     .entry     = e,
                 });
             }

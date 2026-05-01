@@ -12,6 +12,7 @@ uniform TemporalAccumPC
     bool reset;
 } pc;
 
+
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -28,6 +29,14 @@ void main()
     vec3  history = reproj.rgb;
     float hist_w  = reproj.a;
 
+
+    if (pc.reset)
+    {
+        history     = vec3(0.0);
+        hist_w = 1.0;
+        reproj = vec4(0.0);
+    }
+
     float weight_cap = compute_weight_cap();
 
     hist_w = min(hist_w, weight_cap);
@@ -36,11 +45,6 @@ void main()
 
     vec3 result = mix(current, history, hist_w / new_weight);
 
-    if (pc.reset)
-    {
-        result     = current;
-        new_weight = 1.0;
-    }
 
     imageStore(
         u_hdr_color_present_storage[COLOR_OUTPUT_HDR_RTXGI_ACCUM],

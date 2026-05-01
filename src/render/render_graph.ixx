@@ -208,7 +208,8 @@ public:
 export struct ExrDumpEntry
 {
     RGTextureHandle texture;
-    std::string filename_prefix;
+    std::string filename_prefix = "frame";
+    std::string subdir;
     uint32_t  out_channels = 0;
     float placeholder = 0.0f;
     uint32_t layer = 0;

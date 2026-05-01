@@ -76,6 +76,8 @@ public:  // public API
     {
         main_render_graph_num_runs = num;
     }
+    
+    void set_frame(uint32_t f);
 protected:  // internal functions
     
     void load_schemas();

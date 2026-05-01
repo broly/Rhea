@@ -43,6 +43,15 @@ void WorldScript_VariousThings::tick(double dt)
     }
     if (!do_once)
     {
+        if (DO_NN_SAMPLES)
+        {
+            if (rail->timestep)
+            {
+                rail->set_accum_time(499 * *rail->timestep);
+                RhGlobals::engine->renderer->set_frame(499);
+            }
+            RhGlobals::engine->renderer->set_flag("do_readback_nn", true, false, false);
+        }
         rail->add_on_tick("cam", [=] (const RailSampleData& d)
         {
             Transform newt = {d.position, d.rotation};
@@ -207,6 +216,13 @@ void WorldScript_VariousThings::tick(double dt)
         
         
         RhGlobals::engine->render_hot_reload();
+    }
+    if (input->is_key_down(Key::K))
+    {
+        RhGlobals::engine->renderer->set_num_runs_per_frame(40);
+        RhGlobals::engine->renderer->set_flag("reset_temporal_accum", true, false, true);
+        RhGlobals::engine->renderer->set_flag("do_readback_nn", true, false, false);
+        
     }
     if (input->is_key_down(Key::Z))
     {

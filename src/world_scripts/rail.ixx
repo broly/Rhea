@@ -41,6 +41,8 @@ public:
     
     bool fixed_timestep = false;
     
+    void set_accum_time(float t);
+    
     std::optional<float> timestep = std::nullopt;
     
     void tick(const double dt) override;

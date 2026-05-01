@@ -1,5 +1,10 @@
 module rail;
 
+void Rail::set_accum_time(float t)
+{
+    accumulated_time = t;
+}
+
 void Rail::tick(const double dt)
 {
     RhActor::tick(dt);
