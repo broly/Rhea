@@ -172,7 +172,14 @@ export struct MatModel_AttributesLayout
 REFLECT_STRUCT(MatModel_AttributesLayout,
     vertex_type, attributes);
 
-
+export enum class ShaderLanguage
+{
+    glsl,
+    hlsl,
+    slang,
+};
+REFLECT_ENUM(ShaderLanguage,
+    glsl, hlsl, slang);
 
 export enum RBBufferTopology
 {
@@ -272,9 +279,15 @@ export struct MatModel_PassStage
 {
     Name shader;
     std::set<Name> resources;
+    std::optional<ShaderLanguage> lang;
+    
+    ShaderLanguage get_lang() const
+    {
+        return lang.value_or(ShaderLanguage::glsl);
+    }
 };
 REFLECT_STRUCT(MatModel_PassStage,
-    shader, resources);
+    shader, resources, lang);
 
 
 export enum class ResourceUsageType
@@ -326,6 +339,8 @@ export struct PipelineInfoShaderStageInfo
     Name stage_name;
     ShaderStage stage;
     std::set<Name> resources;
+    Name shader;
+    ShaderLanguage lang;
 };
     
 
@@ -386,6 +401,8 @@ export struct PipelineInfo_Graphics : public PipelineInfo
             stage_info.stage_name = reflect::enum_name(stage);
             stage_info.stage = stage;
             stage_info.resources = info.resources;
+            stage_info.shader = info.shader;
+            stage_info.lang = info.lang.value_or(ShaderLanguage::glsl);
             result.push_back(stage_info);
         }
         return result;
@@ -433,6 +450,12 @@ export struct RTShaderInfo
     ShaderStage stage;
     Name shader;
     std::set<Name> resources;
+    std::optional<ShaderLanguage> lang;
+    
+    ShaderLanguage get_lang() const
+    {
+        return lang.value_or(ShaderLanguage::glsl);
+    }
 };
 REFLECT_STRUCT(RTShaderInfo,
     name, stage, shader, resources);

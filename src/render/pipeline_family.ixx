@@ -38,7 +38,21 @@ public:
 private:
 
     void decode_key_to_defines(ShaderKey key, DefinitionMap& out_defines) const;
-    std::filesystem::path request_permutation(const std::string& shader_name, ShaderKey key, const DefinitionMap& defines);
+    std::filesystem::path request_permutation(
+        const std::string& shader_name, 
+        ShaderKey key, 
+        const DefinitionMap& defines,
+        ShaderLanguage language);
+    
+    void compile_shader_checked(
+        const std::filesystem::path source,
+        const std::filesystem::path output_spirv,
+        const std::filesystem::path timestamp_file_name,
+        const std::filesystem::path shaders_dir,
+        const DefinitionMap& defines,
+        ShaderLanguage lang) const;
+    
+    
     
     PipelineLayoutDesc layout_desc;
 

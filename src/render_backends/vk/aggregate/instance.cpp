@@ -252,6 +252,18 @@ void vk::Instance::match_queue_families()
             LogVkInstance.Log("Chosen GPU: %s (%i)",
                 props.deviceName, props.deviceID);
             
+            LogVkInstance.Log(" Here are physical limits of this gpu:");
+            LogVkInstance.Log("  * maxPerStageDescriptorStorageImages = %i",
+                props.limits.maxPerStageDescriptorStorageImages );
+            
+            LogVkInstance.Log("  * maxPerStageDescriptorUniformBuffers = %i",
+                props.limits.maxPerStageDescriptorUniformBuffers);
+            
+            LogVkInstance.Log("  * maxPerStageDescriptorSamplers = %i",
+                props.limits.maxPerStageDescriptorSamplers);
+            
+            LogVkInstance.Log("  * maxBoundDescriptorSets = %i",
+                props.limits.maxBoundDescriptorSets);
             
             VkBool32 presentSupported = VK_FALSE;
             vkGetPhysicalDeviceSurfaceSupportKHR(

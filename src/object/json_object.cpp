@@ -6,6 +6,11 @@ import <json/value.h>;
 import <json/reader.h>;
 import <string>;
 
+import log;
+#include "logging/log_macro.h"
+
+DEFINE_LOGGER(LogJsonObjectLoader, Warning);
+
 
 #include "common/assertion_macros.h"
 
@@ -35,6 +40,17 @@ std::shared_ptr<RhObject> json_object::load_object_impl(std::filesystem::path pa
         auto name_str = cls_it->asString();
         reflection_info = reflect::find_object_reflection_info(name_str);
         checkf(reflection_info != nullptr, "Could not find class with name '%s'", name_str.c_str());
+    }
+    
+    auto skip_field = root.find("__skip__");
+    if (skip_field)
+    {
+        if (skip_field->isBool() && skip_field->asBool() == true) 
+        {
+            LogJsonObjectLoader.Log<Warning>("During loading object `__skip__ = true` field detected. Skipping loading '%s'",
+                path.string().c_str());
+            return nullptr;
+        }
     }
     
         

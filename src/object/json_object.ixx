@@ -18,6 +18,9 @@ namespace json_object
 
         std::shared_ptr<RhObject> ptr = load_object_impl(path, reflection_info, context);
         
+        if (ptr == nullptr)
+            return nullptr;
+        
         std::shared_ptr<T> result = std::static_pointer_cast<T>(ptr);
         
         if constexpr (requires { result->ctor(std::forward<Ts>(args)...); })

@@ -283,12 +283,12 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         update_generic_desc_and_defines(config, desc);
         
     
-        for (const auto& [shader_stage, stage_info] : config.stages)
+        for (const auto& stage_info : config.get_stages())
         {
             PipelineStage stage;
-            stage.stage = shader_stage;
+            stage.stage = stage_info.stage;
             stage.shader = stage_info.shader.to_string();
-            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines).string();
+            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines, stage_info.lang).string();
             desc.stages.push_back(stage);
         }
     
@@ -305,7 +305,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         PipelineStage stage;
         stage.stage = ShaderStage::compute;
         stage.shader = config.shader_stage.shader.to_string();
-        stage.compiled_shader = request_permutation(config.shader_stage.shader.to_string(), key, defines).string();
+        stage.compiled_shader = request_permutation(config.shader_stage.shader.to_string(), key, defines, config.shader_stage.get_lang()).string();
         desc.compute_stage = stage;
 
         result = backend->create_compute_pipeline(desc, pipeline_layout);
@@ -333,6 +333,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
 
             stage.stage = shader.stage;
             stage.shader_source = shader.shader.to_string();
+            stage.lang = shader.get_lang();
             // stage.compiled_shader = request_permutation(shader.shader.to_string(), key, defines).string();
 
             uint32_t index = (uint32_t)desc.stages.size();
@@ -397,7 +398,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         
         for (auto& stage : desc.stages)
         {
-            stage.compiled_shader = request_permutation(stage.shader_source, key, defines).string();
+            stage.compiled_shader = request_permutation(stage.shader_source, key, defines, stage.lang).string();
         }
 
         result = backend->create_raytrace_pipeline(desc, pipeline_layout);
@@ -469,7 +470,8 @@ void PipelineFamily::decode_key_to_defines(ShaderKey key, DefinitionMap& out_def
 std::filesystem::path PipelineFamily::request_permutation(
     const std::string& shader_name, 
     ShaderKey key, 
-    const DefinitionMap& defines)
+    const DefinitionMap& defines,
+    ShaderLanguage language)
 {
     const std::filesystem::path shaders_dir = paths::get_project_path() / "shaders";
     const std::filesystem::path shader_path = shaders_dir / shader_name;
@@ -521,44 +523,93 @@ std::filesystem::path PipelineFamily::request_permutation(
         }
     }
     
+    
+    compile_shader_checked(shader_path, 
+        compiled_shader_permutation_file, timestamp_file_name, shaders_dir, defines, language);
+    
+    return compiled_shader_permutation_file;
+}
+
+void PipelineFamily::compile_shader_checked(
+    const std::filesystem::path source, 
+    const std::filesystem::path output_spirv,
+    const std::filesystem::path timestamp_file_name,
+    const std::filesystem::path shaders_dir,
+    const DefinitionMap& defines,
+    ShaderLanguage lang) const
+{
     std::string cmd;
-    cmd += "glslc ";
-    cmd += shader_path.string() + " ";
+
+    switch (lang)
+    {
+        case ShaderLanguage::glsl:
+            cmd += "glslc ";
+            break;
+
+        case ShaderLanguage::hlsl:
+            cmd += "glslc ";
+            cmd += "-x hlsl ";
+            break;
+
+        case ShaderLanguage::slang:
+            cmd += "slangc ";
+            cmd += "-target spirv ";
+            break;
+    }
+
+    cmd += source.string() + " ";
+
+    // Defines
     for (auto define : defines)
     {
         auto define_str = define.first.to_string();
         std::transform(define_str.begin(), define_str.end(), define_str.begin(), PROJECTION(std::toupper));
+
         if (std::holds_alternative<bool>(define.second))
-            cmd += std::string("-D") + define_str + "=" + (std::get<bool>(define.second) ? "1" : "0") + " ";
+        {
+            cmd += "-D" + define_str + "=" + (std::get<bool>(define.second) ? "1" : "0") + " ";
+        }
         else if (std::holds_alternative<int>(define.second))
-            cmd += std::string("-D") + define_str + "=" + std::to_string(std::get<int>(define.second)) + " ";
+        {
+            cmd += "-D" + define_str + "=" + std::to_string(std::get<int>(define.second)) + " ";
+        }
         else
         {
             todo("support more types");
         }
     }
-    cmd += std::string("-I ") + shaders_dir.string() + " ";
-    cmd += "-o " + compiled_shader_permutation_file.string() + " ";
-    cmd += "--target-env=vulkan1.3";
-    
+
+    // Include path
+    cmd += "-I " + shaders_dir.string() + " ";
+
+    // Output
+    cmd += "-o " + output_spirv.string() + " ";
+
+
+    if (lang == ShaderLanguage::glsl || lang == ShaderLanguage::hlsl)
+    {
+        cmd += "--target-env=vulkan1.3 ";
+    }
+    else if (lang == ShaderLanguage::slang)
+    {
+        cmd += "-profile sm_6_0 ";
+        cmd += "-entry main ";
+    }
+
     LogPipelineFamily.Log("Compiling shader: %s", cmd.c_str());
-    
+
     std::system("chcp 65001");
     int result = std::system(cmd.c_str());
-    
-    
-    
+
     if (result == 0)
     {
-        std::filesystem::file_time_type filetime = std::filesystem::last_write_time(shader_path);
+        auto filetime = std::filesystem::last_write_time(source);
         std::string timestamp = file_helpers::file_time_to_string(filetime);
         file_helpers::save_text_to_file(timestamp_file_name, timestamp);
     }
     else
     {
-        checkf(false, "could not compile shader %s", shader_path.string().c_str());
+        checkf(false, "could not compile shader %s", source.string().c_str());
     }
-    
-    return compiled_shader_permutation_file;
-}
 
+}

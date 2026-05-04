@@ -138,6 +138,7 @@ export
         ShaderStage stage;
         std::string compiled_shader;
         std::string shader_source;
+        ShaderLanguage lang;
     };
 
     struct RayTracingShaderGroupDesc
