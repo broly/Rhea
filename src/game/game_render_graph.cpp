@@ -59,7 +59,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             {
                 if (ctx.bind_pipeline(tonemap_pipeline))
                 {
-                    ctx.bind(hdr_color_output_resource, gbuffer_resource, shadow_resource, dbuffer_resource);
+                    ctx.bind(hdr_color_output_resource, gbuffer_resource);
                 }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);

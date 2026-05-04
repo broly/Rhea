@@ -1,11 +1,7 @@
 #version 450
 
-#include "definitions.glsl"
 #include "resources/hdr_color_output.glsl"
 #include "resources/gbuffer.glsl"
-#include "resources/dbuffer.glsl"
-#include "resources/light.glsl"
-#include "resources/shadow.glsl"
 #include "utils/tonemapping.glsl"
 
 layout(location = 0) in vec2 v_uv;

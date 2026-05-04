@@ -585,7 +585,6 @@ void PipelineFamily::compile_shader_checked(
     // Output
     cmd += "-o " + output_spirv.string() + " ";
 
-
     if (lang == ShaderLanguage::glsl || lang == ShaderLanguage::hlsl)
     {
         cmd += "--target-env=vulkan1.3 ";

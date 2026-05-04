@@ -19,8 +19,9 @@
 					"resources": []
 				},
 				"fragment": {
-					"shader": "tonemap.frag",
-					"resources": ["hdr_color_output", "gbuffer", "shadow", "light", "dbuffer"]
+					"shader": "tonemap.slang",
+					"resources": ["hdr_color_output", "gbuffer"],
+					"lang": "slang"
 				}
 			},
 			"color_attachments": [

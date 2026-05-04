@@ -32,7 +32,6 @@ vec3 tonemap(vec3 color)
 
     vec3 mapped = Uncharted2Tonemap(color);
 
-
     const float W = 11.2;
     vec3 whiteScale = 1.0 / Uncharted2Tonemap(vec3(W));
     mapped *= whiteScale;
