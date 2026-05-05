@@ -112,7 +112,10 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     
 }
 
-ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> material, Name pass_name) const
+ShaderKey PipelineFamily::make_shader_key(
+    std::shared_ptr<const Material> material, 
+    Name pass_name,
+    const std::map<Name, uint32_t>& permutation_constants) const
 {
     PROFILE("PipelineFamily::make_shader_key");
     auto options = material->get_shader_options(pass_name);
@@ -179,6 +182,44 @@ ShaderKey PipelineFamily::make_shader_key(std::shared_ptr<const Material> materi
         bits |= (uint64_t(value) << bit_index);
         bit_index += 1;
         consumed.insert(flag_name);
+    }
+    
+    if (model->permutations.variants.has_value())
+    {
+        for (const auto& [variant_name, variant] : *model->permutations.variants)
+        {
+            checkf(variant.values.size() > 0, "No any variant values");
+        
+            auto provided_value_it = permutation_constants.find(variant_name);
+        
+            const bool constant_provided = provided_value_it != permutation_constants.end();
+            
+            checkf(constant_provided || variant.default_index.has_value(),
+                "Neither parameter nor default_index provided for variant");
+            
+            uint32_t using_value = constant_provided ?
+                provided_value_it->second : variant.values[variant.default_index.value()];
+
+
+            bool is_valid_value = false;
+            uint8_t index = 0;
+            for (uint8_t val_index = 0; auto& val : variant.values)
+            {
+                if (using_value == val)
+                {
+                    is_valid_value = true;
+                    index = val_index;
+                    break;
+                }
+                val_index++;
+            }
+            checkf(is_valid_value, "Wrong variant value");
+        
+            const uint8_t bits_needed = uint8_t(std::ceil(std::log2(variant.values.size())));
+            bits |= (uint64_t(index) << bit_index);
+            bit_index += bits_needed;
+            consumed.insert(variant_name);
+        }
     }
 
     checkf(bit_index <= 64, "ShaderKey overflow");
@@ -464,6 +505,21 @@ void PipelineFamily::decode_key_to_defines(ShaderKey key, DefinitionMap& out_def
     {
         out_defines[flag_name] = ((key.key >> bit_index) & 1) != 0;
         bit_index += 1;
+    }
+    
+    if (model->permutations.variants.has_value())
+    {
+        for (const auto& [variant_name, variant_values] : *model->permutations.variants)
+        {
+            const uint8_t bits_needed =
+                uint8_t(std::ceil(std::log2(variant_values.values.size())));
+
+            uint64_t value = (key.key >> bit_index) & ((1ull << bits_needed) - 1);
+
+            out_defines[variant_name] = variant_values.values[value];
+
+            bit_index += bits_needed;
+        }
     }
 }
 

@@ -133,15 +133,22 @@ export constexpr uint8_t ShaderStage_index(ShaderStage stage)
 
 export constexpr uint8_t MAX_STAGES = ShaderStage_index(ShaderStage::all) + 1;
 
-
+export struct PermutationVariant
+{
+    std::vector<int32_t> values;
+    std::optional<uint32_t> default_index = std::nullopt;
+};
+REFLECT_STRUCT(PermutationVariant,
+    values, default_index);
 
 export struct MatModel_Permutations
 {
     std::map<Name, std::string> flags;
     std::map<Name, std::map<Name, Name>> enums;
+    std::optional<std::map<Name, PermutationVariant>> variants;
 };
 REFLECT_STRUCT(MatModel_Permutations,
-    flags, enums);
+    flags, enums, variants);
 
 
 export struct MatModel_PushConstant

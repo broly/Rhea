@@ -25,7 +25,10 @@ public:
         std::shared_ptr<Renderer> in_renderer
     );
 
-    ShaderKey make_shader_key(std::shared_ptr<const Material> material, Name pass_name) const;
+    ShaderKey make_shader_key(
+        std::shared_ptr<const Material> material, 
+        Name pass_name,
+        const std::map<Name, uint32_t>& permutation_constants = {}) const;
 
     PipelineObject* request_pipeline(ShaderKey key);
     
