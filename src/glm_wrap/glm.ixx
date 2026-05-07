@@ -28,6 +28,9 @@ export namespace glm
     using glm::vec3;
     using glm::vec4;
     using glm::ivec4;
+    using glm::ivec2;
+    using glm::uvec2;
+    using glm::uvec3;
     using glm::uvec4;
     using glm::quat;
     using glm::mat4_cast;

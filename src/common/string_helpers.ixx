@@ -3,11 +3,36 @@ import <utility>;
 import <string>;
 import <stdexcept>;
 import <algorithm>;
+import <vector>;
+import <sstream>;
 
 export namespace string_helpers
 {
+    std::vector<std::string> split(const std::string& str, char delimiter) {
+        std::vector<std::string> tokens;
+        std::stringstream ss(str);
+        std::string token;
+
+        while (std::getline(ss, token, delimiter)) {
+            tokens.push_back(token);
+        }
+
+        return tokens;
+    }
+    
+    std::string substring_after_last(const std::string& str, char delimiter, const std::string& in_default = "") {
+        size_t pos = str.rfind(delimiter);
+
+        if (pos == std::string::npos) {
+            return in_default;
+        }
+
+        return str.substr(pos + 1);
+    }
+
+    
     std::pair<std::string, std::string> split_by_dot(const std::string& str)
-    {
+    {        
         size_t dot_pos = str.find('.');
 
         if (dot_pos == std::string::npos)

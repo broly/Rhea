@@ -143,8 +143,8 @@ REFLECT_STRUCT(PermutationVariant,
 
 export struct MatModel_Permutations
 {
-    std::map<Name, std::string> flags;
-    std::map<Name, std::map<Name, Name>> enums;
+    std::optional<std::map<Name, std::string>> flags;
+    std::optional<std::map<Name, std::map<Name, Name>>> enums;
     std::optional<std::map<Name, PermutationVariant>> variants;
 };
 REFLECT_STRUCT(MatModel_Permutations,
@@ -221,6 +221,8 @@ export enum class MaterialParamType
     // just image parameter (could be used for write in RTX)
     image,
     
+    storage_image,
+    
     // TLAS parameter
     tlas,
     
@@ -235,7 +237,7 @@ export enum class MaterialParamType
     vec4,
 };
 REFLECT_ENUM(MaterialParamType,
-    definition, uniform, sampler, image, ssbo, tlas, Float, vec2, vec4, vec4);
+    definition, uniform, sampler, image, storage_image, ssbo, tlas, Float, vec2, vec4, vec4);
 
 
 
@@ -618,7 +620,6 @@ export class MaterialModel : public RhObject
 {
 public:
     Name model_name;
-    std::map<Name, std::vector<Name>> enums;
     MatModel_Permutations permutations;
     std::vector<MatModel_PipelineVariant> pipelines;
     
@@ -631,7 +632,7 @@ public:
     void on_serialize(const SerializationContext& context) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, enums, permutations, pipelines, material_info);
+                      model_name, permutations, pipelines, material_info);
 
 
 

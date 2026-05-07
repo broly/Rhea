@@ -26,8 +26,9 @@ public:
     );
 
     ShaderKey make_shader_key(
-        std::shared_ptr<const Material> material, 
         Name pass_name,
+        std::shared_ptr<const Material> material = nullptr, 
+        const std::map<Name, Name>& permutation_enums = {},
         const std::map<Name, uint32_t>& permutation_constants = {}) const;
 
     PipelineObject* request_pipeline(ShaderKey key);
@@ -42,7 +43,7 @@ private:
 
     void decode_key_to_defines(ShaderKey key, DefinitionMap& out_defines) const;
     std::filesystem::path request_permutation(
-        const std::string& shader_name, 
+        const std::string& shader_rel_path, 
         ShaderKey key, 
         const DefinitionMap& defines,
         ShaderLanguage language);

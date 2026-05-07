@@ -17,12 +17,20 @@ import name;
 import static_name;
 import container_traits;
 import type_utils;
+import string_utils;
 import <variant>;
 import <set>;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 
+#define DEBUG_SERIALIZATION_PATH 1
 
+#if DEBUG_SERIALIZATION_PATH
+    #define DEBUG_SERIALIZATION_SCOPE(context, string) \
+        SerializationContext::__Scope _(context, string);
+#else
+    #define DEBUG_SERIALZATION_SCOPE(...)
+#endif
 
 export struct SerializationContext
 {
@@ -30,6 +38,45 @@ export struct SerializationContext
     bool is_loading = true;
     bool strict_checking_enabled = false;
     std::optional<std::string> current_file = std::nullopt;
+#if DEBUG_SERIALIZATION_PATH
+    mutable std::vector<std::string> path;
+#endif
+    
+    std::string get_debug_path() const
+    {
+#if DEBUG_SERIALIZATION_PATH
+        std::string result;
+        for (uint32_t index = 0; const auto& e : path)
+        {
+            result.append(e);
+            if (index != path.size() - 1)
+            {
+                result += ".";
+            }
+            index++;
+        }
+        return result;
+#else
+        return "!NOT SUPPORTED!";
+#endif
+    }
+    
+#if DEBUG_SERIALIZATION_PATH
+    struct __Scope
+    {
+        const SerializationContext& ctx;
+        __Scope(const SerializationContext& in_ctx, std::string s)
+            : ctx(in_ctx)
+        {
+            ctx.path.emplace_back(s);
+        }
+        
+        ~__Scope()
+        {
+            ctx.path.pop_back();
+        }
+    };
+#endif
 };
     
 export inline void serialize_json_value(Json::Int& target, const Json::Value& value, const SerializationContext& context)
@@ -166,8 +213,9 @@ export namespace reflect::json
         if constexpr (std::is_enum_v<T> && reflect::is_reflected_v<T>)
         {
             std::string value_str = value.asString();
-            checkf(reflect::is_valid_enum_name<T>(value_str), "Wrong member name '%s' for enum '%s'",
-                            value_str.c_str(), reflect::get_name<T>().to_string().c_str());
+            checkf(reflect::is_valid_enum_name<T>(value_str), "Wrong member name '%s' for enum '%s'. Path: %s",
+                            value_str.c_str(), reflect::get_name<T>().to_string().c_str(),
+                            context.get_debug_path().c_str());
             
             target = reflect::ReflectionInfo<T>::template enum_name_to_value(value.asString());
         } else if constexpr (is_shared_ptr_v<T>)
@@ -175,14 +223,17 @@ export namespace reflect::json
             auto type_id = reflect::get_object_type_name<typename T::element_type>();
             auto info = reflect::find_object_reflection_info(type_id);
             target = info->template instantiate<typename T::element_type>();
+            
             do_serialize_json_value(*target, value, context);
         } else if constexpr (is_variant_v<T>)
         {
             checkf(value.isObject(), "Variant supports only JSON objects");
 
             Json::Value const* type_name_ptr = value.find("__type__");
-            checkf(type_name_ptr != nullptr, "__type__ should be provided for variant fields");
-            checkf(type_name_ptr->isString(), "__type__ must be string");
+            checkf(type_name_ptr != nullptr, "__type__ should be provided for variant fields. Path: %s",
+                            context.get_debug_path().c_str());
+            checkf(type_name_ptr->isString(), "__type__ must be string. Path: %s",
+                            context.get_debug_path().c_str());
             
             const Name type_name = type_name_ptr->asString();
             
@@ -190,6 +241,7 @@ export namespace reflect::json
                 if (type_name == reflect::get_name<U>())
                 {
                     auto& variant_target_value = target.template emplace<U>(U{});
+                    DEBUG_SERIALIZATION_SCOPE(context, format("<%s>", type_name.to_string().c_str()));
                     do_serialize_json_value(variant_target_value, value, context);
                 }
             });
@@ -201,20 +253,24 @@ export namespace reflect::json
             visit_serialize(value, target, context);
         } else if constexpr (is_vector_v<std::decay_t<T>>)
         {
-            assert(value.isArray());
+            checkf(value.isArray(), "Provided JSON value is not an array (meant as array). Path: %s",
+                            context.get_debug_path().c_str());
             target.clear();
-            for (auto& json_item : value)
+            for (uint32_t index = 0; auto& json_item : value)
             {
                 typename T::value_type array_item;
                 // serialize_json_value(array_item, json_item);
                 target.push_back(array_item);
+                DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", index));
                 do_serialize_json_value(target.back(), json_item, context);
+                index++;
             }
         } else if constexpr (is_set_v<std::decay_t<T>>)
         {
-            assert(value.isArray());
+            checkf(value.isArray(), "Provided JSON value is not an array (meant as set). Path: %s",
+                            context.get_debug_path().c_str());
             target.clear();
-            for (auto& json_item : value)
+            for (uint32_t index = 0; auto& json_item : value)
             {
                 using value_type = typename T::value_type;
                 value_type set_item;
@@ -224,13 +280,16 @@ export namespace reflect::json
                     set_item = reflect::ReflectionInfo<value_type>::template enum_name_to_value(json_item.asString());
                 } else
                 {
+                    DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", index));
                     serialize_json_value(set_item, json_item, context);
                 }
                 target.emplace(set_item);
+                index++;
             }
         } else if constexpr (is_mask_v<std::decay_t<T>>)
         {
-            assert(value.isArray());
+            checkf(value.isArray(), "Provided JSON value is not an array (meant as mask). Path: %s",
+                            context.get_debug_path().c_str());
             target = 0;
             for (auto& json_item : value)
             {
@@ -254,7 +313,8 @@ export namespace reflect::json
             }
         } else if constexpr (is_map_v<std::decay_t<T>>)
         {
-            assert(value.isObject());
+            checkf(value.isObject(), "Provided JSON value is not an object (meant as map). Path: %s",
+                            context.get_debug_path().c_str());
             auto member_names = value.getMemberNames();
             
             using KEY = T::key_type;
@@ -268,12 +328,13 @@ export namespace reflect::json
             {
                 typename T::mapped_type map_value;
                 
-                auto from_string = [] (const std::string& name) -> KEY
+                auto from_string = [&context] (const std::string& name) -> KEY
                 {
                     if constexpr (std::is_enum_v<KEY>)
                     {
-                        checkf(reflect::is_valid_enum_name<KEY>(name), "Wrong member name '%s' for enum '%s'",
-                            name.c_str(), reflect::get_name<KEY>().to_string().c_str());
+                        checkf(reflect::is_valid_enum_name<KEY>(name), "Wrong member name '%s' for enum '%s'. Path: %s",
+                            name.c_str(), reflect::get_name<KEY>().to_string().c_str(), 
+                            context.get_debug_path().c_str());
                         return reflect::name_to_enum<KEY>(name);
                     }
                     else
@@ -288,6 +349,7 @@ export namespace reflect::json
             
                 auto& json_value = value[member_name];
             
+                DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", member_name.c_str()));
                 do_serialize_json_value(it->second, json_value, context);
             }
         } 
@@ -307,13 +369,16 @@ export namespace reflect::json
             if (context.strict_checking_enabled)
             {
                 checkf(context.current_file.has_value(), "Strict checking mode not supported for non-file serialization");
-                checkf(json_value, "During parsing '%s', required field '%s' is missing", 
+                checkf(json_value, "During parsing '%s', required field '%s' is missing. Path: %s", 
                     context.current_file->c_str(), 
-                    name.c_str());
+                    name.c_str(),
+                    context.get_debug_path().c_str());
             }
             if (!json_value)
                 return;
             auto& field_ref = struct_ref.*PtrToField;
+            
+            DEBUG_SERIALIZATION_SCOPE(context, name);
             do_serialize_json_value(field_ref, *json_value, context);
             
         });

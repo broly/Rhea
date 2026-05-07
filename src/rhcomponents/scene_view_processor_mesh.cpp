@@ -116,7 +116,7 @@ void SceneViewProcessor_Mesh::process()
                         rp.passes.emplace(pass_name);
                         auto& info = rp.info_by_pass[pass_name];
                         info.pipeline_family = geom_pipeline_family;
-                        info.shader_key = geom_pipeline_family->make_shader_key(instance->material, pass_name);
+                        info.shader_key = geom_pipeline_family->make_shader_key(pass_name, instance->material);
                         info.pipeline = geom_pipeline_family->request_pipeline(info.shader_key);
                         info.material_instance = instance;
                         if (pass_name != "shadowmap")

@@ -146,7 +146,7 @@ void vk::BufferManager::create_descriptor_pool()
         },
         {
             .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .descriptorCount = 512 
+            .descriptorCount = 2048 
         },
         {
             .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,

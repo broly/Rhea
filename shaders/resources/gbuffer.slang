@@ -42,9 +42,15 @@ Sampler2D u_gbuffer[GBUFFER_NUM_SLOTS];
 [[vk::binding(BINDING_SAMPLER_ARRAY_GBUFFER_HIST, SET_GBUFFER)]]
 Sampler2D u_gbuffer_hist[GBUFFER_NUM_SLOTS];
 
+
 float4 get_gbuffer<GBUFFER_SLOT buffer_id>(float2 uv)
 {
     return u_gbuffer[(uint)buffer_id].Sample(uv);
+}
+
+float4 get_gbuffer<GBUFFER_SLOT buffer_id, int level>(float2 uv)
+{
+    return u_gbuffer[(uint)buffer_id].SampleLevel(uv, level);
 }
 
 float4 get_gbuffer_hist<GBUFFER_SLOT buffer_id>(float2 uv)

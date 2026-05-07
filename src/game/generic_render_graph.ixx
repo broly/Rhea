@@ -9,6 +9,7 @@ import <memory>;
 import engine;
 import assets;
 import rhmath;
+import :nn_denoiser_passes;
 import <unordered_map>;
 #include "object/object_reflection_macro.h"
 
@@ -119,6 +120,8 @@ public:
     
     void add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong = true);
     
+    void prepare_nn_denoiser_passes();
+
     ViewInfo  build_view_info(
         RenderGraphContext& ctx,
         bool zero_pos) const;
@@ -219,6 +222,8 @@ public:
     uint32_t debug_line_capacity = 19440*32;
     
     bool readback_nn = false;
+    
+    NNDenoiserState nn_denoiser_state;
     
 };
 REFLECT_OBJECT_FIELDS(GenericRenderGraph, RenderGraph,

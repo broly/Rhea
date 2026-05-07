@@ -117,6 +117,17 @@ CubemapHandle AssetManager::load_cubemap(const std::string& rel_path)
     return cubemap_handle;
 }
 
+TextureHandle AssetManager::register_external_texture(Texture&& tex)
+{
+    const uint32_t texture_id = ++textures_counter;
+    tex.id = texture_id;
+    
+    TextureHandle texture_handle {texture_id};
+    texture_by_path[tex.transition_path] = texture_handle;
+    loaded_textures[texture_handle] = std::move(tex);
+    return texture_handle;
+}
+
 MeshHandle AssetManager::store_mesh(StaticMesh&& mesh)
 {
     const uint32_t mesh_id = ++meshes_counter;

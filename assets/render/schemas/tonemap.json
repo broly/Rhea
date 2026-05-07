@@ -20,7 +20,7 @@
 				},
 				"fragment": {
 					"shader": "tonemap.slang",
-					"resources": ["hdr_color_output", "gbuffer"],
+					"resources": ["hdr_color_output", "gbuffer", "nn_denoiser"],
 					"lang": "slang"
 				}
 			},

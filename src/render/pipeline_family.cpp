@@ -113,18 +113,21 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
 }
 
 ShaderKey PipelineFamily::make_shader_key(
-    std::shared_ptr<const Material> material, 
     Name pass_name,
+    std::shared_ptr<const Material> material, 
+    const std::map<Name, Name>& permutation_enums,
     const std::map<Name, uint32_t>& permutation_constants) const
 {
     PROFILE("PipelineFamily::make_shader_key");
-    auto options = material->get_shader_options(pass_name);
     
+    
+    std::map<Name, ShaderOptionValue> options;
+    if (material != nullptr)
+    {
+        options = material->get_shader_options(pass_name);
+    }
     uint64_t bits = 0;
     uint8_t bit_index = 0;
-    
-    // checkf(model->material_resource.has_value(), "Model should provide material resource");
-    // auto resource_info = renderer->find_resource_info(*model->material_resource);
     
     std::vector<Name> provided_options;
 
@@ -139,9 +142,11 @@ ShaderKey PipelineFamily::make_shader_key(
         {
             if (param_info.is_static_parameter())
             {
+                check(material != nullptr);
                 ctx[param_name.to_string()] = material->parameters.find(param_name.to_string())->second.as<Name>().to_string();
             } else
             {
+                check(material != nullptr);
                 const bool provided = material->parameters.contains(param_name);
                 ctx[param_name.to_string()] = provided;
             }
@@ -151,37 +156,60 @@ ShaderKey PipelineFamily::make_shader_key(
     
 
     // enum
-    for (const auto& [enum_name, enum_values] : model->permutations.enums)
+    if (model->permutations.enums.has_value())
     {
-        auto it = options.find(enum_name);
-        checkf(it != options.end(), "Missing enum option %s", enum_name.to_string().c_str());
-        checkf(std::holds_alternative<Name>(it->second), "Enum option must be Name");
+        for (const auto& [enum_name, enum_values] : *model->permutations.enums)
+        {
+            auto it = options.find(enum_name);
+            auto permutation_param_it = permutation_enums.find(enum_name);
+        
+            const uint8_t bits_needed = std::bit_width(enum_values.size() - 1);
+            
+            Name value;
+        
+            if (it != options.end())
+            {
+                checkf(std::holds_alternative<Name>(it->second), "Enum option must be Name");
+                value = std::get<Name>(it->second);
+            } else if (permutation_param_it != permutation_enums.end())
+            {
+                value = permutation_param_it->second;
+            }
+            else
+            {
+                bit_index += bits_needed;
+                consumed.insert(enum_name);
+                continue;
+                // checkf(false, "Neither option nor parameter '%s' provided for shader key", enum_name.to_string().c_str());
+            }
+            
+            auto vit = enum_values.find(value);
+            checkf(vit != enum_values.end(), "Invalid enum value");
 
-        const Name value = std::get<Name>(it->second);
-        auto vit = enum_values.find(value);
-        checkf(vit != enum_values.end(), "Invalid enum value");
+            const uint32_t index = std::distance(enum_values.begin(), vit);
 
-        const uint32_t index = std::distance(enum_values.begin(), vit);
-        const uint8_t bits_needed = uint8_t(std::ceil(std::log2(enum_values.size())));
-
-        bits |= (uint64_t(index) << bit_index);
-        bit_index += bits_needed;
-        consumed.insert(enum_name);
+            bits |= (uint64_t(index) << bit_index);
+            bit_index += bits_needed;
+            consumed.insert(enum_name);
+        }
     }
 
     // flags
-    for (const auto& [flag_name, expression] : model->permutations.flags)
+    if (model->permutations.flags.has_value())
     {
-        // auto it = options.find(flag_name);
-        // bool value = (it != options.end()) && std::get<bool>(it->second);
+        for (const auto& [flag_name, expression] : *model->permutations.flags)
+        {
+            // auto it = options.find(flag_name);
+            // bool value = (it != options.end()) && std::get<bool>(it->second);
         
 
-        expr::CompiledExpr compiled = expr::compile(expression);
-        bool value = expr::eval_node(compiled.root, compiled.nodes, ctx);
+            expr::CompiledExpr compiled = expr::compile(expression);
+            bool value = expr::eval_node(compiled.root, compiled.nodes, ctx);
 
-        bits |= (uint64_t(value) << bit_index);
-        bit_index += 1;
-        consumed.insert(flag_name);
+            bits |= (uint64_t(value) << bit_index);
+            bit_index += 1;
+            consumed.insert(flag_name);
+        }
     }
     
     if (model->permutations.variants.has_value())
@@ -215,7 +243,7 @@ ShaderKey PipelineFamily::make_shader_key(
             }
             checkf(is_valid_value, "Wrong variant value");
         
-            const uint8_t bits_needed = uint8_t(std::ceil(std::log2(variant.values.size())));
+            const uint8_t bits_needed = std::bit_width(variant.values.size() - 1);
             bits |= (uint64_t(index) << bit_index);
             bit_index += bits_needed;
             consumed.insert(variant_name);
@@ -484,35 +512,39 @@ void PipelineFamily::decode_key_to_defines(ShaderKey key, DefinitionMap& out_def
 {
     uint8_t bit_index = 0;
 
-    for (const auto& [enum_name, enum_values] : model->permutations.enums)
+    if (model->permutations.enums.has_value())
     {
-        const uint8_t bits_needed =
-            uint8_t(std::ceil(std::log2(enum_values.size())));
-
-        uint64_t value = (key.key >> bit_index) & ((1ull << bits_needed) - 1);
-
-        uint32_t idx = 0;
-        for (const auto& [name, define_name] : enum_values)
+        for (const auto& [enum_name, enum_values] : *model->permutations.enums)
         {
-            out_defines[define_name] = (idx == value);
-            ++idx;
-        }
+            const uint8_t bits_needed = std::bit_width(enum_values.size() - 1);;
 
-        bit_index += bits_needed;
+            uint64_t value = (key.key >> bit_index) & ((1ull << bits_needed) - 1);
+
+            uint32_t idx = 0;
+            for (const auto& [name, define_name] : enum_values)
+            {
+                out_defines[define_name] = (idx == value);
+                ++idx;
+            }
+
+            bit_index += bits_needed;
+        }
     }
 
-    for (const auto& [flag_name, _] : model->permutations.flags)
+    if (model->permutations.flags.has_value())
     {
-        out_defines[flag_name] = ((key.key >> bit_index) & 1) != 0;
-        bit_index += 1;
+        for (const auto& [flag_name, _] : *model->permutations.flags)
+        {
+            out_defines[flag_name] = ((key.key >> bit_index) & 1) != 0;
+            bit_index += 1;
+        }
     }
     
     if (model->permutations.variants.has_value())
     {
         for (const auto& [variant_name, variant_values] : *model->permutations.variants)
         {
-            const uint8_t bits_needed =
-                uint8_t(std::ceil(std::log2(variant_values.values.size())));
+            const uint8_t bits_needed = std::bit_width(variant_values.values.size() - 1);
 
             uint64_t value = (key.key >> bit_index) & ((1ull << bits_needed) - 1);
 
@@ -524,13 +556,23 @@ void PipelineFamily::decode_key_to_defines(ShaderKey key, DefinitionMap& out_def
 }
 
 std::filesystem::path PipelineFamily::request_permutation(
-    const std::string& shader_name, 
+    const std::string& shader_rel_path, 
     ShaderKey key, 
     const DefinitionMap& defines,
     ShaderLanguage language)
 {
+    LogPipelineFamily.Log("Requesting permutation for %s. Defines: ", shader_rel_path.c_str());
+    for (auto& [key, value] : defines)
+    {
+        const std::string svalue = std::holds_alternative<bool>(value) ? 
+            std::to_string(std::get<bool>(value)) : std::to_string(std::get<int>(value));
+        LogPipelineFamily.Log("%s=%s", key.to_string().c_str(), svalue.c_str());
+    }
+    
     const std::filesystem::path shaders_dir = paths::get_project_path() / "shaders";
-    const std::filesystem::path shader_path = shaders_dir / shader_name;
+    const std::filesystem::path shader_path = shaders_dir / shader_rel_path;
+    
+    const std::string shader_name = string_helpers::substring_after_last(shader_rel_path, '/', shader_rel_path);
     
     const auto [pure_shader_name, shader_extension] = string_helpers::split_by_dot(shader_name);
     
@@ -542,12 +584,13 @@ std::filesystem::path PipelineFamily::request_permutation(
     const std::filesystem::path shaders_cache_dir = paths::get_project_path() / "shaders_cache";
     
     if (!std::filesystem::exists(shaders_cache_dir))
-        std::filesystem::create_directory(shaders_cache_dir);
+        std::filesystem::create_directories(shaders_cache_dir);
+    
 
-    const std::filesystem::path shader_permutations_dir = shaders_cache_dir / shader_name;
+    const std::filesystem::path shader_permutations_dir = shaders_cache_dir / shader_rel_path;
     
     if (!std::filesystem::exists(shader_permutations_dir))
-        std::filesystem::create_directory(shader_permutations_dir);
+        std::filesystem::create_directories(shader_permutations_dir);
     
     std::string shader_hash = std::to_string(key.key);
     
@@ -596,24 +639,29 @@ void PipelineFamily::compile_shader_checked(
 {
     std::string cmd;
 
+    std::string define_pref;
+    
     switch (lang)
     {
         case ShaderLanguage::glsl:
             cmd += "glslc ";
+            define_pref = "-D";
             break;
 
         case ShaderLanguage::hlsl:
             cmd += "glslc ";
             cmd += "-x hlsl ";
+            define_pref = "-D";
             break;
 
         case ShaderLanguage::slang:
             cmd += "slangc ";
             cmd += "-target spirv ";
+            define_pref = "-D ";
             break;
     }
 
-    cmd += source.string() + " ";
+    cmd += "\"" + source.string() + "\" ";
 
     // Defines
     for (auto define : defines)
@@ -623,11 +671,11 @@ void PipelineFamily::compile_shader_checked(
 
         if (std::holds_alternative<bool>(define.second))
         {
-            cmd += "-D" + define_str + "=" + (std::get<bool>(define.second) ? "1" : "0") + " ";
+            cmd += define_pref + define_str + "=" + (std::get<bool>(define.second) ? "1" : "0") + " ";
         }
         else if (std::holds_alternative<int>(define.second))
         {
-            cmd += "-D" + define_str + "=" + std::to_string(std::get<int>(define.second)) + " ";
+            cmd += define_pref + define_str + "=" + std::to_string(std::get<int>(define.second)) + " ";
         }
         else
         {
@@ -636,10 +684,10 @@ void PipelineFamily::compile_shader_checked(
     }
 
     // Include path
-    cmd += "-I " + shaders_dir.string() + " ";
+    cmd += "-I \"" + shaders_dir.string() + "\" ";
 
     // Output
-    cmd += "-o " + output_spirv.string() + " ";
+    cmd += "-o \"" + output_spirv.string() + "\" ";
 
     if (lang == ShaderLanguage::glsl || lang == ShaderLanguage::hlsl)
     {

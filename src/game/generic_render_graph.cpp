@@ -484,7 +484,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         {
             if (ctx.bind_pipeline(rtx_gi_temporal_accum_pipeline))
             {
-                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource);
+                ctx.bind(hdr_color_output_resource, hdr_color_storage_resource, gbuffer_resource, camera_resource);
             }
             auto extent = backend->get_swapchain_extent();
             ComputeWorkgroups workgroups = ComputeWorkgroups::from_extent(extent);
@@ -504,7 +504,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = "RTXGI_MOMENTS",
         .reads = {
-            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment }
+            { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment },
         },
         .writes = {
             { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
@@ -527,7 +527,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .reads = {
             { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment },
             { hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_MOMENTS], RBImageUsageType::SampledFragment },
-
+    
             { gbuffer[GBUFFER_SLOT_WORLD_NORMAL], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], RBImageUsageType::SampledFragment },
         },
@@ -698,6 +698,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
     
     
+    // nn_denoiser::init_and_add_nn_passes(nn_denoiser_state, *this, *renderer, *renderer->get_backend(), swapchain_extent);
     
     if (readback_nn)
     {
@@ -1533,6 +1534,20 @@ void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTexture
         .num_layers = num_layers,
         .type = RenderPassType::transfer
     });
+}
+
+void GenericRenderGraph::prepare_nn_denoiser_passes()
+{
+    // auto pipeline_json = parse_json("nn/pipeline.json");
+    // for (auto& p : pipeline_json["passes"]) {
+    //     add_pass({
+    //         .name = p["name"],
+    //         .reads = resolve_reads(p),
+    //         .writes = resolve_writes(p),
+    //         .execute = make_executor(p),
+    //         .type = RenderPassType::compute
+    //     });
+    // }
 }
 
 

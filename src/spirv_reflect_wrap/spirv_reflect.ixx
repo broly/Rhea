@@ -2,9 +2,11 @@ export module spirv_reflect;
 
 #include <spirv-reflect/spirv_reflect.h>;
 
+
 export 
 {
     using ::SpvReflectDescriptorType;
+    using ::SpvReflectDecorationFlagBits;
     
     using ::SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER;
     using ::SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

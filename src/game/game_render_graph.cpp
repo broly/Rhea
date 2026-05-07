@@ -50,7 +50,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsageType::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment },                
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsageType::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsageType::SampledFragment },           
             },
             .writes = {
                 { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }

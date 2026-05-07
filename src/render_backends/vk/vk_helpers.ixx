@@ -282,6 +282,8 @@ export namespace vk
             
         case MaterialParamType::image:
             return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        case MaterialParamType::storage_image:
+            return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         
         case MaterialParamType::tlas:
             return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;    

@@ -1,9 +1,24 @@
 export module rhmath:extent;
 import <cstdint>;
+import glm;
 
 export struct Extent
 {
     uint32_t width, height;
+    
+    constexpr Extent() = default;
+    constexpr Extent(const uint32_t w, const uint32_t h)
+        : width{w}, height{h}
+    {}
+    
+    constexpr Extent(const glm::uvec2& vec)
+        : width{vec.x}, height{vec.y}
+    {}
+    
+    
+    constexpr Extent(const glm::ivec2& vec)
+        : width{(uint32_t)vec.x}, height{(uint32_t)vec.y}
+    {}
     
     constexpr Extent operator>>(uint32_t shift) const
     {

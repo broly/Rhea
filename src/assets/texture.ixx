@@ -48,6 +48,8 @@ export struct Texture
     Extent extent;
     TextureFormat format;
     uint32_t id;
+    
+    std::string transition_path;
 
     std::vector<std::byte> bulk;
     

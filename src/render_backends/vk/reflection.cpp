@@ -4,6 +4,7 @@ import <map>;
 import <iostream>;
 import <vulkan/vulkan_core.h>;
 import reflect;
+import spirv_reflect;
 
 #define MAKE_SPV_RESULT_PAIR(x) {x, #x}
 #include "common/assertion_macros.h"
@@ -142,6 +143,9 @@ std::unordered_map<Name, ReflectedInterfaceVariable> SpirvReflection::get_input_
     {
         if (v->storage_class == SpvStorageClass::SpvStorageClassInput)
         {
+            if (v->decoration_flags & SpvReflectDecorationFlagBits::SPV_REFLECT_DECORATION_BUILT_IN)
+                continue;
+            
             result.insert({v->name, 
                ReflectedInterfaceVariable{
                    .name = v->name, 

@@ -145,11 +145,17 @@ public:
         resource->query_single(level)->bind(cmd, frame);
     }
     
+    void bind(RenderResource& resource) const
+    {
+        checkf(current_pipeline, "Could not bind resource while no any pipeline bound");
+        resource.query_single(level)->bind(cmd, frame);
+    }
+    
     template<typename... Ts>
     requires (sizeof...(Ts) > 1)
-    void bind(Ts... vs) const
+    void bind(Ts&&... vs) const
     {
-        (bind(vs), ...);
+        (bind(std::forward<Ts>(vs)), ...);
     }
     
     

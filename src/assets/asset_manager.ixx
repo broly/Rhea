@@ -25,6 +25,8 @@ public:
     AssetSceneInfo load_scene(const std::string& rel_path, const std::string& textures_rel_path);
     CubemapHandle load_cubemap(const std::string& rel_path);
     
+    TextureHandle register_external_texture(Texture&& tex);
+    
     
     MeshHandle store_mesh(StaticMesh&& mesh);
     CubemapHandle store_cubemap(Cubemap&& mesh);

@@ -124,6 +124,7 @@ file(GLOB_RECURSE SHADERS
     ${SHADER_SOURCE_DIR}/*.frag
     ${SHADER_SOURCE_DIR}/*.comp
     ${SHADER_SOURCE_DIR}/*.glsl
+    ${SHADER_SOURCE_DIR}/*.slang
     ${SHADER_SOURCE_DIR}/*.r*
 )
 
@@ -185,6 +186,7 @@ file(GLOB_RECURSE JSON_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/*.json
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/system/*.json
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/actors/*.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/nn/*.json
 )
 
 source_group("Assets\\JSON" FILES ${JSON_FILES})

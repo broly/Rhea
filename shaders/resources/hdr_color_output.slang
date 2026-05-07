@@ -28,6 +28,13 @@ float4 read_hdr_color_present<COLOR_OUTPUT_HDR output>(float2 uv)
     return u_hdr_color_present[(uint)output].Sample(uv);
 }
 
+
+float4 read_hdr_color_present<COLOR_OUTPUT_HDR output, int level>(float2 uv)
+{
+    return u_hdr_color_present[(uint)output].SampleLevel(uv, level);
+}
+
+
 float4 read_hdr_color_history<COLOR_OUTPUT_HDR output>(float2 uv)
 {
     return u_hdr_color_history[(uint)output].Sample(uv);

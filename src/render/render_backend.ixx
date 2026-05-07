@@ -37,6 +37,7 @@ export struct TextureCreationInfo
     bool imported = false;
     RBImageLayout initial_layout = RBImageLayout::undefined;
     RBImageLayout current_layout = RBImageLayout::undefined;
+    uint32_t array_layers = 1;
 };
 
 export struct CopyImageParams
@@ -78,12 +79,12 @@ export struct ComputeWorkgroups
     uint32_t y = 32;
     uint32_t z = 1;
     
-    static ComputeWorkgroups from_extent(const Extent& extent)
+    static ComputeWorkgroups from_extent(const Extent& extent, uint32_t z = 1)
     {
         ComputeWorkgroups result;
         result.x = extent.width;
         result.y = extent.height;
-        result.z = 1;
+        result.z = z;
         return result;
     }
 };

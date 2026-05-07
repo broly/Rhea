@@ -508,60 +508,65 @@ bool vk::ImageManager::is_swapchain_image(RBImageHandle image)
 
 RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info)
 {
-
     if (tex.extent.is_zero())
-    {
         return create_fallback_texture(tex, texture_creation_info);
-    }
-    
-    uint32_t mip_levels = texture_creation_info.generate_mips ? 
-        static_cast<uint32_t>(std::floor(std::log2(std::max(tex.extent.width, tex.extent.height))) ) + 1 :
+
+    const uint32_t array_layers = std::max(1u, texture_creation_info.array_layers);
+    const bool is_array = array_layers > 1;
+
+
+    checkf(!texture_creation_info.generate_mips || !is_array,
+           "Mip generation for 2D arrays not implemented");
+
+    uint32_t mip_levels = texture_creation_info.generate_mips ?
+        static_cast<uint32_t>(std::floor(std::log2(std::max(tex.extent.width, tex.extent.height)))) + 1 :
         1;
-    
+
     RBImageDesc desc;
     desc.name = std::string("TEX_") + tex.name;
-    desc.mip_levels = mip_levels;  // here
-    desc.extent  = tex.extent;
+    desc.mip_levels = mip_levels;
+    desc.num_layers = array_layers;
+    desc.extent = tex.extent;
     desc.format = texture_creation_info.format_override.value_or(tex.format);
-    desc.usage  =
+    desc.usage =
         RenderTextureUsage::Sampled |
         RenderTextureUsage::TransferDst |
         RenderTextureUsage::TransferSrc;
     desc.use_mip_levels_for_image_view = true;
-    
-    // 1. GPU image
+
     RBImageHandle image = create_image(desc);
     auto& res = get_image_resource(image);
-    
-    // 2. staging buffer
-    size_t pixel_size =
-        tex.format == TextureFormat::RGB8 ? 3 : 4;
-    
-    size_t upload_size =
-        tex.extent.width * tex.extent.height * pixel_size;
-    
-    if (upload_size == 0)
+
+
+    size_t pixel_size;
+    switch (desc.format)
     {
-        throw std::runtime_error("create_texture_2d: upload_size == 0");
+        case TextureFormat::RGB8:    pixel_size = 3;  break;
+        case TextureFormat::RGBA8:   pixel_size = 4;  break;
+        case TextureFormat::RGBA16F: pixel_size = 8;  break;
+        case TextureFormat::RGBA32F: pixel_size = 16; break;
+        default:
+            throw std::runtime_error("create_texture_2d: unsupported format");
     }
-    
+
+    const size_t per_layer_size = tex.extent.width * tex.extent.height * pixel_size;
+    const size_t upload_size = per_layer_size * array_layers;
+
+    if (upload_size == 0)
+        throw std::runtime_error("create_texture_2d: upload_size == 0");
+
     VkBuffer staging_buffer;
     VkDeviceMemory staging_memory;
-    
+
     vk::create_buffer(
-        instance.device,
-        instance.physical_device,
+        instance.device, instance.physical_device,
         upload_size,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        staging_buffer,
-        staging_memory);
-    
-    
-    
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buffer, staging_memory);
+
     vk::update_buffer(instance.device, staging_memory, tex.bulk.data(), upload_size);
-    
+
     immediate_command_pool.submit([&](VkCommandBuffer cmd)
     {
         ImageBarrierParams params_before_copy;
@@ -569,37 +574,31 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         params_before_copy.src_usage = RBImageUsageType::Undefined;
         params_before_copy.dst_usage = RBImageUsageType::TransferDst;
         transition_image(cmd, params_before_copy);
-    
+
         VkBufferImageCopy copy{};
+        copy.bufferOffset = 0;
+        copy.bufferRowLength = 0;
+        copy.bufferImageHeight = 0;
         copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copy.imageSubresource.layerCount = 1;
         copy.imageSubresource.mipLevel = 0;
-        copy.imageExtent = {
-            tex.extent.width,
-            tex.extent.height,
-            1
-        };
-    
+        copy.imageSubresource.baseArrayLayer = 0;
+        copy.imageSubresource.layerCount = array_layers;
+        copy.imageOffset = {0, 0, 0};
+        copy.imageExtent = { tex.extent.width, tex.extent.height, 1 };
+
         vkCmdCopyBufferToImage(
             cmd,
             staging_buffer,
             res.image,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1,
-            &copy
-        );
-        
-        
+            &copy);
+
         if (texture_creation_info.generate_mips)
         {
-            generate_mipmaps(
-                cmd,
-                image,
-                tex.extent.width,
-                tex.extent.height,
-                mip_levels
-            );
+            generate_mipmaps(cmd, image, tex.extent.width, tex.extent.height, mip_levels);
         }
+
         if (texture_creation_info.current_layout != RBImageLayout::undefined)
         {
             ImageBarrierParams params_after_gen;
@@ -609,18 +608,13 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
 
             transition_image(cmd, params_after_gen);
         }
-        // transition_image(
-        //     cmd,
-        //     image,
-        //     RBImageUsage::TransferDst,
-        //     RBImageUsage::SampledFragment
-        // );
     });
-    
+
     vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
-    
-    LogVkImageManager.Log<Verbose>("Allocated GPU texture: %s", tex.name.c_str());
-    
+
+    LogVkImageManager.Log<Verbose>("Allocated GPU texture: %s (layers=%u)",
+        tex.name.c_str(), array_layers);
+
     return image;
 }
 

@@ -248,7 +248,7 @@ void Renderer::load_resources()
                 var_desc.size = -1;
                 var_desc.binding = current_binding;
             }
-            else if (variable.type == MaterialParamType::image)
+            else if (variable.type == MaterialParamType::image || variable.type == MaterialParamType::storage_image)
             {
                 var_desc.size = -1;
                 var_desc.binding = current_binding;
