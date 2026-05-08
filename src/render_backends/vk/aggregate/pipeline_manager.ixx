@@ -37,11 +37,13 @@ namespace vk
             vk::Instance& in_instance,
             vk::SwapchainControl& in_swapchain,
             vk::ImageManager& in_image_manager, 
-            vk::BufferManager& in_buffer_manager)
+            vk::BufferManager& in_buffer_manager,
+            vk::VkDebugObjectTracker& in_debug_object_tracker)
             : instance(in_instance)
             , swapchain(in_swapchain)
             , image_manager(in_image_manager)
             , buffer_manager(in_buffer_manager)
+            , debug_object_tracker(in_debug_object_tracker)
         {}
         
         PipelineObject* create_graphics_pipeline(const PipelineCreateDesc_Graphics& desc, RBPipelineLayout pipeline_layout);
@@ -78,6 +80,7 @@ namespace vk
         vk::SwapchainControl& swapchain;
         vk::ImageManager& image_manager;
         vk::BufferManager& buffer_manager;
+        vk::VkDebugObjectTracker& debug_object_tracker;
         
         RBPipelineLayout current_pipeline_layout = {};
         VkDescriptorSet current_descriptor_set = {};

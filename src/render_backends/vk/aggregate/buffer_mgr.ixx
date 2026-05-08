@@ -25,10 +25,11 @@ namespace vk
     {
     public:
         BufferManager(vk::Instance& in_instance, const VkDevice& in_device, const VkPhysicalDevice& in_physical_device, 
-            const vk::SwapchainControl& in_swapchain, vk::ImmediateCommandPool& in_command_pool)
+            const vk::SwapchainControl& in_swapchain, vk::ImmediateCommandPool& in_command_pool, vk::VkDebugObjectTracker& in_tracker)
             : instance(in_instance)
             , device(in_device)
             , physical_device(in_physical_device)
+            , tracker(in_tracker)
             , swapchain(in_swapchain)
             , command_pool(in_command_pool)
         {}
@@ -84,6 +85,7 @@ namespace vk
         vk::Instance& instance;
         const VkDevice& device;
         const VkPhysicalDevice& physical_device;
+        vk::VkDebugObjectTracker& tracker;
         
         const vk::SwapchainControl& swapchain;
         vk::ImmediateCommandPool& command_pool;

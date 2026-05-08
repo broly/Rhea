@@ -17,11 +17,13 @@ public:
         vk::Instance& in_instance,
         vk::SwapchainControl& in_swapchain,
         vk::BufferManager& in_buffer_manager,
+        vk::VkDebugObjectTracker& in_debug_object_tracker,
         RBPipelineLayout in_pipeline_layout)
             : instance(in_instance)
             , swapchain(in_swapchain)
             , buffer_manager(in_buffer_manager)
             , pipeline_layout(in_pipeline_layout)
+            , debug_object_tracker(in_debug_object_tracker)
     {
         
     }
@@ -79,6 +81,7 @@ public:
     vk::Instance& instance;
     vk::SwapchainControl& swapchain;
     vk::BufferManager& buffer_manager;
+    vk::VkDebugObjectTracker& debug_object_tracker;
 
     VkPipeline vk_pipeline = VK_NULL_HANDLE;
     

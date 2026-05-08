@@ -36,6 +36,7 @@ export
         uint32_t num_mip_levels = 1;
         uint32_t num_layers = 1;
         uint8_t num_frames = 1;
+        std::optional<RBImageHandle> optional_image = std::nullopt;
     };
 
 

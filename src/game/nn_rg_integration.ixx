@@ -8,27 +8,10 @@ import rhmath;
 import <vector>;
 import <map>;
 import <filesystem>;
+import :nn_ubo;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 
-
-export struct NNPassIndicesUBO
-{
-    glm::ivec2  uOutSize;
-    int32_t     _pad0[2];          // align to vec4
-
-    int32_t     uActIn[64];
-    int32_t     uActOut[64];
-    int32_t     uActRes[64];
-
-    int32_t     uPwIdx;
-    int32_t     uDwIdx;
-    int32_t     uBiasIdx;
-    int32_t     _pad1;
-};
-
-REFLECT_STRUCT(NNPassIndicesUBO,
-    uOutSize, uActIn, uActOut, uActRes, uPwIdx, uDwIdx, uBiasIdx);
 
 
 export struct NNDenoiserState
@@ -37,16 +20,18 @@ export struct NNDenoiserState
     NNWeightsIndex   weights_index;
 
     // GPU resources
-    std::vector<RGTextureHandle>            activation_textures;
-    std::vector<RBImageHandle>              pw_weight_textures;
-    std::vector<RBImageHandle>              dw_weight_textures;
-    std::vector<RBImageHandle>              bias_textures;
+    std::vector<RGTextureHandle>              activation_textures;
+    std::vector<RGTextureHandle>              pw_weight_textures;
+    std::vector<RGTextureHandle>              dw_weight_textures;
+    std::vector<RGTextureHandle>              bias_textures;
 
     std::map<Name, std::shared_ptr<PipelineFamily>> families;
 
     std::vector<NNPassIndicesUBO> pass_ubo_templates;
 
     bool initialized = false;
+    
+    RenderResource* resource;
 };
 
 namespace nn_denoiser
@@ -54,21 +39,24 @@ namespace nn_denoiser
     NNPassIndicesUBO make_ubo_from_pass_indices(const NNPassIndicesData& pi);
 
 
-    void load_nn_denoiser_schemas(NNDenoiserState& state);
+    export void load_nn_denoiser_schemas(NNDenoiserState& state);
 
-    void allocate_nn_gpu_resources(
+    export void allocate_nn_gpu_resources(
         NNDenoiserState& state,
         RenderGraph& rg,
         Renderer& renderer,
         RenderBackend& backend,
         const Extent& swapchain_extent);
-
-    void add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer);
     
-    export void init_and_add_nn_passes(
-        NNDenoiserState& state,
-        RenderGraph& rg,
-        Renderer& renderer,
-        RenderBackend& backend,
-        const Extent& swapchain_extent);
+    export void prepare_resources(
+        NNDenoiserState& state, RenderGraphContext& ctx);
+
+    export void add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer);
+    
+    // export void init_and_add_nn_passes(
+    //     NNDenoiserState& state,
+    //     RenderGraph& rg,
+    //     Renderer& renderer,
+    //     RenderBackend& backend,
+    //     const Extent& swapchain_extent);
 }

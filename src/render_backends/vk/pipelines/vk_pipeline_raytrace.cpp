@@ -30,9 +30,10 @@ VkPipelineObject_RayTrace::VkPipelineObject_RayTrace(
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
     vk::BufferManager& in_buffer_manager,
+    vk::VkDebugObjectTracker& in_debug_object_tracker,
     RBPipelineLayout pipeline_layout,
     const PipelineCreateDesc_RayTrace& desc)
-        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager, pipeline_layout)
+        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager, in_debug_object_tracker, pipeline_layout)
         , pipeline_desc(desc)
 {
     debug_name = desc.pass_name;
@@ -123,6 +124,7 @@ VkPipeline VkPipelineObject_RayTrace::create_pipeline(VkRenderPass)
         &pci,
         nullptr,
         &vk_pipeline));
+    debug_object_tracker.register_object(vk_pipeline, pipeline_desc.pass_name);
 
     LogVkPipeline.Log<Display>(
         "Created ray tracing pipeline %p (pass: %s)",

@@ -46,11 +46,16 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },
             .reads = {
-                { hdr_color_present[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::SampledFragment },
-                { hdr_color_history[COLOR_OUTPUT_HDR_BASE], RBImageUsageType::SampledFragment },                
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI], RBImageUsageType::SampledFragment },                
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_ACCUM], RBImageUsageType::SampledFragment },                
-                { hdr_color_history[COLOR_OUTPUT_HDR_RTXGI_FILTERED], RBImageUsageType::SampledFragment },           
+                { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },
+                { hdr_color_history[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI], RBImageUsageType::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_ACCUM], RBImageUsageType::SampledFragment },                
+                { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_FILTERED], RBImageUsageType::SampledFragment },        
+                { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED], RBImageUsageType::SampledFragment },
+                { nn_denoiser_state.pw_weight_textures[0] },           
+                { nn_denoiser_state.activation_textures[0] },           
+                { nn_denoiser_state.bias_textures[0] },           
+                { nn_denoiser_state.dw_weight_textures[0] },           
             },
             .writes = {
                 { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
@@ -59,7 +64,11 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             {
                 if (ctx.bind_pipeline(tonemap_pipeline))
                 {
-                    ctx.bind(hdr_color_output_resource, gbuffer_resource);
+                    ctx.bind(
+                        hdr_color_output_resource, 
+                        gbuffer_resource,
+                        nn_denoiser_state.resource
+                        );
                 }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);
@@ -135,7 +144,7 @@ void GameRenderGraph::pass_translucent(RenderGraphContext& ctx)
 
 void GameRenderGraph::pass_clouds(RenderGraphContext& ctx)
 {
-    draw_clouds(ctx, gbuffer[GBUFFER_SLOT_DEPTH], noise_texture);
+    draw_clouds(ctx, gbuffer[GBUFFER_SLOTS::DEPTH], noise_texture);
 }
 
 void GameRenderGraph::pass_tonemapping(RenderGraphContext& ctx)

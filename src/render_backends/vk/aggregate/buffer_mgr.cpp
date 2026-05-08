@@ -100,6 +100,7 @@ std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_lay
                 &alloc,
                 &set
             ));
+            tracker.register_object(set, debug_name);
             
             LogVkBufferManager.Log("allocate_descriptor_sets_for_layout. DescriptorSetLayout=%p, VkDescritorSet=%p (%s)",
                 layout_data.vk_layout, set, debug_name.to_string().c_str());
@@ -123,6 +124,7 @@ std::vector<RBDescriptorSet> vk::BufferManager::allocate_descriptor_sets_for_lay
             &alloc,
             &set
         ));
+        tracker.register_object(set, debug_name);
         
         LogVkBufferManager.Log("allocate_descriptor_sets_for_layout. DescriptorSetLayout=%p, VkDescritorSet=%p (%s)",
             layout_handle, set, debug_name.to_string().c_str());

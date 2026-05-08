@@ -205,6 +205,8 @@ RGTextureHandle RenderGraph::create_texture(const RGTextureDesc& desc)
     handle.name = desc.name;
     
     RGTexture tex {desc};
+    if (desc.optional_image.has_value())
+        tex.image = desc.optional_image;
 
     textures.push_back(std::move(tex));
     return handle;

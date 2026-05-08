@@ -24,9 +24,10 @@ VkPipelineObject_Graphics::VkPipelineObject_Graphics(
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
     vk::BufferManager& in_buffer_manager,
+    vk::VkDebugObjectTracker& in_debug_object_tracker,
     RBPipelineLayout pipeline_layout,
     const PipelineCreateDesc_Graphics& desc)
-        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager, pipeline_layout)
+        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager, in_debug_object_tracker, pipeline_layout)
         , pipeline_desc(desc)
 {
     debug_name = desc.pass_name;
@@ -235,6 +236,8 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
         &pci,
         nullptr,
         &vk_pipeline));
+    
+    debug_object_tracker.register_object(vk_pipeline, pipeline_desc.pass_name);
     
     LogVkPipeline.Log<Display>("Created graphics pipeline %p (pass: %s, pipeline_layout: %p):",
         vk_pipeline, pipeline_desc.pass_name.to_string().c_str(), pipeline_layout);

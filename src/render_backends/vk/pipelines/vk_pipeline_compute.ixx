@@ -24,6 +24,7 @@ public:
         vk::Instance& in_instance,
         vk::SwapchainControl& in_swapchain,
         vk::BufferManager& in_buffer_manager,
+        vk::VkDebugObjectTracker& in_debug_object_tracker,
         RBPipelineLayout pipeline_layout,
         const PipelineCreateDesc_Compute& desc);
 

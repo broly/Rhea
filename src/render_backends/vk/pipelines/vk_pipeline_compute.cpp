@@ -24,9 +24,10 @@ VkPipelineObject_Compute::VkPipelineObject_Compute(
     vk::Instance& in_instance,
     vk::SwapchainControl& in_swapchain,
     vk::BufferManager& in_buffer_manager,
+    vk::VkDebugObjectTracker& in_debug_object_tracker,
     RBPipelineLayout pipeline_layout,
     const PipelineCreateDesc_Compute& desc)
-        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager, pipeline_layout)
+        : VkPipelineObject(in_instance, in_swapchain, in_buffer_manager, in_debug_object_tracker, pipeline_layout)
         , pipeline_desc(desc)
 {
     debug_name = desc.pass_name;
@@ -60,6 +61,10 @@ VkPipeline VkPipelineObject_Compute::create_pipeline(VkRenderPass render_pass)
     pci.stage = stage;
     pci.layout = pipeline_layout;
 
+    LogVkPipeline.Log("Creating compute pipeline %s, layout=%p",
+        debug_name.to_string().c_str(),
+        pipeline_layout.handle);
+    
     VK_CHECK(vkCreateComputePipelines(
         instance.device,
         VK_NULL_HANDLE,
@@ -67,11 +72,12 @@ VkPipeline VkPipelineObject_Compute::create_pipeline(VkRenderPass render_pass)
         &pci,
         nullptr,
         &vk_pipeline));
+    debug_object_tracker.register_object(vk_pipeline, pipeline_desc.pass_name);
 
     LogVkPipeline.Log("Created compute pipeline %p (%s), layout=%p",
         vk_pipeline,
         debug_name.to_string().c_str(),
-        pipeline_layout);
+        pipeline_layout.handle);
 
     return vk_pipeline;
 }

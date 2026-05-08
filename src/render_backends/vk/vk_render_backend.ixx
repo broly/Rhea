@@ -177,10 +177,10 @@ public:   /// Aggregate section. These objects have same lifetime with render ba
     vk::SamplerManager sampler_manager {instance};
     vk::SwapchainControl swapchain {instance, image_manager, sampler_manager, debug, debug_object_tracker};  // holds refs
     vk::FramebufferManager framebuffer_manager{instance, image_manager};
-    vk::BufferManager buffer_manager {instance, instance.device, instance.physical_device, swapchain, immediate_command_pool}; // holds refs
+    vk::BufferManager buffer_manager {instance, instance.device, instance.physical_device, swapchain, immediate_command_pool, debug_object_tracker}; // holds refs
     vk::MeshManager mesh_manager{instance, immediate_command_pool, buffer_manager};
     vk::VertexBufferManager vertex_buffer_manager{instance.device, instance.physical_device};
-    vk::PipelineManager pipeline_manager{instance, swapchain, image_manager, buffer_manager};
+    vk::PipelineManager pipeline_manager{instance, swapchain, image_manager, buffer_manager, debug_object_tracker};
     vk::TLASManager tlas_manager{instance, immediate_command_pool, buffer_manager, mesh_manager};
     
     std::vector<std::unique_ptr<VkRenderResource>> resources;

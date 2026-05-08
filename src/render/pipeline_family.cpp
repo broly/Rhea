@@ -263,7 +263,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         return it->second;
     
     PipelineObject* result = nullptr;
-    
+        
     DefinitionMap defines;
     decode_key_to_defines(key, defines);
     
@@ -272,7 +272,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         desc.pass_name = config.pass;
         desc.permutation_value = key.key;
         desc.layout = layout_desc;
-    
+
         for (auto& resource : layout_desc.resources)
         {
             const Name resource_set_name = resource.resource->desc.set;
@@ -566,7 +566,7 @@ std::filesystem::path PipelineFamily::request_permutation(
     {
         const std::string svalue = std::holds_alternative<bool>(value) ? 
             std::to_string(std::get<bool>(value)) : std::to_string(std::get<int>(value));
-        LogPipelineFamily.Log("%s=%s", key.to_string().c_str(), svalue.c_str());
+        LogPipelineFamily.Log(" * %s=%s", key.to_string().c_str(), svalue.c_str());
     }
     
     const std::filesystem::path shaders_dir = paths::get_project_path() / "shaders";

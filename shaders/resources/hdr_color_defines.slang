@@ -15,15 +15,15 @@ static const uint NUM_COLOR_OUTPUTS = NUM_HDR_COLOR_ARRAY_ELEMENTS;
 
 enum COLOR_OUTPUT_HDR
 {
-    BASE               = 0,
-    RTXGI              = 1,
-    SSR                = 2,
-    INTERMEDIATE       = 3,
-    RESERVED_0         = 4,
-    RTXGI_REPROJECTED  = 5,
-    RTXGI_ACCUM        = 6,
-    RTXGI_MOMENTS      = 7,
-    RTXGI_FILTERED     = 8,
-    RESERVED_1         = 9,
-    RESERVED_2         = 10,
+    BASE                  = 0,
+    RTXGI                 = 1,
+    SSR                   = 2,
+    INTERMEDIATE          = 3,
+    RESERVED_0            = 4,
+    RTXGI_REPROJECTED     = 5,
+    RTXGI_ACCUM           = 6,
+    RTXGI_MOMENTS         = 7,
+    RTXGI_FILTERED        = 8,
+    RTXGI_NEURAL_DENOISED = 9,
+    RESERVED_1            = 10,
 }

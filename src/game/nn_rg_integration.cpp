@@ -20,6 +20,7 @@ NNPassIndicesUBO nn_denoiser::make_ubo_from_pass_indices(const NNPassIndicesData
         ubo.uActOut[i] = (i < int(pi.uActOut.size())) ? pi.uActOut[i] : -1;
         ubo.uActRes[i] = (i < int(pi.uActRes.size())) ? pi.uActRes[i] : -1;
     }
+    
     return ubo;
 }
 
@@ -96,23 +97,39 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
     {
         const auto& [kind, slot] = kind_slot;
         const NNWeightDesc& desc = state.weights_index.find(wname);
+
         RBImageHandle img = state.weights_index.create_gpu_texture(backend, desc);
+        RGTextureDesc tex_desc;
+        tex_desc.name = "nn_weights_" + wname + "_" + reflect::enum_name(kind_slot.first).to_string() + "_" + std::to_string(kind_slot.second);
+        tex_desc.dimension = TextureDimension::Tex2D;
+        tex_desc.extent = {desc.width, desc.height};
+        tex_desc.format = TextureFormat::RGBA16F;
+        tex_desc.imported = true;
+        tex_desc.external = false;
+        tex_desc.num_frames = 1;
+        tex_desc.num_mip_levels = 1;
+        tex_desc.swapchain_image = false;
+        tex_desc.optional_image = img;
+        
+        RGTextureHandle tex = rg.create_texture(tex_desc);
+        
 
         if (kind == NNWeightKind::pointwise)
-            state.pw_weight_textures[slot] = img;
+            state.pw_weight_textures[slot] = tex;
         else if (kind == NNWeightKind::depthwise)
-            state.dw_weight_textures[slot] = img;
+            state.dw_weight_textures[slot] = tex;
         else if (kind == NNWeightKind::bias)    
-            state.bias_textures[slot] = img;
+            state.bias_textures[slot] = tex;
         else 
             checkf(false, "Unknown weight kind: %s", reflect::enum_name(kind).to_string().c_str());
     }
 
     auto& nn_resource = renderer.find_resource_checked(Name("nn_denoiser"));
-    nn_resource.update_image_array(Name("u_nn_pw_weights"), state.pw_weight_textures);
-    nn_resource.update_image_array(Name("u_nn_dw_weights"), state.dw_weight_textures);
-    nn_resource.update_image_array(Name("u_nn_biases"),     state.bias_textures);
-
+    nn_resource.update_image_array(Name("u_nn_pw_weights"), rg.get_image_array(state.pw_weight_textures));
+    nn_resource.update_image_array(Name("u_nn_dw_weights"), rg.get_image_array(state.dw_weight_textures));
+    nn_resource.update_image_array(Name("u_nn_biases"),     rg.get_image_array(state.bias_textures));
+    
+    
     // === 4. Pre-fetch pipeline families ===
     auto nn_model = renderer.find_model(Name("nn_denoise"));
     checkf(nn_model, "MaterialModel 'nn_denoise' not found — load_schemas() didn't pick it up");
@@ -126,39 +143,60 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
     }
 }
 
+void nn_denoiser::prepare_resources(NNDenoiserState& state, RenderGraphContext& ctx)
+{
+    RenderResource* nn_resource = ctx.render_graph.renderer->find_resource(Name("nn_denoiser"));
+    
+    for (size_t pass_idx = 0; pass_idx < state.pipeline->passes.size(); ++pass_idx)
+    {
+        auto& pass = state.pipeline->passes[pass_idx];
+        const Name output_tensor_name = pass.output_tensor;
+        const NNPassIndicesUBO ubo_template = state.pass_ubo_templates[pass_idx];
+        
+        NNPassIndicesUBO ubo = ubo_template;
+        
+        
+        float out_scale = 1.0f;
+        for (const auto& t : state.pipeline->tensors)
+        {
+            if (t.name == output_tensor_name) { out_scale = t.scale; break; }
+        }
+
+        const Extent sc = ctx.backend.get_swapchain_extent();
+        ubo.uOutSize = {
+            std::max(1, int(sc.width * out_scale)),
+            std::max(1, int(sc.height * out_scale))
+        };
+        
+        auto nn_resource_instance = nn_resource->query_single(pass_idx);
+
+        nn_resource_instance->update_uniform_buffer(
+            Name("g_nn_pass_indices"), ubo, ctx.frame);
+        
+        std::vector<RBImageHandle> act_images;
+        act_images.reserve(state.activation_textures.size());
+        for (auto rg_handle : state.activation_textures)
+            act_images.push_back(ctx.render_graph.get_image(rg_handle));
+        
+        nn_resource->update_image_array(Name("u_nn_activations"), act_images, {.frame = ctx.frame}, pass_idx);
+    }
+    
+    
+
+}
+
 void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer)
 {
     RenderResource* nn_resource = renderer.find_resource(Name("nn_denoiser"));
     RenderResource* gbuffer_resource = renderer.find_resource(Name("gbuffer"));
     RenderResource* hdr_color_output = renderer.find_resource(Name("hdr_color_output"));
+    RenderResource* hdr_color_storage = renderer.find_resource(Name("hdr_color_storage"));
+    state.resource = nn_resource;
 
     for (size_t pass_idx = 0; pass_idx < state.pipeline->passes.size(); ++pass_idx)
     {
         const auto& pass = state.pipeline->passes[pass_idx];
 
-
-        std::set<int> read_slots, write_slots;
-        for (auto idx : pass.pass_indices.uActIn)  
-            if (idx >= 0) 
-                read_slots.insert(idx);
-        for (auto idx : pass.pass_indices.uActRes) 
-            if (idx >= 0) 
-                read_slots.insert(idx);
-        for (auto idx : pass.pass_indices.uActOut) 
-            if (idx >= 0) 
-                write_slots.insert(idx);
-
-        std::vector<RBImageUsage> reads, writes;
-        for (int slot : read_slots)
-        {
-            if (slot < int(state.activation_textures.size()))
-                reads.push_back({state.activation_textures[slot], RBImageUsageType::StorageImage});
-        }
-        for (int slot : write_slots)
-        {
-            if (slot < int(state.activation_textures.size()))
-                writes.push_back({state.activation_textures[slot], RBImageUsageType::StorageImage});
-        }
 
         // === Build shader key ===
         auto family_it = state.families.find(pass.pipeline_pass);
@@ -188,12 +226,37 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
         {
             if (t.name == output_tensor_name) { out_scale = t.scale; break; }
         }
+        
+        
 
+        std::set<int> read_slots, write_slots;
+        for (auto idx : pass.pass_indices.uActIn)  
+            if (idx >= 0) 
+                read_slots.insert(idx);
+        for (auto idx : pass.pass_indices.uActRes) 
+            if (idx >= 0) 
+                read_slots.insert(idx);
+        for (auto idx : pass.pass_indices.uActOut) 
+            if (idx >= 0) 
+                write_slots.insert(idx);
+
+        std::vector<RBImageUsage> reads, writes;
+        for (int slot : read_slots)
+        {
+            if (slot < int(state.activation_textures.size()))
+                reads.push_back({state.activation_textures[slot], RBImageUsageType::StorageImage});
+        }
+        for (int slot : write_slots)
+        {
+            if (slot < int(state.activation_textures.size()))
+                writes.push_back({state.activation_textures[slot], RBImageUsageType::StorageImage});
+        }
+        
         rg.add_pass({
             .name = pass_name,
             .reads = std::move(reads),
             .writes = std::move(writes),
-            .execute = [ubo_template, pass_kind, wg_size, out_scale, pso, nn_resource, gbuffer_resource, hdr_color_output, &rg, &state] (RenderGraphContext& ctx)
+            .execute = [pass_idx, ubo_template, pass_kind, wg_size, out_scale, pso, nn_resource, gbuffer_resource, hdr_color_storage, hdr_color_output, &rg, &state] (RenderGraphContext& ctx)
             {
                 NNPassIndicesUBO ubo = ubo_template;
 
@@ -203,32 +266,23 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
                     std::max(1, int(sc.height * out_scale))
                 };
 
-                nn_resource->update_uniform_buffer(
-                    Name("g_nn_pass_indices"), ubo, ctx.frame);
-
-
-                std::vector<RBImageHandle> act_images;
-                act_images.reserve(state.activation_textures.size());
-                for (auto rg_handle : state.activation_textures)
-                    act_images.push_back(rg.get_image(rg_handle));
-                nn_resource->update_image_array(Name("u_nn_activations"), act_images);
 
                 if (ctx.bind_pipeline(pso))
                 {
                     if (pass_kind == NNPassKind::input)
                     {
                         checkf(gbuffer_resource && hdr_color_output,
-                               "input pass needs gbuffer + nn_aov_extra");
-                        ctx.bind(nn_resource, gbuffer_resource, hdr_color_output);
+                               "input pass needs gbuffer + hdr_color_output");
+                        ctx.bind(nn_resource->query_single(pass_idx), gbuffer_resource, hdr_color_output);
                     }
                     else if (pass_kind == NNPassKind::head)
                     {
-                        checkf(hdr_color_output, "head pass needs nn_aov_extra");
-                        ctx.bind(nn_resource, hdr_color_output);
+                        checkf(hdr_color_output, "head pass needs hdr_color_output");
+                        ctx.bind(nn_resource->query_single(pass_idx), hdr_color_output, hdr_color_storage);
                     }
                     else
                     {
-                        ctx.bind(nn_resource);
+                        ctx.bind(nn_resource->query_single(pass_idx));
                     }
                 }
 
@@ -243,15 +297,15 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
     }
 }
 
-void nn_denoiser::init_and_add_nn_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer,
-    RenderBackend& backend, const Extent& swapchain_extent)
-{
-    if (!state.initialized)
-    {
-        load_nn_denoiser_schemas(state);
-        allocate_nn_gpu_resources(state, rg, renderer, backend, swapchain_extent);
-        state.initialized = true;
-    }
-
-    add_nn_denoiser_passes(state, rg, renderer);
-}
+// void nn_denoiser::init_and_add_nn_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer,
+//     RenderBackend& backend, const Extent& swapchain_extent)
+// {
+//     if (!state.initialized)
+//     {
+//         load_nn_denoiser_schemas(state);
+//         allocate_nn_gpu_resources(state, rg, renderer, backend, swapchain_extent);
+//         state.initialized = true;
+//     }
+//
+//     add_nn_denoiser_passes(state, rg, renderer);
+// }

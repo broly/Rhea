@@ -16,7 +16,7 @@ DEFINE_LOGGER(LogVkPipelineManager, Warning);
 
 PipelineObject* vk::PipelineManager::create_graphics_pipeline(const PipelineCreateDesc_Graphics& desc, RBPipelineLayout pipeline_layout)
 {
-    std::unique_ptr<VkPipelineObject_Graphics> pipeline = std::make_unique<VkPipelineObject_Graphics>(instance, swapchain, buffer_manager, pipeline_layout, desc);
+    std::unique_ptr<VkPipelineObject_Graphics> pipeline = std::make_unique<VkPipelineObject_Graphics>(instance, swapchain, buffer_manager,debug_object_tracker,  pipeline_layout, desc);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;
@@ -24,7 +24,7 @@ PipelineObject* vk::PipelineManager::create_graphics_pipeline(const PipelineCrea
 
 PipelineObject* vk::PipelineManager::create_compute_pipeline(const PipelineCreateDesc_Compute& desc, RBPipelineLayout pipeline_layout)
 {
-    std::unique_ptr<VkPipelineObject_Compute> pipeline = std::make_unique<VkPipelineObject_Compute>(instance, swapchain, buffer_manager, pipeline_layout, desc);
+    std::unique_ptr<VkPipelineObject_Compute> pipeline = std::make_unique<VkPipelineObject_Compute>(instance, swapchain, buffer_manager,debug_object_tracker,  pipeline_layout, desc);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;
@@ -33,7 +33,7 @@ PipelineObject* vk::PipelineManager::create_compute_pipeline(const PipelineCreat
 PipelineObject* vk::PipelineManager::create_raytrace_pipeline(const PipelineCreateDesc_RayTrace& desc,
     RBPipelineLayout pipeline_layout)
 {
-    std::unique_ptr<VkPipelineObject_RayTrace> pipeline = std::make_unique<VkPipelineObject_RayTrace>(instance, swapchain, buffer_manager, pipeline_layout, desc);
+    std::unique_ptr<VkPipelineObject_RayTrace> pipeline = std::make_unique<VkPipelineObject_RayTrace>(instance, swapchain, buffer_manager, debug_object_tracker, pipeline_layout, desc);
     PipelineObject* result = pipeline.get();
     pending_pipelines.push_back(std::move(pipeline));
     return result;
@@ -41,10 +41,6 @@ PipelineObject* vk::PipelineManager::create_raytrace_pipeline(const PipelineCrea
 
 RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayoutDesc& desc)
 {
-    if (desc.pass == "rtxgi")
-    {
-        __nop();
-    }
     VkPipelineLayout pipeline_layout;
     
     std::vector<VkDescriptorSetLayout> vk_layouts;
@@ -58,11 +54,14 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
     for (uint32_t index = 0; index <= max_index; index++)
         vk_layouts.push_back(get_empty_descriptor_set());
     
+    
     for (auto& resource_info : desc.resources)
     {
+        uint32_t resource_set = resource_info.resource->desc.set_index;
         RBDescriptorSetLayout layout_id = get_or_create_resource_descriptor_set_layout(
             (VkRenderResource*)resource_info.resource);
-        vk_layouts[resource_info.resource->desc.set_index] = buffer_manager.get_vk_descriptor_set_layout(layout_id).vk_layout;
+        vk_layouts[resource_set] = buffer_manager.get_vk_descriptor_set_layout(layout_id).vk_layout;
+        
     }
     
     VkPipelineLayoutCreateInfo plci{
@@ -76,8 +75,10 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
     std::vector<VkPushConstantRange> push_constants = vk::to_vk_ranges(desc.push_constants);
     plci.pPushConstantRanges = push_constants.data();
 
+    
     vkCreatePipelineLayout(instance.device, &plci, nullptr, &pipeline_layout);
     LogVkPipeline.Log("Created pipeline layout %s (%p)", desc.pass.to_string().c_str(), pipeline_layout);
+    debug_object_tracker.register_object(pipeline_layout, desc.pass);
     
     
     

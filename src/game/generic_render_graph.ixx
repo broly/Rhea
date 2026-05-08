@@ -34,57 +34,85 @@ struct ViewInfo
     Frustum frustum;
 };
 
-enum COLOR_OUTPUT : uint8_t
+enum class COLOR_OUTPUT_HDR : uint8_t
 {
-    COLOR_OUTPUT_HDR_BASE = 0,
-    COLOR_OUTPUT_HDR_RTXGI = 1,
-    COLOR_OUTPUT_HDR_SSR = 2,
-    COLOR_OUTPUT_HDR_INTERMEDIATE = 3,
-    COLOR_OUTPUT_HDR_RESERVED_0 = 4,
-    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED = 5,
-    COLOR_OUTPUT_HDR_RTXGI_ACCUM = 6,
-    COLOR_OUTPUT_HDR_RTXGI_MOMENTS = 7,
-    COLOR_OUTPUT_HDR_RTXGI_FILTERED = 8,
-    COLOR_OUTPUT_HDR_RESERVED_1 = 9,
-    COLOR_OUTPUT_HDR_RESERVED_2 = 10,
+    BASE = 0,
+    RTXGI = 1,
+    SSR = 2,
+    INTERMEDIATE = 3,
+    RESERVED_0 = 4,
+    RTXGI_REPROJECTED = 5,
+    RTXGI_ACCUM = 6,
+    RTXGI_MOMENTS = 7,
+    RTXGI_FILTERED = 8,
+    RTXGI_NEURAL_DENOISED = 9,
+    RESERVED_2 = 10,
     
 };
-REFLECT_ENUM(COLOR_OUTPUT,
-    COLOR_OUTPUT_HDR_BASE,
-    COLOR_OUTPUT_HDR_RTXGI,
-    COLOR_OUTPUT_HDR_SSR,
-    COLOR_OUTPUT_HDR_INTERMEDIATE,
-    COLOR_OUTPUT_HDR_RESERVED_0,
-    COLOR_OUTPUT_HDR_RTXGI_REPROJECTED,
-    COLOR_OUTPUT_HDR_RTXGI_ACCUM,
-    COLOR_OUTPUT_HDR_RTXGI_MOMENTS,
-    COLOR_OUTPUT_HDR_RTXGI_FILTERED,
-    COLOR_OUTPUT_HDR_RESERVED_1,
-    COLOR_OUTPUT_HDR_RESERVED_2);
+REFLECT_ENUM(COLOR_OUTPUT_HDR,
+    BASE,
+    RTXGI,
+    SSR,
+    INTERMEDIATE,
+    RESERVED_0,
+    RTXGI_REPROJECTED,
+    RTXGI_ACCUM,
+    RTXGI_MOMENTS,
+    RTXGI_FILTERED,
+    RTXGI_NEURAL_DENOISED,
+    RESERVED_2);
 
-enum GBUFFER_SLOTS
+enum class GBUFFER_SLOTS : uint8_t
 {
-    GBUFFER_SLOT_NORMAL = 0,
-    GBUFFER_SLOT_WORLD_NORMAL = 1,
-    GBUFFER_SLOT_DEPTH = 2,  // special
-    GBUFFER_SLOT_LINEAR_DEPTH = 3,
-    GBUFFER_SLOT_ALBEDO_ROUGHNESS = 4,
-    GBUFFER_SLOT_POSITION = 5,
-    GBUFFER_SLOT_MOTION_VECTORS = 6,
-    GBUFFER_SLOT_GEOMETRY_NORMAL = 7,
-    GBUFFER_SLOT_EMISSIVE = 8,
+    NORMAL = 0,
+    WORLD_NORMAL = 1,
+    DEPTH = 2,  // special
+    LINEAR_DEPTH = 3,
+    ALBEDO_ROUGHNESS = 4,
+    POSITION = 5,
+    MOTION_VECTORS = 6,
+    GEOMETRY_NORMAL = 7,
+    EMISSIVE = 8,
 };
 REFLECT_ENUM(GBUFFER_SLOTS,
-    GBUFFER_SLOT_NORMAL,
-    GBUFFER_SLOT_WORLD_NORMAL,
-    GBUFFER_SLOT_DEPTH,
-    GBUFFER_SLOT_LINEAR_DEPTH,
-    GBUFFER_SLOT_ALBEDO_ROUGHNESS,
-    GBUFFER_SLOT_POSITION,
-    GBUFFER_SLOT_MOTION_VECTORS,
-    GBUFFER_SLOT_GEOMETRY_NORMAL,
-    GBUFFER_SLOT_EMISSIVE)
+    NORMAL,
+    WORLD_NORMAL,
+    DEPTH,
+    LINEAR_DEPTH,
+    ALBEDO_ROUGHNESS,
+    POSITION,
+    MOTION_VECTORS,
+    GEOMETRY_NORMAL,
+    EMISSIVE)
 
+
+struct HDROutputTextureArray : std::vector<RGTextureHandle>
+{
+    using std::vector<RGTextureHandle>::vector;
+    HDROutputTextureArray() {}
+    HDROutputTextureArray(const std::vector<RGTextureHandle>& array)
+        : std::vector<RGTextureHandle>(array)
+    {}
+    using std::vector<RGTextureHandle>::operator[];
+    RGTextureHandle operator[](COLOR_OUTPUT_HDR enumerator)
+    {
+        return std::vector<RGTextureHandle>::operator[](static_cast<size_t>(enumerator));
+    }
+};
+
+struct GBufferArray : std::vector<RGTextureHandle>
+{
+    using std::vector<RGTextureHandle>::vector;
+    GBufferArray() {};
+    GBufferArray(const std::vector<RGTextureHandle>& array)
+        : std::vector<RGTextureHandle>(array)
+    {}
+    using std::vector<RGTextureHandle>::operator[];
+    RGTextureHandle operator[](GBUFFER_SLOTS enumerator)
+    {
+        return std::vector<RGTextureHandle>::operator[](static_cast<size_t>(enumerator));
+    }
+};
 
 class GenericRenderGraph : public RenderGraph
 {
@@ -139,11 +167,11 @@ public:
     RGTextureHandle noise_texture;
     RGTextureHandle swapchain_color;
     
-    std::vector<RGTextureHandle> hdr_color_present;
-    std::vector<RGTextureHandle> hdr_color_history;
+    HDROutputTextureArray hdr_color_present;
+    HDROutputTextureArray hdr_color_history;
     
-    std::vector<RGTextureHandle> gbuffer;
-    std::vector<RGTextureHandle> gbuffer_hist;
+    GBufferArray gbuffer;
+    GBufferArray gbuffer_hist;
     RGTextureHandle decal_albedo;
     
     RGTextureHandle ssr_texture;
