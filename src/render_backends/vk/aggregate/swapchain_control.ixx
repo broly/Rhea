@@ -75,8 +75,7 @@ namespace vk
         uint32_t current_frame = 0;
         
         bool framebuffer_resized = false;
-        std::vector<VkSemaphore> render_finished_per_image;
 
-        std::array<VkSemaphore, MAX_FRAMES_IN_FLIGHT> render_finished_per_frame;
+        std::vector<VkSemaphore> render_finished_per_image;
     };
 }

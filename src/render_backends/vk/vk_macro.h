@@ -13,7 +13,7 @@ import <vulkan/vulkan_core.h>;
 		if (err)                                                    \
 		{                                                           \
 			std::cout <<"Detected Vulkan error at " << __FILE__ << ":" << __LINE__ << ": " << err << std::endl; \
-			__debugbreak();                                                \
+			__debugbreak(); \
 		}                                                           \
 	} while (0)
 

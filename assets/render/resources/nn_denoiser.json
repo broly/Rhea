@@ -1,0 +1,49 @@
+{
+    "resource": {
+        "name": "nn_denoiser",
+        "usage": "persistent",
+        "set": "SET_NN_DENOISER",
+        "allowed_stages": ["compute", "fragment"],
+        "parameters": {
+            "pass_indices": {
+                "type": "uniform",
+                "ubo": "NNPassIndicesUBO",
+                "variable": "g_nn_pass_indices",
+                "binding": "BINDING_NN_PASS_INDICES"
+            },
+
+            "activations": {
+                "type": "image",
+                "variable": "u_nn_activations",
+                "binding": "BINDING_NN_ACTIVATIONS",
+                "initial_array_size": 1024,
+                "array_size_definition": "NN_NUM_ACTIVATION_SLOTS"
+            },
+
+            "pw_weights": {
+                "type": "sampler",
+                "sampler": "default",
+                "variable": "u_nn_pw_weights",
+                "binding": "BINDING_NN_PW_WEIGHTS",
+                "initial_array_size": 32,
+                "array_size_definition": "NN_NUM_PW_TEXTURES"
+            },
+            "dw_weights": {
+                "type": "sampler",
+                "sampler": "default",
+                "variable": "u_nn_dw_weights",
+                "binding": "BINDING_NN_DW_WEIGHTS",
+                "initial_array_size": 32,
+                "array_size_definition": "NN_NUM_DW_TEXTURES"
+            },
+            "biases": {
+                "type": "sampler",
+                "sampler": "default",
+                "variable": "u_nn_biases",
+                "binding": "BINDING_NN_BIASES",
+                "initial_array_size": 32,
+                "array_size_definition": "NN_NUM_BIAS_TEXTURES"
+            }
+        }
+    }
+}

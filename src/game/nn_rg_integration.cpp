@@ -14,13 +14,15 @@ NNPassIndicesUBO nn_denoiser::make_ubo_from_pass_indices(const NNPassIndicesData
     ubo.uDwIdx   = pi.uDwIdx;
     ubo.uBiasIdx = pi.uBiasIdx;
 
-    for (int i = 0; i < 32; ++i)
-    {
-        ubo.uActIn[i]  = (i < int(pi.uActIn.size()))  ? pi.uActIn[i]  : -1;
-        ubo.uActOut[i] = (i < int(pi.uActOut.size())) ? pi.uActOut[i] : -1;
-        ubo.uActRes[i] = (i < int(pi.uActRes.size())) ? pi.uActRes[i] : -1;
-    }
-    
+    auto fill = [](glm::ivec4* dst, const auto& src) {
+        for (int i = 0; i < 64; ++i) {
+            const int v = (i < int(src.size())) ? src[i] : -1;
+            dst[i >> 2][i & 3] = v;
+        }
+    };
+    fill(ubo.uActIn,  pi.uActIn);
+    fill(ubo.uActOut, pi.uActOut);
+    fill(ubo.uActRes, pi.uActRes);
     return ubo;
 }
 

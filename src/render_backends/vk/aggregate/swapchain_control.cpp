@@ -108,7 +108,13 @@ void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
                 has_swapchain_images ? std::optional{old_image_handle} : std::nullopt);
     }
     
-    render_finished_per_image.resize(swapchain_image_handles.size());
+    for (auto sem : render_finished_per_image)
+    {
+        if (sem != VK_NULL_HANDLE)
+            vkDestroySemaphore(instance.device, sem, nullptr);
+    }
+    render_finished_per_image.clear();
+    render_finished_per_image.resize(swapchain_image_handles.size(), VK_NULL_HANDLE);
 
     VkSemaphoreCreateInfo sem_ci{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 
@@ -119,6 +125,9 @@ void vk::SwapchainControl::init(VkSwapchainKHR old_swapchain)
             &sem_ci,
             nullptr,
             &render_finished_per_image[i]));
+        debug_object_tracker.register_object(
+            render_finished_per_image[i],
+            std::string("render_finished_per_image_") + std::to_string(i));
     }
 }
 
@@ -195,6 +204,8 @@ bool vk::SwapchainControl::submit_frame(
 
     VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
+    VkSemaphore signal_sem = render_finished_per_image[current_swapchain_index];
+
     VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit.waitSemaphoreCount = 1;
     submit.pWaitSemaphores = &f.image_available;
@@ -202,13 +213,13 @@ bool vk::SwapchainControl::submit_frame(
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = cmd_list.ptr<VkCommandBuffer>();
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &render_finished_per_frame[frame];
+    submit.pSignalSemaphores = &signal_sem;
 
     (vkQueueSubmit(instance.graphics_queue, 1, &submit, f.in_flight));
 
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &render_finished_per_frame[frame];
+    present.pWaitSemaphores = &signal_sem;
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain;
     present.pImageIndices = &current_swapchain_index;
@@ -262,10 +273,6 @@ void vk::SwapchainControl::create_sync_objects()
         VkSemaphore& image_available = frames[i].image_available;
         VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &image_available));
         debug_object_tracker.register_object(image_available, std::string("image_available_") + std::to_string(i));
-        
-        VkSemaphore& render_finished = render_finished_per_frame[i];
-        VK_CHECK(vkCreateSemaphore(instance.device, &sem_ci, nullptr, &render_finished));
-        debug_object_tracker.register_object(render_finished, std::string("render_finished_per_frame_") + std::to_string(i));
         
         VkFence& in_flight = frames[i].in_flight;
         VK_CHECK(vkCreateFence(instance.device, &fence_ci, nullptr, &in_flight));

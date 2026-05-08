@@ -40,17 +40,17 @@ PSOutput main(VSOutput input)
     // int2 coord = int2(input.uv * float2(32, 32));
     
     // hdr_color =  float3(width, height, 0.0); // u_nn_activations[0][coord].rgb;
-    //hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
+    hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
     // hdr_color = u_nn_pw_weights[0].Sample(input.uv).rgb;
     
     // hdr_color = u_nn_activations[0][coord].rgb;
     
-    uint w, h;
-    u_nn_activations[0].GetDimensions(w, h);
+    // uint w, h;
+    // u_nn_activations[0].GetDimensions(w, h);
     
-    int2 texel = int2(input.uv * float2(w, h));
+    // int2 texel = int2(input.uv * float2(w, h));
     
-    hdr_color = u_nn_activations[0][texel].rgb;
+    // hdr_color = u_nn_activations[0][texel].rgb;
 
     hdr_color = exposure(hdr_color);
     float3 mapped = ACES(hdr_color);

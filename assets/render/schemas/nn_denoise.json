@@ -1,0 +1,103 @@
+{
+    "model_name": "nn_denoise",
+    "permutations": {
+        "enums": {
+            "ACT": {
+                "NN_ACT_NONE": "NN_ACT_NONE",
+                "NN_ACT_GELU": "NN_ACT_GELU",
+                "NN_ACT_RELU": "NN_ACT_RELU"
+            }
+        },
+        "flags": {},
+        "variants": {
+            "IN_CH":          { "values": [3, 11, 13, 16, 32, 64, 96, 128, 192, 256], "default_index": 4 },
+            "OUT_CH":         { "values": [3, 32, 64, 128],                       "default_index": 1 },
+            "CHANNELS":       { "values": [32, 64, 128],                          "default_index": 0 },
+            "A_CHANNELS":     { "values": [32, 64, 128],                          "default_index": 0 },
+            "B_CHANNELS":     { "values": [32, 64, 128],                          "default_index": 0 },
+            "TOTAL_CHANNELS": { "values": [11, 13, 16],                           "default_index": 0 }
+        }
+    },
+    "pipelines": [
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_ENC",
+            "shader_stage": {
+                "shader": "nn_denoiser/enc.slang",
+                "resources": ["nn_denoiser"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        },
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_DEC",
+            "shader_stage": {
+                "shader": "nn_denoiser/dec.slang",
+                "resources": ["nn_denoiser"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        },
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_BOTTLENECK",
+            "shader_stage": {
+                "shader": "nn_denoiser/bottleneck.slang",
+                "resources": ["nn_denoiser"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        },
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_DOWN",
+            "shader_stage": {
+                "shader": "nn_denoiser/down.slang",
+                "resources": ["nn_denoiser"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        },
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_UP",
+            "shader_stage": {
+                "shader": "nn_denoiser/up.slang",
+                "resources": ["nn_denoiser"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        },
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_CAT",
+            "shader_stage": {
+                "shader": "nn_denoiser/cat.slang",
+                "resources": ["nn_denoiser"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        },
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_HEAD",
+            "shader_stage": {
+                "shader": "nn_denoiser/head.slang",
+                "resources": ["nn_denoiser", "hdr_color_storage", "hdr_color_output"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        },
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "NN_INPUT",
+            "shader_stage": {
+                "shader": "nn_denoiser/input.slang",
+                "resources": ["nn_denoiser", "gbuffer", "hdr_color_storage", "hdr_color_output"],
+                "lang": "slang"
+            },
+            "push_constants": []
+        }
+    ]
+}
