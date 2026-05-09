@@ -52,10 +52,6 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_ACCUM], RBImageUsageType::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_FILTERED], RBImageUsageType::SampledFragment },        
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED], RBImageUsageType::SampledFragment },
-                { nn_denoiser_state.pw_weight_textures[0] },           
-                { nn_denoiser_state.activation_textures[0] },           
-                { nn_denoiser_state.bias_textures[0] },           
-                { nn_denoiser_state.dw_weight_textures[0] },           
             },
             .writes = {
                 { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
@@ -66,9 +62,11 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 {
                     ctx.bind(
                         hdr_color_output_resource, 
-                        gbuffer_resource,
-                        nn_denoiser_state.resource
-                        );
+                        gbuffer_resource);
+                    if (nn_denoiser_state.initialized)
+                    {
+                        ctx.bind(nn_denoiser_state.resource);
+                    }
                 }
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);

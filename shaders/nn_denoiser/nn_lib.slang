@@ -181,16 +181,22 @@ void nn_pointwise_bias_act<int IN_SLICES, int OUT_CH_NUM, int ACT_KIND>(
     int   bias_idx,
     out   float result[OUT_CH_NUM])
 {
-    [ForceUnroll] for (int oc = 0; oc < OUT_CH_NUM; ++oc)
+    [ForceUnroll] 
+    for (int oc = 0; oc < OUT_CH_NUM; ++oc)
     {
         float acc = nn_load_bias(bias_idx, oc);
-        [ForceUnroll] for (int s = 0; s < IN_SLICES; ++s)
+        
+        [ForceUnroll] 
+        for (int s = 0; s < IN_SLICES; ++s)
         {
             float4 w = nn_load_pw(pw_idx, s, oc);
             acc += dot(w, dwAccum[s]);
         }
-        if (ACT_KIND == NN_ACT_GELU) acc = nn_gelu(acc);
-        else if (ACT_KIND == NN_ACT_RELU) acc = nn_relu(acc);
+        if (ACT_KIND == NN_ACT_GELU) 
+            acc = nn_gelu(acc);
+        else if (ACT_KIND == NN_ACT_RELU) 
+            acc = nn_relu(acc);
+            
         result[oc] = acc;
     }
 }
@@ -236,7 +242,8 @@ void nn_store_packed<int OUT_SLICES, int OUT_CH_NUM>(
             v.z = result[s * 4 + 2];
         if (s * 4 + 3 < OUT_CH_NUM) 
             v.w = result[s * 4 + 3];
-        nn_store_act(nn_get_act_out(s), p, v);
+        int act_index = nn_get_act_out(s);
+        nn_store_act(act_index, p, v);
     }
     
 }

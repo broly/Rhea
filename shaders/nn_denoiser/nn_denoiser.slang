@@ -71,13 +71,18 @@ struct NNPassIndicesUBO
 [[vk::binding(BINDING_NN_PASS_INDICES, SET_NN_DENOISER)]]
 ConstantBuffer<NNPassIndicesUBO> g_nn_pass_indices;
 
+#ifdef FRAGMENT_SHADER
+    #define FRAG_READ_ONLY readonly
+#else
+    #define FRAG_READ_ONLY
+#endif
 
 // -----------------------------------------------------------------------------
 // Resource arrays
 // -----------------------------------------------------------------------------
 
 [[vk::binding(BINDING_NN_ACTIVATIONS, SET_NN_DENOISER)]]
-RWTexture2D<float4> u_nn_activations[NN_NUM_ACTIVATION_SLOTS];
+FRAG_READ_ONLY RWTexture2D<float4> u_nn_activations[NN_NUM_ACTIVATION_SLOTS];
 
 [[vk::binding(BINDING_NN_PW_WEIGHTS, SET_NN_DENOISER)]]
 Sampler2D u_nn_pw_weights[NN_NUM_PW_TEXTURES];

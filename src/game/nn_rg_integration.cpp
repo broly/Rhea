@@ -198,6 +198,9 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
     for (size_t pass_idx = 0; pass_idx < state.pipeline->passes.size(); ++pass_idx)
     {
         const auto& pass = state.pipeline->passes[pass_idx];
+        
+        if (pass.is_disabled())
+            continue;
 
 
         // === Build shader key ===
@@ -297,6 +300,7 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
             .type = RenderPassType::compute
         });
     }
+    state.initialized = true;
 }
 
 // void nn_denoiser::init_and_add_nn_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer,

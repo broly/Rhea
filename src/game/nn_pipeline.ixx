@@ -17,8 +17,8 @@ export struct NNTensorDesc
     Name        name;
     uint32_t    channels = 0;
     float       scale = 1.0f;
-    uint32_t    slices = 0;                       // ceil(channels / 4)
-    std::vector<uint32_t> activation_slots;
+    uint32_t    slices = 0;
+    std::vector<uint32_t> activation_slots; 
 };
 
 REFLECT_STRUCT(NNTensorDesc,
@@ -92,6 +92,12 @@ export struct NNPassDesc
     NNPassIndicesData          pass_indices;
     NNPermutationOptions       permutation_options;
     std::vector<NNWeightRef>   weight_refs;
+    std::optional<bool> disabled = std::nullopt;
+    
+    bool is_disabled() const
+    {
+        return disabled.value_or(false);
+    }
 };
 
 REFLECT_STRUCT(NNPassDesc, 
@@ -102,7 +108,8 @@ REFLECT_STRUCT(NNPassDesc,
     workgroup_size,
     pass_indices,
     permutation_options,
-    weight_refs);
+    weight_refs,
+    disabled);
 
 
 // defines arrays sizes (NN_NUM_ACTIVATION_SLOTS, ...).

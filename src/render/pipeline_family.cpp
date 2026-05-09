@@ -357,7 +357,14 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
             PipelineStage stage;
             stage.stage = stage_info.stage;
             stage.shader = stage_info.shader.to_string();
-            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, defines, stage_info.lang).string();
+            
+            auto local_defines = defines;
+            if (stage_info.stage == ShaderStage::fragment)
+            {
+                local_defines.insert({"FRAGMENT_SHADER", 1});
+            }
+            
+            stage.compiled_shader = request_permutation(stage_info.shader.to_string(), key, local_defines, stage_info.lang).string();
             desc.stages.push_back(stage);
         }
     

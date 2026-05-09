@@ -713,9 +713,6 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .type = RenderPassType::transfer
     });
     
-    
-   //nn_denoiser::init_and_add_nn_passes(nn_denoiser_state, *this, *renderer, *renderer->get_backend(), swapchain_extent);
-    
     if (readback_nn)
     {
         add_exr_dump_pass({
@@ -797,7 +794,10 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     prepare_raytracing(ctx);
     prepare_clouds_pass(ctx);
     
-    nn_denoiser::prepare_resources(nn_denoiser_state, ctx);
+    if (enable_nn_denoiser)
+    {
+        nn_denoiser::prepare_resources(nn_denoiser_state, ctx);
+    }
 }
 
 void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
