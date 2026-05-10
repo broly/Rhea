@@ -35,11 +35,14 @@ namespace vk
         void unregister_swapchain_image(RBImageHandle image_handle);
         
         RBImageView fetch_image_view_generic(RBImageHandle image_handle, 
-            uint32_t layer_index = 0, uint32_t mip_level = 0, uint32_t num_mips = 1, bool is_cubemap = false);
+            uint32_t layer_index = 0, uint32_t mip_level = 0, 
+            uint32_t num_mips = 1, uint32_t num_layers = 1, 
+            bool is_cubemap = false, bool as_array_2d = false);
         
         vk::ImageResource& get_image_resource(RBImageHandle image_handle);
         const vk::ImageResource& get_image_resource(RBImageHandle image_handle) const;
         VkImageView get_view(RBImageHandle image_handle, uint32_t layer_index = 0, uint32_t mip_index = 0);
+        VkImageView get_array_view(RBImageHandle image_handle, uint32_t layer_index, uint32_t num_layers);     // 2D_ARRAY view of all layers
         VkImageView get_cubemap_view(RBImageHandle image_handle);
         
         RBImageHandle create_image(const RBImageDesc& desc);

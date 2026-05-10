@@ -427,11 +427,27 @@ export namespace vk
         }
     }
 
-    VkImageLayout to_final_layout(RBImageUsageType usage, bool is_swapchain)
+    // ---------------------------------------------------------------
+    // finalLayout for a render-pass attachment.
+    //
+    // We deliberately do NOT special-case swapchain images here: that is,
+    // we no longer collapse the final layout to PRESENT_SRC_KHR for them.
+    //
+    // Why: if the render pass attribute transitions a swapchain image to
+    // PRESENT_SRC_KHR via finalLayout, the engine's ImageResource::state
+    // tracking is bypassed (we only update state inside transition_image).
+    // On the next frame, transition_image sees layout=ColorAttachment in
+    // its bookkeeping, but the actual image is in PRESENT_SRC_KHR, so the
+    // emitted barrier becomes ColorAttachment->ColorAttachment (no-op) and
+    // the image is never transitioned back. Vulkan validation then fires
+    // VUID-vkCmdDraw-None-09600 (or, on older layers, the explicit
+    // image-layout-mismatch VUID for render-pass attachments).
+    //
+    // Instead the render graph emits an explicit Present transition at
+    // end-of-frame via transition_image, keeping bookkeeping and physical
+    // layout in sync.
+    VkImageLayout to_final_layout(RBImageUsageType usage, bool /*is_swapchain*/)
     {
-        if (is_swapchain)
-            return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
         switch (usage)
         {
         case RBImageUsageType::ColorAttachment:

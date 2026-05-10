@@ -93,20 +93,63 @@ void vk::ImageManager::unregister_swapchain_image(RBImageHandle image_handle)
     res.mark_destroyed();
 }
 
-RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handle, uint32_t layer_index, uint32_t mip_level, uint32_t num_mips,  bool is_cubemap)
+RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handle, 
+    uint32_t layer_index, uint32_t mip_level, 
+    uint32_t num_mips, uint32_t num_layers, bool is_cubemap, bool as_array_2d)
 {
     checkf(image_handle.id < image_resources.size(), "Unknown image id %i", image_handle.id);
     
     
     ImageResource& image_resource = image_resources[image_handle.id];
     
+    // ---------------------------------------------------------------
+    // View type selection.
+    //
+    // Three modes:
+    //   - cubemap       -> VIEW_TYPE_CUBE, layerCount=6
+    //   - as_array_2d   -> VIEW_TYPE_2D_ARRAY, layerCount=num_layers
+    //   - default       -> VIEW_TYPE_2D, layerCount=1
+    //
+    // Why as_array_2d exists:
+    //   We have two distinct array-texture use-cases:
+    //
+    //   1) ping-pong history textures (num_layers=2). The shader binding
+    //      is a flat Sampler2D / RWTexture2D, and per frame we update the
+    //      descriptor to point at a *single-layer* view (layer 0 vs
+    //      layer 1). This needs VIEW_TYPE_2D, layerCount=1.
+    //
+    //   2) NN-denoiser depthwise weights (num_layers up to 64). The
+    //      shader binding is `Sampler2DArray u_nn_dw_weights[N]` and
+    //      samples the entire array as one bound view via Load(int4(...)).
+    //      This needs VIEW_TYPE_2D_ARRAY, layerCount=num_layers.
+    //
+    // Auto-detection on num_layers alone cannot distinguish these. The
+    // caller must opt in explicitly.
+    //
+    // Mismatch is the root cause of the intermittent VK_ERROR_DEVICE_LOST
+    // we saw with the denoiser enabled: a Sampler2DArray binding fed a
+    // VIEW_TYPE_2D image view, NVIDIA driver tolerated it for a while and
+    // then crashed. The post-mortem validation noise (vkResetFences in
+    // use, semaphore pending operations, command buffers in pending state)
+    // is downstream of the lost device.
+    // ---------------------------------------------------------------
+    checkf(!(is_cubemap && as_array_2d), "as_array_2d and is_cubemap are mutually exclusive");
+
     if (is_cubemap && image_resource.has_cubemap())
         return image_resource.get_cubemap_view();
-    else if (!is_cubemap && image_resource.has_view(layer_index, mip_level))
+    else if (!is_cubemap && image_resource.has_view(layer_index, mip_level) && !as_array_2d)
         return image_resource.get_img_view(layer_index, mip_level);
     
-    checkf(image_resource.is_valid_view(layer_index, mip_level),
-        "invalid layer_index or mip_level");
+    if (!as_array_2d)
+    {
+        checkf(image_resource.is_valid_view(layer_index, mip_level),
+            "invalid layer_index or mip_level");
+    }
+    else
+    {
+        checkf(image_resource.num_layers > 0, "as_array_2d requires array image");
+        checkf(layer_index == 0, "as_array_2d view must start at layer 0");
+    }
     
     VkImage image = image_resource.image;
     
@@ -119,13 +162,27 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
 
     VkImageViewCreateInfo view_info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
     view_info.image = image;
-    view_info.viewType = is_cubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+
+    if (is_cubemap)
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    else if (as_array_2d)
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    else
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
     view_info.format = image_resource.format;
     view_info.subresourceRange = {
         aspect, 0, 1, 0, 1
     };
     
-    const uint32_t layer_count = is_cubemap ? 6 : 1;
+    uint32_t layer_count;
+    if (is_cubemap)
+        layer_count = 6;
+    else if (as_array_2d)
+        layer_count = image_resource.num_layers;
+    else
+        layer_count = 1;
+
     const uint32_t mip_level_count = num_mips == 0 ? image_resource.mip_levels : num_mips;
     const uint32_t array_layer_index = is_cubemap ? 0 : layer_index;
     
@@ -152,9 +209,11 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
     
     const Name image_view_name = image_resource.debug_name.to_string() + array_subresources + mip_subresources;
     debug_object_tracker.register_object((uint64_t)view, image_view_name);
-    
-    if (!is_cubemap)
+  
+    if (!is_cubemap && !as_array_2d)
         image_resource.set_img_view(view, layer_index, mip_level);
+    else if (as_array_2d)
+        image_resource.set_array_view(view);
     else
         image_resource.set_cubemap_img_view(view);
     
@@ -175,6 +234,21 @@ const vk::ImageResource& vk::ImageManager::get_image_resource(RBImageHandle imag
 VkImageView vk::ImageManager::get_view(RBImageHandle image_handle, uint32_t layer_index, uint32_t mip_index)
 {
     return fetch_image_view_generic(image_handle, layer_index, mip_index);
+}
+
+VkImageView vk::ImageManager::get_array_view(RBImageHandle image_handle, uint32_t layer_index, uint32_t num_layers)
+{
+    // 2D_ARRAY view spanning all layers from baseArrayLayer=0.
+    // Use this for shader bindings declared as Sampler2DArray /
+    // RWTexture2DArray, where the entire array is sampled by one bind.
+    return fetch_image_view_generic(
+        image_handle,
+        /*layer_index=*/layer_index,
+        /*mip_level=*/0,
+        /*num_mips=*/0,         // = use image's mip_levels
+        /*num_layers*/num_layers,
+        /*is_cubemap=*/false,
+        /*as_array_2d=*/true);
 }
 
 VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)
@@ -934,15 +1008,63 @@ void vk::ImageManager::transition_image(
 
     ImageSubresourceState sub = img.get_state(params.base_layer, params.base_mip);
 
-    ImageState src = to_vk_state(sub.usage, params.pass_type);
+    // Source side of the barrier: use the recorded actual stage/access of
+    // the previous transition. This is critical when the previous access was
+    // in a different pass type than the current one — for example a compute
+    // pass writing storage followed by a graphics pass sampling. Computing
+    // src from to_vk_state(sub.usage, params.pass_type) would derive the
+    // src stage from the CURRENT pass type, which is wrong: we need to
+    // synchronize against the writer's actual stage. The sub.stage/sub.access
+    // recorded by the prior transition is the truth.
+    //
+    // For dst we use the current pass type — that's the stage we're about
+    // to perform the operation in.
     ImageState dst = to_vk_state(params.dst_usage, params.pass_type);
 
     VkImageLayout old_layout = sub.layout;
     VkImageLayout new_layout = dst.layout;
 
-    // Skip barrier
+    // ----------------------------------------------------------------
+    // Decide whether we can elide the barrier entirely.
+    //
+    // Old condition (BUGGY) was: skip if old_layout == new_layout &&
+    // sub.usage == params.dst_usage. That mishandles three cases:
+    //
+    //   1) StorageImage -> StorageImage between two compute passes
+    //      (RAW/WAW/WAR with no layout change). MUST emit a barrier
+    //      with srcStage=COMPUTE, srcAccess=SHADER_STORAGE_WRITE,
+    //      dstStage=COMPUTE, dstAccess=SHADER_STORAGE_READ|WRITE.
+    //
+    //   2) TransferDst -> TransferDst (two consecutive copies into
+    //      the same image — see render_graph copy passes for ping-pong
+    //      history textures). MUST emit a transfer-write WAW barrier.
+    //
+    //   3) ColorAttachment -> ColorAttachment between two distinct
+    //      render passes that both write the same image. MUST emit
+    //      a WAW barrier.
+    //
+    // We elide the barrier only if BOTH layouts match AND usage is a
+    // pure-read kind (Sampled / SampledFragment / SampledVertex /
+    // TransferSrc) — read-after-read on the same usage truly is a no-op.
+    // ----------------------------------------------------------------
+    auto is_pure_read = [](RBImageUsageType u)
+    {
+        switch (u)
+        {
+        case RBImageUsageType::Sampled:
+        case RBImageUsageType::SampledFragment:
+        case RBImageUsageType::SampledVertex:
+        case RBImageUsageType::TransferSrc:
+        case RBImageUsageType::DepthStencilReadOnly:
+            return true;
+        default:
+            return false;
+        }
+    };
+
     if (old_layout == new_layout &&
-        sub.usage == params.dst_usage)
+        sub.usage == params.dst_usage &&
+        is_pure_read(sub.usage))
     {
         return;
     }
@@ -952,14 +1074,40 @@ void vk::ImageManager::transition_image(
     barrier.oldLayout = old_layout;
     barrier.newLayout = new_layout;
 
-    // Undefined = no dependency
+    // ----------------------------------------------------------------
+    // srcAccess / srcStage selection.
+    //
+    // The previous code used VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT for
+    // sub.usage == Undefined, with srcAccess=0. That is correct for
+    // textures the engine just created, but it is INCORRECT for
+    // swapchain images that were just acquired via vkAcquireNextImageKHR.
+    // The acquire operation is conceptually a *read* of the swapchain
+    // image at COLOR_ATTACHMENT_OUTPUT (that's what the wait-semaphore
+    // chain is set up against), and Vulkan validation explicitly flags
+    // the WRITE_AFTER_READ hazard if the layout transition's srcStage is
+    // TOP_OF_PIPE — TOP_OF_PIPE doesn't synchronize with the acquire's
+    // implicit read.
+    //
+    // Fix: when the image is a swapchain image AND prev usage is
+    // Undefined or Present, source the dependency from
+    // COLOR_ATTACHMENT_OUTPUT_BIT. The semaphore wait will resolve to
+    // the same stage on the GPU, so this is free.
+    // ----------------------------------------------------------------
+    const bool is_swapchain = img.is_swapchain_image;
+
     if (sub.usage == RBImageUsageType::Undefined)
     {
+        // No prior writer: nothing to synchronize against.
         barrier.srcAccessMask = 0;
     }
     else
     {
-        barrier.srcAccessMask = src.access;
+        // Source access bits from the previous transition's actual access mask.
+        // For an Undefined->X transition we keep srcAccess=0 (nothing to wait
+        // for). For everything else we MUST wait for the prior writer's
+        // memory writes to flush — that means using whatever access mask
+        // was recorded when the resource was last transitioned.
+        barrier.srcAccessMask = sub.access;
     }
 
     barrier.dstAccessMask = dst.access;
@@ -986,10 +1134,25 @@ void vk::ImageManager::transition_image(
     barrier.subresourceRange.baseArrayLayer = params.base_layer;
     barrier.subresourceRange.layerCount     = layer_count;
 
-    VkPipelineStageFlags src_stage =
-        (sub.usage == RBImageUsageType::Undefined)
-        ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-        : src.stage;
+    VkPipelineStageFlags src_stage;
+    if (is_swapchain &&
+        (sub.usage == RBImageUsageType::Undefined ||
+         sub.usage == RBImageUsageType::Present))
+    {
+        // Synchronize the layout transition with vkAcquireNextImageKHR's
+        // implicit read at COLOR_ATTACHMENT_OUTPUT.
+        src_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    }
+    else if (sub.usage == RBImageUsageType::Undefined)
+    {
+        src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    }
+    else
+    {
+        // Source stage from the recorded actual stage of the previous
+        // transition — NOT recomputed from the current pass type.
+        src_stage = sub.stage;
+    }
 
     VkPipelineStageFlags dst_stage = dst.stage;
 

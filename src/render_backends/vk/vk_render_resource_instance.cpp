@@ -60,15 +60,19 @@ void VkRenderResourceInstance::update_image(Name buffer_name, RBImageHandle imag
             usage,
             binding.sampler,
             update_params.layer_index,
+            update_params.array_layers,
             update_params.cubemap,
-            update_params.array_index);
+            update_params.array_index,
+            update_params.as_array_2d);
         return;
     }
     
     if (binding.parameter.type == MaterialParamType::image)
     {
         resource->backend.update_storage_image(
-            set, *binding.binding_index, image_handle, update_params.array_index);
+            set, *binding.binding_index, image_handle,
+            update_params.array_index,
+            update_params.as_array_2d);
         return;
     }
 

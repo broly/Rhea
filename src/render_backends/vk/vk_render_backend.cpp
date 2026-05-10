@@ -61,19 +61,31 @@ void VkRenderBackend::transition_image(RBCommandList cmd, const ImageBarrierPara
 
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
-                                           ResourceUsage usage, std::optional<RBSampler> sampler, uint32_t layer_index, bool cubemap, uint32_t array_index)
+                                           ResourceUsage usage, std::optional<RBSampler> sampler,
+                                           uint32_t layer_index, uint32_t layers_num, bool cubemap, uint32_t array_index,
+                                           bool as_array_2d)
 {
-    // VkDescriptorSet set = get_descriptor_set(layout, usage);
     auto used_sampler = sampler.has_value() ? VkSampler(*sampler) : sampler_manager.get_default_sampler();
-    auto image_view = cubemap ? get_cubemap_image_view(image) : get_image_view(image, layer_index);
+
+    checkf(!(cubemap && as_array_2d),
+        "update_sampled_image: cubemap and as_array_2d cannot both be set");
+
+    RBImageView image_view;
+    if (cubemap)
+        image_view = get_cubemap_image_view(image);
+    else if (as_array_2d)
+        image_view = get_array_image_view(image, layer_index, layers_num);
+    else
+        image_view = get_image_view(image, layer_index);
+
     buffer_manager.update_sampled_image(set, binding, image_view, usage, used_sampler, array_index);
-    
 }
 
-void VkRenderBackend::update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image, uint32_t array_index)
+void VkRenderBackend::update_storage_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
+                                           uint32_t array_index, bool as_array_2d)
 {
     VkDescriptorImageInfo info{};
-    info.imageView = get_image_view(image);
+    info.imageView = as_array_2d ? get_array_image_view(image) : get_image_view(image);
     info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet write{};
@@ -279,6 +291,11 @@ void VkRenderBackend::destroy_image(RBImageHandle handle, bool wait_fences)
 RBImageView VkRenderBackend::get_image_view(RBImageHandle handle, uint32_t layer_index, uint32_t mip_index)
 {
     return image_manager.get_view(handle, layer_index, mip_index);
+}
+
+RBImageView VkRenderBackend::get_array_image_view(RBImageHandle handle, uint32_t layer_index, uint32_t num_layers)
+{
+    return image_manager.get_array_view(handle, layer_index, num_layers);
 }
 
 RBImageView VkRenderBackend::get_cubemap_image_view(RBImageHandle handle)

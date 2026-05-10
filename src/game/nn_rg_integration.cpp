@@ -3,8 +3,12 @@ module game:nn_denoiser_passes;
 import :render_graph;
 import :renderer;
 import paths;
+import log;
+#include "logging/log_macro.h"
 
 #include "common/assertion_macros.h"
+
+DEFINE_LOGGER(LogNNDenoiser, Log);
 
 NNPassIndicesUBO nn_denoiser::make_ubo_from_pass_indices(const NNPassIndicesData& pi)
 {
@@ -110,8 +114,12 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
         tex_desc.external = false;
         tex_desc.num_frames = 1;
         tex_desc.num_mip_levels = 1;
+        tex_desc.num_layers = desc.depth;
         tex_desc.swapchain_image = false;
         tex_desc.optional_image = img;
+        
+        LogNNDenoiser.Log<Display>("Register weight texture '%s', w=%i,h=%i,d=%i",
+            tex_desc.name.to_string().c_str(), desc.width, desc.height, desc.depth);
         
         RGTextureHandle tex = rg.create_texture(tex_desc);
         
@@ -127,9 +135,18 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
     }
 
     auto& nn_resource = renderer.find_resource_checked(Name("nn_denoiser"));
+
     nn_resource.update_image_array(Name("u_nn_pw_weights"), rg.get_image_array(state.pw_weight_textures));
-    nn_resource.update_image_array(Name("u_nn_dw_weights"), rg.get_image_array(state.dw_weight_textures));
     nn_resource.update_image_array(Name("u_nn_biases"),     rg.get_image_array(state.bias_textures));
+
+    {
+        UpdateImageParams dw_params{};
+        dw_params.as_array_2d = true;
+        nn_resource.update_image_array(
+            Name("u_nn_dw_weights"),
+            rg.get_image_array(state.dw_weight_textures),
+            dw_params);
+    }
     
     
     // === 4. Pre-fetch pipeline families ===
@@ -271,24 +288,22 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
                     std::max(1, int(sc.height * out_scale))
                 };
 
+                ctx.bind_pipeline(pso);
 
-                if (ctx.bind_pipeline(pso))
+                if (pass_kind == NNPassKind::input)
                 {
-                    if (pass_kind == NNPassKind::input)
-                    {
-                        checkf(gbuffer_resource && hdr_color_output,
-                               "input pass needs gbuffer + hdr_color_output");
-                        ctx.bind(nn_resource->query_single(pass_idx), gbuffer_resource, hdr_color_output);
-                    }
-                    else if (pass_kind == NNPassKind::head)
-                    {
-                        checkf(hdr_color_output, "head pass needs hdr_color_output");
-                        ctx.bind(nn_resource->query_single(pass_idx), hdr_color_output, hdr_color_storage);
-                    }
-                    else
-                    {
-                        ctx.bind(nn_resource->query_single(pass_idx));
-                    }
+                    checkf(gbuffer_resource && hdr_color_output,
+                           "input pass needs gbuffer + hdr_color_output");
+                    ctx.bind(nn_resource->query_single(pass_idx), gbuffer_resource, hdr_color_output);
+                }
+                else if (pass_kind == NNPassKind::head)
+                {
+                    checkf(hdr_color_output, "head pass needs hdr_color_output");
+                    ctx.bind(nn_resource->query_single(pass_idx), hdr_color_output, hdr_color_storage);
+                }
+                else
+                {
+                    ctx.bind(nn_resource->query_single(pass_idx));
                 }
 
                 ComputeWorkgroups wg;

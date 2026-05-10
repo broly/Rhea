@@ -197,6 +197,7 @@ public:
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) = 0;
     virtual RBImageView get_image_view(RBImageHandle handle, uint32_t layer_index = 0, uint32_t mip_index = 0) = 0;
+    virtual RBImageView get_array_image_view(RBImageHandle handle, uint32_t layer_index = 0, uint32_t num_layers = 1) = 0;
     virtual RBImageView get_cubemap_image_view(RBImageHandle handle) = 0;
     virtual RBFramebufferId get_or_create_framebuffer(const FramebufferDesc& desc) = 0;
     virtual RBImageHandle get_swapchain_image(std::optional<RBFrameHandle> frame_handle = std::nullopt) const = 0;
@@ -216,15 +217,18 @@ public:
         ResourceUsage usage,
         std::optional<RBSampler> sampler,
         uint32_t layer_index = 0,
+        uint32_t layers_num = 1,
         bool cubemap = false,
-        uint32_t array_index = 0) = 0;
+        uint32_t array_index = 0, 
+        bool as_array_2d = false) = 0;
     
     
     virtual void update_storage_image(
         RBDescriptorSet set,
         uint32_t binding,
         RBImageHandle image, 
-        uint32_t array_index = 0) = 0;
+        uint32_t array_index = 0, 
+        bool as_array_2d = false) = 0;
     
     virtual void update_tlas(
         RBDescriptorSet set,

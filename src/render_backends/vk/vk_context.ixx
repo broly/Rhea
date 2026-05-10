@@ -112,6 +112,11 @@ namespace vk
             views[array_index] = view;
         }
         
+        void set_array_view(VkImageView view)
+        {
+            array_view = view;
+        }
+        
         
         bool is_swapchain_image = false;
         void set_cubemap_img_view(VkImageView view)
@@ -205,6 +210,8 @@ namespace vk
         uint32_t mip_levels = 1; 
         uint32_t num_layers = 1;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
+        
+        VkImageView array_view = VK_NULL_HANDLE;
         
         mutable std::vector<std::vector<ImageSubresourceState>> subresources;
     };

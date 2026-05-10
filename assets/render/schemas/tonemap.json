@@ -34,7 +34,13 @@
 			"front_face": "CW",
 			"compare_op": "greater",
 			"resources": [],
-			"push_constants": [],
+			"push_constants": [
+				{
+					"type": "TonemapPushConstants",
+					"name": "pc",
+					"stages": ["fragment"]
+				}
+			],
 			"translucent": false,
 			"depth_test": false,
 			"depth_write": false,

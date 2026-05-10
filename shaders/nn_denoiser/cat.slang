@@ -49,7 +49,7 @@ void main(uint3 dtid : SV_DispatchThreadID)
             nn_get_act_out(A_SLICES + s),
             p,
             nn_load_act(
-                nn_get_act_in(s), 
+                nn_get_act_res(s), 
                 p
             )
         );

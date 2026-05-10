@@ -10,6 +10,13 @@ import assets;
 import :generic_render_graph;
 #include "object/object_reflection_macro.h"
 
+struct TonemapPushConstants
+{
+    float time;
+};
+REFLECT_STRUCT_RUNTIME(TonemapPushConstants, 
+    time);
+
 
 class GameRenderGraph : public GenericRenderGraph
 {

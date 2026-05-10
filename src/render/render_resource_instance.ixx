@@ -10,6 +10,8 @@ export struct UpdateImageParams
     uint32_t layer_index = 0;
     bool cubemap = false;
     uint32_t array_index = 0;
+    uint32_t array_layers = 1;
+    bool as_array_2d = false;
 };
 
 export class RenderResourceInstance

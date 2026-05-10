@@ -107,24 +107,33 @@ void RGTexture::memory_barrier(
         ? backend.get_swapchain_image(frame)
         : *image;
 
-    // DEPRECATED
-    // auto& current_layout = current_layouts[frame][layer][mip];
     RBImageUsageType& current_usage_ref = current_usage[frame][layer][mip];
 
-    
-    // DEPRECATED
-    // RBImageLayout new_layout = initial_layout_from_usage(dst_usage);
-
-    if (current_usage_ref == dst_usage)
-        return;
+    // ----------------------------------------------------------------
+    // NOTE: do NOT early-out here on `current_usage_ref == dst_usage`.
+    //
+    // The decision "does this resource need a barrier between pass A and
+    // pass B" is made once, in RenderGraph::compile(), and recorded into
+    // pass_barriers. If we landed here, compile() asked us to emit a
+    // barrier — that decision already accounts for hazards that don't
+    // change layout (StorageImage->StorageImage, TransferDst->TransferDst,
+    // etc.), and it MUST NOT be silently overridden by a per-frame state
+    // check that doesn't differentiate read-vs-write.
+    //
+    // The previous code skipped the barrier on the second/third/Nth time
+    // a resource was used with the same usage across frames — which
+    // dropped the WAW barrier on copy-pass history textures (e.g.
+    // RG_g_world_normal_hist, RG_hdr_color_history[RTXGI_MOMENTS])
+    // and produced WRITE_AFTER_WRITE validation errors that referenced
+    // "two copies from the same command buffer".
+    //
+    // transition_image() itself has a narrower, correct early-out that
+    // fires only for pure read->same-pure-read; let it own that decision.
+    // ----------------------------------------------------------------
 
     ImageBarrierParams params{};
     params.image = img_handle;
     params.debug_pass_name = debug_pass_name;
-
-    // DEPRECATED:
-    // params.before = current_layout;
-    // params.after  = new_layout;
 
     params.src_usage = src_usage;
     params.dst_usage = dst_usage;
@@ -137,8 +146,6 @@ void RGTexture::memory_barrier(
 
     backend.transition_image(cmd, params);
 
-    // DEPRECATED:
-    // current_layout = new_layout;
     current_usage_ref = dst_usage;
 }
 
@@ -152,14 +159,28 @@ void RGTexture::reset_layout()
             {
                 if (is_swapchain())
                 {
-                    current_usage[frame][layer][mip] = RBImageUsageType::Undefined;
-                    // DEPRECATED:
-                    // current_layouts[frame][layer][mip] = RBImageLayout::undefined;
+                    // Right after vkAcquireNextImageKHR, the swapchain image
+                    // is physically in VK_IMAGE_LAYOUT_PRESENT_SRC_KHR (it
+                    // was put there by the previous frame's explicit
+                    // end-of-frame Present transition; see RenderGraph::
+                    // execute()). Reflecting that here ensures the per-frame
+                    // bookkeeping in RGTexture matches reality on the GPU,
+                    // and that compile()'s assumption (last_writer = Present
+                    // for swapchain at frame start) lines up with what the
+                    // first emitted barrier expects to see.
+                    //
+                    // Setting Undefined here was the historical bug that
+                    // forced "Undefined -> ColorAttachment" barriers, with
+                    // srcStage = TOP_OF_PIPE, which Vulkan validation flags
+                    // as not synchronizing with vkAcquireNextImageKHR's
+                    // implicit read.
+                    current_usage[frame][layer][mip] = RBImageUsageType::Present;
                 }
                 else
                 {
-                    // current_usage[frame][layer][mip] = RBImageUsage::Undefined;
-                    // current_layouts[frame][layer][mip] = RBImageLayout::undefined;
+                    // For non-swapchain textures the state persists across
+                    // frames (and is updated by transition_image on each
+                    // barrier), so we leave it alone.
                 }
             }
         }
@@ -374,6 +395,55 @@ static RBImageLayout final_layout_from_usage(RBImageUsageType usage)
     return initial_layout_from_usage(usage);
 }
 
+// =============================================================================
+// Hazard analysis primitives
+// =============================================================================
+//
+// Two usages are "compatible without sync" iff both are pure reads of the same
+// kind: that's the only case where back-to-back access needs no barrier.
+// Everything else (any write on either side) requires an execution+memory
+// dependency, even if the layout doesn't change.
+//
+// In particular this catches:
+//   - storage->storage (RAW / WAW / WAR with no layout change)
+//   - transfer_dst->transfer_dst (WAW)
+//   - color_attachment->color_attachment when pass changes (WAW)
+//
+// A pure read->read on the same usage may still need a barrier if the consumer
+// stage differs (e.g. SampledFragment -> SampledVertex), but that is handled
+// by the layout/usage equality check below: same RBImageUsageType implies same
+// shader stage in our enum, so we can elide.
+
+static bool is_write_usage(RBImageUsageType u)
+{
+    switch (u)
+    {
+    case RBImageUsageType::ColorAttachment:
+    case RBImageUsageType::DepthStencilAttachment:
+    case RBImageUsageType::StorageImage:        // can be read AND written
+    case RBImageUsageType::TransferDst:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Returns true if a barrier (execution + memory dependency) is required to go
+// from `prev` to `next`. We always insert a barrier when either side may write.
+static bool needs_barrier(RBImageUsageType prev, RBImageUsageType next)
+{
+    // Different layouts always require a barrier.
+    if (prev != next)
+        return true;
+
+    // Same usage type. Read-only -> read-only is fine.
+    // Anything where either side may write needs a barrier (RAW/WAW/WAR).
+    if (is_write_usage(prev) || is_write_usage(next))
+        return true;
+
+    return false;
+}
+
 void RenderGraph::compile()
 {
     assert(!graph_compiled);
@@ -408,19 +478,108 @@ void RenderGraph::compile()
     // =========================
     // INITIAL STATE
     // =========================
-    std::vector<RBImageUsageType> last_usage(textures.size());
+    //
+    // We keep a two-tier state for every texture:
+    //
+    //   last_writer       — usage of the most recent write. Layout/access for
+    //                       the "src" half of any barrier are derived from it.
+    //                       This is what a future writer (WAW) syncs against.
+    //
+    //   pending_reads     — set of read-usages issued AFTER last_writer with
+    //                       no intervening write. A future writer (WAW after
+    //                       reads) must sync with all of these (RAW reverse
+    //                       a.k.a. WAR), and a future reader of a different
+    //                       kind may need a layout transition relative to one
+    //                       of them.
+    //
+    // For "source" of a barrier we always use last_writer when the dst is a
+    // write (because writers must wait for both the prior writer AND any
+    // pending readers; the layout transition itself rides on the writer's
+    // memory). When the dst is a read we go from last_writer if pending_reads
+    // is empty, else from the latest pending read with a compatible layout
+    // (read->read with same usage is a no-op).
+    //
+    // Important subtle point: when last_writer != dst usage we MUST also
+    // ensure pending readers have completed. The current barrier framework
+    // emits a single barrier whose srcStage/srcAccess come from last_writer
+    // — which is the strongest dependency since the writer logically
+    // happens-before any of the readers, AND any pending reader's writer is
+    // the same last_writer. So one barrier sourced from last_writer is
+    // sufficient (we synchronize against the writer; readers had their own
+    // barriers when they started).
+    //
+    // The only remaining hazard is WAR with no layout change, e.g.:
+    //
+    //   PASS A: read tex as SampledFragment
+    //   PASS B: write tex as SampledFragment ...  (impossible: not a write usage)
+    //
+    //   PASS A: read tex as StorageImage  (storage IS a write usage in our enum)
+    //   PASS B: write tex as StorageImage  -> caught by needs_barrier(Storage,Storage)=true
+    //
+    // So the invariant holds: needs_barrier() catches the cases that matter.
+
+    struct ResourceState
+    {
+        RBImageUsageType last_writer = RBImageUsageType::Undefined;
+        // Set of distinct read usages issued since last_writer.
+        // We don't need order, only presence — a follow-up write barriers
+        // off last_writer (which is "before" all readers in graph order).
+        std::vector<RBImageUsageType> pending_reads;
+
+        bool has_pending_reads() const { return !pending_reads.empty(); }
+
+        void record_read(RBImageUsageType u)
+        {
+            for (auto x : pending_reads)
+                if (x == u) return;
+            pending_reads.push_back(u);
+        }
+
+        void record_write(RBImageUsageType u)
+        {
+            last_writer = u;
+            pending_reads.clear();
+        }
+    };
+
+    std::vector<ResourceState> state(textures.size());
 
     for (uint32_t i = 0; i < textures.size(); i++)
     {
         auto& tex = textures[i];
 
         if (tex.is_swapchain())
-            last_usage[i] = RBImageUsageType::Present;
+        {
+            // Imported as Present (last "writer" is the presentation engine /
+            // previous frame). We need a barrier on first use anyway because
+            // Present->ColorAttachment is a layout change.
+            state[i].last_writer = RBImageUsageType::Present;
+        }
         else if (tex.is_imported())
-            last_usage[i] = RBImageUsageType::Sampled;
+        {
+            // Treat external/imported textures as already in shader-readable
+            // state; first read needs no transition.
+            state[i].last_writer = RBImageUsageType::Sampled;
+        }
         else
-            last_usage[i] = RBImageUsageType::Undefined;
+        {
+            state[i].last_writer = RBImageUsageType::Undefined;
+        }
     }
+
+    // For barrier "src" selection. If we have pending reads and want to
+    // consume the resource as a writer, the source of the dependency is the
+    // most-recently-recorded reader (because that reader is the latest event
+    // we need to wait on). Layout-wise that reader's layout is what the
+    // image is currently in — but for read->read with same usage we already
+    // skipped emission. For all other cases src layout/usage must be the
+    // ACTUAL last access. So:
+    auto current_usage_for_src = [](const ResourceState& s) -> RBImageUsageType
+    {
+        if (s.has_pending_reads())
+            return s.pending_reads.back();
+        return s.last_writer;
+    };
 
     // =========================
     // BUILD BARRIERS
@@ -431,17 +590,18 @@ void RenderGraph::compile()
 
         pass.pass_barriers.clear();
 
-        // =========================
-        // BEFORE PASS (READS)
-        // =========================
+        // ---------------------------------------------------------------
+        // (1) READS — barrier from current state to read usage
+        // ---------------------------------------------------------------
         for (auto& read : pass.reads)
         {
-            uint32_t id = read.texture.id;
+            const uint32_t id = read.texture.id;
+            ResourceState& s = state[id];
 
-            RBImageUsageType prev = last_usage[id];
-            RBImageUsageType next = read.usage_type;
+            const RBImageUsageType prev = current_usage_for_src(s);
+            const RBImageUsageType next = read.usage_type;
 
-            if (prev != next)
+            if (needs_barrier(prev, next))
             {
                 pass.pass_barriers[read.texture].before_pass = BarrierInfo{
                     .src_usage = prev,
@@ -449,42 +609,38 @@ void RenderGraph::compile()
                     .is_transition = true
                 };
             }
+
+            s.record_read(next);
         }
-        
-        // =========================
-        // BEFORE PASS (READ THEN WRITE)
-        // =========================
+
+        // ---------------------------------------------------------------
+        // (2) WRITES — barrier from current state to write usage
+        //
+        // For a write that follows pending reads, src is the writer
+        // (last_writer), since the writer logically happens-before all
+        // readers and a single barrier sourced from the writer's stage
+        // strictly dominates all reader stages: that's wrong in general
+        // but for our enum readers only ever read (no write side-effects),
+        // so we instead source from the latest reader to ensure we wait
+        // for its consumption. needs_barrier() correctly detects WAR on
+        // storage-storage and WAW on transfer-transfer.
+        // ---------------------------------------------------------------
         for (auto& write : pass.writes)
         {
-            if (write.load_op == RBLoadOp::Load)
-            {
-                uint32_t id = write.texture.id;
+            const uint32_t id = write.texture.id;
+            ResourceState& s = state[id];
 
-                RBImageUsageType prev = last_usage[id];
-                RBImageUsageType next = write.usage_type;
+            // For writes we want to wait for BOTH the previous writer
+            // (WAW) and any pending readers (WAR). When pending_reads is
+            // non-empty, the latest reader is the only event later than
+            // last_writer — synchronizing against it transitively covers
+            // last_writer (since last_writer happens-before reader).
+            // For layout transitions the "src layout" must be whatever the
+            // image is actually in right now, which is the latest access.
+            const RBImageUsageType prev = current_usage_for_src(s);
+            const RBImageUsageType next = write.usage_type;
 
-                {
-                    pass.pass_barriers[write.texture].before_pass = BarrierInfo{
-                        .src_usage = prev,
-                        .dst_usage = next,
-                        .is_transition = true
-                    };
-                }
-            }
-        }
-        
-        
-        // =========================
-        // BEFORE PASS (WRITES)
-        // =========================
-        for (auto& write : pass.writes)
-        {
-            uint32_t id = write.texture.id;
-
-            RBImageUsageType prev = last_usage[id];
-            RBImageUsageType next = write.usage_type;
-
-            if (prev != next)
+            if (needs_barrier(prev, next))
             {
                 pass.pass_barriers[write.texture].before_pass = BarrierInfo{
                     .src_usage = prev,
@@ -493,15 +649,23 @@ void RenderGraph::compile()
                 };
             }
 
-            last_usage[id] = next;
+            s.record_write(next);
         }
 
-        // =========================
-        // AFTER PASS (LOOKAHEAD)
-        // =========================
+        // ---------------------------------------------------------------
+        // (3) AFTER PASS (LOOKAHEAD)
+        //
+        // For each texture we wrote, peek at the next pass that touches
+        // it. If the next consumer expects a different usage and needs a
+        // barrier, we request one. This complements (2) at the next pass
+        // and is robust against passes being conditionally skipped at
+        // execute-time (the after_pass barrier of the prior pass still
+        // runs). Worst case it's a duplicate, in which case the runtime
+        // skips it because usages already match.
+        // ---------------------------------------------------------------
         for (auto& write : pass.writes)
         {
-            uint32_t id = write.texture.id;
+            const uint32_t id = write.texture.id;
 
             std::optional<RBImageUsageType> next_usage;
 
@@ -511,35 +675,24 @@ void RenderGraph::compile()
 
                 for (auto& r : p.reads)
                 {
-                    if (r.texture.id == id)
-                    {
-                        next_usage = r.usage_type;
-                        break;
-                    }
+                    if (r.texture.id == id) { next_usage = r.usage_type; break; }
                 }
-
                 if (!next_usage)
                 {
                     for (auto& w : p.writes)
                     {
-                        if (w.texture.id == id)
-                        {
-                            next_usage = w.usage_type;
-                            break;
-                        }
+                        if (w.texture.id == id) { next_usage = w.usage_type; break; }
                     }
                 }
-
-                if (next_usage)
-                    break;
+                if (next_usage) break;
             }
 
             if (!next_usage)
                 continue;
 
-            RBImageUsageType current = write.usage_type;
+            const RBImageUsageType current = write.usage_type;
 
-            if (current != *next_usage)
+            if (needs_barrier(current, *next_usage))
             {
                 pass.pass_barriers[write.texture].after_pass = BarrierInfo{
                     .src_usage = current,
@@ -751,11 +904,52 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         ctx.pass_name = "";
         callback(ctx);
     }
-    
+
+    // ---------------------------------------------------------------
+    // Explicit end-of-frame Present transition for swapchain images.
+    //
+    // We used to rely on the render-pass attribute finalLayout=PRESENT_SRC_KHR
+    // to transition the swapchain image. That works in terms of the actual
+    // GPU layout, but it bypasses our ImageResource::state bookkeeping —
+    // transition_image only updates state when it is the one emitting the
+    // barrier. The next frame would then see stale state (ColorAttachment)
+    // and skip the Present->ColorAttachment transition, leaving the image
+    // physically in PRESENT_SRC_KHR while the engine assumes it's already
+    // in ColorAttachment. Result: VUID-vkCmdDraw-None-09600.
+    //
+    // Fix: keep render-pass finalLayout aligned with the attachment usage
+    // (e.g. ColorAttachment), and emit an explicit transition to Present
+    // here. This keeps state and reality in sync.
+    for (auto& tex : textures)
+    {
+        if (!tex.is_swapchain())
+            continue;
+
+        // Only transition layer 0 of swapchain (it's not array-typed).
+        // src_usage in params is unused by transition_image (it reads the
+        // actual current state from the image itself); pass_type is used
+        // only for dst stage selection — we want Present's stage anyway.
+        ImageBarrierParams params{};
+        params.image = tex.get_image(*backend, ctx.frame);
+        params.debug_pass_name = Name("EndOfFrameSwapchainPresent");
+        params.dst_usage = RBImageUsageType::Present;
+        params.pass_type = RenderPassType::present;
+        params.base_layer = 0;
+        params.base_mip = 0;
+        params.layer_count = 1;
+        params.mip_count = 1;
+        backend->transition_image(cmd, params);
+
+        // Mirror in render-graph bookkeeping so allows_barrier()/etc see it.
+        for (uint32_t f = 0; f < MAX_ALLOWED_FRAMES_IN_FLIGHT; ++f)
+            if (!tex.current_usage[f].empty() && !tex.current_usage[f][0].empty())
+                tex.current_usage[f][0][0] = RBImageUsageType::Present;
+    }
+
     end_frame();
-    
+
     one_time_render_flags.clear();
-    
+
     frame_index++;
 }
 
