@@ -83,9 +83,39 @@ float nn_normalize_depth(float depth, float near_v, float far_v)
     return (log(d) - log(near_v)) / (log(far_v) - log(near_v));
 }
 
-int nn_get_act_in (int s) { return g_nn_pass_indices.uActIn [s >> 2][s & 3]; }
-int nn_get_act_out(int s) { return g_nn_pass_indices.uActOut[s >> 2][s & 3]; }
-int nn_get_act_res(int s) { return g_nn_pass_indices.uActRes[s >> 2][s & 3]; }
+int nn_get_act_in(int s)
+{
+    int4 v = u_nn_pass_indices[nn_pass_pc.pass_idx].uActIn[s >> 2];
+    int  c = s & 3;
+    // Replace dynamic component access with static branches.
+    // SPIR-V cbuffer requires constant component index for vectors;
+    // expanding the switch makes the access a static OpCompositeExtract
+    // for each branch and lets ForceUnroll fully unroll the calling loop.
+    if (c == 0) return v.x;
+    if (c == 1) return v.y;
+    if (c == 2) return v.z;
+    return v.w;
+}
+
+int nn_get_act_out(int s)
+{
+    int4 v = u_nn_pass_indices[nn_pass_pc.pass_idx].uActOut[s >> 2];
+    int  c = s & 3;
+    if (c == 0) return v.x;
+    if (c == 1) return v.y;
+    if (c == 2) return v.z;
+    return v.w;
+}
+
+int nn_get_act_res(int s)
+{
+    int4 v = u_nn_pass_indices[nn_pass_pc.pass_idx].uActRes[s >> 2];
+    int  c = s & 3;
+    if (c == 0) return v.x;
+    if (c == 1) return v.y;
+    if (c == 2) return v.z;
+    return v.w;
+}
 
 
 // -----------------------------------------------------------------------------

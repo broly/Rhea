@@ -42,7 +42,7 @@ PipelineObject* vk::PipelineManager::create_raytrace_pipeline(const PipelineCrea
 RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayoutDesc& desc)
 {
     VkPipelineLayout pipeline_layout;
-    
+
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
     std::vector<VkRenderResourceInfo> prepared_info;
@@ -242,34 +242,47 @@ void vk::PipelineManager::bind_descriptor_set(RBCommandList cmd_list, int set_in
     PROFILE("bind_descriptor_set");
     
     VkDescriptorSet vk_set = rb_descriptors.as<VkDescriptorSet>();
-    
-    if (vk_set == current_descriptor_set)
+
+    // Bind point comes from the currently-bound pipeline object. If no
+    // pipeline is currently bound there is nothing meaningful to bind a
+    // descriptor set to anyway, so assert.
+    checkf(current_pipeline_object != nullptr,
+        "bind_descriptor_set called with no pipeline bound");
+
+    const VkPipelineBindPoint bind_point = current_pipeline_object->get_bind_point();
+
+    // Per-(bind_point, set_index) early-out. Vulkan tracks separate bind
+    // tables per bind point: binding to graphics doesn't affect compute,
+    // so the cache key must include the bind point.
+    const BindKey key{ bind_point, uint32_t(set_index) };
+    auto it = current_descriptor_sets.find(key);
+    if (it != current_descriptor_sets.end() && it->second == vk_set)
         return;
-    
+
     LogVkPipelineManager.Log("bind_descriptor_set. cmd: %p, descriptor_set: %p, pipeline_layout: %p (%s)",
         cmd_list, rb_descriptors, current_pipeline_layout, debug_name.to_string().c_str());
-    
-    current_descriptor_set = vk_set;
-    
+
+    current_descriptor_sets[key] = vk_set;
+
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    
+
     auto vk_pipeline_layout = current_pipeline_layout.as<VkPipelineLayout>();
-    
+
     auto& inst_data = instance_data[vk_pipeline_layout];
     auto& desc_set_layout = inst_data.desc_set_layouts[set_index];
-    
+
     checkf(desc_set_layout != *empty_descriptor_set,
         "Could not bind descriptor set, because it is not provided for this pipeline layout. "
         "Check this callstack to detect resource name and check the configs");
-    
+
     {
         PROFILE("vkCmdBindDescriptorSets");
         vkCmdBindDescriptorSets(
             cmd,
-            current_pipeline_object->get_bind_point(),
+            bind_point,
             vk_pipeline_layout,
-            set_index, 
-            1, 
+            set_index,
+            1,
             &vk_set,
             0, nullptr
         );
@@ -302,8 +315,62 @@ void vk::PipelineManager::bind_pipeline(RBCommandList cmd_list, PipelineObject* 
     checkf(pipeline_vk != VK_NULL_HANDLE, "pipeline not created");
     
     vkCmdBindPipeline(cmd, vk_pipeline_object->get_bind_point(), pipeline_vk);
-    
-    current_pipeline_layout = pipeline_object->get_layout();
+
+    // ----------------------------------------------------------------
+    // Pipeline layout compatibility — descriptor set bind cache.
+    //
+    // Vulkan keeps descriptor sets attached to a bind point only as long
+    // as subsequent pipelines on that bind point use a *compatible*
+    // pipeline layout. Two layouts are compatible for a given set N only
+    // if they share the same push-constant ranges AND identical
+    // descriptor set layouts for sets 0..N. As soon as we bind a
+    // pipeline whose layout is NOT bit-equal to the previously bound
+    // layout, we must conservatively assume the bind table for this bind
+    // point has been invalidated, and force every subsequent
+    // bind_descriptor_set to actually emit a vkCmdBindDescriptorSets.
+    //
+    // We previously cached "current_descriptor_set" globally and so this
+    // worked by accident — every subsequent set had a different vk_set
+    // handle from the cached one and therefore still got rebound. Once
+    // we made the cache per (bind_point, set_index), the cache started
+    // surviving pipeline-layout changes, leaving sets bound under the
+    // OLD layout when the NEW pipeline expected the NEW layout. The
+    // validator catches this as VUID-vkCmdDispatch-None-08600 with
+    // messages like "all sets 0 to N are not compatible with the
+    // pipeline layout bound with vkCmdBindDescriptorSets", or "set N is
+    // out of bounds for the number of sets bound".
+    //
+    // The fix: when the new pipeline's layout differs from the
+    // previously bound layout for this same bind point, drop all cached
+    // entries for this bind point. Same-layout rebinds (e.g. successive
+    // NN_ENC compute passes that share NN_ENC layout but use different
+    // descriptor sets per pass_idx) keep the cache and avoid redundant
+    // vkCmdBindDescriptorSets calls.
+    // ----------------------------------------------------------------
+    const VkPipelineBindPoint bind_point = vk_pipeline_object->get_bind_point();
+    const RBPipelineLayout new_layout = pipeline_object->get_layout();
+
+    auto it_prev_layout = last_layout_per_bind_point.find(bind_point);
+    const bool layout_changed =
+        it_prev_layout == last_layout_per_bind_point.end() ||
+        it_prev_layout->second.as<VkPipelineLayout>() != new_layout.as<VkPipelineLayout>();
+
+    if (layout_changed)
+    {
+        // Drop only the bind-table cache for this bind point. Other bind
+        // points (graphics vs compute vs raytrace) have independent
+        // tables and are unaffected.
+        for (auto it = current_descriptor_sets.begin(); it != current_descriptor_sets.end(); )
+        {
+            if (it->first.bind_point == bind_point)
+                it = current_descriptor_sets.erase(it);
+            else
+                ++it;
+        }
+        last_layout_per_bind_point[bind_point] = new_layout;
+    }
+
+    current_pipeline_layout = new_layout;
     current_pipeline_object = vk_pipeline_object;
 }
 
@@ -311,6 +378,12 @@ void vk::PipelineManager::invalidate_pipeline_layout()
 {
     current_pipeline_layout = RBPipelineLayout();
     current_pipeline_object = nullptr;
+
+    // Forget cached descriptor-set bindings as well — anything we
+    // recorded as "currently bound" was bound on a previous command
+    // buffer or render pass and is no longer in effect.
+    current_descriptor_sets.clear();
+    last_layout_per_bind_point.clear();
 }
 
 void vk::PipelineManager::update_buffers()

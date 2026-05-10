@@ -2,6 +2,7 @@ import resources.hdr_color_output;
 import resources.gbuffer;
 import utils.tonemapping;
 import nn_denoiser.nn_denoiser;
+import utils.draw_number;
 
 static const float NEAR = 0.5f;
 static const float FAR  = 2000.0f;
@@ -26,10 +27,23 @@ struct PSOutput
     [[vk::location(0)]] float4 color : SV_Target0;
 };
 
+struct PushConstants
+{
+    float time;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<PushConstants> pc;
+
 [shader("fragment")]
 PSOutput main(VSOutput input)
 {
     float3 hdr_color;
+    
+    float time_clamped = (int)max(pc.time - 20.0, 0.0);
+    int index = 0;
+    
+    
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI>(input.uv).rgb;
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_FILTERED>(input.uv).rgb;
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_REPROJECTED>(input.uv).rgb;
@@ -40,19 +54,52 @@ PSOutput main(VSOutput input)
     // int2 coord = int2(input.uv * float2(32, 32));
     
     // hdr_color =  float3(width, height, 0.0); // u_nn_activations[0][coord].rgb;
-    // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
-    // hdr_color = u_nn_biases[17].Sample(input.uv).rgb;
+    hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
     
-    // hdr_color = u_nn_activations[0][coord].rgb;
     
-    uint w, h;
-    u_nn_activations[8].GetDimensions(w, h);
     
-    int2 texel = int2(input.uv * float2(w, h));
+    // {
+    //      index = min((int)time_clamped, NN_NUM_DW_TEXTURES);
+    //      int depth_index = 0;// (int)time_clamped;
+    //      int array_layer_index = index;
+    //      
+    //      uint width, height, depth;
+    //      u_nn_dw_weights[array_layer_index].GetDimensions(width, height, depth);
+    //      int4 coord = int4((int)(input.uv.x*width), (int)(input.uv.y*height), depth_index, 0);
+    //      hdr_color = u_nn_dw_weights[array_layer_index].Load(coord).rgb;
+    //      hdr_color = DrawNumber99(input.uv, hdr_color, depth, float2(0.12, 0.42), 0.08, float3(1.0, 0.7, 0.1));
+    // }
+    // {
+    //      index = min((int)time_clamped, NN_NUM_PW_TEXTURES - 1);
+    //      uint width, height;
+    //      u_nn_pw_weights[index].GetDimensions(width, height);
+    //      int3 coord = int3((int)(input.uv.x*width), (int)(input.uv.y*height), 0);
+    //      hdr_color = u_nn_pw_weights[index].Load(coord).rgb;
+    // }
+    // {
+    //      index = min((int)time_clamped, NN_NUM_BIAS_TEXTURES);
+    //      uint width, height;
+    //      u_nn_biases[index].GetDimensions(width, height);
+    //      int3 coord = int3((int)(input.uv.x*width), (int)(input.uv.y*height), 0);
+    //      hdr_color = u_nn_biases[index].Load(coord).rgb;
+    // }
     
-    hdr_color = u_nn_activations[8][texel].rgb;
-
+    
+    {
+        index = min((int)time_clamped, NN_NUM_ACTIVATION_SLOTS - 1);
+        uint w, h;
+        u_nn_activations[index].GetDimensions(w, h);
+        
+        int2 texel = int2(input.uv * float2(w, h));
+        
+        hdr_color = u_nn_activations[index][texel].rgb;
+        
+    }
+    
     hdr_color = exposure(hdr_color);
+    
+    hdr_color = DrawNumber99(input.uv, hdr_color, index, float2(0.12), 0.08, float3(1.0, 0.2, 0.1));
+    
     float3 mapped = ACES(hdr_color);
     mapped = gamma(mapped);
 

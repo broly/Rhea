@@ -6,10 +6,10 @@
         "allowed_stages": ["compute", "fragment"],
         "parameters": {
             "pass_indices": {
-                "type": "uniform",
-                "ubo": "NNPassIndicesUBO",
-                "variable": "g_nn_pass_indices",
-                "binding": "BINDING_NN_PASS_INDICES"
+                "type": "ssbo",
+                "variable": "u_nn_pass_indices",
+                "binding": "BINDING_NN_PASS_INDICES",
+                "initial_buffer_size": 16000
             },
 
             "activations": {

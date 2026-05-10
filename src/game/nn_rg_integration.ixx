@@ -27,7 +27,7 @@ export struct NNDenoiserState
 
     std::map<Name, std::shared_ptr<PipelineFamily>> families;
 
-    std::vector<NNPassIndicesUBO> pass_ubo_templates;
+    std::vector<NNPassIndicesSSBO> pass_ubo_templates;
 
     bool initialized = false;
     
@@ -36,7 +36,7 @@ export struct NNDenoiserState
 
 namespace nn_denoiser
 {
-    NNPassIndicesUBO make_ubo_from_pass_indices(const NNPassIndicesData& pi);
+    NNPassIndicesSSBO make_ubo_from_pass_indices(const NNPassIndicesData& pi);
 
 
     export void load_nn_denoiser_schemas(NNDenoiserState& state);

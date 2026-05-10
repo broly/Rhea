@@ -19,9 +19,26 @@ export class RenderResourceInstance
 public:
     virtual ~RenderResourceInstance() {}
     
+    struct CachedTypedUBOCopy
+    {
+        
+    };
+    
+    template<typename T>
+    struct TCachedTypedUBOCopy : public CachedTypedUBOCopy
+    {
+        TCachedTypedUBOCopy(const T& in_data) 
+            : data(in_data)
+        {}
+        T data;
+    };
+    
+    std::map<Name, std::unique_ptr<CachedTypedUBOCopy>> CachedUBO;
+    
     template<typename T>
     void update_uniform_buffer(Name buffer_name, const T& data, RBFrameHandle frame)
     {
+        CachedUBO[buffer_name] = std::make_unique<TCachedTypedUBOCopy<T>>(data);
         update_uniform_buffer_impl(buffer_name, sizeof(T), (void*)&data, frame);
     }
     

@@ -104,3 +104,69 @@ float3 DrawNumber99(
     // alpha blend over background
     return lerp(background, color, mask);
 }
+
+// Draw number over existing image
+float3 DrawNumber9999(
+    float2 uv,
+    float3 background,
+    int number,
+    float2 screenPos, // 0..1
+    float scale,
+    float3 color)
+{
+    number = clamp(number, 0, 9999);
+
+    int d0 = (number / 1000) % 10;
+    int d1 = (number / 100)  % 10;
+    int d2 = (number / 10)   % 10;
+    int d3 =  number % 10;
+
+    // local space
+    float2 p = uv;
+    p.y = 1.0 - p.y;
+
+    p -= screenPos;
+
+    // aspect correction
+    p.x *= 16.0 / 9.0;
+
+    p /= scale;
+
+    float mask = 0.0;
+
+    // spacing between digits
+    float spacing = 0.42;
+
+    // digit 1 (thousands)
+    {
+        float2 d = p;
+        d.x += spacing * 3.0;
+        mask += DrawDigit(d, d0);
+    }
+
+    // digit 2 (hundreds)
+    {
+        float2 d = p;
+        d.x += spacing;
+        mask += DrawDigit(d, d1);
+    }
+
+    // digit 3 (tens)
+    {
+        float2 d = p;
+        d.x -= spacing;
+        mask += DrawDigit(d, d2);
+    }
+
+    // digit 4 (ones)
+    {
+        float2 d = p;
+        d.x -= spacing * 3.0;
+        mask += DrawDigit(d, d3);
+    }
+
+    mask = saturate(mask);
+
+    // alpha blend over background
+    return lerp(background, color, mask);
+}

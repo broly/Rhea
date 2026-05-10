@@ -23,9 +23,11 @@ static const int OUT_SLICES = (OUT_CH + 3) / 4;
 void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
-    if (p.x >= g_nn_pass_indices.uOutSize.x || p.y >= g_nn_pass_indices.uOutSize.y) return;
+    int2 out_size = get_nn_out_size();
+    if (p.x >= out_size.x || p.y >= out_size.y) 
+        return;
 
-    NNBilinearTaps taps = nn_bilinear_taps(p, g_nn_pass_indices.uOutSize / 2);
+    NNBilinearTaps taps = nn_bilinear_taps(p, out_size / 2);
 
     float4 upsampled[IN_SLICES];
     [ForceUnroll] 
@@ -43,8 +45,8 @@ void main(uint3 dtid : SV_DispatchThreadID)
     float result[OUT_CH];
     nn_pointwise_bias_act<IN_SLICES, OUT_CH, NN_ACT_NONE>(
         upsampled,
-        g_nn_pass_indices.uPwIdx,
-        g_nn_pass_indices.uBiasIdx,
+        get_nn_pointwise_index(),
+        get_nn_bias_index(),
         result);
 
     nn_store_packed<OUT_SLICES, OUT_CH>(p, result);

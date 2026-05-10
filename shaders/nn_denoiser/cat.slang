@@ -27,7 +27,8 @@ static const int B_SLICES = (B_CHANNELS + 3) / 4;
 void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
-    if (p.x >= g_nn_pass_indices.uOutSize.x || p.y >= g_nn_pass_indices.uOutSize.y) 
+    int2 out_size = get_nn_out_size();
+    if (p.x >= out_size.x || p.y >= out_size.y) 
         return;
 
     [ForceUnroll]

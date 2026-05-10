@@ -27,7 +27,13 @@
                 "resources": ["nn_denoiser"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         },
         {
             "__type__": "PipelineInfo_Compute",
@@ -37,7 +43,13 @@
                 "resources": ["nn_denoiser"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         },
         {
             "__type__": "PipelineInfo_Compute",
@@ -47,7 +59,13 @@
                 "resources": ["nn_denoiser"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         },
         {
             "__type__": "PipelineInfo_Compute",
@@ -57,7 +75,13 @@
                 "resources": ["nn_denoiser"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         },
         {
             "__type__": "PipelineInfo_Compute",
@@ -67,7 +91,13 @@
                 "resources": ["nn_denoiser"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         },
         {
             "__type__": "PipelineInfo_Compute",
@@ -77,7 +107,13 @@
                 "resources": ["nn_denoiser"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         },
         {
             "__type__": "PipelineInfo_Compute",
@@ -87,7 +123,13 @@
                 "resources": ["nn_denoiser", "hdr_color_storage", "hdr_color_output"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         },
         {
             "__type__": "PipelineInfo_Compute",
@@ -97,7 +139,13 @@
                 "resources": ["nn_denoiser", "gbuffer", "hdr_color_storage", "hdr_color_output"],
                 "lang": "slang"
             },
-            "push_constants": []
+            "push_constants": [
+                {
+                    "type": "NNPassPC",
+                    "name": "nn_pass_pc",
+                    "stages": ["compute"]
+                }
+            ]
         }
     ]
 }

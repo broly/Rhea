@@ -33,21 +33,23 @@ static const int SEPCONV_OUT_SLICES = (OUT_CH + 3) / 4;
 void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
-    if (p.x >= g_nn_pass_indices.uOutSize.x || p.y >= g_nn_pass_indices.uOutSize.y) return;
+    int2 out_size = get_nn_out_size();
+    if (p.x >= out_size.x || p.y >= out_size.y) 
+        return;
 
     // Depthwise 3x3
     float4 dwAccum[SEPCONV_IN_SLICES];
     nn_depthwise_3x3<SEPCONV_IN_SLICES>(
-        p, g_nn_pass_indices.uOutSize,
-        g_nn_pass_indices.uDwIdx,
+        p, get_nn_out_size(),
+        get_nn_depthwise_index(),
         dwAccum);
 
     // Pointwise + bias + activation
     float result[OUT_CH];
     nn_pointwise_bias_act<SEPCONV_IN_SLICES, OUT_CH, ACT>(
         dwAccum,
-        g_nn_pass_indices.uPwIdx,
-        g_nn_pass_indices.uBiasIdx,
+        get_nn_pointwise_index(),
+        get_nn_bias_index(),
         result);
 
 #if ADD_RESIDUAL
@@ -55,4 +57,6 @@ void main(uint3 dtid : SV_DispatchThreadID)
 #endif
 
     nn_store_packed<SEPCONV_OUT_SLICES, OUT_CH>(p, result);
+    
+    
 }

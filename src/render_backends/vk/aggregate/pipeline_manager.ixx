@@ -83,7 +83,52 @@ namespace vk
         vk::VkDebugObjectTracker& debug_object_tracker;
         
         RBPipelineLayout current_pipeline_layout = {};
-        VkDescriptorSet current_descriptor_set = {};
+
+        // ----------------------------------------------------------------
+        // Per-(bind_point, set_index) descriptor set caching.
+        //
+        // Vulkan keeps INDEPENDENT bind tables for VK_PIPELINE_BIND_POINT_
+        // GRAPHICS, _COMPUTE, _RAY_TRACING_KHR. Binding a descriptor set
+        // for compute does NOT affect the graphics bind table, and vice
+        // versa. The early-out for "skip rebinding the same descriptor set"
+        // therefore must be keyed by (bind_point, set_index), not by a
+        // single global slot.
+        //
+        // Old code used a single `VkDescriptorSet current_descriptor_set`
+        // globally. Symptom: a graphics pass binds set 6 = X. Then a
+        // compute pass binds set 6 = X. Old code sees X == X and skips
+        // the rebind — but the compute bind table actually has nothing in
+        // slot 6, so the compute shader reads UNDEFINED descriptor data.
+        // For the NN denoiser this manifested as activations [3..N] being
+        // black: the input pass thought it had set 6 bound while the
+        // compute pipeline didn't, so its writes went into whatever
+        // (uninitialised / different) descriptor was actually in compute
+        // slot 6.
+        // ----------------------------------------------------------------
+        struct BindKey
+        {
+            VkPipelineBindPoint bind_point;
+            uint32_t            set_index;
+            bool operator==(const BindKey& o) const noexcept
+            {
+                return bind_point == o.bind_point && set_index == o.set_index;
+            }
+        };
+        struct BindKeyHash
+        {
+            size_t operator()(const BindKey& k) const noexcept
+            {
+                return std::hash<uint32_t>{}(uint32_t(k.bind_point)) * 0x9E3779B1u
+                     ^ std::hash<uint32_t>{}(k.set_index);
+            }
+        };
+        std::unordered_map<BindKey, VkDescriptorSet, BindKeyHash> current_descriptor_sets;
+
+        // Last bound pipeline layout per bind point, used to invalidate
+        // current_descriptor_sets when a layout change disturbs the bind
+        // table. See bind_pipeline() for the reasoning.
+        std::unordered_map<VkPipelineBindPoint, RBPipelineLayout> last_layout_per_bind_point;
+
         VkPipelineObject* current_pipeline_object = nullptr;
         
         

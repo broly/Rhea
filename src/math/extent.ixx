@@ -50,6 +50,11 @@ export struct Extent
         return Extent{(uint32_t)(width * m), (uint32_t)(height * m)};
     }
     
+    constexpr operator glm::ivec2() const
+    {
+        return glm::ivec2{width, height};
+    }
+    
     constexpr bool is_zero() const
     {
         return width == 0 || height == 0;

@@ -24,7 +24,11 @@ static const int IN_SLICES = (IN_CH + 3) / 4;
 void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
-    if (p.x >= g_nn_pass_indices.uOutSize.x || p.y >= g_nn_pass_indices.uOutSize.y) return;
+    
+    int2 out_size = get_nn_out_size(pass_index);
+    
+    if (p.x >= out_size.x || p.y >= out_size.y) 
+        return;
 
     float4 feat[IN_SLICES];
     
@@ -39,11 +43,11 @@ void main(uint3 dtid : SV_DispatchThreadID)
     [ForceUnroll] 
     for (int oc = 0; oc < 3; ++oc)
     {
-        float acc = nn_load_bias(g_nn_pass_indices.uBiasIdx, oc);
+        float acc = nn_load_bias(get_nn_bias_index(), oc);
         [ForceUnroll] 
         for (int s = 0; s < IN_SLICES; ++s)
         {
-            float4 w = nn_load_pw(g_nn_pass_indices.uPwIdx, s, oc);
+            float4 w = nn_load_pw(get_nn_pointwise_index(), s, oc);
             acc += dot(w, feat[s]);
         }
         if      (oc == 0) residual.r = acc;

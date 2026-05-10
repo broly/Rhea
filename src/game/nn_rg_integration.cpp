@@ -10,10 +10,9 @@ import log;
 
 DEFINE_LOGGER(LogNNDenoiser, Log);
 
-NNPassIndicesUBO nn_denoiser::make_ubo_from_pass_indices(const NNPassIndicesData& pi)
+NNPassIndicesSSBO nn_denoiser::make_ubo_from_pass_indices(const NNPassIndicesData& pi)
 {
-    NNPassIndicesUBO ubo{};
-    ubo.uOutSize = {0, 0};
+    NNPassIndicesSSBO ubo{};
     ubo.uPwIdx   = pi.uPwIdx;
     ubo.uDwIdx   = pi.uDwIdx;
     ubo.uBiasIdx = pi.uBiasIdx;
@@ -148,6 +147,8 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
             dw_params);
     }
     
+    nn_resource.update_ssbo(Name("u_nn_pass_indices"), state.pass_ubo_templates);
+    
     
     // === 4. Pre-fetch pipeline families ===
     auto nn_model = renderer.find_model(Name("nn_denoise"));
@@ -170,9 +171,9 @@ void nn_denoiser::prepare_resources(NNDenoiserState& state, RenderGraphContext& 
     {
         auto& pass = state.pipeline->passes[pass_idx];
         const Name output_tensor_name = pass.output_tensor;
-        const NNPassIndicesUBO ubo_template = state.pass_ubo_templates[pass_idx];
+        const NNPassIndicesSSBO ubo_template = state.pass_ubo_templates[pass_idx];
         
-        NNPassIndicesUBO ubo = ubo_template;
+        NNPassIndicesSSBO ubo = ubo_template;
         
         
         float out_scale = 1.0f;
@@ -182,22 +183,14 @@ void nn_denoiser::prepare_resources(NNDenoiserState& state, RenderGraphContext& 
         }
 
         const Extent sc = ctx.backend.get_swapchain_extent();
-        ubo.uOutSize = {
-            std::max(1, int(sc.width * out_scale)),
-            std::max(1, int(sc.height * out_scale))
-        };
-        
-        auto nn_resource_instance = nn_resource->query_single(pass_idx);
 
-        nn_resource_instance->update_uniform_buffer(
-            Name("g_nn_pass_indices"), ubo, ctx.frame);
         
         std::vector<RBImageHandle> act_images;
         act_images.reserve(state.activation_textures.size());
         for (auto rg_handle : state.activation_textures)
             act_images.push_back(ctx.render_graph.get_image(rg_handle));
         
-        nn_resource->update_image_array(Name("u_nn_activations"), act_images, {.frame = ctx.frame}, pass_idx);
+        nn_resource->update_image_array(Name("u_nn_activations"), act_images, {});
     }
     
     
@@ -237,7 +230,7 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
         checkf(pso != nullptr, "Failed to create PSO for pass %s",
                pass.name.to_string().c_str());
 
-        const NNPassIndicesUBO ubo_template = state.pass_ubo_templates[pass_idx];
+        const NNPassIndicesSSBO ubo_template = state.pass_ubo_templates[pass_idx];
         const NNPassKind pass_kind = pass.kind;
         const Name pass_name = pass.name;
         const std::vector<int32_t> wg_size = pass.workgroup_size;
@@ -280,13 +273,15 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
             .writes = std::move(writes),
             .execute = [pass_idx, ubo_template, pass_kind, wg_size, out_scale, pso, nn_resource, gbuffer_resource, hdr_color_storage, hdr_color_output, &rg, &state] (RenderGraphContext& ctx)
             {
-                NNPassIndicesUBO ubo = ubo_template;
-
                 const Extent sc = ctx.backend.get_swapchain_extent();
-                ubo.uOutSize = {
-                    std::max(1, int(sc.width * out_scale)),
-                    std::max(1, int(sc.height * out_scale))
+                
+                
+                Extent size = {
+                    (uint32_t)std::max(1, int(sc.width * out_scale)),
+                    (uint32_t)std::max(1, int(sc.height * out_scale))
                 };
+
+                nn_resource->update_ssbo_element("u_nn_pass_indices", state.pass_ubo_templates[pass_idx], pass_idx);
 
                 ctx.bind_pipeline(pso);
 
@@ -294,39 +289,34 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
                 {
                     checkf(gbuffer_resource && hdr_color_output,
                            "input pass needs gbuffer + hdr_color_output");
-                    ctx.bind(nn_resource->query_single(pass_idx), gbuffer_resource, hdr_color_output);
+                    ctx.bind(nn_resource, gbuffer_resource, hdr_color_output);
                 }
                 else if (pass_kind == NNPassKind::head)
                 {
                     checkf(hdr_color_output, "head pass needs hdr_color_output");
-                    ctx.bind(nn_resource->query_single(pass_idx), hdr_color_output, hdr_color_storage);
+                    ctx.bind(nn_resource, hdr_color_output, hdr_color_storage);
                 }
                 else
                 {
-                    ctx.bind(nn_resource->query_single(pass_idx));
+                    ctx.bind(nn_resource);
                 }
 
                 ComputeWorkgroups wg;
-                wg.x = (ubo.uOutSize.x + wg_size[0] - 1) / wg_size[0];
-                wg.y = (ubo.uOutSize.y + wg_size[1] - 1) / wg_size[1];
+                wg.x = (size.width + wg_size[0] - 1) / wg_size[0];
+                wg.y = (size.height + wg_size[1] - 1) / wg_size[1];
                 wg.z = wg_size[2];
+                
+                NNPassPC pc;
+                pc.out_size = size;
+                pc.pass_idx = pass_idx;
+                
+                ctx.push_constants(pc);
                 ctx.compute(wg);
             },
             .type = RenderPassType::compute
         });
     }
+    
+    
     state.initialized = true;
 }
-
-// void nn_denoiser::init_and_add_nn_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer,
-//     RenderBackend& backend, const Extent& swapchain_extent)
-// {
-//     if (!state.initialized)
-//     {
-//         load_nn_denoiser_schemas(state);
-//         allocate_nn_gpu_resources(state, rg, renderer, backend, swapchain_extent);
-//         state.initialized = true;
-//     }
-//
-//     add_nn_denoiser_passes(state, rg, renderer);
-// }

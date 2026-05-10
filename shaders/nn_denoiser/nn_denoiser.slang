@@ -53,10 +53,10 @@
 
 
 // Changes every dispatch
-struct NNPassIndicesUBO
+struct NNPassIndicesSSBO
 {
-    int2 uOutSize;
     int2 _pad0;
+    int2 _pad1;
 
     int4 uActIn [16];
     int4 uActOut[16];
@@ -65,11 +65,40 @@ struct NNPassIndicesUBO
     int  uPwIdx;
     int  uDwIdx;
     int  uBiasIdx;
-    int  _pad1;
+    int  _pad2;
 };
 
 [[vk::binding(BINDING_NN_PASS_INDICES, SET_NN_DENOISER)]]
-ConstantBuffer<NNPassIndicesUBO> g_nn_pass_indices;
+StructuredBuffer<NNPassIndicesSSBO> u_nn_pass_indices;
+
+struct NNPassPC
+{
+    int2 out_size;
+    uint32_t pass_idx;
+};
+[[vk::push_constant]]
+NNPassPC nn_pass_pc;
+
+int2 get_nn_out_size()
+{
+    return nn_pass_pc.out_size;
+};
+
+int get_nn_pointwise_index()
+{
+    return u_nn_pass_indices[nn_pass_pc.pass_idx].uPwIdx;
+}
+
+int get_nn_depthwise_index()
+{
+    return u_nn_pass_indices[nn_pass_pc.pass_idx].uDwIdx;
+};
+
+
+int get_nn_bias_index()
+{
+    return u_nn_pass_indices[nn_pass_pc.pass_idx].uPwIdx;
+}
 
 #ifdef FRAGMENT_SHADER
     #define FRAG_READ_ONLY readonly

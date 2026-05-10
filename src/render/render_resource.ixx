@@ -112,11 +112,24 @@ public:
         query_single(instance_id)->update_ssbo(buffer_name, size, data, frame);
     }
     
+    template<typename T>
+    void update_ssbo(Name buffer_name, const std::vector<T>& buffer, std::optional<RBFrameHandle> frame = std::nullopt, uint32_t instance_id = 0)
+    {
+        query_single(instance_id)->update_ssbo(buffer_name, buffer.size(), (void*)buffer.data(), frame);
+    }
+    
     void update_ssbo_element(Name buffer_name, size_t element_size, uint32_t index, const void* data, std::optional<RBFrameHandle> frame = std::nullopt, uint32_t instance_id = 0)
     {
         query_single(instance_id)->update_ssbo_element(buffer_name, element_size, index, data, frame);
     }
+    
+    template<typename T>
+    void update_ssbo_element(Name buffer_name, const T& elem, uint32_t index, std::optional<RBFrameHandle> frame = std::nullopt, uint32_t instance_id = 0)
+    {
+        query_single(instance_id)->update_ssbo_element(buffer_name, sizeof(elem), index, (void*)&elem, frame);
+    }
 
+    
     virtual std::shared_ptr<RenderResourceInstance> query_single(uint32_t instance_id = 0) = 0;
     virtual std::shared_ptr<RenderResourceInstance> query_unique(uint32_t unique_id, uint32_t instance_id) = 0;
 
