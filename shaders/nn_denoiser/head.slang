@@ -25,7 +25,7 @@ void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
     
-    int2 out_size = get_nn_out_size(pass_index);
+    int2 out_size = get_nn_out_size();
     
     if (p.x >= out_size.x || p.y >= out_size.y) 
         return;
@@ -44,15 +44,19 @@ void main(uint3 dtid : SV_DispatchThreadID)
     for (int oc = 0; oc < 3; ++oc)
     {
         float acc = nn_load_bias(get_nn_bias_index(), oc);
+        
         [ForceUnroll] 
         for (int s = 0; s < IN_SLICES; ++s)
         {
             float4 w = nn_load_pw(get_nn_pointwise_index(), s, oc);
             acc += dot(w, feat[s]);
         }
-        if      (oc == 0) residual.r = acc;
-        else if (oc == 1) residual.g = acc;
-        else              residual.b = acc;
+        if (oc == 0) 
+            residual.r = acc;
+        else if (oc == 1) 
+            residual.g = acc;
+        else              
+            residual.b = acc;
     }
 
     float3 baseline = nn_load_act(nn_get_act_res(0), p).rgb;
