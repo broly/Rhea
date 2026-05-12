@@ -30,18 +30,18 @@ int2 nn_clamp_coord(int2 p, int2 sz) { return clamp(p, int2(0), sz - int2(1)); }
 // Pointwise: 4 weights for in_ch=[4*ic_div4..+3] -> oc.
 float4 nn_load_pw(int pw_idx, int ic_div4, int oc)
 {
-    return u_nn_pw_weights[pw_idx].Load(int3(ic_div4, oc, 0));
+    return denoiser.u_nn_pw_weights[pw_idx].Load(int3(ic_div4, oc, 0));
 }
 
 // Depthwise: 4 weights for chans [4*ic_div4..+3] in pos (kx, ky).
 float4 nn_load_dw(int dw_idx, int kx, int ky, int ic_div4)
 {
-    return u_nn_dw_weights[dw_idx].Load(int4(kx + 1, ky + 1, ic_div4, 0));
+    return denoiser.u_nn_dw_weights[dw_idx].Load(int4(kx + 1, ky + 1, ic_div4, 0));
 }
 
 float nn_load_bias(int bias_idx, int oc)
 {
-    float4 b4 = u_nn_biases[bias_idx].Load(int3(oc >> 2, 0, 0));
+    float4 b4 = denoiser.u_nn_biases[bias_idx].Load(int3(oc >> 2, 0, 0));
     return b4[oc & 3];
 }
 
@@ -52,13 +52,12 @@ float nn_load_bias(int bias_idx, int oc)
 
 float4 nn_load_act(int act_idx, int2 p)
 {
-    return u_nn_activations[act_idx][p];
+    return denoiser.u_nn_activations[act_idx][p];
 }
 
 void nn_store_act(int act_idx, int2 p, float4 v)
 {
-    u_nn_activations[act_idx][p] = v;
-    
+    denoiser.u_nn_activations[act_idx][p] = v;
 }
 
 
@@ -85,7 +84,7 @@ float nn_normalize_depth(float depth, float near_v, float far_v)
 
 int nn_get_act_in(int s)
 {
-    int4 v = u_nn_pass_indices[nn_pass_pc.pass_idx].uActIn[s >> 2];
+    int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActIn[s >> 2];
     int  c = s & 3;
     // Replace dynamic component access with static branches.
     // SPIR-V cbuffer requires constant component index for vectors;
@@ -99,7 +98,7 @@ int nn_get_act_in(int s)
 
 int nn_get_act_out(int s)
 {
-    int4 v = u_nn_pass_indices[nn_pass_pc.pass_idx].uActOut[s >> 2];
+    int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActOut[s >> 2];
     int  c = s & 3;
     if (c == 0) return v.x;
     if (c == 1) return v.y;
@@ -109,12 +108,60 @@ int nn_get_act_out(int s)
 
 int nn_get_act_res(int s)
 {
-    int4 v = u_nn_pass_indices[nn_pass_pc.pass_idx].uActRes[s >> 2];
+    int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActRes[s >> 2];
     int  c = s & 3;
     if (c == 0) return v.x;
     if (c == 1) return v.y;
     if (c == 2) return v.z;
     return v.w;
+}
+
+
+// -----------------------------------------------------------------------------
+// Head-pass helper: load 3 channels (an AOV's RGB) from input_packed,
+// allowing the channel triple to straddle slice boundaries.
+//
+// flat_ch is the flat channel index into input_packed where the AOV's
+// R component starts. The 3 channels are then at flat_ch, flat_ch+1,
+// flat_ch+2 — each of which decodes to (slot, component) via /4 and %4.
+//
+// uActRes for the head pass is populated by build_pass_indices() with
+// the list of input_packed slot ids (one entry per slice of
+// input_packed), so uActRes[(flat_ch+k)/4] gives the correct slot for
+// the k-th channel of the triple.
+// -----------------------------------------------------------------------------
+float3 nn_load_packed_rgb(int flat_ch, int2 p)
+{
+    float3 result;
+    [ForceUnroll]
+    for (int k = 0; k < 3; ++k)
+    {
+        int ch        = flat_ch + k;
+        int slice_idx = ch >> 2;
+        int comp_idx  = ch & 3;
+        int slot      = nn_get_act_res(slice_idx);
+        float4 v      = nn_load_act(slot, p);
+        float scalar;
+        if      (comp_idx == 0) scalar = v.x;
+        else if (comp_idx == 1) scalar = v.y;
+        else if (comp_idx == 2) scalar = v.z;
+        else                    scalar = v.w;
+
+        if      (k == 0) result.r = scalar;
+        else if (k == 1) result.g = scalar;
+        else             result.b = scalar;
+    }
+    return result;
+}
+
+int get_nn_baseline_flat_ch()
+{
+    return denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uBaselineFlatCh;
+}
+
+int get_nn_albedo_flat_ch()
+{
+    return denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uAlbedoFlatCh;
 }
 
 
@@ -153,6 +200,12 @@ float4 nn_bilinear_apply(float4 v00, float4 v10, float4 v01, float4 v11, float2 
 // GENERIC COMPUTE PRIMITIVES
 // =============================================================================
 
+bool nn_inside(int2 p, int2 sz)
+{
+    return p.x >= 0 && p.y >= 0 &&
+           p.x < sz.x && p.y < sz.y;
+}
+
 // -----------------------------------------------------------------------------
 // Depthwise 3x3 for tensor, packed to IN_SLICES vec4-slices.
 //
@@ -180,6 +233,12 @@ void nn_depthwise_3x3<int IN_SLICES>(
             for (int s = 0; s < IN_SLICES; ++s)
             {
                 float4 a = nn_load_act(nn_get_act_in(s), q);
+                // float4 a = float4(0,0,0,0);
+                
+                // if (nn_inside(q, out_size))
+                // {
+                //     a = nn_load_act(nn_get_act_in(s), q);
+                // }   
                 float4 w = nn_load_dw(dw_idx, kx, ky, s);
                 dwAccum[s] += a * w;
             }
@@ -226,7 +285,7 @@ void nn_pointwise_bias_act<int IN_SLICES, int OUT_CH_NUM, int ACT_KIND>(
             acc = nn_gelu(acc);
         else if (ACT_KIND == NN_ACT_RELU) 
             acc = nn_relu(acc);
-            
+               
         result[oc] = acc;
     }
 }

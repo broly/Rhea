@@ -16,6 +16,8 @@ NNPassIndicesSSBO nn_denoiser::make_ubo_from_pass_indices(const NNPassIndicesDat
     ubo.uPwIdx   = pi.uPwIdx;
     ubo.uDwIdx   = pi.uDwIdx;
     ubo.uBiasIdx = pi.uBiasIdx;
+    ubo.uAlbedoFlatCh = pi.uAlbedoFlatCh;
+    ubo.uBaselineFlatCh = pi.uBaselineFlatCh;
 
     auto fill = [](glm::ivec4* dst, const auto& src) {
         for (int i = 0; i < 64; ++i) {
@@ -294,7 +296,7 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
                 else if (pass_kind == NNPassKind::head)
                 {
                     checkf(hdr_color_output, "head pass needs hdr_color_output");
-                    ctx.bind(nn_resource, hdr_color_output, hdr_color_storage);
+                    ctx.bind(gbuffer_resource, nn_resource, hdr_color_output, hdr_color_storage);
                 }
                 else
                 {

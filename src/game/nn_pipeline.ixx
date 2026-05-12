@@ -38,6 +38,8 @@ export struct NNPassIndicesData
     int32_t uPwIdx   = -1;             // pointwise weight slot
     int32_t uDwIdx   = -1;             // depthwise weight slot
     int32_t uBiasIdx = -1;             // bias slot
+    int32_t uAlbedoFlatCh   = -1;
+    int32_t uBaselineFlatCh = -1;
 };
 
 REFLECT_STRUCT(NNPassIndicesData,
@@ -46,7 +48,9 @@ REFLECT_STRUCT(NNPassIndicesData,
     uActRes,
     uPwIdx,
     uDwIdx,
-    uBiasIdx);
+    uBiasIdx,
+    uAlbedoFlatCh,
+    uBaselineFlatCh);
 
 
 export struct NNWeightRef

@@ -41,16 +41,36 @@ static const float CLAMP_MAX_F  = float(CLAMP_MAX);
 
 static const int OUT_SLICES = (TOTAL_CHANNELS + 3) / 4;
 
+int nn_reflect_101(int x, int size)
+{
+    if (x < 0)
+        return -x;
+
+    if (x >= size)
+        return 2 * size - x - 2;
+
+    return x;
+}
+
+int2 nn_reflect_coord(int2 p, int2 size)
+{
+    return int2(
+        nn_reflect_101(p.x, size.x),
+        nn_reflect_101(p.y, size.y)
+    );
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
-    int2 out_size = get_nn_out_size();
+    int2 out_size = denoiser.get_nn_out_size();
     if (p.x >= out_size.x || p.y >= out_size.y) return;
 
-    float2 uv = (float2(p) + 0.5) / float2(get_nn_out_size());
-
+    float2 uv = (float2(p) + 0.5) / float2(denoiser.get_nn_out_size());
+    // int2 rp = nn_reflect_coord(p, out_size);
+    // float2 uv = (float2(rp) + 0.5) / float2(out_size);
 
     // === Read AOVs ===
     float3 noisy   = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI, 0>(uv).rgb;

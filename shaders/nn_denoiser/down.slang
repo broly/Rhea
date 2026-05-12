@@ -18,7 +18,7 @@ void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
     
-    int2 out_size = get_nn_out_size();
+    int2 out_size = denoiser.get_nn_out_size();
     
     if (p.x >= out_size.x || p.y >= out_size.y) 
         return;

@@ -120,7 +120,7 @@
             "pass": "NN_HEAD",
             "shader_stage": {
                 "shader": "nn_denoiser/head.slang",
-                "resources": ["nn_denoiser", "hdr_color_storage", "hdr_color_output"],
+                "resources": ["nn_denoiser", "hdr_color_storage", "hdr_color_output", "gbuffer"],
                 "lang": "slang"
             },
             "push_constants": [

@@ -23,7 +23,7 @@ static const int OUT_SLICES = (OUT_CH + 3) / 4;
 void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
-    int2 out_size = get_nn_out_size();
+    int2 out_size = denoiser.get_nn_out_size();
     if (p.x >= out_size.x || p.y >= out_size.y) 
         return;
 
@@ -45,8 +45,8 @@ void main(uint3 dtid : SV_DispatchThreadID)
     float result[OUT_CH];
     nn_pointwise_bias_act<IN_SLICES, OUT_CH, NN_ACT_NONE>(
         upsampled,
-        get_nn_pointwise_index(),
-        get_nn_bias_index(),
+        denoiser.get_nn_pointwise_index(),
+        denoiser.get_nn_bias_index(),
         result);
 
     nn_store_packed<OUT_SLICES, OUT_CH>(p, result);

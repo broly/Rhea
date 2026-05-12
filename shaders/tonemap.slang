@@ -40,7 +40,7 @@ PSOutput main(VSOutput input)
 {
     float3 hdr_color;
     
-    float time_clamped = (int)max(pc.time - 20.0, 0.0);
+    float time_clamped = max(pc.time - 20, 0.0) * 2;
     int index = 0;
     
     
@@ -85,20 +85,27 @@ PSOutput main(VSOutput input)
     // }
     
     
-    {
-        index = min((int)time_clamped, NN_NUM_ACTIVATION_SLOTS - 1);
-        uint w, h;
-        u_nn_activations[index].GetDimensions(w, h);
-        
-        int2 texel = int2(input.uv * float2(w, h));
-        
-        hdr_color = u_nn_activations[index][texel].rgb;
-        
-    }
-    
+    // {
+    //     index = min((int)(time_clamped), NN_NUM_ACTIVATION_SLOTS - 1);
+    //     uint w, h;
+    //     u_nn_activations[index].GetDimensions(w, h);
+    //     
+    //     int2 texel = int2(input.uv * float2(w, h));
+    //     
+    //     
+    //     hdr_color = u_nn_activations[index][texel].rgb;
+    //     
+    // }
+    //{
+    //    uint w, h;
+    //    u_nn_activations[515].GetDimensions(w, h);
+    //    int2 texel = int2(input.uv * float2(w, h));
+    //    hdr_color = u_nn_activations[514][texel].rgb;
+  //
+    //}
     hdr_color = exposure(hdr_color);
     
-    hdr_color = DrawNumber99(input.uv, hdr_color, index, float2(0.12), 0.08, float3(1.0, 0.2, 0.1));
+    hdr_color = DrawNumber9999(input.uv, hdr_color, index, float2(0.12), 0.08, float3(1.0, 0.2, 0.1));
     
     float3 mapped = ACES(hdr_color);
     mapped = gamma(mapped);

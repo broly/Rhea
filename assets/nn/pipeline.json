@@ -772,7 +772,9 @@
         "uActRes": [],
         "uPwIdx": -1,
         "uDwIdx": -1,
-        "uBiasIdx": -1
+        "uBiasIdx": -1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -811,7 +813,9 @@
         "uActRes": [],
         "uPwIdx": 0,
         "uDwIdx": 0,
-        "uBiasIdx": 0
+        "uBiasIdx": 0,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -874,7 +878,9 @@
         "uActRes": [],
         "uPwIdx": 1,
         "uDwIdx": 1,
-        "uBiasIdx": 1
+        "uBiasIdx": 1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -937,7 +943,9 @@
         "uActRes": [],
         "uPwIdx": -1,
         "uDwIdx": -1,
-        "uBiasIdx": -1
+        "uBiasIdx": -1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -989,7 +997,9 @@
         "uActRes": [],
         "uPwIdx": 2,
         "uDwIdx": 2,
-        "uBiasIdx": 2
+        "uBiasIdx": 2,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -1068,7 +1078,9 @@
         "uActRes": [],
         "uPwIdx": 3,
         "uDwIdx": 3,
-        "uBiasIdx": 3
+        "uBiasIdx": 3,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -1147,7 +1159,9 @@
         "uActRes": [],
         "uPwIdx": -1,
         "uDwIdx": -1,
-        "uBiasIdx": -1
+        "uBiasIdx": -1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -1223,7 +1237,9 @@
         "uActRes": [],
         "uPwIdx": 4,
         "uDwIdx": 4,
-        "uBiasIdx": 4
+        "uBiasIdx": 4,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -1334,7 +1350,9 @@
         "uActRes": [],
         "uPwIdx": 5,
         "uDwIdx": 5,
-        "uBiasIdx": 5
+        "uBiasIdx": 5,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -1445,7 +1463,9 @@
         "uActRes": [],
         "uPwIdx": -1,
         "uDwIdx": -1,
-        "uBiasIdx": -1
+        "uBiasIdx": -1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -1537,7 +1557,9 @@
         "uActRes": [],
         "uPwIdx": 6,
         "uDwIdx": 6,
-        "uBiasIdx": 6
+        "uBiasIdx": 6,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -1681,7 +1703,9 @@
         ],
         "uPwIdx": 7,
         "uDwIdx": 7,
-        "uBiasIdx": 7
+        "uBiasIdx": 7,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -1792,7 +1816,9 @@
         "uActRes": [],
         "uPwIdx": 8,
         "uDwIdx": -1,
-        "uBiasIdx": 8
+        "uBiasIdx": 8,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -1961,7 +1987,9 @@
         ],
         "uPwIdx": -1,
         "uDwIdx": -1,
-        "uBiasIdx": -1
+        "uBiasIdx": -1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -2086,7 +2114,9 @@
         "uActRes": [],
         "uPwIdx": 9,
         "uDwIdx": 8,
-        "uBiasIdx": 9
+        "uBiasIdx": 9,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -2197,7 +2227,9 @@
         "uActRes": [],
         "uPwIdx": 10,
         "uDwIdx": 9,
-        "uBiasIdx": 10
+        "uBiasIdx": 10,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -2292,7 +2324,9 @@
         "uActRes": [],
         "uPwIdx": 11,
         "uDwIdx": -1,
-        "uBiasIdx": 11
+        "uBiasIdx": 11,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -2397,7 +2431,9 @@
         ],
         "uPwIdx": -1,
         "uDwIdx": -1,
-        "uBiasIdx": -1
+        "uBiasIdx": -1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -2474,7 +2510,9 @@
         "uActRes": [],
         "uPwIdx": 12,
         "uDwIdx": 10,
-        "uBiasIdx": 12
+        "uBiasIdx": 12,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -2553,7 +2591,9 @@
         "uActRes": [],
         "uPwIdx": 13,
         "uDwIdx": 11,
-        "uBiasIdx": 13
+        "uBiasIdx": 13,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -2624,7 +2664,9 @@
         "uActRes": [],
         "uPwIdx": 14,
         "uDwIdx": -1,
-        "uBiasIdx": 14
+        "uBiasIdx": 14,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -2697,7 +2739,9 @@
         ],
         "uPwIdx": -1,
         "uDwIdx": -1,
-        "uBiasIdx": -1
+        "uBiasIdx": -1,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {},
@@ -2750,7 +2794,9 @@
         "uActRes": [],
         "uPwIdx": 15,
         "uDwIdx": 12,
-        "uBiasIdx": 15
+        "uBiasIdx": 15,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -2813,7 +2859,9 @@
         "uActRes": [],
         "uPwIdx": 16,
         "uDwIdx": 13,
-        "uBiasIdx": 16
+        "uBiasIdx": 16,
+        "uBaselineFlatCh": -1,
+        "uAlbedoFlatCh": -1
       },
       "permutation_options": {
         "enums": {
@@ -2868,11 +2916,14 @@
         ],
         "uActRes": [
           0,
-          1
+          1,
+          2
         ],
         "uPwIdx": 17,
         "uDwIdx": -1,
-        "uBiasIdx": 17
+        "uBiasIdx": 17,
+        "uBaselineFlatCh": 0,
+        "uAlbedoFlatCh": 7
       },
       "permutation_options": {
         "enums": {},

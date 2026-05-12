@@ -33,23 +33,23 @@ static const int SEPCONV_OUT_SLICES = (OUT_CH + 3) / 4;
 void main(uint3 dtid : SV_DispatchThreadID)
 {
     int2 p = int2(dtid.xy);
-    int2 out_size = get_nn_out_size();
+    int2 out_size = denoiser.get_nn_out_size();
     if (p.x >= out_size.x || p.y >= out_size.y) 
         return;
 
     // Depthwise 3x3
     float4 dwAccum[SEPCONV_IN_SLICES];
     nn_depthwise_3x3<SEPCONV_IN_SLICES>(
-        p, get_nn_out_size(),
-        get_nn_depthwise_index(),
+        p, denoiser.get_nn_out_size(),
+        denoiser.get_nn_depthwise_index(),
         dwAccum);
 
     // Pointwise + bias + activation
     float result[OUT_CH];
     nn_pointwise_bias_act<SEPCONV_IN_SLICES, OUT_CH, ACT>(
         dwAccum,
-        get_nn_pointwise_index(),
-        get_nn_bias_index(),
+        denoiser.get_nn_pointwise_index(),
+        denoiser.get_nn_bias_index(),
         result);
 
 #if ADD_RESIDUAL
