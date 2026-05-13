@@ -69,7 +69,8 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                     }
                 }
                 const float time = RhGlobals::engine->world->get_time_seconds();
-                TonemapPushConstants pc {time};
+                uint32_t mode = ctx.params.get_int("output_mode", 0);
+                TonemapPushConstants pc {time, mode};
                 ctx.push_constants(pc);
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);

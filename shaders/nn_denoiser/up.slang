@@ -3,8 +3,8 @@
 //   IN_CH        — input channels (low-res tensor)
 //   OUT_CH       — output channels (high-res tensor)
 
-#include "nn_denoiser.slang"
-#include "nn_lib.slang"
+import nn_denoiser_resource;
+import nn_lib;
 
 #ifndef IN_CH
     #error "IN_CH define missing"
@@ -43,7 +43,7 @@ void main(uint3 dtid : SV_DispatchThreadID)
     }
 
     float result[OUT_CH];
-    nn_pointwise_bias_act<IN_SLICES, OUT_CH, NN_ACT_NONE>(
+    nn_pointwise_bias_act<IN_SLICES, OUT_CH, NNActFn::None>(
         upsampled,
         denoiser.get_nn_pointwise_index(),
         denoiser.get_nn_bias_index(),

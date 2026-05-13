@@ -874,6 +874,7 @@ void GenericRenderGraph::on_pso_built()
     wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
     tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
     lighting_pipeline = request_pipeline(lighting_pipeline_family, {});
+    nn_denoiser::on_pso_built(nn_denoiser_state);
 }
 
 LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const

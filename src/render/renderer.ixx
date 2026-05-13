@@ -42,6 +42,11 @@ public:  // public API
     void set_flag(Name name, bool value, bool needs_rebuild = false, bool one_time = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
     
+    void set_int_param(Name name, int value)
+    {
+        runtime_int_params[name] = value;
+    }
+    
     void hot_reload();
 
     RBImageHandle create_texture_from_asset(TextureHandle handle, bool generate_mips = true, 
@@ -121,6 +126,8 @@ protected:  // textures
     bool main_render_graph_needs_rebuild = false;
     
     uint8_t main_render_graph_num_runs = 1;
+    
+    std::map<Name, int> runtime_int_params;
     
 
     

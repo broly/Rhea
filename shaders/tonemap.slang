@@ -1,7 +1,8 @@
 import resources.hdr_color_output;
 import resources.gbuffer;
+import resources.hdr_color_defines;
 import utils.tonemapping;
-import nn_denoiser.nn_denoiser;
+import nn_denoiser.nn_denoiser_resource;
 import utils.draw_number;
 
 static const float NEAR = 0.5f;
@@ -30,6 +31,7 @@ struct PSOutput
 struct PushConstants
 {
     float time;
+    uint32_t output_mode;
 };
 
 [[vk::push_constant]]
@@ -54,9 +56,15 @@ PSOutput main(VSOutput input)
     // int2 coord = int2(input.uv * float2(32, 32));
     
     // hdr_color =  float3(width, height, 0.0); // u_nn_activations[0][coord].rgb;
-    hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
-    
-    
+    switch (pc.output_mode)
+    {
+        case 0:
+            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
+            break;
+        case 1:
+            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI>(input.uv).rgb;
+            break;
+    }
     
     // {
     //      index = min((int)time_clamped, NN_NUM_DW_TEXTURES);
@@ -105,7 +113,7 @@ PSOutput main(VSOutput input)
     //}
     hdr_color = exposure(hdr_color);
     
-    hdr_color = DrawNumber9999(input.uv, hdr_color, index, float2(0.12), 0.08, float3(1.0, 0.2, 0.1));
+    // hdr_color = DrawNumber9999(input.uv, hdr_color, index, float2(0.12), 0.08, float3(1.0, 0.2, 0.1));
     
     float3 mapped = ACES(hdr_color);
     mapped = gamma(mapped);

@@ -31,6 +31,16 @@ static std::map<int, Key> GLFW_KEYS = {
     {GLFW_KEY_X, Key::X}, 
     {GLFW_KEY_Y, Key::Y}, 
     {GLFW_KEY_Z, Key::Z},
+    {GLFW_KEY_0, Key::_0},
+    {GLFW_KEY_1, Key::_1},
+    {GLFW_KEY_2, Key::_2},
+    {GLFW_KEY_3, Key::_3},
+    {GLFW_KEY_4, Key::_4},
+    {GLFW_KEY_5, Key::_5},
+    {GLFW_KEY_6, Key::_6},
+    {GLFW_KEY_7, Key::_7},
+    {GLFW_KEY_8, Key::_8},
+    {GLFW_KEY_9, Key::_9},
 };
 
 static std::map<int, Key> GLFW_MOUSE_BUTTONS = {

@@ -60,7 +60,7 @@ void main()
         }
     }
 
-    vec3 gi = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_FILTERED], uv).rgb;
+    vec3 gi = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_NEURAL_DENOISED], uv).rgb;
     vec3 indirect = gi * albedo;
 
     vec3 color = direct + indirect + emissive;

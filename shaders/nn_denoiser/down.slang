@@ -2,8 +2,8 @@
 // Permutation defines:
 //   CHANNELS — number of channels (must be multiple of 4)
 
-#include "nn_denoiser.slang"
-#include "nn_lib.slang"
+import nn_denoiser_resource;
+import nn_lib;
 
 #ifndef CHANNELS
     #error "CHANNELS define missing"

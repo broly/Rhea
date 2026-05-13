@@ -13,9 +13,10 @@ import :generic_render_graph;
 struct TonemapPushConstants
 {
     float time;
+    uint32_t mode;
 };
 REFLECT_STRUCT_RUNTIME(TonemapPushConstants, 
-    time);
+    time, mode);
 
 
 class GameRenderGraph : public GenericRenderGraph

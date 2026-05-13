@@ -1,5 +1,3 @@
-#pragma once
-
 // NUM_HDR_COLOR_ARRAY_ELEMENTS and NUM_HISTORY_ARRAY_ELEMENTS
 // must be provided as compiler defines (e.g. -D NUM_HDR_COLOR_ARRAY_ELEMENTS=N)
 #ifndef NUM_HDR_COLOR_ARRAY_ELEMENTS
@@ -11,19 +9,23 @@
     #define NUM_HISTORY_ARRAY_ELEMENTS 1
 #endif
 
-static const uint NUM_COLOR_OUTPUTS = NUM_HDR_COLOR_ARRAY_ELEMENTS;
-
-enum COLOR_OUTPUT_HDR
+namespace ColorOutput
 {
-    BASE                  = 0,
-    RTXGI                 = 1,
-    SSR                   = 2,
-    INTERMEDIATE          = 3,
-    RESERVED_0            = 4,
-    RTXGI_REPROJECTED     = 5,
-    RTXGI_ACCUM           = 6,
-    RTXGI_MOMENTS         = 7,
-    RTXGI_FILTERED        = 8,
-    RTXGI_NEURAL_DENOISED = 9,
-    RESERVED_1            = 10,
+    public static const uint NumOutputs = NUM_HDR_COLOR_ARRAY_ELEMENTS;
+    
+    public enum Slot
+    {
+        BASE                  = 0,
+        RTXGI                 = 1,
+        SSR                   = 2,
+        INTERMEDIATE          = 3,
+        RESERVED_0            = 4,
+        RTXGI_REPROJECTED     = 5,
+        RTXGI_ACCUM           = 6,
+        RTXGI_MOMENTS         = 7,
+        RTXGI_FILTERED        = 8,
+        RTXGI_NEURAL_DENOISED = 9,
+        RESERVED_1            = 10,
+    }
+
 }

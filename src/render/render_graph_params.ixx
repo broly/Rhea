@@ -12,4 +12,12 @@ export struct RenderGraphParameters
     std::map<Name, int> int_params;
     std::map<Name, bool> bool_params;
     std::map<Name, glm::vec3> vec3_params;
+    
+    int get_int(Name param, int default_value = 0) const
+    {
+        auto it = int_params.find(param);
+        if (it != int_params.end())
+            return it->second;
+        return default_value;
+    }
 };

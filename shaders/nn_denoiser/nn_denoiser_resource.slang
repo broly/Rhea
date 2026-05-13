@@ -55,9 +55,9 @@
 
 
 #ifdef FRAGMENT_SHADER
-    #define FRAG_READ_ONLY readonly
+    #define fragment_readonly readonly
 #else
-    #define FRAG_READ_ONLY
+    #define fragment_readonly
 #endif
 
 
@@ -77,15 +77,6 @@ namespace denoiser
         int  uBiasIdx;
         int  _pad2;
     
-        // Head-only: flat-channel indices into input_packed for the AOVs
-        // the head pass needs to reconstruct (baseline and albedo). Encoded
-        // as a flat channel index because the AOV's RGB triple may STRADDLE
-        // two slices of input_packed; the shader decodes
-        //   slot_for_ch     = uActRes[ch / 4]
-        //   component_in_v4 = ch % 4
-        // for each of the three RGB channels and assembles componentwise.
-        //
-        // -1 in non-head passes (and ignored by their shaders).
         int  uBaselineFlatCh;
         int  uAlbedoFlatCh;
         int  _pad3;
@@ -105,12 +96,10 @@ namespace denoiser
     [[vk::push_constant]]
     NNPassPC nn_pass_pc;
     
-    
     int get_pass_index()
     {
         return nn_pass_pc.pass_idx;
     }
-    
     
     int2 get_nn_out_size()
     {
@@ -127,15 +116,8 @@ namespace denoiser
         return u_nn_pass_indices[nn_pass_pc.pass_idx].uDwIdx;
     };
     
-    
     int get_nn_bias_index()
     {
-        // BUG FIX: previously returned uPwIdx, which happened to match
-        // uBiasIdx in most passes by coincidence (every pw weight has a
-        // matching bias in the current model, and slots are issued in
-        // parallel). In the general case — e.g. if a pass had a pointwise
-        // without a bias, or vice versa — this silently sampled the wrong
-        // bias texture.
         return u_nn_pass_indices[nn_pass_pc.pass_idx].uBiasIdx;
     }
     
@@ -144,7 +126,7 @@ namespace denoiser
     // -----------------------------------------------------------------------------
     
     [[vk::binding(BINDING_NN_ACTIVATIONS, SET_NN_DENOISER)]]
-    FRAG_READ_ONLY RWTexture2D<float4> u_nn_activations[NN_NUM_ACTIVATION_SLOTS];
+    fragment_readonly RWTexture2D<float4> u_nn_activations[NN_NUM_ACTIVATION_SLOTS];
     
     [[vk::binding(BINDING_NN_PW_WEIGHTS, SET_NN_DENOISER)]]
     Sampler2D u_nn_pw_weights[NN_NUM_PW_TEXTURES];

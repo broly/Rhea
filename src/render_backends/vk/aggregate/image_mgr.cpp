@@ -1139,8 +1139,6 @@ void vk::ImageManager::transition_image(
         (sub.usage == RBImageUsageType::Undefined ||
          sub.usage == RBImageUsageType::Present))
     {
-        // Synchronize the layout transition with vkAcquireNextImageKHR's
-        // implicit read at COLOR_ATTACHMENT_OUTPUT.
         src_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     }
     else if (sub.usage == RBImageUsageType::Undefined)

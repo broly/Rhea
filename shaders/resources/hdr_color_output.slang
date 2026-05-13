@@ -1,6 +1,4 @@
-#pragma once
-
-#include "hdr_color_defines.slang"
+import hdr_color_defines;
 
 // SET_HDR_COLOR, BINDING_SAMPLER_HDR_COLOR, BINDING_SAMPLER_HISTORY
 // must be provided as compiler defines
@@ -17,25 +15,30 @@
     #define BINDING_SAMPLER_HISTORY 0
 #endif
 
-[[vk::binding(BINDING_SAMPLER_HDR_COLOR, SET_HDR_COLOR)]]
-Sampler2D u_hdr_color_present[NUM_COLOR_OUTPUTS];
-
-[[vk::binding(BINDING_SAMPLER_HISTORY, SET_HDR_COLOR)]]
-Sampler2D u_hdr_color_history[NUM_COLOR_OUTPUTS];
-
-float4 read_hdr_color_present<COLOR_OUTPUT_HDR output>(float2 uv)
+namespace ColorOutput
 {
-    return u_hdr_color_present[(uint)output].Sample(uv);
+    public float4 read<Slot output>(float2 uv)
+    {
+        return u_hdr_color_present[(uint)output].Sample(uv);
+    }
+    
+    
+    public float4 read<Slot output, int level>(float2 uv)
+    {
+        return u_hdr_color_present[(uint)output].SampleLevel(uv, level);
+    }
+    
+    
+    public float4 read_history<Slot output>(float2 uv)
+    {
+        return u_hdr_color_history[(uint)output].Sample(uv);
+    }
+
+    [[vk::binding(BINDING_SAMPLER_HDR_COLOR, SET_HDR_COLOR)]]
+    internal Sampler2D u_hdr_color_present[NumOutputs];
+    
+    [[vk::binding(BINDING_SAMPLER_HISTORY, SET_HDR_COLOR)]]
+    internal Sampler2D u_hdr_color_history[NumOutputs];
+
 }
 
-
-float4 read_hdr_color_present<COLOR_OUTPUT_HDR output, int level>(float2 uv)
-{
-    return u_hdr_color_present[(uint)output].SampleLevel(uv, level);
-}
-
-
-float4 read_hdr_color_history<COLOR_OUTPUT_HDR output>(float2 uv)
-{
-    return u_hdr_color_history[(uint)output].Sample(uv);
-}

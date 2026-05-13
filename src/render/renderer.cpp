@@ -51,6 +51,7 @@ void Renderer::execute()
         params.render_iter_id = i;
         params.num_runs = main_render_graph_num_runs;
         params.output_frame_id = frame_id;
+        params.int_params = runtime_int_params;
         execute_graph(main_render_graph, params);
     }
     

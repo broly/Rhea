@@ -32,11 +32,15 @@ export struct NNDenoiserState
     bool initialized = false;
     
     RenderResource* resource;
+    
+    std::map<uint32_t, PipelineObject*> pso = {};
 };
 
 namespace nn_denoiser
 {
     NNPassIndicesSSBO make_ubo_from_pass_indices(const NNPassIndicesData& pi);
+    
+    export void on_pso_built(NNDenoiserState& state);
 
 
     export void load_nn_denoiser_schemas(NNDenoiserState& state);

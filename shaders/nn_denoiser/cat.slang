@@ -7,8 +7,8 @@
 //   A_CHANNELS — channels of A (supposed multiple of 4)
 //   B_CHANNELS — channels of B
 
-#include "nn_denoiser.slang"
-#include "nn_lib.slang"
+import nn_denoiser_resource;
+import nn_lib;
 
 #ifndef A_CHANNELS
     #error "A_CHANNELS define missing"

@@ -1,34 +1,9 @@
-// head.slang — final head pass: 1x1 conv -> +baseline -> expm1 -> remodulate.
-// Out_ch = 3 (RGB).
-//
-// IMPORTANT: This pass intentionally does NOT recover baseline / albedo via
-// nn_get_act_res(s). That mechanism reads slices of input_packed, but the
-// values it needs (full RGB log-irradiance and full RGB albedo) are NOT
-// aligned on 4-channel boundaries inside input_packed — they are split
-// across slices, with .rgb of any single slice corresponding to a mix of
-// AOVs (e.g. slice 1 = (normal.g, normal.b, depth, albedo.r)).
-//
-// Old code did `nn_load_act(nn_get_act_res(1), p).rgb` and got back
-// (normal.g, normal.b, depth) instead of albedo — which is exactly the
-// "albedo with weird colors" artifact you observed: finalRGB = irr *
-// (normal.gb, depth) visually resembles a tinted albedo, but it isn't one.
-//
-// Fix: sample albedo straight from the gbuffer and the noisy color from
-// the HDR present buffer. These are the originals the input pass already
-// consumed, so this round-trips through the network correctly without
-// touching the export-side input_packed layout.
-//
-// uActIn[]   — feature input slices (decoder output)
-// uActRes[]  — unused now (kept in pipeline.json for compatibility)
-//
-// Permutation defines:
-//   IN_CH — input feature channels
-
-#include "nn_denoiser.slang"
-#include "nn_lib.slang"
-#include "resources/gbuffer.slang"
-#include "resources/hdr_color_output.slang"
-#include "resources/hdr_color_storage.slang"
+import nn_denoiser_resource;
+import nn_lib;
+import resources.gbuffer;
+import resources.hdr_color_output;
+import resources.hdr_color_storage;
+import resources.hdr_color_defines;
 
 #ifndef IN_CH
     #error "IN_CH define missing"
@@ -91,24 +66,14 @@ void main(uint3 dtid : SV_DispatchThreadID)
             residual.b = acc;
     }
 
-    // -----------------------------------------------------------------
-    // Baseline = log-compressed demodulated noisy.
-    // Must match input.slang exactly so the residual learned during
-    // training composes correctly.
-    // -----------------------------------------------------------------
-    float3 noisy  = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI, 0>(uv).rgb;
+    float3 noisy  = ColorOutput::read<ColorOutput::Slot::RTXGI, 0>(uv).rgb;
     float3 albedo = nn_load_packed_rgb(get_nn_albedo_flat_ch(), p);
-    // float3 albedo = get_gbuffer<GBUFFER_SLOT::GBUFFER_SLOT_ALBEDO_ROUGHNESS, 0>(uv).rgb;
 
-    float3 irr_log_baseline = nn_log_compress(
-        nn_demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
+    float3 irr_log_baseline = nn_log_compress(nn_demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
 
-    // -----------------------------------------------------------------
-    // Apply network residual, undo log compression, remodulate by albedo.
-    // -----------------------------------------------------------------
     float3 logIrr   = irr_log_baseline + residual;
     float3 irr      = nn_log_expand(logIrr);
     float3 finalRGB = nn_remodulate(irr, albedo);
 
-    u_hdr_color_present_storage[COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED][p] = float4(finalRGB, 1.0);
+    ColorOutput::write<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(p, finalRGB);
 }

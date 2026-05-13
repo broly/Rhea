@@ -203,6 +203,16 @@ void WorldScript_VariousThings::tick(double dt)
         rail->startup();
         handled = true;
     }
+    if (input->is_key_down(Key::_1))
+    {
+        RhGlobals::engine->renderer->set_int_param("output_mode", 1);
+        handled = true;
+    }
+    if (input->is_key_down(Key::_0))
+    {
+        RhGlobals::engine->renderer->set_int_param("output_mode", 0);
+        handled = true;
+    }
     if (input->is_key_down(Key::B))
     {
         RhGlobals::engine->renderer->set_flag("reset_temporal_accum", true, false, true);

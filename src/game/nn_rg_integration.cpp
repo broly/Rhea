@@ -31,6 +31,11 @@ NNPassIndicesSSBO nn_denoiser::make_ubo_from_pass_indices(const NNPassIndicesDat
     return ubo;
 }
 
+void nn_denoiser::on_pso_built(NNDenoiserState& state)
+{
+    state.pso = {};
+}
+
 void nn_denoiser::load_nn_denoiser_schemas(NNDenoiserState& state)
 {
     SerializationContext ctx;
@@ -220,17 +225,6 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
         checkf(family_it != state.families.end(),
                "No family for pipeline_pass %s",
                pass.pipeline_pass.to_string().c_str());
-        auto& family = family_it->second;
-
-        const ShaderKey shader_key = family->make_shader_key(
-            pass.pipeline_pass,
-            nullptr,
-            pass.permutation_options.enums,
-            pass.permutation_options.variants);
-
-        PipelineObject* pso = family->request_pipeline(shader_key);
-        checkf(pso != nullptr, "Failed to create PSO for pass %s",
-               pass.name.to_string().c_str());
 
         const NNPassIndicesSSBO ubo_template = state.pass_ubo_templates[pass_idx];
         const NNPassKind pass_kind = pass.kind;
@@ -243,7 +237,6 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
         {
             if (t.name == output_tensor_name) { out_scale = t.scale; break; }
         }
-        
         
 
         std::set<int> read_slots, write_slots;
@@ -273,7 +266,7 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
             .name = pass_name,
             .reads = std::move(reads),
             .writes = std::move(writes),
-            .execute = [pass_idx, ubo_template, pass_kind, wg_size, out_scale, pso, nn_resource, gbuffer_resource, hdr_color_storage, hdr_color_output, &rg, &state] (RenderGraphContext& ctx)
+            .execute = [pass_idx, ubo_template, pass_kind, wg_size, out_scale, nn_resource, gbuffer_resource, hdr_color_storage, hdr_color_output, &rg, &state] (RenderGraphContext& ctx)
             {
                 const Extent sc = ctx.backend.get_swapchain_extent();
                 
@@ -284,8 +277,28 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
                 };
 
                 nn_resource->update_ssbo_element("u_nn_pass_indices", state.pass_ubo_templates[pass_idx], pass_idx);
+                
+                if (!state.pso.contains(pass_idx))
+                {
+                    
+                    
+                    auto& pass = state.pipeline->passes[pass_idx];
+                    auto family_it = state.families.find(pass.pipeline_pass);
+                    auto family = family_it->second;
+                    const ShaderKey shader_key = family->make_shader_key(
+                        pass.pipeline_pass,
+                        nullptr,
+                        pass.permutation_options.enums,
+                        pass.permutation_options.variants);
+                    
+                    auto pipeline = family->request_pipeline(shader_key);
+                    
+                    checkf(pipeline != nullptr, "Failed to create PSO for pass %s",
+                           pass.name.to_string().c_str());
+                    state.pso[pass_idx] = pipeline;
+                }
 
-                ctx.bind_pipeline(pso);
+                ctx.bind_pipeline(state.pso[pass_idx]);
 
                 if (pass_kind == NNPassKind::input)
                 {
