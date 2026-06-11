@@ -60,10 +60,10 @@ Passes declare their inputs/outputs; the graph derives execution order, resource
 
 ## Roadmap
 
- [ ] Temporal stability for the neural denoiser (currently per-frame inference)
- [ ] Skeletal Meshes
- [ ] Animation
- [ ] A lot of interesting, stay tuned
+- [ ] Temporal stability for the neural denoiser (currently per-frame inference)
+- [ ] Skeletal Meshes
+- [ ] Animation
+- [ ] A lot of interesting, stay tuned
 
 ## Writing
 
