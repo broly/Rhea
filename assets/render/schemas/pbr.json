@@ -180,9 +180,9 @@
 			"compare_op": "less_or_equal",
 			"push_constants": [
 				{
-					"type": "ModelPushConstants",
-					"name": "model",
-					"stages": ["vertex", "fragment"]
+					"type": "ColorOutputConstants",
+					"name": "pc",
+					"stages": ["fragment"]
 				}
 			],
 			"topology": "triangle_list",

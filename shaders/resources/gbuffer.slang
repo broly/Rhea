@@ -1,4 +1,3 @@
-module gbuffer;
 
 // NUM_GBUFFER_SLOTS must be provided as a compiler define
 #ifndef NUM_GBUFFER_SLOTS

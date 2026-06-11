@@ -51,7 +51,7 @@
     #define NN_NUM_BIAS_TEXTURES 1
 #endif
 
-
+import channel_writer;
 
 
 #ifdef FRAGMENT_SHADER
@@ -63,60 +63,60 @@
 
 namespace denoiser
 {
-    struct NNPassIndicesSSBO
+    public struct NNPassIndicesSSBO
     {
         int2 _pad0;
         int2 _pad1;
     
-        int4 uActIn [16];
-        int4 uActOut[16];
-        int4 uActRes[16];
+        public int4 uActIn [16];
+        public int4 uActOut[16];
+        public int4 uActRes[16];
     
-        int  uPwIdx;
-        int  uDwIdx;
-        int  uBiasIdx;
+        public int  uPwIdx;
+        public int  uDwIdx;
+        public int  uBiasIdx;
         int  _pad2;
     
-        int  uBaselineFlatCh;
-        int  uAlbedoFlatCh;
+        public int  uBaselineFlatCh;
+        public int  uAlbedoFlatCh;
         int  _pad3;
         int  _pad4;
     };
     
     [[vk::binding(BINDING_NN_PASS_INDICES, SET_NN_DENOISER)]]
-    StructuredBuffer<NNPassIndicesSSBO> u_nn_pass_indices;
+    public StructuredBuffer<NNPassIndicesSSBO> u_nn_pass_indices;
 
 
-    struct NNPassPC
+    public struct NNPassPC
     {
         int2 out_size;
         uint32_t pass_idx;
     };
     
     [[vk::push_constant]]
-    NNPassPC nn_pass_pc;
+    public NNPassPC nn_pass_pc;
     
-    int get_pass_index()
+    public int get_pass_index()
     {
         return nn_pass_pc.pass_idx;
     }
     
-    int2 get_nn_out_size()
+    public int2 get_nn_out_size()
     {
         return nn_pass_pc.out_size;
     };
     
-    int get_nn_pointwise_index()
+    public int get_nn_pointwise_index()
     {
         return u_nn_pass_indices[nn_pass_pc.pass_idx].uPwIdx;
     }
     
-    int get_nn_depthwise_index()
+    public int get_nn_depthwise_index()
     {
         return u_nn_pass_indices[nn_pass_pc.pass_idx].uDwIdx;
     };
     
-    int get_nn_bias_index()
+    public int get_nn_bias_index()
     {
         return u_nn_pass_indices[nn_pass_pc.pass_idx].uBiasIdx;
     }
@@ -126,15 +126,17 @@ namespace denoiser
     // -----------------------------------------------------------------------------
     
     [[vk::binding(BINDING_NN_ACTIVATIONS, SET_NN_DENOISER)]]
-    fragment_readonly RWTexture2D<float4> u_nn_activations[NN_NUM_ACTIVATION_SLOTS];
+    public fragment_readonly RWTexture2D<float4> u_nn_activations[NN_NUM_ACTIVATION_SLOTS];
     
     [[vk::binding(BINDING_NN_PW_WEIGHTS, SET_NN_DENOISER)]]
-    Sampler2D u_nn_pw_weights[NN_NUM_PW_TEXTURES];
+    public Sampler2D u_nn_pw_weights[NN_NUM_PW_TEXTURES];
     
     [[vk::binding(BINDING_NN_DW_WEIGHTS, SET_NN_DENOISER)]]
-    Sampler2DArray u_nn_dw_weights[NN_NUM_DW_TEXTURES];
+    public Sampler2DArray u_nn_dw_weights[NN_NUM_DW_TEXTURES];
     
     [[vk::binding(BINDING_NN_BIASES, SET_NN_DENOISER)]]
-    Sampler2D u_nn_biases[NN_NUM_BIAS_TEXTURES];
+    public Sampler2D u_nn_biases[NN_NUM_BIAS_TEXTURES];
+    
 
+     
 }

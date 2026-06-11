@@ -62,6 +62,8 @@ public:
         on_tick_map.insert({name, cb});
     }
     
+    bool loop = false;
+    
     std::map<Name, RailCallback> on_tick_map;
 };
 REFLECT_OBJECT_FIELDS(Rail, RhActor,

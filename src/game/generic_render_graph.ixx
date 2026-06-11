@@ -114,6 +114,13 @@ struct GBufferArray : std::vector<RGTextureHandle>
     }
 };
 
+struct ColorOutputConstants
+{
+    uint32_t buffer_index;
+};
+REFLECT_STRUCT_RUNTIME(ColorOutputConstants,
+    buffer_index);
+
 class GenericRenderGraph : public RenderGraph
 {
 public:

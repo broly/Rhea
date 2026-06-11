@@ -12,6 +12,7 @@ import game;
 import rail;
 
 constexpr bool DO_NN_SAMPLES = false;
+constexpr bool DO_ANIMATE_LIGHT = true;
 
 void WorldScript_VariousThings::tick(double dt)
 {
@@ -54,8 +55,11 @@ void WorldScript_VariousThings::tick(double dt)
         }
         rail->add_on_tick("cam", [=] (const RailSampleData& d)
         {
-            // Transform newt = {d.position, d.rotation};
-            // camera_actor->set_transform(newt);
+            if (DO_NN_SAMPLES)
+            {
+                Transform newt = {d.position, d.rotation};
+                camera_actor->set_transform(newt);
+            }
         });
         
         rail->add_on_tick("light", [=] (const RailSampleData& d)
@@ -68,6 +72,13 @@ void WorldScript_VariousThings::tick(double dt)
         });
         if (DO_NN_SAMPLES)
         {
+            rail->startup();
+        }
+        if (DO_ANIMATE_LIGHT)
+        {
+            rail->loop = true;
+            rail->fixed_timestep = false;
+            rail->time_dilation = 0.3;
             rail->startup();
         }
         do_once = true;
@@ -201,6 +212,11 @@ void WorldScript_VariousThings::tick(double dt)
     if (input->is_key_down(Key::J))
     {
         rail->startup();
+        handled = true;
+    }
+    if (input->is_key_down(Key::_2))
+    {
+        RhGlobals::engine->renderer->set_int_param("output_mode", 2);
         handled = true;
     }
     if (input->is_key_down(Key::_1))

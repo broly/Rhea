@@ -11,6 +11,12 @@
 layout(location = 0) out vec4 out_color;
 layout(location = 0) in vec2 v_uv;
 
+layout(push_constant)
+uniform ColorOutputConstants
+{
+    uint buffer_index;
+} pc;
+
 void main()
 {
     vec2 uv = v_uv;
@@ -60,7 +66,7 @@ void main()
         }
     }
 
-    vec3 gi = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_RTXGI_NEURAL_DENOISED], uv).rgb;
+    vec3 gi = texture(u_hdr_color_present[pc.buffer_index], uv).rgb;
     vec3 indirect = gi * albedo;
 
     vec3 color = direct + indirect + emissive;

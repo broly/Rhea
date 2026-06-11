@@ -34,7 +34,7 @@ import log;
 
 DEFINE_LOGGER(LogGenericRG, Display);
 
-constexpr bool enable_nn_denoiser = true;
+constexpr bool enable_nn_denoiser = false;
 
 
 GenericRenderGraph::GenericRenderGraph()
@@ -631,6 +631,10 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             {
                 ctx.bind(camera_resource, light_resource, hdr_color_output_resource, gbuffer_resource, dbuffer_resource, shadow_resource);
             }
+            
+            ColorOutputConstants pc;
+            pc.buffer_index = (uint32_t)COLOR_OUTPUT_HDR::RTXGI_FILTERED;
+            ctx.push_constants(pc);
             
             ctx.draw_fullscreen();
         },

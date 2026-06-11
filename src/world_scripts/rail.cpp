@@ -1,4 +1,5 @@
 module rail;
+import <algorithm>;
 
 void Rail::set_accum_time(float t)
 {
@@ -96,12 +97,27 @@ void Rail::tick(const double dt)
     if (all_done)
     {
         active = false;
+        if (loop)
+        {
+            startup();
+        }
     }
 }
 void Rail::startup()
 {
     start_time = world->get_time_seconds();
     active = true;
+    accumulated_time = 0.0;
+    
+    for (auto& [name, track] : samples)
+    {
+        std::sort(track.begin(), track.end(),
+            [](const RailSample& a,
+               const RailSample& b)
+            {
+                return a.timestamp_seconds < b.timestamp_seconds;
+            });
+    }
 }
 
 void Rail::on_serialize(const SerializationContext& context)

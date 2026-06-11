@@ -21,10 +21,12 @@
     #define TOTAL_CHANNELS 0
 #endif
 import nn_denoiser_resource;
+import nn_denoiser_api;
 
 import resources.gbuffer;
 import resources.hdr_color_output;
 import nn_lib;
+import channel_writer;
 import resources.hdr_color_defines;
 
 #define ALBEDO_EPS 1000     // 1e-3 * 1e6
@@ -53,18 +55,13 @@ void main(uint3 dtid : SV_DispatchThreadID)
    
     ChannelWriter<TOTAL_CHANNELS> writer;
 
-    float3 irr_log = nn_log_compress(nn_demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
-    writer.push(irr_log);
-    
-    float3 n_enc = nn_encode_normal(normal);
-    writer.push(n_enc);
-    
 
-    float depth_norm = nn_normalize_depth(depth, 0.1, 1000.0);
-    writer.push(depth_norm);
-
+    writer << nn_log_compress(nn_demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
+    writer << nn_encode_normal(normal);
+    writer << nn_normalize_depth(depth, 0.1, 1000.0);
+    
     // 7..10: albedo (3) + roughness (1)
-    writer.push(ar);
+    writer << ar;
     
     
 #if HAS_MVEC
@@ -85,7 +82,5 @@ void main(uint3 dtid : SV_DispatchThreadID)
     // ch[prev_start + 1] = prev.g;
     // ch[prev_start + 2] = prev.b;
 #endif
-
-    // === Pack to slices ===
-    nn_store_packed<OUT_SLICES, TOTAL_CHANNELS>(p, writer.output());
+    denoiser.present_writer(p, writer);
 }

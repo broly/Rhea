@@ -91,6 +91,22 @@ public:
 
         return backend.create_texture_2d(tex.get(), info);
     }
+    
+    std::vector<std::byte> create_gpu_texture_ssbo(const NNWeightDesc& desc) const
+    {
+        auto base_dir = paths::get_assets_path();
+        
+        const std::filesystem::path bin_path = base_dir / desc.file;
+        std::ifstream file(bin_path, std::ios::binary);
+        checkf(file.is_open(), "Could not open %s", bin_path.string().c_str());
+        
+        std::vector<std::byte> bulk;
+        bulk.reserve(desc.file_bytes);
+        
+        file.read(reinterpret_cast<char*>(bulk.data()), desc.file_bytes);
+        
+        return bulk;
+    }
 
     const NNWeightDesc& find(const std::string& name) const
     {

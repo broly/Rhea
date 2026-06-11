@@ -45,7 +45,6 @@ PSOutput main(VSOutput input)
     float time_clamped = max(pc.time - 20, 0.0) * 2;
     int index = 0;
     
-    
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI>(input.uv).rgb;
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_FILTERED>(input.uv).rgb;
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_REPROJECTED>(input.uv).rgb;
@@ -59,9 +58,12 @@ PSOutput main(VSOutput input)
     switch (pc.output_mode)
     {
         case 0:
-            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
+            hdr_color = ColorOutput::read<ColorOutput::Slot::BASE>(input.uv).rgb;
             break;
         case 1:
+            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
+            break;
+        case 2:
             hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI>(input.uv).rgb;
             break;
     }

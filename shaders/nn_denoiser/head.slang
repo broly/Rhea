@@ -1,5 +1,6 @@
 import nn_denoiser_resource;
 import nn_lib;
+import channel_writer;
 import resources.gbuffer;
 import resources.hdr_color_output;
 import resources.hdr_color_storage;
@@ -65,6 +66,7 @@ void main(uint3 dtid : SV_DispatchThreadID)
         else
             residual.b = acc;
     }
+    
 
     float3 noisy  = ColorOutput::read<ColorOutput::Slot::RTXGI, 0>(uv).rgb;
     float3 albedo = nn_load_packed_rgb(get_nn_albedo_flat_ch(), p);
