@@ -58,6 +58,12 @@ Passes declare their inputs/outputs; the graph derives execution order, resource
     <tr><td>Build</td><td>CMake</td> </tr>
 </table>
 
+## Roadmap
+
+ [ ] Temporal stability for the neural denoiser (currently per-frame inference)
+ [ ] Skeletal Meshes
+ [ ] Animation
+ [ ] A lot of interesting, stay tuned
 
 ## Writing
 
