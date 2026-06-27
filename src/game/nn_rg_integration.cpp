@@ -90,10 +90,48 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
         }
     }
 
-    // === 2. Weight textures (RBImageHandle, persistent) ===
-    state.pw_weight_textures.resize(pipeline->array_sizes.pw_weights);
-    state.dw_weight_textures.resize(pipeline->array_sizes.dw_weights);
-    state.bias_textures.resize(pipeline->array_sizes.biases);
+
+    // Mirror of denoiser::NNWeightSlot in the shader (std430: 4x int32).
+    struct NNWeightSlotCPU
+    {
+        int32_t base; 
+        int32_t width; 
+        int32_t height; 
+        int32_t depth;
+    };
+
+    const uint32_t num_pw   = pipeline->array_sizes.pw_weights;
+    const uint32_t num_dw   = pipeline->array_sizes.dw_weights;
+    const uint32_t num_bias = pipeline->array_sizes.biases;
+
+    std::vector<glm::vec4> pw_buffer;
+    std::vector<glm::vec4> dw_buffer;
+    std::vector<glm::vec4> bias_buffer;
+
+    std::vector<NNWeightSlotCPU> pw_slots(num_pw, {0, 0, 0, 0});
+    std::vector<NNWeightSlotCPU> dw_slots(num_dw, {0, 0, 0, 0});
+    std::vector<NNWeightSlotCPU> bias_slots(num_bias, {0, 0, 0, 0});
+
+    auto append_weight = [&](const NNWeightDesc& desc,
+                             std::vector<glm::vec4>& buf,
+                             NNWeightSlotCPU& slot)
+    {
+        const uint32_t base_elem = (uint32_t)buf.size();
+        const uint32_t count     = NNWeightsIndex::slot_float4_count(desc);
+
+        std::vector<float> f32 = state.weights_index.load_weight_ssbo_f32(desc);
+        checkf(f32.size() == size_t(count) * 4,
+            "Weight '%s': element count %zu != expected %u (w=%u h=%u d=%u)",
+            desc.file.c_str(), f32.size(), count * 4, desc.width, desc.height, desc.depth);
+
+        buf.resize(base_elem + count);
+        std::memcpy(buf.data() + base_elem, f32.data(), count * sizeof(glm::vec4));
+
+        slot.base   = (int32_t)base_elem;
+        slot.width  = (int32_t)desc.width;
+        slot.height = (int32_t)desc.height;
+        slot.depth  = (int32_t)desc.depth;
+    };
 
     std::map<std::string, std::pair<NNWeightKind, uint32_t>> seen;  // weight_name -> (kind, slot)
     for (const auto& pass : pipeline->passes)
@@ -110,54 +148,64 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
         const auto& [kind, slot] = kind_slot;
         const NNWeightDesc& desc = state.weights_index.find(wname);
 
-        RBImageHandle img = state.weights_index.create_gpu_texture(backend, desc);
-        RGTextureDesc tex_desc;
-        tex_desc.name = "nn_weights_" + wname + "_" + reflect::enum_name(kind_slot.first).to_string() + "_" + std::to_string(kind_slot.second);
-        tex_desc.dimension = TextureDimension::Tex2D;
-        tex_desc.extent = {desc.width, desc.height};
-        tex_desc.format = TextureFormat::RGBA16F;
-        tex_desc.imported = true;
-        tex_desc.external = false;
-        tex_desc.num_frames = 1;
-        tex_desc.num_mip_levels = 1;
-        tex_desc.num_layers = desc.depth;
-        tex_desc.swapchain_image = false;
-        tex_desc.optional_image = img;
-        
-        LogNNDenoiser.Log<Display>("Register weight texture '%s', w=%i,h=%i,d=%i",
-            tex_desc.name.to_string().c_str(), desc.width, desc.height, desc.depth);
-        
-        RGTextureHandle tex = rg.create_texture(tex_desc);
-        
-
         if (kind == NNWeightKind::pointwise)
-            state.pw_weight_textures[slot] = tex;
+        {
+            checkf(slot < num_pw, "pw slot %u out of range (%u)", slot, num_pw);
+            append_weight(desc, pw_buffer, pw_slots[slot]);
+        }
         else if (kind == NNWeightKind::depthwise)
-            state.dw_weight_textures[slot] = tex;
-        else if (kind == NNWeightKind::bias)    
-            state.bias_textures[slot] = tex;
-        else 
+        {
+            checkf(slot < num_dw, "dw slot %u out of range (%u)", slot, num_dw);
+            append_weight(desc, dw_buffer, dw_slots[slot]);
+        }
+        else if (kind == NNWeightKind::bias)
+        {
+            checkf(slot < num_bias, "bias slot %u out of range (%u)", slot, num_bias);
+            append_weight(desc, bias_buffer, bias_slots[slot]);
+        }
+        else
+        {
             checkf(false, "Unknown weight kind: %s", reflect::enum_name(kind).to_string().c_str());
+        }
+
+        LogNNDenoiser.Log<Display>("Register weight '%s' (%s slot %u), w=%i,h=%i,d=%i",
+            wname.c_str(), reflect::enum_name(kind).to_string().c_str(), slot,
+            desc.width, desc.height, desc.depth);
     }
+
+    // Combined layout table: [ pw | dw | bias ] — matches the push-constant bases.
+    std::vector<NNWeightSlotCPU> layout;
+    layout.reserve(num_pw + num_dw + num_bias);
+    layout.insert(layout.end(), pw_slots.begin(),   pw_slots.end());
+    layout.insert(layout.end(), dw_slots.begin(),   dw_slots.end());
+    layout.insert(layout.end(), bias_slots.begin(), bias_slots.end());
+
+    // pw sub-range starts at 0; dw after pw; bias after dw. These reach the
+    // shader through NNPassPC so the weight SSBOs can stay single-bound.
+    state.layout_dw_base   = int32_t(num_pw);
+    state.layout_bias_base = int32_t(num_pw + num_dw);
+
+    // Guard against empty buffers (an SSBO must have at least one element to memcpy into the host-visible mapping).
+    if (pw_buffer.empty())   pw_buffer.push_back(glm::vec4(0.0f));
+    if (dw_buffer.empty())   dw_buffer.push_back(glm::vec4(0.0f));
+    if (bias_buffer.empty()) bias_buffer.push_back(glm::vec4(0.0f));
+    if (layout.empty())      layout.push_back({0, 0, 0, 0});
 
     auto& nn_resource = renderer.find_resource_checked(Name("nn_denoiser"));
 
-    nn_resource.update_image_array(Name("u_nn_pw_weights"), rg.get_image_array(state.pw_weight_textures));
-    nn_resource.update_image_array(Name("u_nn_biases"),     rg.get_image_array(state.bias_textures));
+    // Use the explicit (byte-size, data) overload so the upload copies the right number of bytes regardless of element type.
+    nn_resource.update_ssbo(Name("u_nn_pw_weights"),
+        pw_buffer.size() * sizeof(glm::vec4), (void*)pw_buffer.data());
+    nn_resource.update_ssbo(Name("u_nn_dw_weights"),
+        dw_buffer.size() * sizeof(glm::vec4), (void*)dw_buffer.data());
+    nn_resource.update_ssbo(Name("u_nn_biases"),
+        bias_buffer.size() * sizeof(glm::vec4), (void*)bias_buffer.data());
+    nn_resource.update_ssbo(Name("u_nn_weight_layout"),
+        layout.size() * sizeof(NNWeightSlotCPU), (void*)layout.data());
 
-    {
-        UpdateImageParams dw_params{};
-        dw_params.as_array_2d = true;
-        nn_resource.update_image_array(
-            Name("u_nn_dw_weights"),
-            rg.get_image_array(state.dw_weight_textures),
-            dw_params);
-    }
-    
     nn_resource.update_ssbo(Name("u_nn_pass_indices"), state.pass_ubo_templates);
     
     
-    // === 4. Pre-fetch pipeline families ===
     auto nn_model = renderer.find_model(Name("nn_denoise"));
     checkf(nn_model, "MaterialModel 'nn_denoise' not found — load_schemas() didn't pick it up");
 
@@ -190,7 +238,6 @@ void nn_denoiser::prepare_resources(NNDenoiserState& state, RenderGraphContext& 
         }
 
         const Extent sc = ctx.backend.get_swapchain_extent();
-
         
         std::vector<RBImageHandle> act_images;
         act_images.reserve(state.activation_textures.size());
@@ -199,9 +246,6 @@ void nn_denoiser::prepare_resources(NNDenoiserState& state, RenderGraphContext& 
         
         nn_resource->update_image_array(Name("u_nn_activations"), act_images, {});
     }
-    
-    
-
 }
 
 void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer)
@@ -219,8 +263,6 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
         if (pass.is_disabled())
             continue;
 
-
-        // === Build shader key ===
         auto family_it = state.families.find(pass.pipeline_pass);
         checkf(family_it != state.families.end(),
                "No family for pipeline_pass %s",
@@ -324,6 +366,8 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
                 NNPassPC pc;
                 pc.out_size = size;
                 pc.pass_idx = pass_idx;
+                pc.nn_layout_dw_base   = state.layout_dw_base;
+                pc.nn_layout_bias_base = state.layout_bias_base;
                 
                 ctx.push_constants(pc);
                 ctx.compute(wg);

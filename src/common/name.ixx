@@ -69,7 +69,15 @@ public:
     Name& operator=(const char* str);
     Name& operator=(const std::string& str);
     
-    auto operator<=>(const Name&) const = default;
+    auto operator<=>(const Name& other) const
+    {
+        return id <=> other.id;
+    }
+    
+    bool operator==(const Name& other) const
+    {
+        return id == other.id;
+    }
     
     bool is_none() const
     {
@@ -81,6 +89,7 @@ public:
 
 private:
     uint32_t id = 0;
+    std::string* debug_string = nullptr;;
 };
 
 

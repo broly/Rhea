@@ -55,18 +55,21 @@ PSOutput main(VSOutput input)
     // int2 coord = int2(input.uv * float2(32, 32));
     
     // hdr_color =  float3(width, height, 0.0); // u_nn_activations[0][coord].rgb;
-    switch (pc.output_mode)
-    {
-        case 0:
-            hdr_color = ColorOutput::read<ColorOutput::Slot::BASE>(input.uv).rgb;
-            break;
-        case 1:
-            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
-            break;
-        case 2:
-            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI>(input.uv).rgb;
-            break;
-    }
+    //switch (pc.output_mode)
+    //{
+    //    case 0:
+    //        hdr_color = ColorOutput::read<ColorOutput::Slot::BASE>(input.uv).rgb;
+    //        break;
+    //    case 1:
+    //        hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
+    //        break;
+    //    case 2:
+    //        hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI>(input.uv).rgb;
+    //        break;
+    //}
+    
+    hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
+    // hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI>(input.uv).rgb;
     
     // {
     //      index = min((int)time_clamped, NN_NUM_DW_TEXTURES);

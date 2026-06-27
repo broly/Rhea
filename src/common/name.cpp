@@ -75,28 +75,38 @@ static uint32_t get_or_create_name_id(const std::string& str)
 Name::Name(const char* str)
     : id(get_or_create_name_id(str))
 {
+    auto& globals = get_name_globals();
+    debug_string = &globals.table[id];
 }
 
 Name::Name(const std::string& str)
     : id(get_or_create_name_id(str))
 {
+    auto& globals = get_name_globals();
+    debug_string = &globals.table[id];
 }
 
 Name::Name(const std::string_view& str)
     : id(get_or_create_name_id(std::string(str)))
 {
+    auto& globals = get_name_globals();
+    debug_string = &globals.table[id];
 }
 
 
 Name& Name::operator=(const char* str)
 {
     id = get_or_create_name_id(str);
+    auto& globals = get_name_globals();
+    debug_string = &globals.table[id];
     return *this;
 }
 
 Name& Name::operator=(const std::string& str)
 {
     id = get_or_create_name_id(str);
+    auto& globals = get_name_globals();
+    debug_string = &globals.table[id];
     return *this;
 }
 

@@ -35,5 +35,7 @@ struct NNPassPC
 {
     glm::ivec2 out_size;
     uint32_t pass_idx;
+    int32_t nn_layout_dw_base;
+    int32_t nn_layout_bias_base;
 };
 REFLECT_STRUCT_RUNTIME(NNPassPC, out_size, pass_idx);

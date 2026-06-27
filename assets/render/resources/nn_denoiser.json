@@ -21,28 +21,28 @@
             },
 
             "pw_weights": {
-                "type": "sampler",
-                "sampler": "default",
+                "type": "ssbo",
                 "variable": "u_nn_pw_weights",
                 "binding": "BINDING_NN_PW_WEIGHTS",
-                "initial_array_size": 32,
-                "array_size_definition": "NN_NUM_PW_TEXTURES"
+                "initial_buffer_size": 624512
             },
             "dw_weights": {
-                "type": "sampler",
-                "sampler": "default",
+                "type": "ssbo",
                 "variable": "u_nn_dw_weights",
                 "binding": "BINDING_NN_DW_WEIGHTS",
-                "initial_array_size": 32,
-                "array_size_definition": "NN_NUM_DW_TEXTURES"
+                "initial_buffer_size": 45360
             },
             "biases": {
-                "type": "sampler",
-                "sampler": "default",
+                "type": "ssbo",
                 "variable": "u_nn_biases",
                 "binding": "BINDING_NN_BIASES",
-                "initial_array_size": 32,
-                "array_size_definition": "NN_NUM_BIAS_TEXTURES"
+                "initial_buffer_size": 5520
+            },
+            "weight_layout": {
+                "type": "ssbo",
+                "variable": "u_nn_weight_layout",
+                "binding": "BINDING_NN_WEIGHT_LAYOUT",
+                "initial_buffer_size": 800
             }
         }
     }

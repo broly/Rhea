@@ -16,14 +16,12 @@ namespace denoiser
         for (int s = 0; s < OUT_SLICES; ++s)
         {
             float4 v = float4(0, 0, 0, 0);
-            if (s * 4 + 0 < NUM_CHANNELS) 
-                v.x = result[s * 4 + 0];
-            if (s * 4 + 1 < NUM_CHANNELS) 
-                v.y = result[s * 4 + 1];
-            if (s * 4 + 2 < NUM_CHANNELS) 
-                v.z = result[s * 4 + 2];
-            if (s * 4 + 3 < NUM_CHANNELS) 
-                v.w = result[s * 4 + 3];
+            [ForceUnroll]
+            for (int index = 0; index < 4; index++)
+            {
+                if (s * 4 + index < NUM_CHANNELS) 
+                    v[index] = result[s * 4 + index];
+            }
             int act_index = nn_get_act_out(s);
             nn_store_act(act_index, pixel, v);
         }

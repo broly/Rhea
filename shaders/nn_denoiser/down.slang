@@ -23,7 +23,8 @@ void main(uint3 dtid : SV_DispatchThreadID)
     if (p.x >= out_size.x || p.y >= out_size.y) 
         return;
 
-    [ForceUnroll] for (int s = 0; s < N_SLICES; ++s)
+    [ForceUnroll] 
+    for (int s = 0; s < N_SLICES; ++s)
     {
         nn_store_act(
             nn_get_act_out(s),

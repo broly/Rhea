@@ -21,13 +21,15 @@ export struct NNDenoiserState
 
     // GPU resources
     std::vector<RGTextureHandle>              activation_textures;
-    std::vector<RGTextureHandle>              pw_weight_textures;
-    std::vector<RGTextureHandle>              dw_weight_textures;
-    std::vector<RGTextureHandle>              bias_textures;
+    
+    // NOTE: Weights uploaded as flat SSBOs (see: u_nn_pw_weights / u_nn_dw_weights / u_nn_biases)
 
     std::map<Name, std::shared_ptr<PipelineFamily>> families;
 
     std::vector<NNPassIndicesSSBO> pass_ubo_templates;
+
+    int32_t layout_dw_base = 0;
+    int32_t layout_bias_base = 0;
 
     bool initialized = false;
     
@@ -41,8 +43,7 @@ namespace nn_denoiser
     NNPassIndicesSSBO make_ubo_from_pass_indices(const NNPassIndicesData& pi);
     
     export void on_pso_built(NNDenoiserState& state);
-
-
+    
     export void load_nn_denoiser_schemas(NNDenoiserState& state);
 
     export void allocate_nn_gpu_resources(

@@ -34,7 +34,7 @@ import log;
 
 DEFINE_LOGGER(LogGenericRG, Display);
 
-constexpr bool enable_nn_denoiser = false;
+constexpr bool enable_nn_denoiser = true;
 
 
 GenericRenderGraph::GenericRenderGraph()

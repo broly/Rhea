@@ -28,20 +28,33 @@ public int2 nn_clamp_coord(int2 p, int2 sz) { return clamp(p, int2(0), sz - int2
 // -----------------------------------------------------------------------------
 
 // Pointwise: 4 weights for in_ch=[4*ic_div4..+3] -> oc.
+// Source texel layout was Load(int3(ic_div4, oc, 0)) on a width=PW_W texture,
+// i.e. row-major element = oc * width + ic_div4.
 public float4 nn_load_pw(int pw_idx, int ic_div4, int oc)
 {
-    return denoiser.u_nn_pw_weights[pw_idx].Load(int3(ic_div4, oc, 0));
+    denoiser::NNWeightSlot slot = denoiser.get_pw_slot(pw_idx);
+    int elem = slot.base + oc * slot.width + ic_div4;
+    return denoiser.u_nn_pw_weights[elem];
 }
 
 // Depthwise: 4 weights for chans [4*ic_div4..+3] in pos (kx, ky).
+// Source texel layout was Load(int4(kx+1, ky+1, ic_div4, 0)) on a
+// width=height=3 array texture, i.e. element =
+//   ic_div4 * (width*height) + (ky+1) * width + (kx+1).
 public float4 nn_load_dw(int dw_idx, int kx, int ky, int ic_div4)
 {
-    return denoiser.u_nn_dw_weights[dw_idx].Load(int4(kx + 1, ky + 1, ic_div4, 0));
+    denoiser::NNWeightSlot slot = denoiser.get_dw_slot(dw_idx);
+    int x = kx + 1;
+    int y = ky + 1;
+    int elem = slot.base + ic_div4 * (slot.width * slot.height) + y * slot.width + x;
+    return denoiser.u_nn_dw_weights[elem];
 }
 
+// Bias: source texel layout was Load(int3(oc>>2, 0, 0)), element = oc>>2.
 public float nn_load_bias(int bias_idx, int oc)
 {
-    float4 b4 = denoiser.u_nn_biases[bias_idx].Load(int3(oc >> 2, 0, 0));
+    denoiser::NNWeightSlot slot = denoiser.get_bias_slot(bias_idx);
+    float4 b4 = denoiser.u_nn_biases[slot.base + (oc >> 2)];
     return b4[oc & 3];
 }
 
@@ -86,34 +99,22 @@ public int nn_get_act_in(int s)
 {
     int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActIn[s >> 2];
     int  c = s & 3;
-    // Replace dynamic component access with static branches.
-    // SPIR-V cbuffer requires constant component index for vectors;
-    // expanding the switch makes the access a static OpCompositeExtract
-    // for each branch and lets ForceUnroll fully unroll the calling loop.
-    if (c == 0) return v.x;
-    if (c == 1) return v.y;
-    if (c == 2) return v.z;
-    return v.w;
+    
+    return v[c];
 }
 
 public int nn_get_act_out(int s)
 {
     int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActOut[s >> 2];
     int  c = s & 3;
-    if (c == 0) return v.x;
-    if (c == 1) return v.y;
-    if (c == 2) return v.z;
-    return v.w;
+    return v[c];
 }
 
 public int nn_get_act_res(int s)
 {
     int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActRes[s >> 2];
     int  c = s & 3;
-    if (c == 0) return v.x;
-    if (c == 1) return v.y;
-    if (c == 2) return v.z;
-    return v.w;
+    return v[c];
 }
 
 
@@ -141,15 +142,9 @@ public float3 nn_load_packed_rgb(int flat_ch, int2 p)
         int comp_idx  = ch & 3;
         int slot      = nn_get_act_res(slice_idx);
         float4 v      = nn_load_act(slot, p);
-        float scalar;
-        if      (comp_idx == 0) scalar = v.x;
-        else if (comp_idx == 1) scalar = v.y;
-        else if (comp_idx == 2) scalar = v.z;
-        else                    scalar = v.w;
-
-        if      (k == 0) result.r = scalar;
-        else if (k == 1) result.g = scalar;
-        else             result.b = scalar;
+        float scalar  = v[comp_idx];
+        
+        result[k] = scalar;
     }
     return result;
 }
@@ -303,6 +298,15 @@ public void nn_pointwise_bias_act<int IN_SLICES, int OUT_CH_NUM, TAct : NNActFn:
     }
 }
 
+void store_slice<int NUM>(inout float array[NUM], int s, float4 value)
+{
+    [ForceUnroll]
+    for (int ch_idx = 0; ch_idx < 4; ch_idx++)
+    {
+        if (s * 4 + ch_idx < NUM)
+            array[s * 4 + ch_idx] += value[ch_idx];
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Add residual: result += [readback from uActRes slices].
@@ -318,17 +322,24 @@ public void nn_add_residual<int OUT_SLICES, int OUT_CH_NUM>(
     for (int s = 0; s < OUT_SLICES; ++s)
     {
         float4 rv = nn_load_act(nn_get_act_res(s), p);
-        if (s * 4 + 0 < OUT_CH_NUM) 
-            result[s * 4 + 0] += rv.x;
-        if (s * 4 + 1 < OUT_CH_NUM) 
-            result[s * 4 + 1] += rv.y;
-        if (s * 4 + 2 < OUT_CH_NUM) 
-            result[s * 4 + 2] += rv.z;
-        if (s * 4 + 3 < OUT_CH_NUM) 
-            result[s * 4 + 3] += rv.w;
+        store_slice(result, s, rv);
     }
 }
 
+float4 get_slice<int ARRAY_SIZE>(in float array[ARRAY_SIZE], int slice)
+{
+    float4 v = float4(0, 0, 0, 0);
+    
+    [ForceUnroll]
+    for (int index = 0; index < 4; index++)
+    {
+        if (slice * 4 + index < ARRAY_SIZE)
+        {
+            v[index] = array[slice * 4 + index];
+        }
+    }
+    return v;
+}
 
 // -----------------------------------------------------------------------------
 // Pack flat result[OUT_CH_NUM] to RGBA-slices and writes to u_nn_activations.
@@ -340,15 +351,7 @@ public void nn_store_packed<int OUT_SLICES, int OUT_CH_NUM>(
     [ForceUnroll] 
     for (int s = 0; s < OUT_SLICES; ++s)
     {
-        float4 v = float4(0, 0, 0, 0);
-        if (s * 4 + 0 < OUT_CH_NUM) 
-            v.x = result[s * 4 + 0];
-        if (s * 4 + 1 < OUT_CH_NUM) 
-            v.y = result[s * 4 + 1];
-        if (s * 4 + 2 < OUT_CH_NUM) 
-            v.z = result[s * 4 + 2];
-        if (s * 4 + 3 < OUT_CH_NUM) 
-            v.w = result[s * 4 + 3];
+        float4 v = get_slice(result, s);
         int act_index = nn_get_act_out(s);
         nn_store_act(act_index, p, v);
     }
