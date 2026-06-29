@@ -18,11 +18,11 @@ import nn_lib;
 
 
 #if ACT == NN_ACT_NONE
-    typedef NNActFn::None ActivationFn;
+    typealias ActivationFn = NN::ActivationFunctions::None;
 #elif ACT == NN_ACT_RELU
-    typedef NNActFn::ReLU ActivationFn;
+    typealias ActivationFn = NN::ActivationFunctions::ReLU;
 #elif ACT == NN_ACT_GELU
-    typedef NNActFn::GeLU ActivationFn;
+    typealias ActivationFn = NN::ActivationFunctions::GeLU;
 #else
     #error "Unknown activation function
 #endif

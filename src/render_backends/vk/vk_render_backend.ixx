@@ -124,6 +124,13 @@ public:   /// API Section
     virtual void flush_frame_garbage(RBFrameHandle frame) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
+
+    virtual double get_timestamp_period_ns() const override;
+    virtual RBQueryPool create_timestamp_pool(uint32_t query_count) override;
+    virtual void destroy_timestamp_pool(RBQueryPool pool) override;
+    virtual void cmd_reset_timestamp_pool(RBCommandList cmd, RBQueryPool pool, uint32_t query_count) override;
+    virtual void cmd_write_timestamp(RBCommandList cmd, RBQueryPool pool, uint32_t query_index, bool bottom_of_pipe) override;
+    virtual bool read_timestamps(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values) override;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) override;
     virtual RBVertexBufferHandle create_vertex_buffer(const VertexBufferDesc& desc) override;
     virtual void* get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame) override;

@@ -10,12 +10,69 @@
         },
         "flags": {},
         "variants": {
-            "IN_CH":          { "values": [3, 11, 13, 16, 32, 64, 96, 128, 192, 256], "default_index": 4 },
-            "OUT_CH":         { "values": [3, 32, 64, 128],                       "default_index": 1 },
-            "CHANNELS":       { "values": [32, 64, 128],                          "default_index": 0 },
-            "A_CHANNELS":     { "values": [32, 64, 128],                          "default_index": 0 },
-            "B_CHANNELS":     { "values": [32, 64, 128],                          "default_index": 0 },
-            "TOTAL_CHANNELS": { "values": [11, 13, 16],                           "default_index": 0 }
+            "IN_CH": {
+                "values": [
+                    3,
+                    11,
+                    13,
+                    16,
+                    32,
+                    64,
+                    96,
+                    128,
+                    192,
+                    256
+                ],
+                "default_index": 4
+            },
+            "OUT_CH": {
+                "values": [
+                    3,
+                    32,
+                    64,
+                    128
+                ],
+                "default_index": 1
+            },
+            "CHANNELS": {
+                "values": [
+                    32,
+                    64,
+                    128
+                ],
+                "default_index": 0
+            },
+            "A_CHANNELS": {
+                "values": [
+                    32,
+                    64,
+                    128
+                ],
+                "default_index": 0
+            },
+            "B_CHANNELS": {
+                "values": [
+                    32,
+                    64,
+                    128
+                ],
+                "default_index": 0
+            },
+            "TOTAL_CHANNELS": {
+                "values": [
+                    11,
+                    13,
+                    16
+                ],
+                "default_index": 0
+            },
+            "NN_USE_COOPMAT": {
+                "values": [
+                    0,
+                    1
+                ],
+                "default_index": 0
+            }
         }
     },
     "pipelines": [
@@ -24,14 +81,18 @@
             "pass": "NN_ENC",
             "shader_stage": {
                 "shader": "nn_denoiser/enc.slang",
-                "resources": ["nn_denoiser"],
+                "resources": [
+                    "nn_denoiser"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         },
@@ -40,14 +101,18 @@
             "pass": "NN_DEC",
             "shader_stage": {
                 "shader": "nn_denoiser/dec.slang",
-                "resources": ["nn_denoiser"],
+                "resources": [
+                    "nn_denoiser"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         },
@@ -56,14 +121,18 @@
             "pass": "NN_BOTTLENECK",
             "shader_stage": {
                 "shader": "nn_denoiser/bottleneck.slang",
-                "resources": ["nn_denoiser"],
+                "resources": [
+                    "nn_denoiser"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         },
@@ -72,14 +141,18 @@
             "pass": "NN_DOWN",
             "shader_stage": {
                 "shader": "nn_denoiser/down.slang",
-                "resources": ["nn_denoiser"],
+                "resources": [
+                    "nn_denoiser"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         },
@@ -88,14 +161,18 @@
             "pass": "NN_UP",
             "shader_stage": {
                 "shader": "nn_denoiser/up.slang",
-                "resources": ["nn_denoiser"],
+                "resources": [
+                    "nn_denoiser"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         },
@@ -104,14 +181,18 @@
             "pass": "NN_CAT",
             "shader_stage": {
                 "shader": "nn_denoiser/cat.slang",
-                "resources": ["nn_denoiser"],
+                "resources": [
+                    "nn_denoiser"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         },
@@ -120,14 +201,21 @@
             "pass": "NN_HEAD",
             "shader_stage": {
                 "shader": "nn_denoiser/head.slang",
-                "resources": ["nn_denoiser", "hdr_color_storage", "hdr_color_output", "gbuffer"],
+                "resources": [
+                    "nn_denoiser",
+                    "hdr_color_storage",
+                    "hdr_color_output",
+                    "gbuffer"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         },
@@ -136,14 +224,21 @@
             "pass": "NN_INPUT",
             "shader_stage": {
                 "shader": "nn_denoiser/input.slang",
-                "resources": ["nn_denoiser", "gbuffer", "hdr_color_storage", "hdr_color_output"],
+                "resources": [
+                    "nn_denoiser",
+                    "gbuffer",
+                    "hdr_color_storage",
+                    "hdr_color_output"
+                ],
                 "lang": "slang"
             },
             "push_constants": [
                 {
                     "type": "NNPassPC",
                     "name": "nn_pass_pc",
-                    "stages": ["compute"]
+                    "stages": [
+                        "compute"
+                    ]
                 }
             ]
         }

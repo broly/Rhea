@@ -32,6 +32,11 @@ export struct NNDenoiserState
     int32_t layout_bias_base = 0;
 
     bool initialized = false;
+
+    // Pointwise back-end switch for enc/dec/bottleneck/up: false = scalar dot products, true = coopmat/GEMM on the 
+    // tensor cores. Each value is a distinct ShaderKey -> its own PSO, so flipping it gives a clean A/B. Flipping at
+    // runtime has to invalidate cached PSOs (see set_coopmat_gemm / on_pso_built).
+    bool use_coopmat_gemm = true;
     
     RenderResource* resource;
     
@@ -43,6 +48,10 @@ namespace nn_denoiser
     NNPassIndicesSSBO make_ubo_from_pass_indices(const NNPassIndicesData& pi);
     
     export void on_pso_built(NNDenoiserState& state);
+
+    // Flip the pointwise back-end for benchmarking. Invalidates cached PSOs so the next frame rebuilds with the new 
+    // COOPMAT permutation. Returns true if the value changed.
+    export bool set_coopmat_gemm(NNDenoiserState& state, bool enable);
     
     export void load_nn_denoiser_schemas(NNDenoiserState& state);
 
@@ -57,11 +66,4 @@ namespace nn_denoiser
         NNDenoiserState& state, RenderGraphContext& ctx);
 
     export void add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer);
-    
-    // export void init_and_add_nn_passes(
-    //     NNDenoiserState& state,
-    //     RenderGraph& rg,
-    //     Renderer& renderer,
-    //     RenderBackend& backend,
-    //     const Extent& swapchain_extent);
 }

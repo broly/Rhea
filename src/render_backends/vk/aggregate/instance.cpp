@@ -143,6 +143,7 @@ void vk::Instance::init(GLFWwindow* in_window)
         VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
         VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+        VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,   // cooperative-matrix denoiser path
     };
     
     
@@ -184,15 +185,24 @@ void vk::Instance::init(GLFWwindow* in_window)
     // features12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
     features12.descriptorBindingPartiallyBound = VK_TRUE;
     // features12.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+    features12.shaderFloat16 = VK_TRUE;                  // fp16 in cooperative-matrix denoiser
+    features12.vulkanMemoryModel = VK_TRUE;              // required by cooperative matrices
+    features12.vulkanMemoryModelDeviceScope = VK_TRUE;   // device-scope coop-matrix ops
     features12.pNext = &rtFeatures;
     
     VkPhysicalDeviceVulkan13Features features13{};
     features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     features13.shaderDemoteToHelperInvocation = VK_TRUE;
     features13.pNext = &features12;
-    
 
-    dci.pNext = &features13;
+    // Cooperative-matrix (KHR) feature for the GEMM denoiser path. Placed at the
+    // head of the pNext chain; ordering does not matter to Vulkan.
+    VkPhysicalDeviceCooperativeMatrixFeaturesKHR coopMatFeatures{};
+    coopMatFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
+    coopMatFeatures.cooperativeMatrix = VK_TRUE;
+    coopMatFeatures.pNext = &features13;
+
+    dci.pNext = &coopMatFeatures;
 
     VK_CHECK(
         vkCreateDevice(physical_device, &dci, nullptr, &device)
@@ -265,6 +275,9 @@ void vk::Instance::match_queue_families()
             LogVkInstance.Log("  * maxBoundDescriptorSets = %i",
                 props.limits.maxBoundDescriptorSets);
             
+            LogVkInstance.Log("  * maxComputeSharedMemorySize = %u",
+                props.limits.maxComputeSharedMemorySize);
+            
             VkBool32 presentSupported = VK_FALSE;
             vkGetPhysicalDeviceSurfaceSupportKHR(
                 device,
@@ -291,6 +304,8 @@ void vk::Instance::match_queue_families()
     
     queues_indices[0] = queues.graphics;
     queues_indices[1] = queues.present;
+    
+    
 }
 
 VkBool32 vk::Instance::debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

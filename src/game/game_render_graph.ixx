@@ -14,6 +14,7 @@ struct TonemapPushConstants
 {
     float time;
     uint32_t mode;
+    uint32_t fps;
 };
 REFLECT_STRUCT_RUNTIME(TonemapPushConstants, 
     time, mode);

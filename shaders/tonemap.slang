@@ -32,6 +32,7 @@ struct PushConstants
 {
     float time;
     uint32_t output_mode;
+    uint32_t fps;
 };
 
 [[vk::push_constant]]
@@ -58,7 +59,7 @@ PSOutput main(VSOutput input)
     //switch (pc.output_mode)
     //{
     //    case 0:
-    //        hdr_color = ColorOutput::read<ColorOutput::Slot::BASE>(input.uv).rgb;
+    //            hdr_color = ColorOutput::read<ColorOutput::Slot::BASE>(input.uv).rgb;
     //        break;
     //    case 1:
     //        hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
@@ -116,9 +117,11 @@ PSOutput main(VSOutput input)
     //    hdr_color = u_nn_activations[514][texel].rgb;
   //
     //}
+    
+    
     hdr_color = exposure(hdr_color);
     
-    // hdr_color = DrawNumber9999(input.uv, hdr_color, index, float2(0.12), 0.08, float3(1.0, 0.2, 0.1));
+    hdr_color = DrawNumber9999(input.uv, hdr_color, pc.fps, float2(0.12), 0.08, float3(1.0, 0.2, 0.1));
     
     float3 mapped = ACES(hdr_color);
     mapped = gamma(mapped);

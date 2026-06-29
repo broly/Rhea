@@ -6,21 +6,29 @@ import nn_denoiser_resource;
 // Activations
 // -----------------------------------------------------------------------------
 
-public float nn_gelu(float x)
+namespace NN
+{
+
+public float gelu(float x)
 {
     const float c = 0.7978845608f;   // sqrt(2/pi)
     const float k = 0.044715f;
     return 0.5f * x * (1.0f + tanh(c * (x + k * x * x * x)));
 }
 
-public float nn_relu(float x) { return max(x, 0.0f); }
+public float relu(float x) { return max(x, 0.0f); }
 
 
 // -----------------------------------------------------------------------------
 // Coordinate utilities
 // -----------------------------------------------------------------------------
 
-public int2 nn_clamp_coord(int2 p, int2 sz) { return clamp(p, int2(0), sz - int2(1)); }
+public int2 clamp_coord(int2 p, int2 sz) 
+{ 
+    return clamp(p, int2(0), sz - int2(1)); 
+}
+
+
 
 
 // -----------------------------------------------------------------------------
@@ -30,7 +38,7 @@ public int2 nn_clamp_coord(int2 p, int2 sz) { return clamp(p, int2(0), sz - int2
 // Pointwise: 4 weights for in_ch=[4*ic_div4..+3] -> oc.
 // Source texel layout was Load(int3(ic_div4, oc, 0)) on a width=PW_W texture,
 // i.e. row-major element = oc * width + ic_div4.
-public float4 nn_load_pw(int pw_idx, int ic_div4, int oc)
+public float4 load_pointwise(int pw_idx, int ic_div4, int oc)
 {
     denoiser::NNWeightSlot slot = denoiser.get_pw_slot(pw_idx);
     int elem = slot.base + oc * slot.width + ic_div4;
@@ -41,7 +49,7 @@ public float4 nn_load_pw(int pw_idx, int ic_div4, int oc)
 // Source texel layout was Load(int4(kx+1, ky+1, ic_div4, 0)) on a
 // width=height=3 array texture, i.e. element =
 //   ic_div4 * (width*height) + (ky+1) * width + (kx+1).
-public float4 nn_load_dw(int dw_idx, int kx, int ky, int ic_div4)
+public float4 load_depthwise(int dw_idx, int kx, int ky, int ic_div4)
 {
     denoiser::NNWeightSlot slot = denoiser.get_dw_slot(dw_idx);
     int x = kx + 1;
@@ -51,7 +59,7 @@ public float4 nn_load_dw(int dw_idx, int kx, int ky, int ic_div4)
 }
 
 // Bias: source texel layout was Load(int3(oc>>2, 0, 0)), element = oc>>2.
-public float nn_load_bias(int bias_idx, int oc)
+public float load_bias(int bias_idx, int oc)
 {
     denoiser::NNWeightSlot slot = denoiser.get_bias_slot(bias_idx);
     float4 b4 = denoiser.u_nn_biases[slot.base + (oc >> 2)];
@@ -63,39 +71,43 @@ public float nn_load_bias(int bias_idx, int oc)
 // Activation slice access
 // -----------------------------------------------------------------------------
 
-public float4 nn_load_act(int act_idx, int2 p)
+public float4 load_activation(int act_idx, int2 p)
 {
     return denoiser.u_nn_activations[act_idx][p];
 }
 
-public void nn_store_act(int act_idx, int2 p, float4 v)
+public void store_activation(int act_idx, int2 p, float4 v)
 {
     denoiser.u_nn_activations[act_idx][p] = v;
 }
 
+namespace processing
+{
 
 // -----------------------------------------------------------------------------
 // Preprocessing helpers (input pass)
 // -----------------------------------------------------------------------------
 
-public float3 nn_demodulate(float3 noisy, float3 albedo, float eps, float clamp_max)
+public float3 demodulate(float3 noisy, float3 albedo, float eps, float clamp_max)
 {
     float3 irr = noisy / max(albedo, float3(eps, eps, eps));
     return clamp(irr, float3(0.0f, 0.0f, 0.0f), float3(clamp_max, clamp_max, clamp_max));
 }
 
-public float3 nn_log_compress(float3 x) { return log(1.0f + max(x, float3(0.0f, 0.0f, 0.0f))); }
-public float3 nn_log_expand(float3 x) { return max(exp(x) - 1.0f, float3(0.0f, 0.0f, 0.0f)); }
-public float3 nn_remodulate(float3 irr, float3 albedo) { return irr * albedo; }
-public float3 nn_encode_normal(float3 n) { return n * 0.5f + 0.5f; }
+public float3 log_compress(float3 x) { return log(1.0f + max(x, float3(0.0f, 0.0f, 0.0f))); }
+public float3 log_expand(float3 x) { return max(exp(x) - 1.0f, float3(0.0f, 0.0f, 0.0f)); }
+public float3 remodulate(float3 irr, float3 albedo) { return irr * albedo; }
+public float3 encode_normal(float3 n) { return n * 0.5f + 0.5f; }
 
-public float nn_normalize_depth(float depth, float near_v, float far_v)
+public float normalize_depth(float depth, float near_v, float far_v)
 {
     float d = clamp(depth, near_v, far_v);
     return (log(d) - log(near_v)) / (log(far_v) - log(near_v));
 }
+}
 
-public int nn_get_act_in(int s)
+
+public int get_activation_input(int s)
 {
     int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActIn[s >> 2];
     int  c = s & 3;
@@ -103,19 +115,21 @@ public int nn_get_act_in(int s)
     return v[c];
 }
 
-public int nn_get_act_out(int s)
+public int get_activation_output(int s)
 {
     int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActOut[s >> 2];
     int  c = s & 3;
     return v[c];
 }
 
-public int nn_get_act_res(int s)
+public int get_activation_residual(int s)
 {
     int4 v = denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uActRes[s >> 2];
     int  c = s & 3;
     return v[c];
 }
+
+
 
 
 // -----------------------------------------------------------------------------
@@ -131,7 +145,7 @@ public int nn_get_act_res(int s)
 // input_packed), so uActRes[(flat_ch+k)/4] gives the correct slot for
 // the k-th channel of the triple.
 // -----------------------------------------------------------------------------
-public float3 nn_load_packed_rgb(int flat_ch, int2 p)
+public float3 load_packed_rgb(int flat_ch, int2 p)
 {
     float3 result;
     [ForceUnroll]
@@ -140,8 +154,8 @@ public float3 nn_load_packed_rgb(int flat_ch, int2 p)
         int ch        = flat_ch + k;
         int slice_idx = ch >> 2;
         int comp_idx  = ch & 3;
-        int slot      = nn_get_act_res(slice_idx);
-        float4 v      = nn_load_act(slot, p);
+        int slot      = get_activation_residual(slice_idx);
+        float4 v      = load_activation(slot, p);
         float scalar  = v[comp_idx];
         
         result[k] = scalar;
@@ -149,12 +163,12 @@ public float3 nn_load_packed_rgb(int flat_ch, int2 p)
     return result;
 }
 
-public int get_nn_baseline_flat_ch()
+public int get_baseline_flat_ch()
 {
     return denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uBaselineFlatCh;
 }
 
-public int get_nn_albedo_flat_ch()
+public int get_albedo_flat_ch()
 {
     return denoiser.u_nn_pass_indices[denoiser.get_pass_index()].uAlbedoFlatCh;
 }
@@ -175,10 +189,10 @@ public NNBilinearTaps nn_bilinear_taps(int2 dst_p, int2 src_size)
     float2 srcF = float2(dst_p) * 0.5f - 0.25f;
     int2   src0 = int2(floor(srcF));
     NNBilinearTaps r;
-    r.q00 = nn_clamp_coord(src0,                   src_size);
-    r.q10 = nn_clamp_coord(src0 + int2(1, 0),       src_size);
-    r.q01 = nn_clamp_coord(src0 + int2(0, 1),       src_size);
-    r.q11 = nn_clamp_coord(src0 + int2(1, 1),       src_size);
+    r.q00 = NN::clamp_coord(src0,                   src_size);
+    r.q10 = NN::clamp_coord(src0 + int2(1, 0),       src_size);
+    r.q01 = NN::clamp_coord(src0 + int2(0, 1),       src_size);
+    r.q11 = NN::clamp_coord(src0 + int2(1, 1),       src_size);
     r.t   = srcF - float2(src0);
     return r;
 }
@@ -207,7 +221,7 @@ public bool nn_inside(int2 p, int2 sz)
 // Reads u_nn_activations[uActIn[0..IN_SLICES-1]] around p (3x3 neighborhood),
 // Applies depthwise weights from tex by index dw_idx.
 // -----------------------------------------------------------------------------
-public void nn_depthwise_3x3<int IN_SLICES>(
+public void depthwise_3x3<int IN_SLICES>(
     int2 p,
     int2 out_size,
     int  dw_idx,
@@ -223,18 +237,18 @@ public void nn_depthwise_3x3<int IN_SLICES>(
         [ForceUnroll] 
         for (int kx = -1; kx <= 1; ++kx)
         {
-            int2 q = nn_clamp_coord(p + int2(kx, ky), out_size);
+            int2 q = NN::clamp_coord(p + int2(kx, ky), out_size);
             [ForceUnroll] 
             for (int s = 0; s < IN_SLICES; ++s)
             {
-                float4 a = nn_load_act(nn_get_act_in(s), q);
+                float4 a = NN::load_activation(get_activation_input(s), q);
                 // float4 a = float4(0,0,0,0);
                 
                 // if (nn_inside(q, out_size))
                 // {
                 //     a = nn_load_act(nn_get_act_in(s), q);
                 // }   
-                float4 w = nn_load_dw(dw_idx, kx, ky, s);
+                float4 w = load_depthwise(dw_idx, kx, ky, s);
                 dwAccum[s] += a * w;
             }
         }
@@ -249,8 +263,7 @@ public void nn_depthwise_3x3<int IN_SLICES>(
 // -----------------------------------------------------------------------------
 
 
-
-namespace NNActFn
+namespace ActivationFunctions
 {
     public interface IAct
     {
@@ -264,41 +277,40 @@ namespace NNActFn
     
     public struct ReLU : IAct
     {
-        public static float apply(float x) { return nn_relu(x); }
+        public static float apply(float x) { return relu(x); }
     }
     
     public struct GeLU : IAct
     {
-        public static float apply(float x) { return nn_gelu(x); }
+        public static float apply(float x) { return gelu(x); }
     }
 }
 
-public void nn_pointwise_bias_act<int IN_SLICES, int OUT_CH_NUM, TAct : NNActFn::IAct>(
+public void pointwise_bias_activate<int IN_SLICES, int OUT_CH_NUM, TAct : ActivationFunctions::IAct>(
     in float4 dwAccum[IN_SLICES],
     int pw_idx,
     int bias_idx,
     out float result[OUT_CH_NUM])
 {
-
-    [ForceUnroll] 
+    // maybe [DoNotUnroll]
     for (int oc = 0; oc < OUT_CH_NUM; ++oc)
     {
-        float acc = nn_load_bias(bias_idx, oc);
-        
-        [ForceUnroll] 
+        float acc = NN::load_bias(bias_idx, oc);
+
+        [ForceUnroll]
         for (int s = 0; s < IN_SLICES; ++s)
         {
-            float4 w = nn_load_pw(pw_idx, s, oc);
+            float4 w = load_pointwise(pw_idx, s, oc);
             acc += dot(w, dwAccum[s]);
         }
-        
+
         acc = TAct::apply(acc);
-                       
+
         result[oc] = acc;
     }
 }
 
-void store_slice<int NUM>(inout float array[NUM], int s, float4 value)
+internal void store_slice<int NUM>(inout float array[NUM], int s, float4 value)
 {
     [ForceUnroll]
     for (int ch_idx = 0; ch_idx < 4; ch_idx++)
@@ -314,19 +326,19 @@ void store_slice<int NUM>(inout float array[NUM], int s, float4 value)
 // OUT_SLICES = ceil(OUT_CH_NUM / 4). Supposed OUT_CH_NUM multiples by 4 for
 // bottleneck residual blocks (see unet.py).
 // -----------------------------------------------------------------------------
-public void nn_add_residual<int OUT_SLICES, int OUT_CH_NUM>(
+public void add_residual<int OUT_SLICES, int OUT_CH_NUM>(
     int2 p,
     inout float result[OUT_CH_NUM])
 {
     [ForceUnroll] 
     for (int s = 0; s < OUT_SLICES; ++s)
     {
-        float4 rv = nn_load_act(nn_get_act_res(s), p);
+        float4 rv = load_activation(get_activation_residual(s), p);
         store_slice(result, s, rv);
     }
 }
 
-float4 get_slice<int ARRAY_SIZE>(in float array[ARRAY_SIZE], int slice)
+internal float4 get_slice<int ARRAY_SIZE>(in float array[ARRAY_SIZE], int slice)
 {
     float4 v = float4(0, 0, 0, 0);
     
@@ -344,7 +356,7 @@ float4 get_slice<int ARRAY_SIZE>(in float array[ARRAY_SIZE], int slice)
 // -----------------------------------------------------------------------------
 // Pack flat result[OUT_CH_NUM] to RGBA-slices and writes to u_nn_activations.
 // -----------------------------------------------------------------------------
-public void nn_store_packed<int OUT_SLICES, int OUT_CH_NUM>(
+public void store_packed<int OUT_SLICES, int OUT_CH_NUM>(
     int2 p,
     in float result[OUT_CH_NUM])
 {
@@ -352,8 +364,8 @@ public void nn_store_packed<int OUT_SLICES, int OUT_CH_NUM>(
     for (int s = 0; s < OUT_SLICES; ++s)
     {
         float4 v = get_slice(result, s);
-        int act_index = nn_get_act_out(s);
-        nn_store_act(act_index, p, v);
+        int act_index = get_activation_output(s);
+        store_activation(act_index, p, v);
     }
     
 }
@@ -362,13 +374,15 @@ public void nn_store_packed<int OUT_SLICES, int OUT_CH_NUM>(
 // -----------------------------------------------------------------------------
 // 2x2 average pool (for Down pass).
 // -----------------------------------------------------------------------------
-public float4 nn_avg_pool_2x2(int act_idx, int2 dst_p)
+public float4 avg_pool_2x2(int act_idx, int2 dst_p)
 {
-    float4 a = nn_load_act(act_idx, int2(dst_p.x*2,     dst_p.y*2  ));
-    float4 b = nn_load_act(act_idx, int2(dst_p.x*2 + 1, dst_p.y*2  ));
-    float4 c = nn_load_act(act_idx, int2(dst_p.x*2,     dst_p.y*2 + 1));
-    float4 d = nn_load_act(act_idx, int2(dst_p.x*2 + 1, dst_p.y*2 + 1));
+    float4 a = load_activation(act_idx, int2(dst_p.x*2,     dst_p.y*2  ));
+    float4 b = load_activation(act_idx, int2(dst_p.x*2 + 1, dst_p.y*2  ));
+    float4 c = load_activation(act_idx, int2(dst_p.x*2,     dst_p.y*2 + 1));
+    float4 d = load_activation(act_idx, int2(dst_p.x*2 + 1, dst_p.y*2 + 1));
     return 0.25f * (a + b + c + d);
 }
 
-    
+}
+
+

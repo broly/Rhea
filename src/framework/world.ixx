@@ -7,7 +7,9 @@ import :core;
 import dependency_collector;
 import rhmath;
 import rhobject;
+import <array>;
 // import :scene_extractor;
+
 
 
 export class World : public std::enable_shared_from_this<World>
@@ -34,6 +36,8 @@ public:
     }
 
     double get_time_seconds() const;
+    
+    double get_delta_seconds() const;
 
     void set_clock(std::shared_ptr<EngineClock> in_clock)
     {
@@ -51,7 +55,9 @@ public:
         return std::static_pointer_cast<T>(find_actor_by_name(name));
     }
     
-    
+    double get_avg_fps() const;
+
+
     std::shared_ptr<RhActor> find_actor_by_name(const std::string& name);
 
     std::vector<std::unique_ptr<WorldScript>> scripts;
@@ -59,4 +65,14 @@ public:
     std::vector<std::shared_ptr<RhActor>> actors;
     DependencyCollector collector;
     SerializationContext world_load_serialization_context;
+    
+    
+    static constexpr int32_t NUM_SAMPLES_AVG_FPS = 60; 
+    static constexpr bool COUNT_AVG_FPS = true;
+    
+    // AVG FPS
+    std::array<double, NUM_SAMPLES_AVG_FPS> fps_samples{};
+    uint32_t fps_sample_index = 0;
+    uint32_t fps_sample_count = 0;
+    double fps_sum = 0.0;
 };

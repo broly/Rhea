@@ -36,6 +36,19 @@ void nn_denoiser::on_pso_built(NNDenoiserState& state)
     state.pso = {};
 }
 
+bool nn_denoiser::set_coopmat_gemm(NNDenoiserState& state, bool enable)
+{
+    if (state.use_coopmat_gemm == enable)
+        return false;
+    state.use_coopmat_gemm = enable;
+    // Drop cached PSOs so the convolution passes recompile with the new COOPMAT
+    // permutation on the next add_nn_denoiser_passes / execute.
+    state.pso = {};
+    LogNNDenoiser.Log<Display>("NN denoiser pointwise back-end -> %s",
+        enable ? "Coopmat/GEMM (NN_COOPMAT_ON)" : "scalar (NN_COOPMAT_OFF)");
+    return true;
+}
+
 void nn_denoiser::load_nn_denoiser_schemas(NNDenoiserState& state)
 {
     SerializationContext ctx;
@@ -53,7 +66,6 @@ void nn_denoiser::load_nn_denoiser_schemas(NNDenoiserState& state)
     checkf(weights_loaded, "Could not load %s", weights_path.string().c_str());
     state.weights_index = std::move(*weights_loaded);
 
-    // Pre-compute UBO templates
     state.pass_ubo_templates.reserve(state.pipeline->passes.size());
     for (const auto& pass : state.pipeline->passes)
         state.pass_ubo_templates.push_back(make_ubo_from_pass_indices(pass.pass_indices));
@@ -185,7 +197,7 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
     state.layout_dw_base   = int32_t(num_pw);
     state.layout_bias_base = int32_t(num_pw + num_dw);
 
-    // Guard against empty buffers (an SSBO must have at least one element to memcpy into the host-visible mapping).
+    // an SSBO needs at least one element or there's nothing to memcpy into
     if (pw_buffer.empty())   pw_buffer.push_back(glm::vec4(0.0f));
     if (dw_buffer.empty())   dw_buffer.push_back(glm::vec4(0.0f));
     if (bias_buffer.empty()) bias_buffer.push_back(glm::vec4(0.0f));
@@ -193,7 +205,7 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
 
     auto& nn_resource = renderer.find_resource_checked(Name("nn_denoiser"));
 
-    // Use the explicit (byte-size, data) overload so the upload copies the right number of bytes regardless of element type.
+    // explicit (byte-size, data) overload so element type doesn't matter for the copy
     nn_resource.update_ssbo(Name("u_nn_pw_weights"),
         pw_buffer.size() * sizeof(glm::vec4), (void*)pw_buffer.data());
     nn_resource.update_ssbo(Name("u_nn_dw_weights"),
@@ -221,31 +233,13 @@ void nn_denoiser::allocate_nn_gpu_resources(NNDenoiserState& state, RenderGraph&
 void nn_denoiser::prepare_resources(NNDenoiserState& state, RenderGraphContext& ctx)
 {
     RenderResource* nn_resource = ctx.render_graph.renderer->find_resource(Name("nn_denoiser"));
-    
-    for (size_t pass_idx = 0; pass_idx < state.pipeline->passes.size(); ++pass_idx)
-    {
-        auto& pass = state.pipeline->passes[pass_idx];
-        const Name output_tensor_name = pass.output_tensor;
-        const NNPassIndicesSSBO ubo_template = state.pass_ubo_templates[pass_idx];
-        
-        NNPassIndicesSSBO ubo = ubo_template;
-        
-        
-        float out_scale = 1.0f;
-        for (const auto& t : state.pipeline->tensors)
-        {
-            if (t.name == output_tensor_name) { out_scale = t.scale; break; }
-        }
 
-        const Extent sc = ctx.backend.get_swapchain_extent();
-        
-        std::vector<RBImageHandle> act_images;
-        act_images.reserve(state.activation_textures.size());
-        for (auto rg_handle : state.activation_textures)
-            act_images.push_back(ctx.render_graph.get_image(rg_handle));
-        
-        nn_resource->update_image_array(Name("u_nn_activations"), act_images, {});
-    }
+    std::vector<RBImageHandle> act_images;
+    act_images.reserve(state.activation_textures.size());
+    for (auto rg_handle : state.activation_textures)
+        act_images.push_back(ctx.render_graph.get_image(rg_handle));
+
+    nn_resource->update_image_array(Name("u_nn_activations"), act_images, {});
 }
 
 void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg, Renderer& renderer)
@@ -322,16 +316,81 @@ void nn_denoiser::add_nn_denoiser_passes(NNDenoiserState& state, RenderGraph& rg
                 
                 if (!state.pso.contains(pass_idx))
                 {
-                    
-                    
                     auto& pass = state.pipeline->passes[pass_idx];
                     auto family_it = state.families.find(pass.pipeline_pass);
                     auto family = family_it->second;
+
+                    // Select the pointwise back-end at compile time. Only the passes whose 1x1 conv was ported to the 
+                    // GEMM path accept this define (enc/dec/bottleneck/up). NN_USE_COOPMAT is a numeric VARIANT in the 
+                    // nn_denoise material (values [0,1]), so it is injected through permutation_constants — the same
+                    // channel as IN_CH/OUT_CH — NOT through enums. (enums only index pre-declared enum tokens like ACT;
+                    // an unknown enum key is silently dropped, which is why the earlier COOPMAT enum approach never 
+                    // reached the shader.)
+                    auto variants = pass.permutation_options.variants;
+                    const bool coopmat_capable_pass =
+                        pass.kind == NNPassKind::enc        ||
+                        pass.kind == NNPassKind::dec        ||
+                        pass.kind == NNPassKind::bottleneck ||
+                        pass.kind == NNPassKind::up;
+
+                    // Shared-mem budget guard. The coopmat path stages
+                    // Wsh[OUT*K]*2 + Xsh[K*64]*2 + Ysh[OUT*64]*4 bytes. Consumer NVIDIA caps compute shared mem 
+                    // at 48 KB, so the big passes (dec2_a at IN=256/OUT=128 wants 128 KB) don't fit and fall
+                    // back to scalar. Dropping Ysh would shrink this a lot, but that's a TODO.
+                    auto coopmat_shared_bytes = [](uint32_t in_ch, uint32_t out_ch) -> uint32_t {
+                        const uint32_t K = ((in_ch + 3) / 4) * 4;
+                        const uint32_t W = out_ch * K * 2;   // fp16
+                        const uint32_t X = K * 64 * 2;       // fp16
+                        const uint32_t Y = out_ch * 64 * 4;  // fp32
+                        return W + X + Y;
+                    };
+                    const uint32_t kSharedCapBytes = 48u * 1024u;   // consumer NVIDIA hard limit
+
+                    bool use_coopmat_here = state.use_coopmat_gemm && coopmat_capable_pass;
+                    if (use_coopmat_here)
+                    {
+                        uint32_t in_ch =
+                            variants.count(Name("IN_CH"))  ? variants[Name("IN_CH")]  : 0u;
+                        uint32_t out_ch =
+                            variants.count(Name("OUT_CH")) ? variants[Name("OUT_CH")] : 0u;
+
+                        // Coopmat fragment shape is 16x16x16, so the GEMM tiling requires K_PAD and OUT_CH to be 
+                        // positive multiples of 16. pass_enc0_a (IN=11 -> K_PAD=12) is the only conv pass that
+                        // fails this; force it to scalar. (Also guards OUT_CH<16.)
+                        const uint32_t k_pad = ((in_ch + 3u) / 4u) * 4u;
+                        const bool tiling_ok =
+                            (k_pad >= 16u) && (k_pad % 16u == 0u) &&
+                            (out_ch >= 16u) && (out_ch % 16u == 0u);
+                        if (!tiling_ok)
+                        {
+                            use_coopmat_here = false;
+                            LogNNDenoiser.Log<Display>(
+                                "NN pass '%s' K_PAD=%u OUT=%u not 16-aligned -> scalar",
+                                pass.name.to_string().c_str(), k_pad, out_ch);
+                        }
+
+                        // Shared-memory budget guard (fast path): dec2_a needs 128 KB.
+                        if (use_coopmat_here &&
+                            coopmat_shared_bytes(in_ch, out_ch) > kSharedCapBytes)
+                        {
+                            use_coopmat_here = false;
+                            LogNNDenoiser.Log<Display>(
+                                "NN pass '%s' exceeds coopmat shared budget (%u B) -> scalar",
+                                pass.name.to_string().c_str(),
+                                coopmat_shared_bytes(in_ch, out_ch));
+                        }
+                    }
+
+                    if (coopmat_capable_pass)
+                    {
+                        variants[Name("NN_USE_COOPMAT")] = use_coopmat_here ? 1u : 0u;
+                    }
+
                     const ShaderKey shader_key = family->make_shader_key(
                         pass.pipeline_pass,
                         nullptr,
                         pass.permutation_options.enums,
-                        pass.permutation_options.variants);
+                        variants);
                     
                     auto pipeline = family->request_pipeline(shader_key);
                     

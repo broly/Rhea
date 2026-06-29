@@ -296,15 +296,22 @@ export
     using RBPipelineHandle = RBHandle<VkPipeline>;
     using RBDescriptorSet = RBHandle<VkDescriptorSet>;
     using RBDescriptorSetLayout = RBHandle<uint64_t>; // temporary
-    
+
     using RBAccelStruct = RBHandle<VkAccelerationStructureKHR>;
-    
+
     using RBObject = RBHandle<uint64_t>;
 
     using RBWindowHandle = RBHandle<GLFWwindow*>;
 
     using RBFramebufferId = RBHandle<uint64_t>;
     using RBFrameHandle = uint32_t;
+
+    using RBQueryPool = RBHandle<VkQueryPool>;   // timestamp query pool (GPU profiler)
+
+    // Number of frames the renderer keeps in flight. Mirrors
+    // vk::MAX_FRAMES_IN_FLIGHT; exposed here so backend-agnostic code (e.g. the
+    // GPU profiler's per-frame query-pool ring) can size its buffers.
+    inline constexpr uint32_t kRenderMaxFramesInFlight = 2;
     
     using RBVertexBufferHandle = RBHandle<uint32_t>;
     

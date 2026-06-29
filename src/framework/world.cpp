@@ -13,9 +13,27 @@ import <json/value.h>;
 
 #include "common/assertion_macros.h"
 
+
 void World::tick()
 {
     double dt = clock->get_delta_seconds();
+    
+    if constexpr (COUNT_AVG_FPS)
+    {
+        if (dt > 0.0)
+        {
+            double fps = 1.0 / dt;
+
+            fps_sum -= fps_samples[fps_sample_index];
+            fps_samples[fps_sample_index] = fps;
+            fps_sum += fps;
+
+            fps_sample_index = (fps_sample_index + 1) % NUM_SAMPLES_AVG_FPS;
+
+            if (fps_sample_count < NUM_SAMPLES_AVG_FPS)
+                ++fps_sample_count;
+        }
+    }
     
     for (auto& script : scripts)
         script->tick(dt);
@@ -185,6 +203,19 @@ AABB World::get_world_aabb() const
 double World::get_time_seconds() const
 {
     return clock->get_total_seconds();
+}
+
+double World::get_delta_seconds() const
+{
+    return clock->get_delta_seconds();
+}
+
+double World::get_avg_fps() const
+{
+    if (fps_sample_count == 0)
+        return 0.0;
+
+    return fps_sum / static_cast<double>(fps_sample_count);
 }
 
 std::shared_ptr<RhActor> World::find_actor_by_name(const std::string& name)

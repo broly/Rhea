@@ -106,6 +106,15 @@ public:
     virtual void flush_frame_garbage(RBFrameHandle frame) = 0;
     virtual void reset_frame_fence(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
+
+    // --- GPU timestamp queries (used by the gpu_profile pass profiler) -------
+    virtual double get_timestamp_period_ns() const = 0;
+    virtual RBQueryPool create_timestamp_pool(uint32_t query_count) = 0;
+    virtual void destroy_timestamp_pool(RBQueryPool pool) = 0;
+    virtual void cmd_reset_timestamp_pool(RBCommandList cmd, RBQueryPool pool, uint32_t query_count) = 0;
+    virtual void cmd_write_timestamp(RBCommandList cmd, RBQueryPool pool, uint32_t query_index, bool bottom_of_pipe) = 0;
+    virtual bool read_timestamps(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values) = 0;
+
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
     virtual ImageReadback readback_image(RBImageHandle img) const = 0;
     

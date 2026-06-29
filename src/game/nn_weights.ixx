@@ -130,10 +130,9 @@ public:
         return out;
     }
 
-    // Load a weight tensor's raw bytes from disk. The on-disk layout is the
-    // texel data the texture path used (row-major float4 / half4), so reading it
-    // straight into a buffer preserves element ordering. If the source dtype is
-    // fp16 it is expanded to fp32 here, since the SSBO is declared float4.
+    // Load a weight tensor's raw bytes from disk. The on-disk layout is the texel data the texture path used 
+    // (row-major float4 / half4), so reading it  straight into a buffer preserves element ordering. 
+    // If the source dtype is fp16 it is expanded to fp32 here, since the SSBO is declared float4.
     std::vector<float> load_weight_ssbo_f32(const NNWeightDesc& desc) const
     {
         auto base_dir = paths::get_assets_path();

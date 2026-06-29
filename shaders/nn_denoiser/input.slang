@@ -56,9 +56,9 @@ void main(uint3 dtid : SV_DispatchThreadID)
     ChannelWriter<TOTAL_CHANNELS> writer;
 
 
-    writer << nn_log_compress(nn_demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
-    writer << nn_encode_normal(normal);
-    writer << nn_normalize_depth(depth, 0.1, 1000.0);
+    writer << NN::processing::log_compress(NN::processing::demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
+    writer << NN::processing::encode_normal(normal);
+    writer << NN::processing::normalize_depth(depth, 0.1, 1000.0);
     
     // 7..10: albedo (3) + roughness (1)
     writer << ar;

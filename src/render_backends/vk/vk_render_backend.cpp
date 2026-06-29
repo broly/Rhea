@@ -837,3 +837,78 @@ RBSampler VkRenderBackend::create_sampler(const ::SamplerDesc& desc)
 {
     return sampler_manager.get_or_create(desc);
 }
+
+// =============================================================================
+// GPU timestamp queries (gpu_profile pass profiler backend implementation).
+// =============================================================================
+
+double VkRenderBackend::get_timestamp_period_ns() const
+{
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(instance.physical_device, &props);
+    return double(props.limits.timestampPeriod);
+}
+
+RBQueryPool VkRenderBackend::create_timestamp_pool(uint32_t query_count)
+{
+    VkQueryPoolCreateInfo qpci{ VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+    qpci.queryType  = VK_QUERY_TYPE_TIMESTAMP;
+    qpci.queryCount = query_count;
+
+    VkQueryPool pool = VK_NULL_HANDLE;
+    if (vkCreateQueryPool(instance.get_device(), &qpci, nullptr, &pool) != VK_SUCCESS)
+        return RBQueryPool{};
+
+    // Fresh pools start in an undefined state; host-reset so the first readback
+    // is well-defined even before the first cmd reset runs.
+    vkResetQueryPool(instance.get_device(), pool, 0, query_count);
+
+    return RBQueryPool{ pool };
+}
+
+void VkRenderBackend::destroy_timestamp_pool(RBQueryPool pool_handle)
+{
+    VkQueryPool pool = pool_handle.as<VkQueryPool>();
+    if (pool != VK_NULL_HANDLE)
+        vkDestroyQueryPool(instance.get_device(), pool, nullptr);
+}
+
+void VkRenderBackend::cmd_reset_timestamp_pool(
+    RBCommandList cmd, RBQueryPool pool_handle, uint32_t query_count)
+{
+    vkCmdResetQueryPool(
+        cmd.as<VkCommandBuffer>(),
+        pool_handle.as<VkQueryPool>(),
+        0, query_count);
+}
+
+void VkRenderBackend::cmd_write_timestamp(
+    RBCommandList cmd, RBQueryPool pool_handle, uint32_t query_index,
+    bool bottom_of_pipe)
+{
+    VkPipelineStageFlagBits stage = bottom_of_pipe
+        ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+        : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+    vkCmdWriteTimestamp(
+        cmd.as<VkCommandBuffer>(),
+        stage,
+        pool_handle.as<VkQueryPool>(),
+        query_index);
+}
+
+bool VkRenderBackend::read_timestamps(
+    RBQueryPool pool_handle, uint32_t first_query, uint32_t query_count,
+    uint64_t* out_values)
+{
+    VkResult res = vkGetQueryPoolResults(
+        instance.get_device(),
+        pool_handle.as<VkQueryPool>(),
+        first_query, query_count,
+        query_count * sizeof(uint64_t),
+        out_values,
+        sizeof(uint64_t),
+        VK_QUERY_RESULT_64_BIT);   // no WAIT bit: pool already cycled, results ready
+
+    return res == VK_SUCCESS;
+}

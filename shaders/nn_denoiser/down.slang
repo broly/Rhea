@@ -26,10 +26,10 @@ void main(uint3 dtid : SV_DispatchThreadID)
     [ForceUnroll] 
     for (int s = 0; s < N_SLICES; ++s)
     {
-        nn_store_act(
-            nn_get_act_out(s),
+        NN::store_activation(
+            NN::get_activation_output(s),
             p,
-            nn_avg_pool_2x2(nn_get_act_in(s), p)
+            NN::avg_pool_2x2(NN::get_activation_input(s), p)
         );
     }
     

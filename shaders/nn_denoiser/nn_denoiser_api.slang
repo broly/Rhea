@@ -22,8 +22,8 @@ namespace denoiser
                 if (s * 4 + index < NUM_CHANNELS) 
                     v[index] = result[s * 4 + index];
             }
-            int act_index = nn_get_act_out(s);
-            nn_store_act(act_index, pixel, v);
+            int act_index = NN::get_activation_output(s);
+            NN::store_activation(act_index, pixel, v);
         }
     }
 }

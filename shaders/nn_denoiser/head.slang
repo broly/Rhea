@@ -44,19 +44,19 @@ void main(uint3 dtid : SV_DispatchThreadID)
     [ForceUnroll]
     for (int s = 0; s < IN_SLICES; ++s)
     {
-        feat[s] = nn_load_act(nn_get_act_in(s), p);
+        feat[s] = NN::load_activation(NN::get_activation_input(s), p);
     }
 
     float3 residual;
     [ForceUnroll]
     for (int oc = 0; oc < 3; ++oc)
     {
-        float acc = nn_load_bias(denoiser.get_nn_bias_index(), oc);
+        float acc = NN::load_bias(denoiser.get_nn_bias_index(), oc);
 
         [ForceUnroll]
         for (int s = 0; s < IN_SLICES; ++s)
         {
-            float4 w = nn_load_pw(denoiser.get_nn_pointwise_index(), s, oc);
+            float4 w = NN::load_pointwise(denoiser.get_nn_pointwise_index(), s, oc);
             acc += dot(w, feat[s]);
         }
         if (oc == 0)
@@ -69,13 +69,13 @@ void main(uint3 dtid : SV_DispatchThreadID)
     
 
     float3 noisy  = ColorOutput::read<ColorOutput::Slot::RTXGI, 0>(uv).rgb;
-    float3 albedo = nn_load_packed_rgb(get_nn_albedo_flat_ch(), p);
+    float3 albedo = NN::load_packed_rgb(NN::get_albedo_flat_ch(), p);
 
-    float3 irr_log_baseline = nn_log_compress(nn_demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
+    float3 irr_log_baseline = NN::processing::log_compress(NN::processing::demodulate(noisy, albedo, ALBEDO_EPS_F, CLAMP_MAX_F));
 
     float3 logIrr   = irr_log_baseline + residual;
-    float3 irr      = nn_log_expand(logIrr);
-    float3 finalRGB = nn_remodulate(irr, albedo);
+    float3 irr      = NN::processing::log_expand(logIrr);
+    float3 finalRGB = NN::processing::remodulate(irr, albedo);
 
     ColorOutput::write<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(p, finalRGB);
 }

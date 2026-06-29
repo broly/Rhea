@@ -5,6 +5,7 @@ import :render_backend;
 import <vulkan/vulkan_core.h>;
 import <cassert>;
 import profile;
+import gpu_profile;
 import :renderer;
 import dump_exr;
 import paths;
@@ -754,6 +755,10 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     PROFILE("RenderGraph::execute");
     assert(graph_compiled);
 
+    // GPU pass profiler: open this frame's timestamp pool (drains the results
+    // recorded MAX_FRAMES_IN_FLIGHT frames ago, then resets for fresh recording).
+    gpuprof::frame_begin(frame, cmd);
+
     RenderGraphContext ctx(*backend, cmd, {}, *this, params);
     ctx.frame = frame;
 
@@ -855,10 +860,12 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
                 {
                     PROFILE("RenderGraph Pass");
+                    gpuprof::pass_begin(cmd, pass.name.to_string());
                     ctx.pass_name = pass.name;
                     ctx.level = layer_id;
                     ctx.mip = mip_map_id;
                     pass.execute(ctx);
+                    gpuprof::pass_end(cmd);
                 }
 
                 if (pass.type == RenderPassType::graphics)
