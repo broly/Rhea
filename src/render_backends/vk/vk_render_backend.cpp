@@ -257,9 +257,9 @@ GPUMesh VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     return mesh_manager.get_or_create_mesh_buffers(handle, rt_build_mode);
 }
 
-SkinnedMeshGPU VkRenderBackend::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count)
+SkinnedMeshGPU VkRenderBackend::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, RTBuildMode rt_build_mode)
 {
-    return mesh_manager.create_skinned_mesh(source, skin, bone_count);
+    return mesh_manager.create_skinned_mesh(source, skin, bone_count, rt_build_mode);
 }
 
 RBDeviceAddress VkRenderBackend::upload_bone_matrices(uint32_t instance_id, RBFrameHandle frame, const std::vector<glm::mat4>& matrices)

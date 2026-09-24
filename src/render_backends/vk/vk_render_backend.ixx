@@ -142,7 +142,7 @@ public:   /// API Section
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) override;
     virtual void draw_fullscreen(RBCommandList cmd) override;
     virtual GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) override;
-    virtual SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count) override;
+    virtual SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, RTBuildMode rt_build_mode) override;
     virtual RBDeviceAddress upload_bone_matrices(uint32_t instance_id, RBFrameHandle frame, const std::vector<glm::mat4>& matrices) override;
     virtual void cmd_skinning_begin_barrier(RBCommandList cmd) override;
     virtual void cmd_skinning_end_barrier(RBCommandList cmd) override;

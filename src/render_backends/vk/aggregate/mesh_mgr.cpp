@@ -282,7 +282,7 @@ static constexpr VkBuildAccelerationStructureFlagsKHR skinned_blas_flags =
     VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
     VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 
-SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count)
+SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, RTBuildMode rt_build_mode)
 {
     PROFILE(__FUNCTION__);
 
@@ -335,6 +335,7 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     const VkDeviceAddress index_address = buffer_manager.get_buffer_device_address(src.index_buffer);
 
     // ---- BLAS (updatable) ----
+    if (rt_build_mode == RTBuildMode::build_blas)
     {
         VkAccelerationStructureGeometryKHR geometry = make_triangles_geometry(vertex_address, index_address, data.vertex_count);
 
@@ -467,6 +468,7 @@ void vk::MeshManager::cmd_refit_skinned_blas(VkCommandBuffer cmd, const std::vec
     for (uint32_t instance_id : instance_ids)
     {
         const SkinnedMeshGPUData& data = skinned_meshes.at(instance_id);
+        checkf(data.blas != VK_NULL_HANDLE, "Skinned mesh %u has no BLAS", instance_id);
         const MeshGPUData& src = mesh_map.at(data.source);
 
         geometries.push_back(make_triangles_geometry(

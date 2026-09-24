@@ -14,6 +14,26 @@ import rail;
 constexpr bool DO_NN_SAMPLES = false;
 constexpr bool DO_ANIMATE_LIGHT = true;
 
+bool WorldScript_VariousThings::frame_character(Transform& t, bool face)
+{
+    auto character = world->find_actor_by_name("cosmo_bunny");
+    if (!character)
+        return false;
+    
+    const Transform ct = character->get_transform();
+    const glm::vec3 facing = ct.rotation.glm() * glm::vec3(0, 0, 1);   // glTF characters face +Z
+    const glm::vec3 target = ct.position.glm() + glm::vec3(0, face ? 1.62f : 1.0f, 0);
+    
+    t.position = target + facing * (face ? 0.55f : 2.8f) + glm::vec3(0, face ? 0.02f : 0.15f, 0);
+    
+    // inverse of from_euler_rotation(pitch, yaw, 0): forward = (-sin(yaw)cos(p), sin(p), -cos(yaw)cos(p))
+    const glm::vec3 dir = glm::normalize(target - t.position.glm());
+    pitch = asinf(glm::clamp(dir.y, -1.0f, 1.0f));
+    yaw = atan2f(-dir.x, -dir.z);
+    t.rotation = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
+    return true;
+}
+
 void WorldScript_VariousThings::tick(double dt)
 {
     if (!camera_actor)
@@ -103,6 +123,9 @@ void WorldScript_VariousThings::tick(double dt)
             t.position = glm::vec3{7.804476, 1.001801, 1.158290};
             t.rotation = glm::quat( 0.885217, 0.079783, -0.057427, -0.456434);
         }
+        
+        // start looking at the imported character when it is in the level
+        frame_character(t, false);
         
         auto qrot = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
     
@@ -232,22 +255,8 @@ void WorldScript_VariousThings::tick(double dt)
     // F: frame the imported character (full body), V: face close-up
     if (input->is_key_down(Key::F) || input->is_key_down(Key::V))
     {
-        if (auto character = world->find_actor_by_name("cosmo_bunny"))
-        {
-            const bool face = input->is_key_down(Key::V);
-            const Transform ct = character->get_transform();
-            const glm::vec3 facing = ct.rotation.glm() * glm::vec3(0, 0, 1);   // glTF characters face +Z
-            const glm::vec3 target = ct.position.glm() + glm::vec3(0, face ? 1.62f : 1.0f, 0);
-            
-            t.position = target + facing * (face ? 0.55f : 2.8f) + glm::vec3(0, face ? 0.02f : 0.15f, 0);
-            
-            // inverse of from_euler_rotation(pitch, yaw, 0): forward = (-sin(yaw)cos(p), sin(p), -cos(yaw)cos(p))
-            const glm::vec3 dir = glm::normalize(target - t.position.glm());
-            pitch = asinf(glm::clamp(dir.y, -1.0f, 1.0f));
-            yaw = atan2f(-dir.x, -dir.z);
-            t.rotation = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
+        if (frame_character(t, input->is_key_down(Key::V)))
             handled = true;
-        }
     }
     if (input->is_key_down(Key::B))
     {

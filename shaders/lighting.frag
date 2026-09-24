@@ -6,6 +6,7 @@
 #include "resources/light.glsl"
 #include "resources/hdr_color_output.glsl"
 #include "resources/shadow.glsl"
+#include "resources/reflection.glsl"
 #include "pbr_helpers.glsl"
 #include "character/character_lighting.glsl"
 
@@ -34,7 +35,11 @@ void main()
 
     vec3 V = normalize(camera_ubo.camera_pos.xyz - pos);
     
-    vec3 gi = texture(u_hdr_color_present[pc.buffer_index], uv).rgb;
+    // buffer_index == LIGHTING_GI_FROM_IBL (ray tracing disabled): ambient from the reflection capture
+    const bool gi_from_ibl = pc.buffer_index == 0xFFFFFFFFu;
+    vec3 gi = gi_from_ibl
+        ? texture(u_irradiance, N).rgb
+        : texture(u_hdr_color_present[pc.buffer_index], uv).rgb;
     
     // ---- character shading models (see character/shading_models.glsl) ----
     uint shading_model = decode_shading_model(get_gbuffer_GEOMETRY_NORMAL(uv).a);
@@ -66,7 +71,7 @@ void main()
             radiance += character_eval_light(g, V, L, light_ubo.dir_light.color.rgb * shadow);
         }
         
-        radiance += character_eval_indirect(g, V, gi);
+        radiance += character_eval_indirect(g, V, gi, pos);
         radiance += g.emissive;
         
         out_color = vec4(radiance, 1.0);

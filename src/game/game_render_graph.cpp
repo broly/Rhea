@@ -73,6 +73,9 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 // const uint32_t fps = 1 / delta;
                 const uint32_t avg_fps = (uint32_t)RhGlobals::engine->world->get_avg_fps();
                 uint32_t mode = ctx.params.get_int("output_mode", 0);
+                // GI debug views (1-3) show ray tracing outputs
+                if constexpr (!render_settings::enable_raytracing)
+                    mode = 0;
                 TonemapPushConstants pc {time, mode, avg_fps};
                 ctx.push_constants(pc);
                          

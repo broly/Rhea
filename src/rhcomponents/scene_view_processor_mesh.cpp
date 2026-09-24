@@ -40,6 +40,8 @@ void SceneViewProcessor_Mesh::process()
     auto& renderer = *RhGlobals::engine->renderer;
 
     RenderResource& primitive_table_resource = renderer.find_resource_checked("primitive_table");
+    
+    constexpr RTBuildMode rt_build_mode = render_settings::enable_raytracing ? RTBuildMode::build_blas : RTBuildMode::none;
 
     for (const auto& submitted : read_submission_buffer<SceneViewProxy_Mesh>())
     {
@@ -150,13 +152,14 @@ void SceneViewProcessor_Mesh::process()
                         rp.skinned = renderer.get_backend()->create_skinned_mesh(
                             rp.mesh,
                             skeletal.primitive_skins[prim_index],
-                            skeletal.skeleton.num_bones());
+                            skeletal.skeleton.num_bones(),
+                            rt_build_mode);
                         rp.skinning = submitted.skinning;
                         rp.mesh_index = rp.skinned->mesh_index;
                     }
                     else
                     {
-                        auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::build_blas);
+                        auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, rt_build_mode);
                         rp.mesh_index = result.mesh_index;
                     }
                         

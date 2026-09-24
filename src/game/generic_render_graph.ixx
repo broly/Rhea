@@ -114,6 +114,9 @@ struct GBufferArray : std::vector<RGTextureHandle>
     }
 };
 
+// lighting.frag: take indirect light from the reflection capture IBL instead of the RTXGI output
+constexpr uint32_t LIGHTING_GI_FROM_IBL = 0xFFFFFFFFu;
+
 struct ColorOutputConstants
 {
     uint32_t buffer_index;

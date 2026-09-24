@@ -2,7 +2,7 @@
 #define CHARACTER_LIGHTING
 
 // Deferred shading for the character shading models (see character/shading_models.glsl).
-// Requires pbr_helpers.glsl (GGX helpers, PI).
+// Requires pbr_helpers.glsl (GGX helpers, PI) and resources/reflection.glsl.
 
 #include "character/shading_models.glsl"
 
@@ -144,16 +144,21 @@ vec3 character_env_brdf_approx(vec3 F0, float roughness, float NdotV)
     return F0 * AB.x + AB.y;
 }
 
-// gi: irradiance-like signal of the RT GI (same term as legacy: gi * albedo)
-vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi)
+// gi: irradiance-like signal (RT GI or IBL irradiance, same term as legacy: gi * albedo)
+// Specular comes from the prefiltered environment of the nearest reflection capture.
+vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi, vec3 pos)
 {
     float NdotV = max(dot(g.N, V), 1e-4);
 
     vec3 diffuse = gi * g.albedo * (1.0 - g.metallic);
 
-    // no prefiltered environment in the lighting pass yet: the GI signal stands in for it
     vec3 F0 = g.shading_model == SHADING_MODEL_ID_HAIR ? vec3(0.04) : character_f0(g);
-    vec3 specular = gi * character_env_brdf_approx(F0, g.roughness, NdotV);
+
+    vec3 R = reflect(-V, g.N);
+    float max_lod = float(textureQueryLevels(u_prefilter_map) - 1);
+    vec3 prefiltered = textureLod(u_prefilter_map, R, g.roughness * max_lod).rgb;
+
+    vec3 specular = prefiltered * character_env_brdf_approx(F0, g.roughness, NdotV);
 
     return (diffuse + specular) * g.ao;
 }

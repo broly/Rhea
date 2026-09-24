@@ -567,6 +567,96 @@
 				}
 			]
 		},
+		// soft three-point lighting around the imported character (key / fill / rim + floor bounce).
+		// point lights: radiance = color / (distance^2 + 1), no shadows
+		{
+			"name": "cosmo_bunny_key_light",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "light",
+					"class": "RhComp_Light",
+					"fields": {
+						"transform": {
+							"position": { "x": 6.147, "y": 1.9, "z": -0.92 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"color": { "x": 12.0, "y": 10.6, "z": 9.0, "w": 0 },
+						"intensity": 1,
+						"falloff": 100,
+						"type": "point"
+					}
+				}
+			]
+		},
+		{
+			"name": "cosmo_bunny_fill_light",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "light",
+					"class": "RhComp_Light",
+					"fields": {
+						"transform": {
+							"position": { "x": 5.098, "y": 1.2, "z": 1.023 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"color": { "x": 4.2, "y": 4.8, "z": 6.0, "w": 0 },
+						"intensity": 1,
+						"falloff": 100,
+						"type": "point"
+					}
+				}
+			]
+		},
+		{
+			"name": "cosmo_bunny_rim_light",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "light",
+					"class": "RhComp_Light",
+					"fields": {
+						"transform": {
+							"position": { "x": 3.566, "y": 2.3, "z": -1.913 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"color": { "x": 10.0, "y": 9.5, "z": 9.0, "w": 0 },
+						"intensity": 1,
+						"falloff": 100,
+						"type": "point"
+					}
+				}
+			]
+		},
+		{
+			"name": "cosmo_bunny_bounce_light",
+			"class": "RhActor",
+			
+			"components": [
+				{
+					"name": "light",
+					"class": "RhComp_Light",
+					"fields": {
+						"transform": {
+							"position": { "x": 5.15, "y": 0.3, "z": -0.502 },
+							"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+							"scale": { "x": 1, "y": 1, "z": 1}
+						},
+						"color": { "x": 2.25, "y": 1.9, "z": 1.5, "w": 0 },
+						"intensity": 1,
+						"falloff": 100,
+						"type": "point"
+					}
+				}
+			]
+		},
 		{
 			"name": "reflection_capture_1",
 			"class": "RhActor",

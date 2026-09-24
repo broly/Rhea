@@ -21,3 +21,4 @@ export import :material_model;
 export import :material_manager;
 export import :gpu_types;
 export import :skinning;
+export import :settings;

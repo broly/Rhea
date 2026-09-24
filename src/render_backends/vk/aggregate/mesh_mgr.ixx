@@ -73,7 +73,7 @@ namespace vk
         
         void bind(const RBCommandList& cmd, MeshPrimHandle mesh);
         
-        SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count);
+        SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, RTBuildMode rt_build_mode);
         
         VkDeviceAddress upload_bone_matrices(uint32_t instance_id, uint32_t frame, const std::vector<glm::mat4>& matrices);
         
