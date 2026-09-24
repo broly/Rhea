@@ -249,3 +249,264 @@ void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
     vkCmdBindVertexBuffers(cmd, 0, 1, &vb, offsets);
     vkCmdBindIndexBuffer(cmd, ib, 0, VK_INDEX_TYPE_UINT32);
 }
+
+
+
+// ============================================================================
+// Skinned meshes
+// ============================================================================
+
+static VkAccelerationStructureGeometryKHR make_triangles_geometry(
+    VkDeviceAddress vertex_address, VkDeviceAddress index_address, uint32_t vertex_count)
+{
+    VkAccelerationStructureGeometryTrianglesDataKHR triangles{
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR
+    };
+    triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    triangles.vertexData.deviceAddress = vertex_address;
+    triangles.vertexStride = sizeof(Vertex);
+    triangles.maxVertex = vertex_count - 1;
+    triangles.indexType = VK_INDEX_TYPE_UINT32;
+    triangles.indexData.deviceAddress = index_address;
+
+    VkAccelerationStructureGeometryKHR geometry{
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR
+    };
+    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    geometry.geometry.triangles = triangles;
+    return geometry;
+}
+
+static constexpr VkBuildAccelerationStructureFlagsKHR skinned_blas_flags =
+    VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+    VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+
+SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count)
+{
+    PROFILE(__FUNCTION__);
+
+    const Primitive& primitive = source.get();
+    checkf(skin.size() == primitive.vertices.size(), "Skin data does not match vertex count");
+    checkf(bone_count > 0, "Skinned mesh must have bones");
+
+    // shared source geometry (bind pose vertices + indices), no BLAS needed
+    get_or_create_mesh_buffers(source, RTBuildMode::none);
+    const MeshGPUData& src = mesh_map.at(source);
+
+    SkinnedMeshGPUData data{};
+    data.source = source;
+    data.vertex_count = src.vertex_count;
+    data.index_count = src.index_count;
+    data.bone_count = bone_count;
+
+    // ---- skin weights ----
+    buffer_manager.create_device_local_buffer_with_data(
+        skin.data(),
+        skin.size() * sizeof(SkinVertex),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        data.skin_buffer,
+        data.skin_memory);
+
+    // ---- skinned output vertices, initialized with bind pose ----
+    buffer_manager.create_device_local_buffer_with_data(
+        primitive.vertices.data(),
+        primitive.vertices.size() * sizeof(Vertex),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+        data.vertex_buffer,
+        data.vertex_memory);
+
+    // ---- bone matrices ring ----
+    data.bones_slot_size = sizeof(glm::mat4) * bone_count;
+    create_buffer(
+        instance.device,
+        instance.physical_device,
+        data.bones_slot_size * kRenderMaxFramesInFlight,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        data.bones_buffer,
+        data.bones_memory);
+    vkMapMemory(instance.device, data.bones_memory, 0, VK_WHOLE_SIZE, 0, &data.bones_mapped);
+
+    const VkDeviceAddress vertex_address = buffer_manager.get_buffer_device_address(data.vertex_buffer);
+    const VkDeviceAddress index_address = buffer_manager.get_buffer_device_address(src.index_buffer);
+
+    // ---- BLAS (updatable) ----
+    {
+        VkAccelerationStructureGeometryKHR geometry = make_triangles_geometry(vertex_address, index_address, data.vertex_count);
+
+        VkAccelerationStructureBuildGeometryInfoKHR build_info{
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR
+        };
+        build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+        build_info.flags = skinned_blas_flags;
+        build_info.geometryCount = 1;
+        build_info.pGeometries = &geometry;
+        build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+
+        uint32_t primitive_count = data.index_count / 3;
+
+        VkAccelerationStructureBuildSizesInfoKHR size_info{
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR
+        };
+        vk_ext::vkGetAccelerationStructureBuildSizesKHR(
+            instance.device,
+            VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+            &build_info,
+            &primitive_count,
+            &size_info);
+
+        create_buffer(
+            instance.device,
+            instance.physical_device,
+            size_info.accelerationStructureSize,
+            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            data.blas_buffer,
+            data.blas_memory);
+
+        VkAccelerationStructureCreateInfoKHR as_create{
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR
+        };
+        as_create.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+        as_create.size = size_info.accelerationStructureSize;
+        as_create.buffer = data.blas_buffer;
+        vk_ext::vkCreateAccelerationStructureKHR(instance.device, &as_create, nullptr, &data.blas);
+
+        // scratch is kept alive for refits
+        const VkDeviceSize scratch_size = std::max(size_info.buildScratchSize, size_info.updateScratchSize);
+        create_buffer(
+            instance.device,
+            instance.physical_device,
+            scratch_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            data.blas_scratch_buffer,
+            data.blas_scratch_memory);
+        data.blas_scratch_address = buffer_manager.get_buffer_device_address(data.blas_scratch_buffer);
+
+        build_info.dstAccelerationStructure = data.blas;
+        build_info.scratchData.deviceAddress = data.blas_scratch_address;
+
+        VkAccelerationStructureBuildRangeInfoKHR range_info{};
+        range_info.primitiveCount = primitive_count;
+        const VkAccelerationStructureBuildRangeInfoKHR* ranges[] = { &range_info };
+
+        command_pool.submit([&] (VkCommandBuffer cmd)
+        {
+            vk_ext::vkCmdBuildAccelerationStructuresKHR(cmd, 1, &build_info, ranges);
+        });
+
+        VkAccelerationStructureDeviceAddressInfoKHR address_info{
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR
+        };
+        address_info.accelerationStructure = data.blas;
+        data.blas_address = vk_ext::vkGetAccelerationStructureDeviceAddressKHR(instance.device, &address_info);
+    }
+
+    // ---- mesh table entry: skinned vertices + shared indices ----
+    data.mesh_table_index = (uint32_t)gpu_mesh_table.size();
+
+    GPUMesh gpu{};
+    gpu.vertex_address = vertex_address;
+    gpu.index_address = index_address;
+    gpu.index_count = data.index_count;
+    gpu.mesh_index = data.mesh_table_index;
+    gpu_mesh_table.push_back(gpu);
+    mesh_table_dirty = true;
+
+    SkinnedMeshGPU& info = data.info;
+    info.instance_id = (uint32_t)skinned_meshes.size();
+    info.mesh_index = data.mesh_table_index;
+    info.src_vertex_address = buffer_manager.get_buffer_device_address(src.vertex_buffer);
+    info.skin_address = buffer_manager.get_buffer_device_address(data.skin_buffer);
+    info.dst_vertex_address = vertex_address;
+    info.vertex_count = data.vertex_count;
+    info.bone_count = bone_count;
+
+    skinned_meshes.push_back(data);
+
+    LogVkMeshManager.Log("Created skinned mesh instance %u (%u vertices, %u bones)",
+        info.instance_id, info.vertex_count, bone_count);
+
+    return info;
+}
+
+VkDeviceAddress vk::MeshManager::upload_bone_matrices(uint32_t instance_id, uint32_t frame, const std::vector<glm::mat4>& matrices)
+{
+    SkinnedMeshGPUData& data = skinned_meshes.at(instance_id);
+    checkf(matrices.size() == data.bone_count, "Bone count mismatch");
+    checkf(frame < kRenderMaxFramesInFlight, "Invalid frame index");
+
+    const VkDeviceSize offset = data.bones_slot_size * frame;
+    memcpy(static_cast<uint8_t*>(data.bones_mapped) + offset, matrices.data(), data.bones_slot_size);
+
+    // note: RBDeviceAddress must be unwrapped explicitly, `handle + offset` would go through operator bool
+    const VkDeviceAddress base = buffer_manager.get_buffer_device_address(data.bones_buffer).handle;
+    return base + offset;
+}
+
+void vk::MeshManager::cmd_refit_skinned_blas(VkCommandBuffer cmd, const std::vector<uint32_t>& instance_ids)
+{
+    if (instance_ids.empty())
+        return;
+
+    std::vector<VkAccelerationStructureGeometryKHR> geometries;
+    std::vector<VkAccelerationStructureBuildGeometryInfoKHR> build_infos;
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR> ranges;
+    std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> range_ptrs;
+
+    // reserve up front: build infos keep pointers into `geometries`
+    geometries.reserve(instance_ids.size());
+    build_infos.reserve(instance_ids.size());
+    ranges.reserve(instance_ids.size());
+
+    for (uint32_t instance_id : instance_ids)
+    {
+        const SkinnedMeshGPUData& data = skinned_meshes.at(instance_id);
+        const MeshGPUData& src = mesh_map.at(data.source);
+
+        geometries.push_back(make_triangles_geometry(
+            data.info.dst_vertex_address,
+            buffer_manager.get_buffer_device_address(src.index_buffer),
+            data.vertex_count));
+
+        VkAccelerationStructureBuildGeometryInfoKHR build_info{
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR
+        };
+        build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+        build_info.flags = skinned_blas_flags;
+        build_info.geometryCount = 1;
+        build_info.pGeometries = &geometries.back();
+        build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+        build_info.srcAccelerationStructure = data.blas;
+        build_info.dstAccelerationStructure = data.blas;
+        build_info.scratchData.deviceAddress = data.blas_scratch_address;
+        build_infos.push_back(build_info);
+
+        VkAccelerationStructureBuildRangeInfoKHR range{};
+        range.primitiveCount = data.index_count / 3;
+        ranges.push_back(range);
+    }
+
+    for (auto& range : ranges)
+        range_ptrs.push_back(&range);
+
+    vk_ext::vkCmdBuildAccelerationStructuresKHR(
+        cmd, (uint32_t)build_infos.size(), build_infos.data(), range_ptrs.data());
+
+    VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+    vkCmdPipelineBarrier(
+        cmd,
+        VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+        VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+        0,
+        1, &barrier,
+        0, nullptr,
+        0, nullptr);
+}

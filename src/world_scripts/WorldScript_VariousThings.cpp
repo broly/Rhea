@@ -162,21 +162,21 @@ void WorldScript_VariousThings::tick(double dt)
     float speed = move_speed * (float)dt;
     
     
-    if (input->is_key_down(Key::P))
-    {
-        prof::set_is_profiling(true);
-    }
-    
-    if (input->is_key_down(Key::O))
-    {
-        prof::set_is_profiling(false);
-    }
-    
-    
-    if (input->is_key_down(Key::L))
-    {
-        prof::dump();
-    }
+    // if (input->is_key_down(Key::P))
+    // {
+    //     prof::set_is_profiling(true);
+    // }
+    //
+    // if (input->is_key_down(Key::O))
+    // {
+    //     prof::set_is_profiling(false);
+    // }
+    //
+    //
+    // if (input->is_key_down(Key::L))
+    // {
+    //     prof::dump();
+    // }
 
 
     if (input->is_key_down(Key::W))
@@ -228,6 +228,26 @@ void WorldScript_VariousThings::tick(double dt)
     {
         RhGlobals::engine->renderer->set_int_param("output_mode", 0);
         handled = true;
+    }
+    // F: frame the imported character (full body), V: face close-up
+    if (input->is_key_down(Key::F) || input->is_key_down(Key::V))
+    {
+        if (auto character = world->find_actor_by_name("cosmo_bunny"))
+        {
+            const bool face = input->is_key_down(Key::V);
+            const Transform ct = character->get_transform();
+            const glm::vec3 facing = ct.rotation.glm() * glm::vec3(0, 0, 1);   // glTF characters face +Z
+            const glm::vec3 target = ct.position.glm() + glm::vec3(0, face ? 1.62f : 1.0f, 0);
+            
+            t.position = target + facing * (face ? 0.55f : 2.8f) + glm::vec3(0, face ? 0.02f : 0.15f, 0);
+            
+            // inverse of from_euler_rotation(pitch, yaw, 0): forward = (-sin(yaw)cos(p), sin(p), -cos(yaw)cos(p))
+            const glm::vec3 dir = glm::normalize(target - t.position.glm());
+            pitch = asinf(glm::clamp(dir.y, -1.0f, 1.0f));
+            yaw = atan2f(-dir.x, -dir.z);
+            t.rotation = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
+            handled = true;
+        }
     }
     if (input->is_key_down(Key::B))
     {

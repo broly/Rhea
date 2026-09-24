@@ -257,6 +257,58 @@ GPUMesh VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     return mesh_manager.get_or_create_mesh_buffers(handle, rt_build_mode);
 }
 
+SkinnedMeshGPU VkRenderBackend::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count)
+{
+    return mesh_manager.create_skinned_mesh(source, skin, bone_count);
+}
+
+RBDeviceAddress VkRenderBackend::upload_bone_matrices(uint32_t instance_id, RBFrameHandle frame, const std::vector<glm::mat4>& matrices)
+{
+    return mesh_manager.upload_bone_matrices(instance_id, frame, matrices);
+}
+
+static constexpr VkPipelineStageFlags skinned_vertices_reader_stages =
+    VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+    VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR |
+    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+
+void VkRenderBackend::cmd_skinning_begin_barrier(RBCommandList cmd)
+{
+    // WAR: previous readers of skinned vertices must finish before compute overwrites them
+    // (execution dependency is enough for WAR)
+    vkCmdPipelineBarrier(
+        cmd.as<VkCommandBuffer>(),
+        skinned_vertices_reader_stages,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        0, nullptr);
+}
+
+void VkRenderBackend::cmd_skinning_end_barrier(RBCommandList cmd)
+{
+    // BLAS build inputs (vertex buffers) are read with SHADER_READ at the AS build stage
+    VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(
+        cmd.as<VkCommandBuffer>(),
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        skinned_vertices_reader_stages,
+        0,
+        1, &barrier,
+        0, nullptr,
+        0, nullptr);
+}
+
+void VkRenderBackend::cmd_refit_skinned_blas(RBCommandList cmd, const std::vector<uint32_t>& instance_ids)
+{
+    mesh_manager.cmd_refit_skinned_blas(cmd.as<VkCommandBuffer>(), instance_ids);
+}
+
 TextureFormat VkRenderBackend::get_swapchain_format() const
 {
     switch (swapchain.surface_format.format)

@@ -620,6 +620,10 @@ export class MaterialModel : public RhObject
 {
 public:
     Name model_name;
+    
+    // Masked materials of this model are rendered in the base pass (alpha test in shader).
+    // Legacy models leave it unset: their masked materials are not drawn.
+    std::optional<bool> supports_masked;
     MatModel_Permutations permutations;
     std::vector<MatModel_PipelineVariant> pipelines;
     
@@ -632,7 +636,7 @@ public:
     void on_serialize(const SerializationContext& context) override;
 };
 REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, permutations, pipelines, material_info);
+                      model_name, permutations, pipelines, material_info, supports_masked);
 
 
 

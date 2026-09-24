@@ -34,7 +34,7 @@ import log;
 
 DEFINE_LOGGER(LogGenericRG, Display);
 
-constexpr bool enable_nn_denoiser = true;
+constexpr bool enable_nn_denoiser = false;
 
 
 GenericRenderGraph::GenericRenderGraph()
@@ -328,6 +328,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     rtx_gi_spatial_filter_pipeline_family = renderer->query_pipeline_family("RTXGI_SPATIAL_FILTER", rtxgi_model);
     
+    auto skinning_model = renderer->find_model("skinning");
+    skinning_pipeline_family = renderer->query_pipeline_family("Skinning", skinning_model);
+    
     
     shadow_map = create_texture({
         .name = NAME(shadow_map),
@@ -355,7 +358,18 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
 }
 
 void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
-{    
+{
+    // GPU skinning: must run before every consumer of skinned vertices
+    // (shadow map, base pass, RT hit shaders)
+    add_pass({
+        .name = "Skinning",
+        .execute = [this] (RenderGraphContext& ctx)
+        {
+            dispatch_skinning(ctx);
+        },
+        .type = RenderPassType::compute
+    });
+    
     add_pass({
         .name = "ShadowMap",
         .writes = {
@@ -819,7 +833,12 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
         {
             if (!prim.passes.contains("GeometryTranslucent"))
             {
-                tlas_objs.push_back({prim.mesh, *prim.world, prim.id});
+                tlas_objs.push_back({
+                    prim.mesh,
+                    *prim.world,
+                    prim.id,
+                    prim.is_skinned() ? std::optional<uint32_t>(prim.skinned->instance_id) : std::nullopt
+                });
             }
         }
 
@@ -878,6 +897,7 @@ void GenericRenderGraph::on_pso_built()
     wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
     tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
     lighting_pipeline = request_pipeline(lighting_pipeline_family, {});
+    skinning_pipeline = skinning_pipeline_family->request_pipeline({});
     nn_denoiser::on_pso_built(nn_denoiser_state);
 }
 
@@ -1237,6 +1257,58 @@ glm::mat4 GenericRenderGraph::build_dir_light_vp() const
     return lightProj * lightView;
 }
 
+void GenericRenderGraph::dispatch_skinning(RenderGraphContext& ctx)
+{
+    PROFILE("GenericRenderGraph::dispatch_skinning");
+    
+    auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
+    
+    std::vector<RenderPrimitive*> pending;
+    for (auto& prim : mesh_processor.primitives)
+    {
+        if (prim.is_skinned() && prim.skinned_pose_version != prim.skinning->version)
+            pending.push_back(&prim);
+    }
+    
+    if (pending.empty())
+        return;
+    
+    backend->cmd_skinning_begin_barrier(ctx.cmd);
+    
+    ctx.bind_pipeline(skinning_pipeline);
+    
+    std::vector<uint32_t> refit_instances;
+    refit_instances.reserve(pending.size());
+    
+    for (RenderPrimitive* prim : pending)
+    {
+        const SkinnedMeshGPU& gpu = *prim->skinned;
+        
+        const RBDeviceAddress bones = backend->upload_bone_matrices(
+            gpu.instance_id, ctx.frame, prim->skinning->skinning_matrices);
+        
+        SkinningPushConstants pc{};
+        pc.src_vertices = gpu.src_vertex_address;
+        pc.skin = gpu.skin_address;
+        pc.bones = bones.handle;
+        pc.dst_vertices = gpu.dst_vertex_address;
+        pc.vertex_count = gpu.vertex_count;
+        pc.bone_count = gpu.bone_count;
+        ctx.push_constants(pc);
+        
+        ctx.compute({ (gpu.vertex_count + SKINNING_GROUP_SIZE - 1) / SKINNING_GROUP_SIZE, 1, 1 });
+        
+        prim->skinned_pose_version = prim->skinning->version;
+        refit_instances.push_back(gpu.instance_id);
+    }
+    
+    backend->cmd_skinning_end_barrier(ctx.cmd);
+    backend->cmd_refit_skinned_blas(ctx.cmd, refit_instances);
+    
+    // BLAS bounds changed -> TLAS is rebuilt on the next prepare_raytracing
+    mesh_processor.set_dirty(true);
+}
+
 void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 {
     PROFILE("GenericRenderGraph::draw_scene");
@@ -1334,13 +1406,19 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         if (ctx.bind_pipeline(pipeline))
         {
             bind_shadow_globals(ctx);
+            
+            // alpha tested shadow pipelines sample material textures
+            if (info->pipeline_family->uses_resource("pbr_material_table"))
+                ctx.bind(pbr_material_table_resource);
+            if (info->pipeline_family->uses_resource("textures"))
+                ctx.bind(textures_resource);
         }
         
         
         ModelPushConstants pc;
         pc.mesh_id = prim.mesh_index;
         pc.primitive_id = prim.id;
-        pc.material_id = 0;
+        pc.material_id = info->material_index;
         pc.debug_id = 0;
         ctx.push_constants(pc);
         

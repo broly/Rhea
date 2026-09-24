@@ -2,6 +2,7 @@
 
 export import :asset;
 export import :mesh;
+export import :skeletal_mesh;
 export import :texture;
 export import :asset_manager;
 export import :asset_scene;

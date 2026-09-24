@@ -41,6 +41,23 @@ struct GPUMaterial
     // y normal
     // z orm
     // w emissive
+
+    // ---- extended block (used by non-legacy material models, see character.json) ----
+    uvec4 textures1;
+    vec4 params2;
+    vec4 params3;
+    vec4 params4;
+    vec4 params5;
+    vec4 params6;
+    vec4 params7;
+    vec4 params8;
+    vec4 params9;
+    vec4 params10;
+    vec4 params11;
+    vec4 params12;
+    vec4 params13;
+    vec4 params14;
+    vec4 params15;
 };
 
 // ================= MATERIAL BUFFER =================

@@ -4,6 +4,7 @@ import paths;
 import log;
 import <cassert>;
 #include "logging/log_macro.h"
+#include "common/assertion_macros.h"
 
 
 DEFINE_LOGGER(LogAssets, Log);
@@ -38,6 +39,31 @@ MeshHandle AssetManager::load_mesh(const std::string& rel_path)
     loaded_meshes.insert({mesh_handle, std::move(mesh)});
 
     return mesh_handle;
+}
+
+SkeletalMeshHandle AssetManager::load_skeletal_mesh(const std::string& rel_path)
+{
+    if (auto it = skeletal_mesh_by_path.find(rel_path); it != skeletal_mesh_by_path.end())
+        return it->second;
+    LogAssets.Log("Loading skeletal mesh: %s", rel_path.c_str());
+    
+    const std::filesystem::path path = paths::get_assets_path() / rel_path;
+    
+    std::optional<SkeletalMesh> mesh_opt = SkeletalMesh::create_from_file(path);
+    
+    if (!mesh_opt.has_value())
+        return SkeletalMeshHandle::invalid();
+    
+    SkeletalMesh mesh = std::move(*mesh_opt);
+    mesh.name = rel_path;
+    
+    SkeletalMeshHandle handle;
+    handle.id = ++skeletal_meshes_counter;
+    
+    skeletal_mesh_by_path.insert({rel_path, handle});
+    loaded_skeletal_meshes.insert({handle, std::move(mesh)});
+    
+    return handle;
 }
 
 TextureHandle AssetManager::load_texture(const std::string& rel_path)
@@ -210,6 +236,13 @@ AssetManager& AssetManager::get()
 const StaticMesh& AssetManager::get_mesh(MeshHandle id)
 {
     return loaded_meshes[id];
+}
+
+const SkeletalMesh& AssetManager::get_skeletal_mesh(SkeletalMeshHandle id)
+{
+    auto it = loaded_skeletal_meshes.find(id);
+    checkf(it != loaded_skeletal_meshes.end(), "Skeletal mesh %u is not loaded", id.id);
+    return it->second;
 }
 
 const Texture& AssetManager::get_texture(TextureHandle texture_handle)

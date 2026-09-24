@@ -12,6 +12,7 @@ import :render_resource;
 import :sampler_desc;
 import :vertex_buffer;
 import :gpu_types;
+import :skinning;
 
 import assets;
 
@@ -94,6 +95,9 @@ export struct TLASInfo
     MeshPrimHandle mesh;
     Transform transform;
     uint32_t primitive_id;
+    
+    // skinned instances own their BLAS (built over the skinned vertices)
+    std::optional<uint32_t> skinned_instance = std::nullopt;
 };
 
 export class RenderBackend 
@@ -202,6 +206,24 @@ public:
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
     virtual GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) = 0;
+    
+    // ---- skinning section ----
+    
+    // Creates a per-instance skinned copy of `source` (output vertices + BLAS + mesh table entry).
+    // Output vertices are initialized with the bind pose.
+    virtual SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count) = 0;
+    
+    // Writes bone matrices into the `frame` slot, returns device address of the slot
+    virtual RBDeviceAddress upload_bone_matrices(uint32_t instance_id, RBFrameHandle frame, const std::vector<glm::mat4>& matrices) = 0;
+    
+    // Before skinning: previous readers of skinned vertices -> compute write
+    virtual void cmd_skinning_begin_barrier(RBCommandList cmd) = 0;
+    
+    // After skinning: compute write -> vertex/fragment/RT reads and BLAS build input
+    virtual void cmd_skinning_end_barrier(RBCommandList cmd) = 0;
+    
+    // Refits skinned BLASes after their vertices were updated (followed by an AS barrier)
+    virtual void cmd_refit_skinned_blas(RBCommandList cmd, const std::vector<uint32_t>& instance_ids) = 0;
     virtual TextureFormat get_swapchain_format() const = 0;
     virtual RBImageHandle create_image(const RBImageDesc& desc) = 0;
     virtual void destroy_image(RBImageHandle handle, bool wait_fences) = 0;

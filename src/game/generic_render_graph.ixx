@@ -145,6 +145,7 @@ public:
     void setup_hdr_color_table(RenderGraphContext& ctx) const;
 
 
+    void dispatch_skinning(RenderGraphContext& ctx);
     void draw_scene(RenderGraphContext& ctx);
     void draw_scene_shadow(RenderGraphContext& ctx);
     void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
@@ -227,6 +228,7 @@ public:
     PipelineObject* rtx_gi_moments_pipeline;
     PipelineObject* rtx_gi_spatial_filter_pipeline;
     PipelineObject* lighting_pipeline;
+    PipelineObject* skinning_pipeline = nullptr;
 
     
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
@@ -240,6 +242,7 @@ public:
     std::shared_ptr<PipelineFamily> rtx_gi_moments_pipeline_family;
     std::shared_ptr<PipelineFamily> rtx_gi_spatial_filter_pipeline_family;
     std::shared_ptr<PipelineFamily> lighting_pipeline_family;
+    std::shared_ptr<PipelineFamily> skinning_pipeline_family;
     
     bool use_swapchain_extent;
     

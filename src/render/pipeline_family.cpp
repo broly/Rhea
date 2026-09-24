@@ -135,6 +135,11 @@ ShaderKey PipelineFamily::make_shader_key(
     
     
     expr::Context ctx;
+    // owns string values referenced by ctx (Name strings may move when the Name table grows);
+    // capacity is reserved up front so the stored strings never relocate
+    std::vector<std::string> ctx_strings;
+    if (model->material_info.has_value())
+        ctx_strings.reserve(model->material_info->params.size());
     
     if (model->material_info.has_value())
     {
@@ -143,12 +148,15 @@ ShaderKey PipelineFamily::make_shader_key(
             if (param_info.is_static_parameter())
             {
                 check(material != nullptr);
-                ctx[param_name.to_string()] = material->parameters.find(param_name.to_string())->second.as<Name>().to_string();
+                auto param_it = material->parameters.find(param_name);
+                checkf(param_it != material->parameters.end(), "Material has no static parameter '%s'", param_name.to_string().c_str());
+                ctx_strings.push_back(param_it->second.as<Name>().to_string());
+                ctx[expr::context_key(param_name.to_string())] = std::string_view(ctx_strings.back());
             } else
             {
                 check(material != nullptr);
                 const bool provided = material->parameters.contains(param_name);
-                ctx[param_name.to_string()] = provided;
+                ctx[expr::context_key(param_name.to_string())] = provided;
             }
         }
     }
@@ -488,6 +496,14 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
 RBPipelineLayout PipelineFamily::get_pipeline_layout() const
 {
     return pipeline_layout;
+}
+
+bool PipelineFamily::uses_resource(Name resource_name) const
+{
+    for (const auto& resource : layout_desc.resources)
+        if (resource.name == resource_name)
+            return true;
+    return false;
 }
 
 const PipelineInfo& PipelineFamily::get_base_pipeline_config() const

@@ -49,6 +49,14 @@ export struct RenderPrimitive
     uint64_t mesh_index;
     uint32_t debug_texture_id;
     std::string debug_texture_name;
+    
+    // ---- skinning (RhComp_SkeletalMesh) ----
+    std::shared_ptr<SkinningPose> skinning;
+    std::optional<SkinnedMeshGPU> skinned;
+    // pose version last written to the skinned vertices
+    uint64_t skinned_pose_version = 0;
+    
+    bool is_skinned() const { return skinned.has_value(); }
 
     
     std::set<Name> passes;

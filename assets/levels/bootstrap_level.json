@@ -550,6 +550,24 @@
 			]
 		},
 		{
+			"name": "cosmo_bunny",
+			"__ref__": "actors/cosmo_bunny.json",
+			
+			"components": [
+				{
+					"name": "body",
+					"class": "RhComp_SkeletalMesh",
+					"fields": {
+						"transform": {
+							"position": { "x": 4.4, "y": 0.0, "z": -1.0 },
+							"rotation": { "x": 0, "y": 0.4728, "z": 0, "w": 0.8812 },
+							"scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
+						}
+					}
+				}
+			]
+		},
+		{
 			"name": "reflection_capture_1",
 			"class": "RhActor",
 			

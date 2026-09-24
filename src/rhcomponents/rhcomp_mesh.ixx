@@ -16,6 +16,9 @@ export struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
     AABB bounds;
     std::vector<std::shared_ptr<Material>> materials;
     Name debug_name;
+    
+    // set for skinned meshes (RhComp_SkeletalMesh)
+    std::shared_ptr<SkinningPose> skinning;
 };
 
 
@@ -30,7 +33,7 @@ public:
     
     AABB get_aabb() const override;
     
-    void update_scene_proxy();
+    virtual void update_scene_proxy();
     
     SceneViewProxy_Mesh scene_proxy;
     

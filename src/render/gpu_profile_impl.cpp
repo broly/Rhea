@@ -5,7 +5,10 @@ import <string>;
 import <string_view>;
 import <vector>;
 import <algorithm>;
+import <json/value.h>;
 import render;
+import paths;
+import json_utils;
 
 namespace gpuprof
 {
@@ -62,6 +65,7 @@ namespace gpuprof
                 r.last_ms = ms;
                 r.min_ms = std::min(r.min_ms, ms);
                 r.max_ms = std::max(r.max_ms, ms);
+                r.samples.push_back(ms);
             }
         }
 
@@ -165,5 +169,24 @@ namespace gpuprof
         }
         file.close();
         std::cout << "GPU profiling data dumped to gpu_profiling_dump.txt\n";
+    }
+
+    void dump_json()
+    {
+        auto& c = ctx();
+        auto path = paths::get_project_path() / "gpu_profiling_dump.json";
+
+        // { "pass_name": [ms_frame0, ms_frame1, ...], ... }
+        Json::Value root(Json::objectValue);
+        for (auto& [name, r] : c.results)
+        {
+            Json::Value arr(Json::arrayValue);
+            for (double ms : r.samples)
+                arr.append(ms);
+            root[name] = arr;
+        }
+
+        if (json_utils::save_json_to_path(path, root))
+            std::cout << "GPU profiling samples dumped to gpu_profiling_dump.json\n";
     }
 }

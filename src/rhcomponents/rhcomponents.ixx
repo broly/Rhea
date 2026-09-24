@@ -2,6 +2,7 @@
 
 export import :rhcomp_camera;
 export import :rhcomp_mesh;
+export import :rhcomp_skeletal_mesh;
 export import :rhcomp_light;
 export import :rhcomp_reflection_capture;
 export import :scene_view_proxy.camera;

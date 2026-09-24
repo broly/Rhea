@@ -7,11 +7,47 @@ import assets;
 import <unordered_map>;
 import <vulkan/vulkan_core.h>;
 import :mesh_gpu_data;
+import render;
+import glm;
 #include "common/assertion_macros.h"
 
 
 namespace vk
 {
+    struct SkinnedMeshGPUData
+    {
+        MeshPrimHandle source;
+        
+        VkBuffer skin_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory skin_memory = VK_NULL_HANDLE;
+        
+        // skinned output vertices (same layout as Vertex)
+        VkBuffer vertex_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
+        
+        // bone matrices ring: one slot per frame in flight (host visible, persistently mapped)
+        VkBuffer bones_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory bones_memory = VK_NULL_HANDLE;
+        void* bones_mapped = nullptr;
+        VkDeviceSize bones_slot_size = 0;
+        
+        // BLAS over skinned vertices (built with ALLOW_UPDATE for refits)
+        VkAccelerationStructureKHR blas = VK_NULL_HANDLE;
+        VkBuffer blas_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory blas_memory = VK_NULL_HANDLE;
+        VkDeviceAddress blas_address = 0;
+        VkBuffer blas_scratch_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory blas_scratch_memory = VK_NULL_HANDLE;
+        VkDeviceAddress blas_scratch_address = 0;
+        
+        uint32_t vertex_count = 0;
+        uint32_t index_count = 0;
+        uint32_t bone_count = 0;
+        uint32_t mesh_table_index = 0;
+        
+        SkinnedMeshGPU info;
+    };
+    
     class MeshManager
     {
     public:
@@ -36,6 +72,20 @@ namespace vk
             VkDeviceAddress index_address);
         
         void bind(const RBCommandList& cmd, MeshPrimHandle mesh);
+        
+        SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count);
+        
+        VkDeviceAddress upload_bone_matrices(uint32_t instance_id, uint32_t frame, const std::vector<glm::mat4>& matrices);
+        
+        void cmd_refit_skinned_blas(VkCommandBuffer cmd, const std::vector<uint32_t>& instance_ids);
+        
+        const SkinnedMeshGPUData& get_skinned_mesh(uint32_t instance_id) const
+        {
+            checkf(instance_id < skinned_meshes.size(), "Invalid skinned mesh instance");
+            return skinned_meshes[instance_id];
+        }
+        
+        std::vector<SkinnedMeshGPUData> skinned_meshes;
         
         const MeshGPUData& get_mesh_gpu_data(MeshPrimHandle handle)
         {

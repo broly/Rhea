@@ -35,6 +35,8 @@ public:
     
     RBPipelineLayout get_pipeline_layout() const;
     
+    bool uses_resource(Name resource_name) const;
+    
     const PipelineInfo& get_base_pipeline_config() const;
     
     void clear_pso_cache();

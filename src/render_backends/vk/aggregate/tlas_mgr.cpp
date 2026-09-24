@@ -38,8 +38,6 @@ RBAccelStruct vk::TLASManager::build_tlas(
     for (auto& obj : objects)
     {
         
-        const auto& mesh = mesh_manager.get_mesh_gpu_data(obj.mesh);
-
         VkAccelerationStructureInstanceKHR inst{};
 
         inst.transform = to_vk_transform(obj.transform);
@@ -52,7 +50,9 @@ RBAccelStruct vk::TLASManager::build_tlas(
         inst.flags =
             VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 
-        inst.accelerationStructureReference = mesh.blas_address;
+        inst.accelerationStructureReference = obj.skinned_instance.has_value()
+            ? mesh_manager.get_skinned_mesh(*obj.skinned_instance).blas_address
+            : mesh_manager.get_mesh_gpu_data(obj.mesh).blas_address;
 
         instances.push_back(inst);
     }

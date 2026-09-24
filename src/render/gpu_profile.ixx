@@ -44,6 +44,7 @@ export namespace gpuprof
         double      last_ms      = 0.0;
         double      min_ms       = 1e30;
         double      max_ms       = 0.0;
+        std::vector<double> samples;   // per-frame ms, in capture order
     };
 
     struct FramePool
@@ -93,4 +94,5 @@ export namespace gpuprof
 
     // ---- dump ---------------------------------------------------------------
     export void dump();
+    export void dump_json();   // per-frame samples per pass -> JSON for Python viz
 }

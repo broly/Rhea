@@ -69,8 +69,22 @@ PSOutput main(VSOutput input)
     //        break;
     //}
     
-    hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
-    // hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI>(input.uv).rgb;
+    // output_mode (keys 0/1/2): final lit image / SVGF-filtered GI / raw RTXGI; 3 = neural denoiser output
+    switch (pc.output_mode)
+    {
+        case 1:
+            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_FILTERED>(input.uv).rgb;
+            break;
+        case 2:
+            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI>(input.uv).rgb;
+            break;
+        case 3:
+            hdr_color = ColorOutput::read<ColorOutput::Slot::RTXGI_NEURAL_DENOISED>(input.uv).rgb;
+            break;
+        default:
+            hdr_color = ColorOutput::read<ColorOutput::Slot::BASE>(input.uv).rgb;
+            break;
+    }
     
     // {
     //      index = min((int)time_clamped, NN_NUM_DW_TEXTURES);

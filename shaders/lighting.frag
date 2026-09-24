@@ -7,6 +7,7 @@
 #include "resources/hdr_color_output.glsl"
 #include "resources/shadow.glsl"
 #include "pbr_helpers.glsl"
+#include "character/character_lighting.glsl"
 
 layout(location = 0) out vec4 out_color;
 layout(location = 0) in vec2 v_uv;
@@ -32,7 +33,47 @@ void main()
     vec3 emissive = get_gbuffer_EMISSIVE(uv).rgb;
 
     vec3 V = normalize(camera_ubo.camera_pos.xyz - pos);
+    
+    vec3 gi = texture(u_hdr_color_present[pc.buffer_index], uv).rgb;
+    
+    // ---- character shading models (see character/shading_models.glsl) ----
+    uint shading_model = decode_shading_model(get_gbuffer_GEOMETRY_NORMAL(uv).a);
+    
+    if (shading_model != SHADING_MODEL_ID_CLEAR && shading_model != SHADING_MODEL_ID_LEGACY)
+    {
+        CharacterGBuffer g = character_decode_gbuffer(
+            shading_model,
+            vec4(albedo, albedo_roughness.a),
+            N,
+            get_gbuffer_WORLD_NORMAL(uv).a,
+            get_gbuffer_EMISSIVE(uv));
+        
+        vec3 radiance = vec3(0.0);
+        
+        for (int i = 0; i < light_ubo.light_count; ++i)
+        {
+            vec3 Lpos = light_ubo.lights[i].position.xyz;
+            vec3 to_light = Lpos - pos;
+            float dist = length(to_light);
+            float attenuation = 1.0 / (dist * dist + 1.0);
+            radiance += character_eval_light(g, V, to_light / dist, light_ubo.lights[i].color.rgb * attenuation);
+        }
+        
+        if (light_ubo.has_dir_light == 1)
+        {
+            vec3 L = normalize(-light_ubo.dir_light.direction.xyz);
+            float shadow = shadow_factor(pos, Ng);
+            radiance += character_eval_light(g, V, L, light_ubo.dir_light.color.rgb * shadow);
+        }
+        
+        radiance += character_eval_indirect(g, V, gi);
+        radiance += g.emissive;
+        
+        out_color = vec4(radiance, 1.0);
+        return;
+    }
 
+    // ---- legacy PBR model ----
     vec3 direct = vec3(0.0);
 
     for (int i = 0; i < light_ubo.light_count; ++i)
@@ -66,7 +107,6 @@ void main()
         }
     }
 
-    vec3 gi = texture(u_hdr_color_present[pc.buffer_index], uv).rgb;
     vec3 indirect = gi * albedo;
 
     vec3 color = direct + indirect + emissive;

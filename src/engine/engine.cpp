@@ -70,22 +70,22 @@ void Engine::run()
         // GPU profiler runtime control (edge-detected):
         //   P -> start timing (clears previous results)
         //   O -> dump to gpu_profiling_dump.txt and stop
-        // {
-        //     const bool p_down = input->is_key_down(Key::P);
-        //     const bool o_down = input->is_key_down(Key::O);
-        //     if (p_down && !gpu_prof_prev_p)
-        //     {
-        //         gpuprof::clear_results();
-        //         gpuprof::set_enabled(true);
-        //     }
-        //     if (o_down && !gpu_prof_prev_o)
-        //     {
-        //         gpuprof::dump();
-        //         gpuprof::set_enabled(false);
-        //     }
-        //     gpu_prof_prev_p = p_down;
-        //     gpu_prof_prev_o = o_down;
-        // }
+        {
+            const bool p_down = input->is_key_down(Key::P);
+            const bool o_down = input->is_key_down(Key::O);
+            if (p_down && !gpu_prof_prev_p)
+            {
+                gpuprof::clear_results();
+                gpuprof::set_enabled(true);
+            }
+            if (o_down && !gpu_prof_prev_o)
+            {
+                gpuprof::dump_json();
+                gpuprof::set_enabled(false);
+            }
+            gpu_prof_prev_p = p_down;
+            gpu_prof_prev_o = o_down;
+        }
 
         renderer->execute();
         prof::frame_end();

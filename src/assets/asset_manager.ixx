@@ -5,6 +5,7 @@ import <map>;
 import <string>;
 
 import :mesh;
+import :skeletal_mesh;
 import :texture;
 import :cubemap;
 import <future>;
@@ -21,6 +22,7 @@ public:
     AssetManager(AssetManagerInit);;
     
     MeshHandle load_mesh(const std::string& rel_path);
+    SkeletalMeshHandle load_skeletal_mesh(const std::string& rel_path);
     TextureHandle load_texture(const std::string& rel_path);
     AssetSceneInfo load_scene(const std::string& rel_path, const std::string& textures_rel_path);
     CubemapHandle load_cubemap(const std::string& rel_path);
@@ -43,6 +45,7 @@ public:
     
     
     const StaticMesh& get_mesh(MeshHandle id);
+    const SkeletalMesh& get_skeletal_mesh(SkeletalMeshHandle id);
     const Texture& get_texture(TextureHandle texture_handle);
     const Cubemap& get_cubemap(CubemapHandle cubemap_handle);
     
@@ -56,11 +59,15 @@ public:
     std::map<MeshHandle, StaticMesh> loaded_meshes;
     std::map<std::string, MeshHandle> mesh_by_path;
     
+    std::map<SkeletalMeshHandle, SkeletalMesh> loaded_skeletal_meshes;
+    std::map<std::string, SkeletalMeshHandle> skeletal_mesh_by_path;
+    
     std::vector<StaticMesh> stored_meshes;
     
     std::mutex load_texture_mutex;
     
     uint32_t meshes_counter;
+    uint32_t skeletal_meshes_counter = 0;
     uint32_t textures_counter;
     uint32_t cubemaps_counter;
 };

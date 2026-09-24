@@ -76,10 +76,27 @@ void SceneViewProcessor_Mesh::process()
                         geometry.primitives[prim_index]
                             .material_index.value_or(0);
                     
+                    checkf(mat_index < submitted.materials.size(),
+                        "Mesh '%s': no material for slot %u (%zu provided)",
+                        submitted.debug_name.to_string().c_str(), mat_index, submitted.materials.size());
+                    
                     auto material = submitted.materials[mat_index];
+                    
+                    // explicitly hidden material (e.g. fully transparent UE materials)
+                    if (auto visible_it = material->parameters.find("visible");
+                        visible_it != material->parameters.end() &&
+                        visible_it->second.is<float>() && visible_it->second.as<float>() == 0.0f)
+                    {
+                        continue;
+                    }
                     
                     auto blend_mode = material->get_enum_parameter<BlendMode>("blend_mode");
 
+                    auto model =
+                        renderer.find_model(material->model);
+                    checkf(model, "Material model '%s' not found", material->model.to_string().c_str());
+                    
+                    const bool masked_in_base_pass = model->supports_masked.value_or(false);
 
                     RenderPrimitive rp{};
                     rp.mesh = MeshPrimHandle{
@@ -89,7 +106,8 @@ void SceneViewProcessor_Mesh::process()
 
                     std::set<Name> passes;
         
-                    if (blend_mode == BlendMode::opaque)
+                    if (blend_mode == BlendMode::opaque ||
+                        (blend_mode == BlendMode::masked && masked_in_base_pass))
                     {
                         passes.emplace("GeometryBase");
                         // passes.emplace("DepthPrepass");
@@ -99,9 +117,6 @@ void SceneViewProcessor_Mesh::process()
                     
                     if (blend_mode != BlendMode::translucent)
                         passes.emplace("ShadowMap");
-
-                    auto model =
-                        renderer.find_model(material->model);
                     
                     for (Name pass_name : passes)
                     {
@@ -126,18 +141,38 @@ void SceneViewProcessor_Mesh::process()
                         info.material_index = instance->material_id;
                     }
                     
-                    auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::build_blas);
+                    if (submitted.skinning)
+                    {
+                        // per-instance skinned copy with its own vertices and BLAS
+                        const SkeletalMesh& skeletal = submitted.skinning->mesh.get();
+                        checkf(geom == 0, "Skeletal meshes have a single geometry");
                         
-                    rp.mesh_index = result.mesh_index;
+                        rp.skinned = renderer.get_backend()->create_skinned_mesh(
+                            rp.mesh,
+                            skeletal.primitive_skins[prim_index],
+                            skeletal.skeleton.num_bones());
+                        rp.skinning = submitted.skinning;
+                        rp.mesh_index = rp.skinned->mesh_index;
+                    }
+                    else
+                    {
+                        auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, RTBuildMode::build_blas);
+                        rp.mesh_index = result.mesh_index;
+                    }
                         
-                    rp.debug_texture_name = 
-                    rp.id = render_primitive_id_counter++;
-                    primitives.push_back(rp);
-                    
                     // todo: temp. exact pass is bad idea
                     auto mat_instance_TODO_EXACT_PASS =
                             renderer.query_material_instance(
                                 submitted.materials[mat_index], "GeometryBase");
+                    
+                    // shadow instances are never filled with parameters (see above):
+                    // shadow pipelines which alpha test read the base pass material
+                    if (auto shadow_it = rp.info_by_pass.find("ShadowMap"); shadow_it != rp.info_by_pass.end())
+                        shadow_it->second.material_index = mat_instance_TODO_EXACT_PASS->material_id;
+                        
+                    rp.debug_texture_name = 
+                    rp.id = render_primitive_id_counter++;
+                    primitives.push_back(rp);
                     
                     const GPUPrimitiveInfo primitive_info {
                         ro.world,

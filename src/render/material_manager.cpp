@@ -9,6 +9,9 @@ void MaterialManager::ctor(const std::shared_ptr<Renderer>& in_renderer)
     material_resource = renderer->find_resource(material_resource_name);
     checkf(material_resource, "MaterialSSBO not found");
     
+    const RenderResourceVariableDesc& materials_var = material_resource->find_var_checked("materials");
+    capacity_bytes = materials_var.parameter.initial_buffer_size.value_or(0);
+    
     
 }
 
@@ -40,6 +43,9 @@ void MaterialManager::upload()
         return;
 
     const size_t size = materials_cpu.size() * sizeof(GPUMaterial);
+    checkf(size <= capacity_bytes,
+        "Material SSBO overflow: %zu materials need %zu bytes, capacity is %zu (increase initial_buffer_size of '%s')",
+        materials_cpu.size(), size, capacity_bytes, material_resource_name.to_string().c_str());
     
     material_resource->update_ssbo("materials", size, materials_cpu.data());
 

@@ -2,6 +2,7 @@ export module expr;
 
 import <variant>;
 import <string_view>;
+import <string>;
 import <locale>;
 import <vector>;
 import <unordered_map>;
@@ -171,7 +172,19 @@ struct Parser {
 };
 
 
-using Context = std::unordered_map<std::string_view, Value>;
+// Keys are owned and lower case: identifiers are case-insensitive like Name
+// (Name::to_string() returns the first registered spelling, e.g. "NORMAL" for "normal").
+// String values must outlive the evaluation (see PipelineFamily::make_shader_key).
+using Context = std::unordered_map<std::string, Value>;
+
+inline std::string context_key(std::string_view ident)
+{
+    std::string key(ident);
+    for (char& c : key)
+        if (c >= 'A' && c <= 'Z')
+            c = char(c - 'A' + 'a');
+    return key;
+}
 
 bool eval_node(int id, const std::vector<Node>& nodes, const Context& ctx);
 
@@ -180,7 +193,7 @@ Value eval_value(int id, const std::vector<Node>& nodes, const Context& ctx) {
     if (n.type == NodeType::Literal)
         return n.literal;
     if (n.type == NodeType::Identifier)
-        return ctx.at(n.ident);
+        return ctx.at(context_key(n.ident));
     throw std::runtime_error("Invalid value node");
 }
 
@@ -202,7 +215,7 @@ bool eval_node(int id, const std::vector<Node>& nodes, const Context& ctx) {
             return eval_value(n.lhs, nodes, ctx) !=
                    eval_value(n.rhs, nodes, ctx);
         case NodeType::Identifier:
-            return as_bool(ctx.at(n.ident));
+            return as_bool(ctx.at(context_key(n.ident)));
         case NodeType::Literal:
             return as_bool(n.literal);
     }
