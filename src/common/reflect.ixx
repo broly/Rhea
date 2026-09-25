@@ -234,6 +234,7 @@ export namespace reflect
     {
         const auto& names = detail::enum_table<E>().names;
         auto it = names.find(static_cast<std::underlying_type_t<E>>(value));
+        
         checkf(it != names.end(), "Value %lld is not an enumerator of '%s'",
             (long long)value, get_name<E>().to_string().c_str());
         return it->second;

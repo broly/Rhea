@@ -433,6 +433,11 @@ consteval const CharT *define_encoded_static_string(R &&r);
 #define _LIBCPP_END_NAMESPACE_META } }
 #define _LIBCPP_BEGIN_NAMESPACE_REFLECTION_V2 _LIBCPP_BEGIN_NAMESPACE_META inline namespace reflection_v2 {
 #define _LIBCPP_END_NAMESPACE_REFLECTION_V2 } _LIBCPP_END_NAMESPACE_META
+#ifdef __RESHARPER__
+#define _RHEA_META_FEATURE(feature) 1
+#else
+#define _RHEA_META_FEATURE(feature) __has_feature(feature)
+#endif
 // --------------------------------------------------------------------
 #include <bit>
 #include <initializer_list>
@@ -448,7 +453,7 @@ consteval const CharT *define_encoded_static_string(R &&r);
 #include <vector>
 
 
-#if __has_feature(reflection)
+#if _RHEA_META_FEATURE(reflection)
 _LIBCPP_BEGIN_NAMESPACE_STD
 template <class _Tp>
 struct is_consteval_only : integral_constant<bool, __is_consteval_only(_Tp)> {};
@@ -487,7 +492,7 @@ constexpr basic_string<_Ch, _Tr, _Al> operator+(type_identity_t<basic_string_vie
 _LIBCPP_END_NAMESPACE_STD
 #endif
 
-#if __has_feature(reflection)
+#if _RHEA_META_FEATURE(reflection)
 
 _LIBCPP_BEGIN_NAMESPACE_REFLECTION_V2
 
@@ -837,7 +842,7 @@ constexpr struct front_enumerator_of_fn {
   }
 } front_enumerator;
 
-#if __has_feature(parameter_reflection)
+#if _RHEA_META_FEATURE(parameter_reflection)
 
 struct next_parameter_of_fn {
   consteval info operator()(auto /* currItrInfo */, info reflectedEntity,
@@ -873,7 +878,7 @@ struct front_annotation_of {
   }
 };
 
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
 
 struct front_attribute_of {
   consteval info operator()(info reflectedEntity) const {
@@ -899,14 +904,14 @@ struct next_attribute_of {
 // -----------------------------------------------------------------------------
 
 // Returns a reflection of the canonical type for the reflected type.
-#if __has_feature(entity_proxy_reflection)
+#if _RHEA_META_FEATURE(entity_proxy_reflection)
 [[deprecated("renamed to 'underlying_entity_of' in PXYZ")]]
 #endif
 consteval auto dealias(info r) -> info {
   return __metafunction(detail::__metafn_underlying_entity_of, r);
 }
 
-#if __has_feature(entity_proxy_reflection)
+#if _RHEA_META_FEATURE(entity_proxy_reflection)
 consteval auto underlying_entity_of(info r) -> info {
   return __metafunction(detail::__metafn_underlying_entity_of, r);
 }
@@ -1380,7 +1385,7 @@ consteval auto is_namespace_alias(info r) -> bool {
   return is_namespace(r) && __metafunction(detail::__metafn_is_alias, r);
 }
 
-#if __has_feature(entity_proxy_reflection)
+#if _RHEA_META_FEATURE(entity_proxy_reflection)
 // Returns true if the reflected entity is an entity proxy.
 consteval auto is_entity_proxy(info r) -> bool {
   return __metafunction(detail::__metafn_is_entity_proxy, r);
@@ -2104,7 +2109,7 @@ consteval auto __workaround_expand_compiler_builtins(info type) -> info {
 
 }  // namespace detail
 
-#if __has_feature(parameter_reflection)
+#if _RHEA_META_FEATURE(parameter_reflection)
 
 consteval auto parameters_of(info r) -> vector<info> {
   using iterator =
@@ -2142,7 +2147,7 @@ consteval auto variable_of(info r) -> info {
 
 #endif  // __has_feature(parameter_reflection)
 
-#if __has_feature(annotation_attributes)
+#if _RHEA_META_FEATURE(annotation_attributes)
 
 consteval auto annotations_of(info r) -> vector<info> {
   using iterator =
@@ -2189,7 +2194,7 @@ consteval auto annotate(info entity, info val) -> info {
 
 #endif  // __has_feature(annotation_attributes)
 
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
 
 // Returns whether the reflected entity is an attribute.
 consteval auto is_attribute(info r) -> bool {
@@ -2410,7 +2415,7 @@ struct data_member_options {
   optional<name_type> name = nullopt;
   optional<int> alignment = nullopt;
   optional<int> width = nullopt;
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
   [[deprecated("Use .attributes = { ^^[[no_unique_address]] }")]] bool no_unique_address = false;
   vector<meta::info> attributes = {};
 #else
@@ -2427,7 +2432,7 @@ struct enumerator_options {
   string name;
   info value = info{};
   vector<info> annotations = {};
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
   vector<info> attributes = {};
 #endif
 };
@@ -2437,7 +2442,7 @@ consteval info enumerator_spec(enumerator_options props) {
                          ^^const char, props.name.size(), props.name.data(), // TODO support utf8 ?
                         props.value,
                         props.annotations.size(), props.annotations.data(),
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
                         props.attributes.size(), props.attributes.data()
 #else
                         size_t(0), (const info *)nullptr
@@ -2520,7 +2525,7 @@ consteval auto data_member_spec(info member_type,
                             options.alignment.has_value(), alignment,
                             options.width.has_value(), width,
                             no_unique_address,
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
                             options.attributes.size(), options.attributes.data()
 #else
                             size_t(0), (const info *)nullptr
@@ -2534,7 +2539,7 @@ consteval auto data_member_spec(info member_type,
                             options.alignment.has_value(), alignment,
                             options.width.has_value(), width,
                             no_unique_address,
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
                             options.attributes.size(), options.attributes.data()
 #else
                             size_t(0), (const info *)nullptr
@@ -2548,7 +2553,7 @@ consteval auto data_member_spec(info member_type,
       options.alignment.has_value(), alignment,
       options.width.has_value(), width,
       no_unique_address,
-#if __has_feature(attribute_reflection)
+#if _RHEA_META_FEATURE(attribute_reflection)
       options.attributes.size(), options.attributes.data()
 #else
       size_t(0), (const info *)nullptr
@@ -3150,7 +3155,7 @@ consteval auto pretty_printer<CharT>::tprint_impl::render() -> string_t {
       return result + operator_symbol_helper(op);
     }
   } else if constexpr (is_conversion_function(R)) {
-#if __has_feature(parameter_reflection)
+#if _RHEA_META_FEATURE(parameter_reflection)
     return string_constant("operator ") + render<return_type_of(R)>();
 #else
     return string_constant("conversion-function");
@@ -3266,7 +3271,7 @@ template <info R>  // Function pointers.
               is_function_type(remove_pointer(R)))
 consteval auto pretty_printer<CharT>::tprint_impl::render() -> string_t {
 
-#if __has_feature(parameter_reflection)
+#if _RHEA_META_FEATURE(parameter_reflection)
   constexpr auto FnTy = remove_pointer(R);
   string_t result = render<return_type_of(FnTy)>() + string_constant("(*)(");
   size_t Idx = 0;
@@ -3289,7 +3294,7 @@ template <typename CharT>
 template <info R>  // Function types.
     requires (is_type(R) && is_function_type(R))
 consteval auto pretty_printer<CharT>::tprint_impl::render() -> string_t {
-#if __has_feature(parameter_reflection)
+#if _RHEA_META_FEATURE(parameter_reflection)
   string_t result = render<return_type_of(R)>() + string_constant("(");
   size_t Idx = 0;
   [:expand(parameters_of(R)):] >> [&]<auto Param> {
@@ -3336,7 +3341,7 @@ template <info R>  // Pointer to member function types.
 consteval auto pretty_printer<CharT>::tprint_impl::render() -> string_t {
   constexpr auto FnTy = type_of_member_from_memptr<R>();
 
-#if __has_feature(parameter_reflection)
+#if _RHEA_META_FEATURE(parameter_reflection)
   string_t result = render<return_type_of(FnTy)>() + string_constant("(");
   result += render<type_of_object_from_memptr<R>()>() +
             string_constant("::*)(");
@@ -3402,6 +3407,7 @@ _LIBCPP_END_NAMESPACE_REFLECTION_V2
 #endif  // __has_feature(reflection)
 
 
+#undef _RHEA_META_FEATURE
 #undef _LIBCPP_BEGIN_NAMESPACE_STD
 #undef _LIBCPP_END_NAMESPACE_STD
 #undef _LIBCPP_BEGIN_NAMESPACE_META
