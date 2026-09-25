@@ -1,6 +1,7 @@
 export module framework:engine_clock;
 
-import <chrono>;
+import std.compat;
+
 
 export struct EngineClock
 {

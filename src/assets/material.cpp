@@ -1,4 +1,13 @@
-module assets:material;
+module;
+
+#include <json/value.h>
+
+module assets;
+
+import :material;
+
+import std.compat;
+import assertions;
 
 
 import linear_color;

@@ -1,4 +1,15 @@
+module;
+
+#include <json/value.h>
+
 export module rhcomponents:rhcomp_camera;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 
 import rhmath;

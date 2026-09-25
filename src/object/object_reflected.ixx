@@ -1,4 +1,14 @@
-﻿export module rhobject:reflected;
+﻿module;
+
+#include <json/value.h>
+
+export module rhobject:reflected;
+
+import std.compat;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import :object;
 import :reflection;

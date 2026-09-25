@@ -1,11 +1,11 @@
+module;
+
+#include <json/value.h>
+
 module gpu_profile;
 
-import <cstdint>;
-import <string>;
-import <string_view>;
-import <vector>;
-import <algorithm>;
-import <json/value.h>;
+import std.compat;
+
 import render;
 import paths;
 import json_utils;

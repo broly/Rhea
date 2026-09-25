@@ -1,8 +1,14 @@
-module render:material_instance;
+module render;
+
+import :material_instance;
+
+import std.compat;
+import assertions;
+import fixed_string;
 import assets;
-#include "common/assertion_macros.h"
 import :material_manager;
 import log;
+#include "common/assertion_macros.h"
 #include "logging/log_macro.h"
 
 DEFINE_LOGGER(LogMaterialInstance, Warning);

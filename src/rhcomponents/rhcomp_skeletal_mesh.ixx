@@ -1,12 +1,21 @@
+module;
+
+#include <json/value.h>
+
 export module rhcomponents:rhcomp_skeletal_mesh;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import rhmath;
 import assets;
 import framework;
 import render;
 import glm;
-import <memory>;
-import <vector>;
 import :rhcomp_mesh;
 
 #include "object/object_reflection_macro.h"

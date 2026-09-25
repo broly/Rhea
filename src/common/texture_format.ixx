@@ -1,5 +1,7 @@
 export module texture_format;
-import <exception>;
+
+import std.compat;
+import assertions;
 
 #include "assertion_macros.h"
 

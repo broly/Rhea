@@ -1,8 +1,11 @@
-﻿export module vk:immediate_commands;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+export module vk:immediate_commands;
+
+import std.compat;
 import :instance;
-import <optional>;
-import <vulkan/vulkan_core.h>;
-import <functional>;
 
 namespace vk
 {

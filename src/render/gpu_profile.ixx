@@ -1,14 +1,7 @@
 export module gpu_profile;
 
-import <cstdint>;
-import <string>;
-import <string_view>;
-import <vector>;
-import <unordered_map>;
-import <array>;
-import <fstream>;
-import <iostream>;
-import <algorithm>;
+import std.compat;
+
 import render;        // RenderBackend (abstract), RB* handle types
 import paths;
 
@@ -76,23 +69,23 @@ export namespace gpuprof
     }
 
     // ---- runtime toggle -----------------------------------------------------
-    export void set_enabled(bool v) { ctx().enabled = v; }
-    export bool is_enabled()        { return ctx().enabled; }
-    export void clear_results()     { ctx().results.clear(); }
+    void set_enabled(bool v) { ctx().enabled = v; }
+    bool is_enabled()        { return ctx().enabled; }
+    void clear_results()     { ctx().results.clear(); }
 
     // ---- lifecycle ----------------------------------------------------------
-    export void init(RenderBackend* backend);
-    export void shutdown();
+    void init(RenderBackend* backend);
+    void shutdown();
 
     // ---- frame boundaries (called by the render graph each frame) -----------
-    export void frame_begin(uint32_t frame_in_flight, RBCommandList cmd);
-    export void frame_end();
+    void frame_begin(uint32_t frame_in_flight, RBCommandList cmd);
+    void frame_end();
 
     // ---- pass boundaries (called around pass.execute in the loop) -----------
-    export void pass_begin(RBCommandList cmd, std::string_view pass_name);
-    export void pass_end(RBCommandList cmd);
+    void pass_begin(RBCommandList cmd, std::string_view pass_name);
+    void pass_end(RBCommandList cmd);
 
     // ---- dump ---------------------------------------------------------------
-    export void dump();
-    export void dump_json();   // per-frame samples per pass -> JSON for Python viz
+    void dump();
+    void dump_json();   // per-frame samples per pass -> JSON for Python viz
 }

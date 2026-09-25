@@ -1,14 +1,14 @@
 export module reflect;
+
+import std.compat;
+import assertions;
+import fixed_string;
+import name;
+import type_id;
+import container_traits;
 #include "assertion_macros.h"
 #include "common/foreach_macro.h"
 
-import fixed_string;
-import <string_view>;
-import <functional>;
-import name;
-import type_id;
-import <string>;
-import container_traits;
 
 export namespace reflect
 {

@@ -1,12 +1,7 @@
 ﻿export module profile;
 
-import <source_location>;
-import <chrono>;
-import <unordered_map>;
-import <string_view>;
-import <iostream>;
-import <fstream>;
-import <vector>;
+import std.compat;
+
 import paths;
 
 using Clock = std::chrono::high_resolution_clock;
@@ -48,18 +43,18 @@ export namespace prof
     // ------------------------------------------------------------
     // Global enable flag
     // ------------------------------------------------------------
-    export bool& get_is_profiling()
+    bool& get_is_profiling()
     {
         static bool enabled = false;
         return enabled;
     }
 
-    export void set_is_profiling(bool value)
+    void set_is_profiling(bool value)
     {
         get_is_profiling() = value;
     }
 
-    export bool is_profiling()
+    bool is_profiling()
     {
         return get_is_profiling();
     }
@@ -67,18 +62,18 @@ export namespace prof
     // ------------------------------------------------------------
     // Thread-local current node (stack top)
     // ------------------------------------------------------------
-    thread_local ProfileNode* tls_current_node = nullptr;
+    inline thread_local ProfileNode* tls_current_node = nullptr;
 
     // ------------------------------------------------------------
     // Frame control
     // ------------------------------------------------------------
-    export FORCEINLINE void frame_start()
+    FORCEINLINE void frame_start()
     {
         auto& ctx = get_context();
         tls_current_node = &ctx.root;
     }
 
-    export FORCEINLINE void frame_end()
+    FORCEINLINE void frame_end()
     {
         
     }
@@ -122,7 +117,7 @@ export namespace prof
             dump_node(file, child, depth + 1);
     }
 
-    export void dump()
+    void dump()
     {
         auto path = paths::get_project_path() / "profiling_dump.txt";
         std::ofstream file(path.c_str());

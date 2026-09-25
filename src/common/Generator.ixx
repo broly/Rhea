@@ -1,8 +1,7 @@
 ﻿export module generator;
 
-import <optional>;
-import <coroutine>;
-import <vector>;
+import std.compat;
+
 
 #define CORO_INLINE __declspec(noinline)
 

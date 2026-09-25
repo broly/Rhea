@@ -1,10 +1,20 @@
+module;
+
+#include <json/value.h>
+
 export module rail;
+
+import std.compat;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 import framework;
-import <functional>;
 import glm;
 import name;
 import rhmath;
-#include "object/object_reflection_macro.h";
+import rhobject;
+#include "object/object_reflection_macro.h"
 
 export struct RailSampleData
 {

@@ -1,13 +1,12 @@
 ﻿export module framework:world;
 
-import <memory>;
-import <string>;
+import std.compat;
+
 import :engine_clock;
 import :core;
 import dependency_collector;
 import rhmath;
 import rhobject;
-import <array>;
 // import :scene_extractor;
 
 

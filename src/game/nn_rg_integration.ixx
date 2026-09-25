@@ -1,13 +1,16 @@
 export module game:nn_denoiser_passes;
 
+import std.compat;
+import assertions;
+import fixed_string;
+import reflect;
+import type_id;
+
 import name;
 import :nn_pipeline;
 import :nn_weights;
 import glm;
 import rhmath;
-import <vector>;
-import <map>;
-import <filesystem>;
 import :nn_ubo;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"

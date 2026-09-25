@@ -1,11 +1,13 @@
 ﻿module gltf_scene;
 
+import std.compat;
+import fixed_string;
+
 
 import log;
 import glm;
 import rhcomponents;
 import assets;
-import <future>;
 
 #include "logging/log_macro.h"
 

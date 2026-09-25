@@ -1,7 +1,7 @@
 export module vk:debug_object_tracker;
 
-import <map>;
-import <string>;
+import std.compat;
+
 import name;
 
 namespace vk

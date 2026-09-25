@@ -1,5 +1,6 @@
 module rail;
-import <algorithm>;
+
+import std.compat;
 
 void Rail::set_accum_time(float t)
 {

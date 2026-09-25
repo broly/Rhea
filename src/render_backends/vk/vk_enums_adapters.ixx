@@ -1,8 +1,12 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:enums_adapters;
 
-import <string>;
-import <string_view>;
-import <vulkan/vulkan_core.h>;
+import std.compat;
+import assertions;
+
 
 import render;
 import texture_format;

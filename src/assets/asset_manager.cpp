@@ -1,8 +1,17 @@
-﻿module assets:asset_manager;
+﻿module;
+
+#include <cassert>
+
+module assets;
+
+import :asset_manager;
+
+import std.compat;
+import fixed_string;
+import assertions;
 
 import paths;
 import log;
-import <cassert>;
 #include "logging/log_macro.h"
 #include "common/assertion_macros.h"
 

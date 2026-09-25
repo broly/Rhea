@@ -1,27 +1,33 @@
-module game:generic_render_graph;
+module;
+
+#include <cfloat>
+
+module game;
+
+import :generic_render_graph;
+
+import std.compat;
+import assertions;
+import fixed_string;
 
 
 import render;
 import vk;
 import glm;
 import rhmath;
-import <vector>;
 import profile;
 import name;
-import <unordered_map>;
 import rhcomponents;
 import globals;
 import assets;
-import <functional>;
 import texture_format;
 import :constants;
 import :names;
 import :debug_line;
-import <algorithm>;
-import <set>;
 import dump_exr;
 import paths;
 
+import log;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -30,7 +36,6 @@ import paths;
 #include "logging/log_macro.h"
 #include "profiling/profile.h"
 
-import log;
 
 DEFINE_LOGGER(LogGenericRG, Display);
 
@@ -346,7 +351,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     
     debug_line_buffer = backend->create_vertex_buffer(VertexBufferDesc {
-        .frame_size  = debug_line_capacity * sizeof(LineVertex),
+        .frame_size  = static_cast<uint32_t>(debug_line_capacity * sizeof(LineVertex)),
         .dynamic = true
     });
     

@@ -1,10 +1,16 @@
+module;
+
+#include <json/value.h>
 
 export module game:nn_pipeline;
 
-import <vector>;
-import <map>;
-import <string>;
-import <cstdint>;
+import std.compat;
+import assertions;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
+
 import rhobject;
 import name;
 import :nn_weights;

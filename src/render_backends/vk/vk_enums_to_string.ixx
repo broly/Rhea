@@ -1,8 +1,12 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:enums_to_string;
 
-import <string>;
-import <string_view>;
-import <vulkan/vulkan_core.h>;
+import std.compat;
+import assertions;
+
 
 
 #define VK_ENUM_CONVERT_TO_STRING_CASE(layout) \

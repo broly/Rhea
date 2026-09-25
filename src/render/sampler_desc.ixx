@@ -1,10 +1,10 @@
 export module render:sampler_desc;
 
+import std.compat;
+
 
 import hash_utils;
 import name;
-import <type_traits>;
-import <string_view>;
 
 export enum class SamplerFilter : uint32_t
 {

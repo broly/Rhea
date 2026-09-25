@@ -1,12 +1,12 @@
 export module WorldScript_RotateAroundObject;
 
+import std.compat;
+
 import framework;
 import glm;
 import rhmath;
 import character_controller;
 import character_light_rig;
-import <memory>;
-import <cstdint>;
 
 export class WorldScript_VariousThings : public WorldScript
 {

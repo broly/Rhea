@@ -1,8 +1,7 @@
 export module framework:world_script;
 
-import <iostream>;
-import <memory>;
-import <ostream>;
+import std.compat;
+
 
 import :core;
 

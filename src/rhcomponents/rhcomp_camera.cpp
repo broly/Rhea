@@ -1,7 +1,10 @@
-﻿module rhcomponents:rhcomp_camera;
+﻿module rhcomponents;
+
+import :rhcomp_camera;
+
+import std.compat;
 import rhmath;
 import globals;
-import <cassert>;
 import render;
 import :scene_view_proxy.camera;
 

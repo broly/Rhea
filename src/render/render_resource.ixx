@@ -1,6 +1,8 @@
 ﻿export module render:render_resource;
 
-import <string>;
+import std.compat;
+import assertions;
+
 import :pipeline_desc;
 import :render_resource_instance;
 import :pipeline_object;

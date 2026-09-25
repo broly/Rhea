@@ -1,5 +1,9 @@
 export module render:gpu_types;
-import <cstdint>;
+
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
 
 import glm;
 

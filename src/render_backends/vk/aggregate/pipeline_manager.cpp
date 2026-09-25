@@ -1,11 +1,20 @@
-module vk:pipeline_manager;
+module;
+
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :pipeline_manager;
+
+import std.compat;
+import assertions;
+import fixed_string;
+import profile;
 import :helpers;
-import <vector>;
 import :log;
 import :pipeline_graphics;
 import :pipeline_compute;
 import :pipeline_raytrace;
-import <vulkan/vulkan_core.h>;
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
 #include "profiling/profile.h"

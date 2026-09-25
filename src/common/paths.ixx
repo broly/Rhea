@@ -1,7 +1,7 @@
 ﻿export module paths;
 
-import <filesystem>;
-import <iostream>;
+import std.compat;
+
 
 export namespace paths
 {
@@ -14,28 +14,24 @@ export namespace paths
         
         std::filesystem::path find_project_path()
         {
-            
+            // The project root is the nearest ancestor of the working directory
+            // (the build dir, e.g. out/build/debug, or the project itself) that
+            // contains project_marker_file.
+            const std::filesystem::path start = std::filesystem::current_path();
 
-            std::filesystem::path exePath = std::filesystem::current_path();
-    
-
-            std::filesystem::path projectPath = exePath;
-    
-
-            for (int i = 0; i < 1; ++i) 
+            for (std::filesystem::path dir = start; ; dir = dir.parent_path())
             {
-                if (projectPath.has_parent_path()) 
+                if (std::filesystem::exists(dir / "project_marker_file"))
                 {
-                    projectPath = projectPath.parent_path();
-            
-                    std::filesystem::path jsonPath = projectPath / "project_marker_file";
-    
-                    if (std::filesystem::exists(jsonPath)) {
-                        std::cout << "Project path is: " << projectPath << std::endl;
-                        return projectPath;
-                    }
+                    std::cout << "Project path is: " << dir << std::endl;
+                    return dir;
                 }
+                if (!dir.has_parent_path() || dir.parent_path() == dir)
+                    break;
             }
+
+            std::cerr << "project_marker_file not found in " << start << " or any parent directory" << std::endl;
+            std::abort();
         }
 
         Paths& get_paths()

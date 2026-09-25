@@ -1,9 +1,14 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:pipeline_helpers;
 
-import <vulkan/vulkan_core.h>;
+import std.compat;
+import assertions;
+
 import render;
 #include "common/assertion_macros.h"
-import <array>;
 
 #define PROVIDE_VK_SHADER_STAGE(stage, vk_stage) \
    stages_vk_bits[ShaderStage_index(ShaderStage::stage)] = vk_stage;

@@ -1,8 +1,11 @@
-﻿export module vk:instance;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+#include <glfw/glfw3.h>
+
+export module vk:instance;
 
 import platform;
-import <vulkan/vulkan_core.h>;
-import <glfw/glfw3.h>;
 import :context;
 
 import :debug_object_tracker;

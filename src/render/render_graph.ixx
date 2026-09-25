@@ -1,10 +1,20 @@
+module;
+
+#include <cassert>
+#include <json/value.h>
+
 export module render:render_graph;
+
+import std.compat;
+import rhobject;
+import assertions;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import :render_backend;
 import :rg_types;
-import <cassert>;
-import <functional>;
-import <map>;
 import name;
 import :pipeline_family;
 import :common;

@@ -1,7 +1,11 @@
-﻿export module vk:internal_types;
-import <cstdint>;
-#include <vector>
-import <vulkan/vulkan_core.h>;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+export module vk:internal_types;
+
+import std.compat;
+
 
 namespace vk
 {

@@ -1,6 +1,7 @@
 export module render:material_instance;
 
-import <memory>;
+import std.compat;
+
 import :render_resource_instance;
 import :renderer;
 import assets;

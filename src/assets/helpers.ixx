@@ -1,8 +1,12 @@
+module;
+
+#include <json/value.h>
+
 export module assets:helpers;
 
-import <iostream>;
+import std.compat;
+
 import glm;
-import <json/value.h>;
 import dependency_collector;
 import fastgltf;
 import fastgltf_helper;

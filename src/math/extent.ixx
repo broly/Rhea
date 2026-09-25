@@ -1,5 +1,6 @@
 export module rhmath:extent;
-import <cstdint>;
+
+import std.compat;
 import glm;
 
 export struct Extent

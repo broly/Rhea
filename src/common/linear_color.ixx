@@ -1,5 +1,10 @@
 export module linear_color;
 
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
+
 import glm;
 #include "reflect_macros.h"
 

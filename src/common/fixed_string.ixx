@@ -56,7 +56,7 @@ struct FixedString
         return false;
     }
 };
-template<size_t Num>
+export template<size_t Num>
 FixedString(char const (&)[Num]) -> FixedString<Num - 1>;
 
 export template<FixedString FS>

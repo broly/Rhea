@@ -1,18 +1,13 @@
 ﻿export module game:renderer;
-import <memory>;
+
+import std.compat;
 import render;
 import engine;
-import <map>;
-import <vector>;
 import name;
 import glm;
 import assets;
 import texture_format;
-import <optional>;
-import <array>;
-import <vector>;
 import assets;
-import <string>;
 
 export class GameRenderer : public Renderer
 {

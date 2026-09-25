@@ -1,6 +1,7 @@
 module WorldScript_RotateAroundObject;
 
-import <iostream>;
+import std.compat;
+
 import glm;
 import rhmath;
 import globals;

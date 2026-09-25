@@ -1,4 +1,10 @@
-module rhcomponents:rhcomp_skeletal_mesh;
+module rhcomponents;
+
+import :rhcomp_skeletal_mesh;
+
+import std.compat;
+import assertions;
+import fixed_string;
 
 import log;
 

@@ -1,9 +1,17 @@
+module;
+
+#include <json/value.h>
+
 export module rhmath:vec;
+
+import std.compat;
+import assertions;
+import fixed_string;
+import type_id;
 
 import glm;
 import reflect;
 
-import <json/value.h>;
 import rhobject;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"

@@ -1,4 +1,9 @@
-module render:material_manager;
+module render;
+
+import :material_manager;
+
+import std.compat;
+import assertions;
 import glm;
 #include "common/assertion_macros.h"
 

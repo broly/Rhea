@@ -1,16 +1,17 @@
 module;
 
-module assets:skeletal_mesh;
+#include <json/value.h>
+#include <json/reader.h>
 
-import <iostream>;
-import <array>;
-import <cmath>;
-import <algorithm>;
-import <functional>;
-import <fstream>;
+module assets;
+
+import :skeletal_mesh;
+
+import std.compat;
+import assertions;
+import fixed_string;
+
 import glm;
-import <json/value.h>;
-import <json/reader.h>;
 
 import dependency_collector;
 import fastgltf;

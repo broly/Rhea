@@ -1,11 +1,19 @@
-﻿export module rhcomponents:scene_view_proxy.light;
+﻿module;
+
+#include <json/value.h>
+
+export module rhcomponents:scene_view_proxy.light;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import render_scene;
 import :rhcomp_light;
-import <array>;
-import <vector>;
 import glm;
-import <algorithm>;
 #include "object/object_reflection_macro.h"
 
 

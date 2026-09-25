@@ -1,8 +1,7 @@
 export module render:shader_key;
 
-import <cstdint>;
-import <type_traits>;
-import <compare>;
+import std.compat;
+
 
 export struct ShaderKey
 {

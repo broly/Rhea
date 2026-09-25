@@ -1,12 +1,19 @@
-﻿module assets:texture;
+﻿module;
+
+#include <json/value.h>
+
+module assets;
+
+import :texture;
+
+import std.compat;
+import assertions;
 
 import stb_image;
-import <json/value.h>;
 import rhobject;
 import globals;
 import engine;
 import :asset_manager;
-import <future>;
 
 #include "common/assertion_macros.h"
 

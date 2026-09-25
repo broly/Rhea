@@ -1,4 +1,15 @@
+module;
+
+#include <json/value.h>
+
 export module rhcomponents:scene_view_proxy.reflection_capture;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 import assets;
 import name;
 import :rhcomp_reflection_capture;

@@ -1,11 +1,9 @@
 ﻿export module render_scene:scene_view;
-import <vector>;
 
-import <memory>;
-import <unordered_map>;
+import std.compat;
+
 import framework;
 
-import <any>;
 
 import name;
 
@@ -16,7 +14,7 @@ export class SceneView
     friend class SceneViewProcessor;
 public:
     
-    SceneView(std::shared_ptr<class World> in_world, std::shared_ptr<class Renderer> in_renderer);
+    SceneView(std::shared_ptr<World> in_world, std::shared_ptr<class Renderer> in_renderer);
 
     void perform_extraction();
     
@@ -47,7 +45,7 @@ public:
     void submit_raw(SceneViewProcId svp_id, const void* scene_proxy_ptr);
 
 
-    std::shared_ptr<class World> world;
+    std::shared_ptr<World> world;
 
     std::shared_ptr<Renderer> renderer;
     

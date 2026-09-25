@@ -1,12 +1,13 @@
-module render:pipeline_family;
+module render;
 
-import <variant>;
-import <map>;
-import <set>;
+import :pipeline_family;
+
+import std.compat;
+import fixed_string;
+import assertions;
+import profile;
+
 import paths;
-import <fstream>;
-import <filesystem>;
-import <variant>;
 import file_helpers;
 import string_helpers;
 import expr;

@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-import fixed_string;
 
 #define DEFINE_VERBOSITY(name, level, details, printer) \
     export inline constexpr auto name = LogVerbosity(level, static_cast<ELogOutputDetailsMask>(details), &printer); \

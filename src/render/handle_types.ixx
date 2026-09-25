@@ -1,23 +1,28 @@
+module;
+
+#include <cassert>
+#include <vulkan/vulkan_core.h>
+#include <GLFW/glfw3.h>
+
 export module render:handle_types;
 
-import <cassert>;
-import <optional>;
-import <vulkan/vulkan_core.h>;
-import <GLFW/glfw3.h>;
-import <vector>;
+import std.compat;
+import assertions;
+import fixed_string;
+import reflect;
+
 import type_id;
 import assets;
 import name;
 import texture_format;
 import rhmath;
 
+import :material_model;
+import type_utils;
+import enum_helpers;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 #include "common/type_macros.h"
-import :material_model;
-import <map>;
-import type_utils;
-import enum_helpers;
 
 
 

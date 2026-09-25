@@ -1,9 +1,18 @@
+module;
+
+#include <json/value.h>
+
 export module assets:material;
 
-import <variant>;
+import std.compat;
+import assertions;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
+
 import linear_color;
 import :material_parameter_type;
-import <future>;
 import rhobject;
 #include "common/assertion_macros.h"
 #include "object/object_reflection_macro.h"

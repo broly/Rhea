@@ -1,17 +1,23 @@
+module;
+
+#include <json/value.h>
+
 export module render:material_model;
+
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
+import dependency_collector;
+import assertions;
 
 import name;
 import rhobject;
-import <map>;
-import <vector>;
-import <string>;
-import <variant>;
+import enum_helpers;
+import glm;
 #include "common/reflect_macros.h"
 #include "object/object_reflection_macro.h"
 #include "common/type_macros.h"
-import enum_helpers;
-import <bit>;
-import glm;
 
 #include "common/assertion_macros.h"
 

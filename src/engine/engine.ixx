@@ -1,5 +1,14 @@
+module;
+
+#include <json/value.h>
+
 export module engine:engine;
-import <memory>;
+
+import std.compat;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import rhobject;
 import framework;
@@ -22,7 +31,7 @@ public:
     
     void render_hot_reload();
 
-    platform::window::Window window = nullptr;
+    platform::window::Window window{};
     std::shared_ptr<Input> input = nullptr;
     RBWindowHandle window_handle;
     std::shared_ptr<World> world = nullptr;

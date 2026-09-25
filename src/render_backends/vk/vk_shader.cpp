@@ -1,8 +1,14 @@
-﻿module vk:shader;
+﻿module;
 
-import <cassert>;
-import <fstream>;
-import <vector>;
+#include <cassert>
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :shader;
+
+import std.compat;
+
 import :log;
 #include "vk_macro.h"
 

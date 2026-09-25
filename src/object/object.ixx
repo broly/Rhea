@@ -1,9 +1,8 @@
 ﻿export module rhobject:object;
+
+import std.compat;
 import dependency_collector;
 
-import <memory>;
-import <string>;
-import <optional>;
 import reflect;
 import static_name;
 import name;

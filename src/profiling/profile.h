@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-import profile;
 
 #define DO_PROFILE 1
 

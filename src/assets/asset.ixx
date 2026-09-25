@@ -1,8 +1,6 @@
 ﻿export module assets:asset;
-import <cstdint>;
-import <limits>;
-import <string>;
-import <optional>;
+
+import std.compat;
 
 #include "common/type_macros.h"
 

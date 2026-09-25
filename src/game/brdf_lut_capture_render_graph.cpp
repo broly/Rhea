@@ -1,4 +1,9 @@
-module game:brdf_lut_capture_render_graph;
+module game;
+
+import :brdf_lut_capture_render_graph;
+
+import std.compat;
+import assertions;
 import texture_format;
 import :constants;
 import :names;

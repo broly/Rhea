@@ -1,5 +1,13 @@
-﻿module vk:buffer_mgr;
-import <vulkan/vulkan_core.h>;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :buffer_mgr;
+
+import std.compat;
+import assertions;
 import :helpers;
 import :log;
 import reflect;

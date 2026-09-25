@@ -1,11 +1,6 @@
 #pragma once
 #include "common/foreach_macro.h"
-import <numeric>;
 
-import fixed_string;
-import reflect;
-import <string>;
-import type_id;
 
 #define __PRIVATE_NAMED_FIELD(x) detail::NamedField<&Type::x, #x>
 

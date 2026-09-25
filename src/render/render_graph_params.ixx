@@ -1,6 +1,7 @@
 export module render:rg_params;
 
-import <map>;
+import std.compat;
+
 import name;
 import glm;
 

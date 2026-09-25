@@ -1,6 +1,7 @@
 ﻿export module render_scene:render_id;
 
-import <cstdint>;
+import std.compat;
+
 
 export struct RenderId
 {

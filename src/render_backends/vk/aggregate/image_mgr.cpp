@@ -1,16 +1,26 @@
-﻿module vk:image_mgr;
+﻿module;
 
-import <vulkan/vulkan_core.h>;
+#include <intrin.h>
 
-#include "common/assertion_macros.h"
-#include "render_backends/vk/vk_macro.h"
+#include <vulkan/vulkan_core.h>
+#include <cassert>
+
+module vk;
+
+import :image_mgr;
+
+import std.compat;
+import assertions;
+
 
 import reflect;
-import <cassert>;
 import :helpers;
 import :log;
 import :enums_adapters;
 import :enums_to_string;
+#include "common/assertion_macros.h"
+#include "render_backends/vk/vk_macro.h"
+
 
 
 RBImageHandle vk::ImageManager::register_swapchain_image(

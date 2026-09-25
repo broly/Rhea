@@ -1,10 +1,11 @@
-﻿export module assets:texture;
+﻿module;
 
-import <cstdint>;
-import <filesystem>;
-import <vector>;
-import <future>;
-import <json/value.h>;
+#include <json/value.h>
+
+export module assets:texture;
+
+import std.compat;
+
 import texture_format;
 import dependency_collector;
 import rhmath;

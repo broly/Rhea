@@ -1,4 +1,9 @@
-module render:material_model;
+module render;
+
+import :material_model;
+
+import std.compat;
+import assertions;
 #include "common/assertion_macros.h"
 
 

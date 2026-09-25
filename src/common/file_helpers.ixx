@@ -1,8 +1,7 @@
 export module file_helpers;
 
-import <fstream>;
-import <filesystem>;
-import <chrono>;
+import std.compat;
+
 
 export namespace file_helpers
 {

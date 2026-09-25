@@ -1,6 +1,9 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:mesh_gpu_data;
 
-import <vulkan/vulkan_core.h>;
 import render;
 
 export struct MeshGPUData 

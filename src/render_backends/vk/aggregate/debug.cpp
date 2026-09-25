@@ -1,4 +1,10 @@
-module vk:debug;
+module;
+
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :debug;
 
 void vk::Debug::register_vk_image_name(VkImage image, Name debug_name)
 {

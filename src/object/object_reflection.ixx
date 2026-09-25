@@ -1,12 +1,14 @@
-﻿export module rhobject:reflection;
+﻿module;
 
-import <cassert>;
-import <functional>;
-import <memory>;
-import <optional>;
-import <string_view>;
-import <json/value.h>;
-import <set>;
+#include <cassert>
+#include <json/value.h>
+
+export module rhobject:reflection;
+
+import std.compat;
+import assertions;
+import type_id;
+
 import reflect;
 import fixed_string;
 import enum_helpers;
@@ -18,8 +20,6 @@ import static_name;
 import container_traits;
 import type_utils;
 import string_utils;
-import <variant>;
-import <set>;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 
@@ -217,7 +217,7 @@ export namespace reflect::json
                             value_str.c_str(), reflect::get_name<T>().to_string().c_str(),
                             context.get_debug_path().c_str());
             
-            target = reflect::ReflectionInfo<T>::template enum_name_to_value(value.asString());
+            target = reflect::ReflectionInfo<T>::enum_name_to_value(value.asString());
         } else if constexpr (is_shared_ptr_v<T>)
         {
             auto type_id = reflect::get_object_type_name<typename T::element_type>();
@@ -277,7 +277,7 @@ export namespace reflect::json
                 if constexpr (std::is_enum_v<value_type> && is_reflected_v<value_type>)
                 {
                     // todo: crutch
-                    set_item = reflect::ReflectionInfo<value_type>::template enum_name_to_value(json_item.asString());
+                    set_item = reflect::ReflectionInfo<value_type>::enum_name_to_value(json_item.asString());
                 } else
                 {
                     DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", index));
@@ -296,7 +296,7 @@ export namespace reflect::json
                 using value_type = typename T::enum_type;
                 value_type enum_value;
                 static_assert(std::is_enum_v<value_type> && is_reflected_v<value_type>);
-                enum_value = reflect::ReflectionInfo<value_type>::template enum_name_to_value(json_item.asString());
+                enum_value = reflect::ReflectionInfo<value_type>::enum_name_to_value(json_item.asString());
                 target |= enum_value;
             }
         }else if constexpr (is_optional_v<std::decay_t<T>>)

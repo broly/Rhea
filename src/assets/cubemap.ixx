@@ -1,12 +1,12 @@
+module;
+
+#include <json/value.h>
+
 export module assets:cubemap;
+
+import std.compat;
 import texture_format;
 import :asset;
-import <array>;
-import <vector>;
-import <string>;
-import <future>;
-import <filesystem>;
-import <json/value.h>;
 import texture_format;
 import dependency_collector;
 import name;

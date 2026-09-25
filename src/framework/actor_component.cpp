@@ -1,6 +1,9 @@
-﻿module framework:rhcomponent;
+﻿module framework;
 
-import <set>;
+import :rhcomponent;
+
+import std.compat;
+
 
 void RhComponent::on_add(std::shared_ptr<RhActor> actor)
 {

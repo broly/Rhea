@@ -1,5 +1,10 @@
 ﻿export module rhmath:vertex;
 
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
+
 import :vec;
 #include "common/reflect_macros.h"
 

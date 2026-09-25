@@ -1,8 +1,17 @@
-﻿export module framework:rhcomponent;
+﻿module;
+
+#include <json/value.h>
+
+export module framework:rhcomponent;
+
+import std.compat;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import rhobject;
 import :core;
-import <memory>;
 
 #include "object/object_reflection_macro.h"
 

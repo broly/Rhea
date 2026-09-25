@@ -1,15 +1,13 @@
 ﻿export module assets:asset_manager;
 
-import <cstdint>;
-import <map>;
-import <string>;
+import std.compat;
+
 
 import :mesh;
 import :skeletal_mesh;
 import :animation;
 import :texture;
 import :cubemap;
-import <future>;
 import :asset_scene;
 #include "common/type_macros.h"
 

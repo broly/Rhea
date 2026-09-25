@@ -1,7 +1,10 @@
-﻿module rhcomponents:rhcomp_reflection_capture;
+﻿module rhcomponents;
+
+import :rhcomp_reflection_capture;
+
+import std.compat;
 import rhmath;
 import globals;
-import <cassert>;
 import render;
 import :scene_view_proxy.reflection_capture;
 import paths;

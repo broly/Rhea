@@ -1,6 +1,9 @@
-﻿module rhobject:reflection;
+﻿module rhobject;
 
-import <map>;
+import :reflection;
+
+import std.compat;
+
 
 static auto& get_registry() 
 {

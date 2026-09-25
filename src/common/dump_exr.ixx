@@ -1,13 +1,11 @@
+module;
+
+#include <json/value.h>
+
 export module dump_exr;
-import <array>;
-import <vector>;
-import <string>;
-import <future>;
-import <filesystem>;
-import <algorithm>;
-import <cmath>;
-import <cstdint>;
-import <json/value.h>;
+
+import std.compat;
+import assertions;
 import tinyexr;
 #include "assertion_macros.h"
 
@@ -39,7 +37,7 @@ export namespace exr_dump
         if (ret != TINYEXR_SUCCESS)
         {
             std::string msg = err ? err : "unknown error";
-            FreeEXRErrorMessage(err);
+            tinyexr::FreeEXRErrorMessage(err);
             checkf(false, "EXR save failed: %s", msg.c_str());
         }
     }

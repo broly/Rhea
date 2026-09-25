@@ -1,9 +1,13 @@
-﻿export module vk:framebuffer_mgr;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+export module vk:framebuffer_mgr;
+
+import std.compat;
 
 import :instance;
 import :image_mgr;
-import <unordered_map>;
-import <vulkan/vulkan_core.h>;
 
 namespace vk
 {

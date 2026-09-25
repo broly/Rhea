@@ -1,6 +1,11 @@
-﻿export module render:rg_types;
+﻿module;
 
-import <cstdint>;
+#include <vulkan/vulkan_core.h>
+
+export module render:rg_types;
+
+import std.compat;
+
 
 import :handle_types;
 import enum_helpers;

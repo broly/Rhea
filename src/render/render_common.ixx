@@ -1,5 +1,6 @@
 export module render:common;
-import <functional>;
+
+import std.compat;
 
 export class RenderGraphContext;
 

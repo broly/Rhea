@@ -1,4 +1,8 @@
-﻿export module vk:swapchain_control;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+export module vk:swapchain_control;
 import render;
 import :context;
 import :instance;
@@ -7,9 +11,8 @@ import assets;
 import :sampler_mgr;
 import :debug_object_tracker;
 import :debug;
-import <vulkan/vulkan_core.h>;
 
-class VkRenderBackend;
+export class VkRenderBackend;
 
 namespace vk
 {

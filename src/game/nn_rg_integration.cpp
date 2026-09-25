@@ -1,4 +1,10 @@
-module game:nn_denoiser_passes;
+module game;
+
+import :nn_denoiser_passes;
+
+import std.compat;
+import fixed_string;
+import assertions;
 
 import :render_graph;
 import :renderer;

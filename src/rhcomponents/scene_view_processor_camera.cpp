@@ -1,4 +1,6 @@
-﻿module rhcomponents:scene_view_proxy.camera;
+﻿module rhcomponents;
+
+import :scene_view_proxy.camera;
 import render_scene;
 
 

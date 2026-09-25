@@ -1,8 +1,15 @@
-﻿export module framework:actor;
+﻿module;
+
+#include <json/value.h>
+
+export module framework:actor;
+
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
 
 import rhobject;
-import <memory>;
-import <json/value.h>;
 import :world;
 import :rhcomponent;
 import rhmath;

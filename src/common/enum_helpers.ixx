@@ -1,7 +1,7 @@
 ﻿export module enum_helpers;
 
-import <type_traits>;
-import <vector>;
+import std.compat;
+
 
 template<typename T, typename E>
 concept enum_compatible = std::is_same_v<E, T> || std::is_integral_v<T>;

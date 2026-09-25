@@ -1,6 +1,9 @@
-module rhcomponents:scene_view_proxy.reflection_capture;
+module rhcomponents;
+
+import :scene_view_proxy.reflection_capture;
+
+import std.compat;
 import globals;
-import <algorithm>;
 
 RenderId SceneViewProcessor_ReflectionCapture::register_proxy()
 {

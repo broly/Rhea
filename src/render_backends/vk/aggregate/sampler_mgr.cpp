@@ -1,9 +1,15 @@
-module vk:sampler_mgr;
+module;
 
-import <vulkan/vulkan_core.h>;
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :sampler_mgr;
+
+import std.compat;
+
 import :log;
 import :sampler_desc;
-import <string>;
 
 void vk::SamplerManager::init()
 {

@@ -1,6 +1,7 @@
 ﻿export module fastgltf_helper;
 
-import <type_traits>;
+import std.compat;
+
 
 import fastgltf;
 

@@ -1,6 +1,9 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:tlas_mgr;
 
-import <vulkan/vulkan_core.h>;
 import :instance;
 import :immediate_commands;
 import :buffer_mgr;

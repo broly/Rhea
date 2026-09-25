@@ -1,10 +1,13 @@
-﻿module render_scene:scene_view;
+﻿module render_scene;
 
-import <cassert>;
+import :scene_view;
+
+import std.compat;
+
 import framework;
 import :scene_view_processor;
 
-SceneView::SceneView(std::shared_ptr<class World> in_world, std::shared_ptr<class Renderer> in_renderer)
+SceneView::SceneView(std::shared_ptr<World> in_world, std::shared_ptr<class Renderer> in_renderer)
 {
     world = in_world;
     renderer = in_renderer;

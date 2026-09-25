@@ -1,12 +1,20 @@
+module;
+
+#include <json/value.h>
+
 export module render:pipeline_family;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import :pipeline_object;
 import :shader_key;
 import :render_backend;
 import :material_model;
-import <map>;
-import <variant>;
-import <filesystem>;
 
 #include "object/object_reflection_macro.h"
 

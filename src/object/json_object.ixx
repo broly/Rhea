@@ -1,6 +1,6 @@
 export module rhobject:json_object;
-import <memory>;
-import <filesystem>;
+
+import std.compat;
 
 import :reflection;
 import json_utils;

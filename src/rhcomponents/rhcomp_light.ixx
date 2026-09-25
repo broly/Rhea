@@ -1,11 +1,21 @@
+module;
+
+#include <json/value.h>
+
 export module rhcomponents:rhcomp_light;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 
 import rhmath;
 import assets;
 import framework;
 import render_scene;
-import <map>;
 import name;
 
 #include "object/object_reflection_macro.h"

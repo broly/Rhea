@@ -1,8 +1,14 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:pipeline;
+
+import std.compat;
+import assertions;
 import :instance;
 import :swapchain_control;
 import :buffer_mgr;
-import <vulkan/vulkan_core.h>;
 import :shader;
 import :reflection;
 import render;

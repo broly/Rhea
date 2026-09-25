@@ -1,9 +1,9 @@
 export module name;
 
-import <string>;
+import std.compat;
+
 import fixed_string;
 import static_name;
-import <future>;
 
 export namespace NameDebug
 {
@@ -40,7 +40,7 @@ export namespace NameDebug
     }
 }
 
-export enum { NAME_None = 0 };
+export enum ENameNone { NAME_None = 0 };
 
 export class Name
 {

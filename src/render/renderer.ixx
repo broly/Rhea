@@ -1,7 +1,10 @@
 ﻿export module render:renderer;
 
-import <memory>;
-import <map>;
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
+
 
 import :handle_types;
 import :render_backend;

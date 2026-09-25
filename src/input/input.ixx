@@ -1,7 +1,11 @@
-﻿export module input;
+﻿module;
 
-import <unordered_map>;
-import <GLFW/glfw3.h>;
+#include <GLFW/glfw3.h>
+
+export module input;
+
+import std.compat;
+
 
 export enum class Key
 {

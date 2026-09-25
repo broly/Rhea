@@ -1,5 +1,4 @@
 ﻿#pragma once
-import <compare>;
 
 #define DEFAULT_NON_COPYABLE(Class) \
     Class(const Class&) = delete; \

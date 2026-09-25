@@ -1,6 +1,7 @@
 export module render:vertex_buffer;
 
-import <cstdint>;
+import std.compat;
+
 
 export struct VertexBufferDesc
 {

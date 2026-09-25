@@ -1,11 +1,15 @@
-﻿module rhcomponents:scene_view_proxy.mesh;
+﻿module rhcomponents;
+
+import :scene_view_proxy.mesh;
+
+import std.compat;
+import assertions;
 
 import render_scene;
 import framework;
 import globals;
 import profile;
 import render;
-import <algorithm>;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 

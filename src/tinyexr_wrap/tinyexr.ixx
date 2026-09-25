@@ -1,6 +1,8 @@
-export module tinyexr;
+module;
 
 #include <tinyexr.h>
+
+export module tinyexr;
 
 export namespace tinyexr
 {

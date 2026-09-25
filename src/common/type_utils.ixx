@@ -1,7 +1,7 @@
 export module type_utils;
 
-import <type_traits>;
-import <variant>;
+import std.compat;
+
 
 export template<typename... Ts>
 struct TypeList

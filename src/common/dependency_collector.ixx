@@ -1,7 +1,7 @@
 ﻿export module dependency_collector;
 
-import <vector>;
-import <future>;
+import std.compat;
+
 
 export class DependencyCollector
 {

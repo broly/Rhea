@@ -1,10 +1,19 @@
+module;
+
+#include <json/value.h>
+
 export module game:render_graph;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import render;
 import glm;
 import name;
-import <map>;
-import <memory>;
 import engine;
 import assets;
 import :generic_render_graph;

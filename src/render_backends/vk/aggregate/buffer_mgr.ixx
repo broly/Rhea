@@ -1,15 +1,17 @@
-﻿export module vk:buffer_mgr;
-import <cstdint>;
-import <map>;
-import <vulkan/vulkan_core.h>;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+export module vk:buffer_mgr;
+
+import std.compat;
 
 import :context;
 import :internal_types;
 import :swapchain_control;
 import render;
-import <optional>;
 
-class VkRenderBackend;
+export class VkRenderBackend;
 
 namespace vk
 {

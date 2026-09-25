@@ -1,4 +1,6 @@
-﻿module rhcomponents:rhcomp_light;
+﻿module rhcomponents;
+
+import :rhcomp_light;
 
 
 import :scene_view_proxy.light;

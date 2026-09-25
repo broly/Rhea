@@ -1,4 +1,9 @@
-﻿module vk:render_resource_instance;
+﻿module vk;
+
+import :render_resource_instance;
+
+import std.compat;
+import assertions;
 import :render_resource;
 import :render_backend;
 import profile;

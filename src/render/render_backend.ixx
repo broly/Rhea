@@ -1,6 +1,6 @@
 ﻿export module render:render_backend;
-import <memory>;
-import <span>;
+
+import std.compat;
 
 import glm;
 import :pipeline_desc;
@@ -19,7 +19,7 @@ import assets;
 // Pending readback handle: opaque readback queue index
 export struct PendingReadbackHandle { uint64_t id = 0; };
 
-struct RenderGraphPass;
+export struct RenderGraphPass;
 export class RenderBackend;
 
 export template<typename T>

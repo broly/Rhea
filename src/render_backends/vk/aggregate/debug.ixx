@@ -1,8 +1,12 @@
+module;
+
+#include <vulkan/vulkan.h>
+
 export module vk:debug;
 
+import std.compat;
+
 import name;
-import <map>;
-import <vulkan/vulkan.h>;
 
 namespace vk
 {

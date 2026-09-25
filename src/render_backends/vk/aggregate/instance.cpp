@@ -1,15 +1,24 @@
-﻿module vk:instance;
+﻿module;
 
-import <set>;
-import <vulkan/vulkan_core.h>;
+#include <GLFW/glfw3.h>
+
+#include <vulkan/vulkan_core.h>
+#include <cassert>
+
+module vk;
+
+import :instance;
+
+import std.compat;
+import fixed_string;
+
 import array_helpers;
 import :helpers;
 
-#include "render_backends/vk/vk_macro.h"
-import <cassert>;
 import :device_extension_api;
-
 import log;
+#include "render_backends/vk/vk_macro.h"
+
 #include "logging/log_macro.h"
 
 DEFINE_LOGGER(LogVkInstance, Display);

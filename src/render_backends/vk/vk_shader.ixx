@@ -1,8 +1,11 @@
-﻿export module vk:shader;
+﻿module;
 
-import <string>;
-import <vulkan/vulkan_core.h>;
-import <vector>;
+#include <vulkan/vulkan_core.h>
+
+export module vk:shader;
+
+import std.compat;
+
 
 class VkShader
 {

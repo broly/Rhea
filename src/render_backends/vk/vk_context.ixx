@@ -1,9 +1,12 @@
-﻿export module vk:context;
+﻿module;
 
-import <array>;
-import <vector>;
-import <vulkan/vulkan_core.h>;
-import <map>;
+#include <vulkan/vulkan_core.h>
+
+export module vk:context;
+
+import std.compat;
+import assertions;
+
 import rhmath;
 import enum_helpers;
 import render;

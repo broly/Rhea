@@ -1,15 +1,25 @@
-﻿export module gltf_scene;
+﻿module;
 
-import <string>;
+#include <json/value.h>
+
+export module gltf_scene;
+
+import std.compat;
+import rhobject;
+import fixed_string;
+import reflect;
+import type_id;
+import dependency_collector;
+
 import framework;
-#include "common/reflect_macros.h"
-
-#include "object/object_reflection_macro.h"
 import fastgltf;
 import glm;
 import render;
 import name;
 import assets;
+#include "common/reflect_macros.h"
+
+#include "object/object_reflection_macro.h"
 
 class RhComp_GltfScene : public RhComponent
 {

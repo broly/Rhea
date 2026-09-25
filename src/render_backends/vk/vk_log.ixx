@@ -1,4 +1,5 @@
 ﻿export module vk:log;
+import fixed_string;
 
 import log;
 #include "logging/log_macro.h"

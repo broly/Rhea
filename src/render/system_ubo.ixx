@@ -1,5 +1,10 @@
 export module render:system_ubo;
 
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
+
 import glm;
 #include "common/reflect_macros.h"
 

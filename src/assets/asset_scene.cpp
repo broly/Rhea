@@ -1,8 +1,15 @@
-﻿module assets:asset_scene;
+﻿module;
 
-import <iostream>;
+#include <json/value.h>
+
+module assets;
+
+import :asset_scene;
+
+import std.compat;
+import assertions;
+
 import glm;
-import <json/value.h>;
 import engine;
 import globals;
 import dependency_collector;

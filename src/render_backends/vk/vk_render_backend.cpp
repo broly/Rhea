@@ -1,18 +1,18 @@
-﻿module vk:render_backend;
+﻿module;
 
-import <cassert>;
-import <set>;
-import <GLFW/glfw3.h>;
-import <algorithm>;
-import <span>;
+#include <GLFW/glfw3.h>
+#include <vulkan/vulkan_core.h>
 
-#include "vk_macro.h"
-#include "common/assertion_macros.h"
-#include "logging/log_macro.h"
-#include "profiling/profile.h"
+module vk;
+
+import :render_backend;
+
+import std.compat;
+import assertions;
+import fixed_string;
+
 
 import render;
-
 import :enums_to_string;
 import :enums_adapters;
 import :helpers;
@@ -22,6 +22,12 @@ import :pipeline_raytrace;
 import profile;
 import reflect;
 import :device_extension_api;
+#include "vk_macro.h"
+#include "common/assertion_macros.h"
+#include "logging/log_macro.h"
+#include "profiling/profile.h"
+
+
 
 DEFINE_LOGGER(LogVkCommands, Display);
 

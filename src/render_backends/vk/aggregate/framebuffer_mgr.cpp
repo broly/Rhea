@@ -1,7 +1,15 @@
-module vk:framebuffer_mgr;
+module;
+
+#include <cassert>
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :framebuffer_mgr;
+
+import std.compat;
 import :log;
 
-import <cassert>;
 
 #include "render_backends/vk/vk_macro.h"
 

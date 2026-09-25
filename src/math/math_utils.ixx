@@ -1,7 +1,7 @@
 export module rhmath:math_utils;
 
-import <cstdint>;
-import <memory>;
+import std.compat;
+
 
 
 export namespace math

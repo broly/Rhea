@@ -1,17 +1,19 @@
-module game:render_graph;
+module game;
+
+import :render_graph;
+
+import std.compat;
+import assertions;
 
 import render;
 import vk;
 import glm;
 import rhmath;
-import <vector>;
 import profile;
 import name;
-import <unordered_map>;
 import rhcomponents;
 import globals;
 import assets;
-import <functional>;
 import texture_format;
 import :constants;
 import :names;

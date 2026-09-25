@@ -1,7 +1,11 @@
-﻿module vk:render_resource;
+﻿module vk;
 
-import <cassert>;
-import <set>;
+import :render_resource;
+
+import std.compat;
+import assertions;
+import profile;
+
 import :render_backend;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"

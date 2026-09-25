@@ -1,8 +1,12 @@
-﻿export module rhmath:aabb;
+﻿module;
+
+#include <cfloat>
+
+export module rhmath:aabb;
+
+import std.compat;
 import glm;
-import <type_traits>;
 import :transform;
-import <float.h>;
 
 export class AABB
 {

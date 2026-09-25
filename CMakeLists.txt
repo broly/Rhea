@@ -1,13 +1,21 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.30)
 project(rhea LANGUAGES CXX)
 
-include(cmake/dependencies.cmake)
+# C++26 static reflection (P2996) requires the bloomberg/clang-p2996 compiler,
+# see CMakePresets.json and tools/build_clang_p2996.bat
+if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR "Rhea requires clang-p2996 (C++26 reflection). Use a preset from CMakePresets.json.")
+endif()
 
-
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API "cxx_modules")
-set(CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP 1)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Must be identical for every target: module BMIs are only importable with matching flags.
+add_compile_options(-freflection-latest)
+
+include(cmake/std_module.cmake)
+include(cmake/dependencies.cmake)
 
 
 
@@ -72,10 +80,13 @@ function(add_module_dir TARGET DIR)
 
     target_sources(${TARGET}
         PRIVATE
-            ${MODULE_IXX}
-            ${OTHER_IXX}
             ${MODULE_CPP}
             ${MODULE_H}
+        PRIVATE FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
+        FILES
+            ${MODULE_IXX}
+            ${OTHER_IXX}
     )
 endfunction()
 
@@ -91,6 +102,7 @@ target_sources(rhea
 
 target_link_libraries(rhea
 	PRIVATE
+		rhea_std
 		Vulkan::Vulkan
 		glfw
 		JsonCpp::JsonCpp
@@ -138,27 +150,8 @@ set_source_files_properties(${SHADERS}
 )
 
 
-set(SPIRV_SHADERS "")
-
-
-foreach(shader ${SHADERS})
-    get_filename_component(shader_name ${shader} NAME)
-    set(output ${SHADER_BINARY_DIR}/${shader_name}.spv)
-
-    # add_custom_command(
-    #     OUTPUT ${output}
-    #     COMMAND ${GLSLC} ${shader} -o ${output}
-    #     DEPENDS ${shader}
-    #     COMMENT "Compiling shader ${shader_name}"
-    #     VERBATIM
-    # )
-
-    list(APPEND SPIRV_SHADERS ${output})
-endforeach()
-
-add_custom_target(shaders ALL
-    DEPENDS ${SPIRV_SHADERS}
-)
+# Shaders are compiled at runtime (see render/pipeline_family.cpp); they are
+# listed as sources only so they show up in the IDE.
 
 set(ENABLE_ASAN 1)
 
@@ -197,27 +190,16 @@ set_source_files_properties(${JSON_FILES}
     PROPERTIES HEADER_FILE_ONLY TRUE
 )
 
-add_dependencies(rhea shaders)
-
-add_custom_target(compile_shaders ALL
-    DEPENDS ${SPIRV_SHADERS}
-    COMMENT "Compiling all shaders"
+# Copy dependency DLLs (glfw, jsoncpp, simdjson, miniz, ...) next to the executable.
+# Replaces vcpkg's applocal step, which needs dumpbin/llvm-objdump in PATH.
+add_custom_command(TARGET rhea POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:rhea> $<TARGET_FILE_DIR:rhea>
+    COMMAND_EXPAND_LISTS
 )
 
-add_custom_command(
-    TARGET rhea
-    PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target compile_shaders
-    COMMENT "Recompiling shaders if needed"
-)
-
-set_target_properties(compile_shaders PROPERTIES EXCLUDE_FROM_ALL FALSE)
-
-if (MSVC)
-    target_sources(rhea PRIVATE
-        ${CMAKE_SOURCE_DIR}/tools/debugger/Name.natvis
-    )
-endif()
+# Embed natvis into the PDB so Rider/VS debuggers pick it up
+target_link_options(rhea PRIVATE "LINKER:/NATVIS:${CMAKE_SOURCE_DIR}/tools/debugger/Name.natvis")
+set_property(TARGET rhea APPEND PROPERTY LINK_DEPENDS ${CMAKE_SOURCE_DIR}/tools/debugger/Name.natvis)
 
 
 
@@ -238,3 +220,6 @@ target_include_directories(rhea PRIVATE "${CUDAToolkit_INCLUDE_DIRS}")
 
 target_include_directories(rhea PRIVATE ${CUDA_TOOLKIT_ROOT_DIR}/include)
 target_compile_definitions(rhea PRIVATE WIN32)
+
+# printf-style helpers (Logger::Log, print_error) take the format string as a parameter by design
+target_compile_options(rhea PRIVATE -Wno-format-security)

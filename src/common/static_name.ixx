@@ -1,7 +1,7 @@
 export module static_name;
 
-import <stdint.h>;
-import <compare>;
+import std.compat;
+
 import fixed_string;
 
 constexpr char to_lower_ascii(char c)

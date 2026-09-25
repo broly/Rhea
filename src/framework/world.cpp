@@ -1,4 +1,13 @@
-module framework:world;
+module;
+
+#include <json/value.h>
+
+module framework;
+
+import :world;
+
+import std.compat;
+import assertions;
 
 import json_utils;
 import rhmath;
@@ -9,7 +18,6 @@ import dependency_collector;
 import glm;
 
 import rhobject;
-import <json/value.h>;
 
 #include "common/assertion_macros.h"
 

@@ -1,8 +1,9 @@
 ﻿export module vk:render_resource;
+
+import std.compat;
 import render;
 
 import :render_resource_instance;
-import <memory>;
 
 
 template<typename T>

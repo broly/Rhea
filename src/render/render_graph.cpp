@@ -1,9 +1,19 @@
-module render:render_graph;
+module;
+
+#include <intrin.h>
+
+#include <vulkan/vulkan_core.h>
+#include <cassert>
+
+module render;
+
+import :render_graph;
+
+import std.compat;
+import assertions;
 
 import enum_helpers;
 import :render_backend;
-import <vulkan/vulkan_core.h>;
-import <cassert>;
 import profile;
 import gpu_profile;
 import :renderer;

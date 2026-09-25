@@ -1,10 +1,18 @@
-module vk:vertex_buffer_mgr;
+module;
+
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :vertex_buffer_mgr;
+
+import std.compat;
+import fixed_string;
 
 import :helpers;
-import <vulkan/vulkan_core.h>;
+import log;
 #include "render_backends/vk/vk_macro.h"
 #include "logging/log_macro.h"
-import log;
 
 DEFINE_LOGGER(LogVertexBufferMgr, Log);
 

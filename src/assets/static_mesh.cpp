@@ -1,10 +1,14 @@
 ﻿module;
 
-module assets:mesh;
+#include <json/value.h>
 
-import <iostream>;
+module assets;
+
+import :mesh;
+
+import std.compat;
+
 import glm;
-import <json/value.h>;
 
 import dependency_collector;
 import fastgltf;

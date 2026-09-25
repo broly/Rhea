@@ -1,10 +1,18 @@
-module assets:cubemap;
+module;
+
+#include <json/value.h>
+
+module assets;
+
+import :cubemap;
+
+import std.compat;
+import assertions;
 
 import paths;
 import tinyexr;
 import :asset_manager;
 import :asset;
-import <filesystem>;
 
 #include "common/assertion_macros.h"
 
@@ -116,20 +124,20 @@ std::optional<Cubemap> Cubemap::load(
     if (!std::filesystem::exists(filename))
         return std::nullopt;
 
-    EXRVersion version;
-    EXRHeader  header;
-    EXRImage   image;
+    tinyexr::EXRVersion version;
+    tinyexr::EXRHeader  header;
+    tinyexr::EXRImage   image;
 
-    InitEXRHeader(&header);
-    InitEXRImage(&image);
+    tinyexr::InitEXRHeader(&header);
+    tinyexr::InitEXRImage(&image);
 
     const char* err = nullptr;
 
-    int ret = ParseEXRVersionFromFile(
+    int ret = tinyexr::ParseEXRVersionFromFile(
         &version, filename.string().c_str());
     checkf(ret == 0, "Invalid EXR version");
 
-    ret = ParseEXRHeaderFromFile(
+    ret = tinyexr::ParseEXRHeaderFromFile(
         &header, &version,
         filename.string().c_str(),
         &err);
@@ -140,7 +148,7 @@ std::optional<Cubemap> Cubemap::load(
         header.requested_pixel_types[i] =
             2;  // TINYEXR_PIXELTYPE_FLOAT (2)
 
-    ret = LoadEXRImageFromFile(
+    ret = tinyexr::LoadEXRImageFromFile(
         &image, &header,
         filename.string().c_str(),
         &err);
@@ -249,8 +257,8 @@ std::optional<Cubemap> Cubemap::load(
         }
     }
 
-    FreeEXRImage(&image);
-    FreeEXRHeader(&header);
+    tinyexr::FreeEXRImage(&image);
+    tinyexr::FreeEXRHeader(&header);
 
     return cubemap;
 }

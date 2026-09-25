@@ -1,6 +1,11 @@
-module vk:tlas_mgr;
+module;
 
-import <vulkan/vulkan_core.h>;
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :tlas_mgr;
+
 import :helpers;
 import :device_extension_api;
 import glm;

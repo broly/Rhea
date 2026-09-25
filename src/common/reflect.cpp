@@ -1,6 +1,7 @@
 module reflect;
 
-import <map>;
+import std.compat;
+
 
 
 

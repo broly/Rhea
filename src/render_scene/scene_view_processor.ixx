@@ -1,14 +1,20 @@
-﻿export module render_scene:scene_view_processor;
+﻿module;
 
-import <functional>;
-import <optional>;
-import <cassert>;
-import <any>;
-import <memory>;
+#include <cassert>
+#include <json/value.h>
+
+export module render_scene:scene_view_processor;
+
+import std.compat;
+import assertions;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
+
 import guard_value;
 import generator;
 import :render_id;
-import <string>;
 import rhmath;
 import name;
 import rhobject;

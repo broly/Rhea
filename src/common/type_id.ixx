@@ -1,53 +1,28 @@
 export module type_id;
 
-import <source_location>;
-import <string_view>;
+import std.compat;
+
 import name;
 
-consteval std::string_view remove_struct_pref(std::string_view name)
+// Qualified type name via C++26 reflection, e.g. "CameraUBO", "vk::DescriptorSetLayoutData".
+// Replaces parsing __FUNCSIG__ / source_location, whose format is compiler specific.
+template<typename T>
+consteval std::string_view get_unique_id()
 {
-	constexpr std::string_view prefix = "struct ";
-	if (name.starts_with(prefix))
-		return name.substr(prefix.size());
-	return name;
-}
+	constexpr std::meta::info type = std::meta::dealias(^^T);
+	std::string name(std::meta::display_string_of(type));
 
-#ifndef _MSC_VER
-consteval std::string_view ExtractTypeNameFromSourceLocation(std::string_view input) 
-{
-    auto start = input.find("[T = ");
-    if (start == -1) 
-        return {};
-
-    start += 5;
-
-    auto end = input.find("]");
-    if (end == -1) 
-        return {};
-
-	return remove_struct_pref(input.substr(start, end - start));
-}
-#else
-consteval std::string_view extract_type(std::string_view input) 
-{
-	int32_t start_index = input.find("<");
-    if (start_index == -1) 
-        return {};
-
-    start_index += 1; 
-
-	int32_t end_index = input.find(">", start_index);
-    if (end_index == -1) 
-        return {}; 
-
-	return remove_struct_pref(input.substr(start_index, end_index - start_index));
-}
-#endif
-
-template<typename>
-consteval static std::string_view get_unique_id(std::source_location location = std::source_location::current())
-{
-	return extract_type(location.function_name());
+	if constexpr (std::meta::is_class_type(type) || std::meta::is_enum_type(type))
+	{
+		for (std::meta::info scope = std::meta::parent_of(type);
+			 scope != ^^::;
+			 scope = std::meta::parent_of(scope))
+		{
+			if (std::meta::has_identifier(scope))
+				name = std::string(std::meta::identifier_of(scope)) + "::" + name;
+		}
+	}
+	return std::define_static_string(name);
 }
 
 export struct TypeId

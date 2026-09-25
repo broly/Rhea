@@ -1,4 +1,9 @@
-module game:cubemap_capture_render_graph;
+module game;
+
+import :cubemap_capture_render_graph;
+
+import std.compat;
+import assertions;
 import texture_format;
 import :constants;
 import :names;

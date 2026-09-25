@@ -1,18 +1,17 @@
 ﻿export module render:pipeline_desc;
-import <string>;
-import <unordered_map>;
-import <vector>;
-import <memory>;
-import <bit>;
+
+import std.compat;
+import assertions;
+import fixed_string;
+import reflect;
+import type_id;
 import :handle_types;
 import :rg_types;
-import <variant>;
 
+import name;
 #include "common/assertion_macros.h"
 #include "common/reflect_macros.h"
 #include "common/type_macros.h"
-import <map>;
-import name;
 
 export class RenderResource;
 

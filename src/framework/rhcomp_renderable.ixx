@@ -1,4 +1,15 @@
+module;
+
+#include <json/value.h>
+
 export module framework:rhcomp_renderable;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import :rhcomp_transform;
 import rhmath;

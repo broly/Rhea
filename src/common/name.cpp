@@ -1,11 +1,7 @@
 module name;
 
-import <future>;
-import <iostream>;
-import <ostream>;
-import <variant>;
-import <vector>;
-import <unordered_map>;
+import std.compat;
+
 
 #include "type_macros.h"
 

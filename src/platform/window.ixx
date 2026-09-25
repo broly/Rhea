@@ -1,6 +1,9 @@
-﻿export module platform:window;
+﻿module;
 
-import <GLFW/glfw3.h>;
+#include <GLFW/glfw3.h>
+
+export module platform:window;
+
 
 import input;
 

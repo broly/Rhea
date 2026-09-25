@@ -1,10 +1,16 @@
-module rhobject:json_object;
+module;
 
-import <iostream>;
-import <fstream>;
-import <json/value.h>;
-import <json/reader.h>;
-import <string>;
+#include <json/value.h>
+#include <json/reader.h>
+
+module rhobject;
+
+import :json_object;
+
+import std.compat;
+import fixed_string;
+import assertions;
+
 
 import log;
 #include "logging/log_macro.h"

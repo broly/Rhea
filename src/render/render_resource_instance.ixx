@@ -1,6 +1,7 @@
 ﻿export module render:render_resource_instance;
 
-import <string>;
+import std.compat;
+
 import :pipeline_desc;
 import name;
 

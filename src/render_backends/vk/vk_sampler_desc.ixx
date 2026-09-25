@@ -1,6 +1,9 @@
+module;
+
+#include <vulkan/vulkan.h>
+
 export module vk:sampler_desc;
 
-import <vulkan/vulkan.h>;
 import render;
 
 VkFilter vk_convert_SamplerFilter(SamplerFilter v)

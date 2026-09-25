@@ -1,12 +1,15 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:pipeline_manager;
 
-import <vulkan/vulkan_core.h>;
-import <map>;
+import std.compat;
+
 import :render_resource;
 import :pipeline;
 import render;
 import hash_utils;
-import <type_traits>;
 
 namespace vk
 {

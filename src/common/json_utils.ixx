@@ -1,15 +1,14 @@
-﻿export module json_utils;
+﻿module;
 
-import <filesystem>;
-import <fstream>;
-import <iostream>;
-import <memory>;
-import <optional>;
-import <string>;
-import <json/reader.h>;
+#include <json/reader.h>
+#include <json/value.h>
+#include <json/writer.h>
 
-import <json/value.h>;
-import <json/writer.h>;
+export module json_utils;
+
+import std.compat;
+
+
 
 import paths;
 

@@ -1,8 +1,14 @@
-﻿module platform:window;
-import <cassert>;
-import <glfw/glfw3.h>;
+﻿module;
+
+#include <cassert>
+#include <glfw/glfw3.h>
+
+module platform;
+
+import :window;
+
+import std.compat;
 import input;
-import <map>;
 
 static std::map<int, Key> GLFW_KEYS = {
     {GLFW_KEY_A, Key::A}, 

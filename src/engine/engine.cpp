@@ -1,7 +1,9 @@
-module engine:engine;
+module engine;
 
-import <chrono>;
-import <set>;
+import :engine;
+
+import std.compat;
+
 
 import platform;
 

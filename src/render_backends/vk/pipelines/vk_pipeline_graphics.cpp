@@ -1,21 +1,26 @@
-﻿module vk:pipeline_graphics;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+#include <cassert>
+
+module vk;
+
+import :pipeline_graphics;
+
+import std.compat;
+import assertions;
 
 import render;
 import :helpers;
 import rhmath;
-import <vector>;
-import <vulkan/vulkan_core.h>;
-import <cassert>;
 import spirv_reflect;
 import :reflection;
 import :render_resource;
 import :log;
-#include "../vk_macro.h"
 import reflect;
 import :enums_adapters;
-import <bit>;
-import <set>;
 import :pipeline_helpers;
+#include "../vk_macro.h"
 #include "common/assertion_macros.h"
 
 class VkRenderBackend;

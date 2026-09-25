@@ -1,6 +1,14 @@
 ﻿#pragma once
-import <iostream>;
-import <vulkan/vulkan_core.h>;
+
+// Breaks into the debugger right at the call site. __builtin_debugtrap needs no
+// declaration, unlike __debugbreak, whose implicit declarations clash across modules.
+#ifndef RH_DEBUGBREAK
+#if defined(__clang__)
+#define RH_DEBUGBREAK() __builtin_debugtrap()
+#else
+#define RH_DEBUGBREAK() __debugbreak()
+#endif
+#endif
 
 
 // we want to immediately abort when there is an error. 
@@ -13,7 +21,7 @@ import <vulkan/vulkan_core.h>;
 		if (err)                                                    \
 		{                                                           \
 			std::cout <<"Detected Vulkan error at " << __FILE__ << ":" << __LINE__ << ": " << err << std::endl; \
-			__debugbreak(); \
+			RH_DEBUGBREAK(); \
 		}                                                           \
 	} while (0)
 

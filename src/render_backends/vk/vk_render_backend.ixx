@@ -1,10 +1,10 @@
-﻿export module vk:render_backend;
-import <map>;
-import <span>;
-import <vector>;
-import <GLFW/glfw3.h>;
-import <memory>;
-import <unordered_map>;
+﻿module;
+
+#include <GLFW/glfw3.h>
+
+export module vk:render_backend;
+
+import std.compat;
 import glm;
 
 import :instance;

@@ -1,12 +1,15 @@
 export module rhmath:transform;
 
+import std.compat;
+import fixed_string;
+import reflect;
+import type_id;
+
 import :math;
 
-import <string>;
-import <sstream>;
 import glm;
 import :vec;
-#include "common/reflect_macros.h";
+#include "common/reflect_macros.h"
 
 
 

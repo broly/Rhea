@@ -1,11 +1,7 @@
 export module container_traits;
+
+import std.compat;
 import enum_helpers;
-import <vector>;
-import <optional>;
-import <map>;
-import <set>;
-import <memory>;
-import <variant>;
 
 export
 {

@@ -1,7 +1,8 @@
+module;
+
+#include <spirv-reflect/spirv_reflect.h>
+
 export module spirv_reflect;
-
-#include <spirv-reflect/spirv_reflect.h>;
-
 
 export 
 {

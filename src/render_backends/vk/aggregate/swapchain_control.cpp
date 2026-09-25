@@ -1,10 +1,19 @@
-﻿module vk:swapchain_control;
+﻿module;
+
+#include <GLFW/glfw3.h>
+
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :swapchain_control;
+
+import std.compat;
+import profile;
 
 import :helpers;
 import :log;
 import :render_backend;
-import <iostream>;
-import <vulkan/vulkan_core.h>;
 
 import render;
 

@@ -1,10 +1,6 @@
 export module string_helpers;
-import <utility>;
-import <string>;
-import <stdexcept>;
-import <algorithm>;
-import <vector>;
-import <sstream>;
+
+import std.compat;
 
 export namespace string_helpers
 {

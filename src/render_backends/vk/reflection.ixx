@@ -1,11 +1,12 @@
-﻿export module vk:reflection;
-import <string>;
-import <numeric>;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+export module vk:reflection;
+
+import std.compat;
 import render;
 import spirv_reflect;
-import <unordered_map>;
-import <optional>;
-import <vulkan/vulkan_core.h>;
 import name;
 
 

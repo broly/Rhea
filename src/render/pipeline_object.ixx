@@ -1,8 +1,9 @@
 ﻿export module render:pipeline_object;
 
+import std.compat;
+
 import :handle_types;
 import name;
-import <cstdint>;
 
 export class PipelineObject
 {

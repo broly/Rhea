@@ -1,15 +1,23 @@
-﻿module framework:actor;
+﻿module;
+
+#include <json/value.h>
+
+#include <cassert>
+
+module framework;
+
+import :actor;
+
+import std.compat;
+import assertions;
 
 import :rhcomponent;
 import :rhcomp_transform;
 import :rhcomp_renderable;
 import :core;
 
-import <unordered_map>;
 
-import <string>;
 
-import <cassert>;
 
 #include "common/assertion_macros.h"
 

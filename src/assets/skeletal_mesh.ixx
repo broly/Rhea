@@ -1,11 +1,11 @@
+module;
+
+#include <json/value.h>
+
 export module assets:skeletal_mesh;
 
-import <filesystem>;
-import <string>;
-import <vector>;
-import <optional>;
-import <unordered_map>;
-import <json/value.h>;
+import std.compat;
+
 import glm;
 import :asset;
 import :mesh;

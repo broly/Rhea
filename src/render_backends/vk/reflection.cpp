@@ -1,8 +1,14 @@
-﻿module vk:reflection;
+﻿module;
 
-import <map>;
-import <iostream>;
-import <vulkan/vulkan_core.h>;
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :reflection;
+
+import std.compat;
+import assertions;
+
 import reflect;
 import spirv_reflect;
 

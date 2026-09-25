@@ -1,7 +1,10 @@
-﻿module game:engine;
+﻿module game;
+
+import :engine;
+
+import std.compat;
 
 import :renderer;
-import <memory>;
 
 void GameEngine::engine_init()
 {

@@ -1,17 +1,25 @@
+module;
+
+#include <json/value.h>
+
 export module game:generic_render_graph;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 
 import render;
 import glm;
 import name;
-import <map>;
-import <memory>;
 import engine;
 import assets;
 import rhmath;
 import :nn_denoiser_passes;
 import :debug_view;
-import <unordered_map>;
 #include "object/object_reflection_macro.h"
 
 

@@ -1,4 +1,4 @@
-﻿export module glm;
+﻿module;
 
 #define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -21,6 +21,8 @@
 #include <glm/common.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtc/matrix_access.hpp>
+
+export module glm;
 
 export namespace glm
 {

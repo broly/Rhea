@@ -1,9 +1,13 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:sampler_mgr;
 
-import <vulkan/vulkan_core.h>;
+import std.compat;
+
 
 import :instance;
-import <unordered_map>;
 
 namespace vk
 {

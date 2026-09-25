@@ -1,9 +1,18 @@
-﻿module render:renderer;
+﻿module;
+
+#include <json/value.h>
+
+module render;
+
+import :renderer;
+
+import std.compat;
+import assertions;
+import profile;
 
 import :render_backend;
 import paths;
 import :material_instance;
-import <filesystem>;
 import reflect;
 import :render_graph;
 import json_utils;

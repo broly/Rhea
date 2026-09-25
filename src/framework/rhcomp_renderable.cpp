@@ -1,4 +1,6 @@
-﻿module framework:rhcomp_renderable;
+﻿module framework;
+
+import :rhcomp_renderable;
 
 import :rhcomp_renderable;
 import globals;

@@ -1,6 +1,9 @@
+module;
+
+#include <vulkan/vulkan_core.h>
+
 export module vk:device_extension_api;
 
-import <vulkan/vulkan_core.h>;
 
 #define LOAD_VK_EXT_FUNCTION_COMBINE(a,b) a##b
 

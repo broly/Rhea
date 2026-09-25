@@ -1,27 +1,30 @@
-﻿module game:renderer;
+﻿module game;
+
+import :renderer;
+
+import std.compat;
+import assertions;
+import fixed_string;
 
 import render;
 import vk;
 import glm;
 import rhmath;
-import <vector>;
 import profile;
 import name;
-import <unordered_map>;
 import rhcomponents;
 import :render_graph;
 import :constants;
 import texture_format;
-import <filesystem>;
 import paths;
 import :cubemap_capture_render_graph;
 import :brdf_lut_capture_render_graph;
 
+import log;
 #include "render_layout.h"
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
-import log;
 #include "logging/log_macro.h"
 
 DEFINE_LOGGER(LogGameRenderer, Display);

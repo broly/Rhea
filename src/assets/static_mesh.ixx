@@ -1,9 +1,11 @@
-﻿export module assets:mesh;
+﻿module;
 
-import <filesystem>;
-import <string>;
-import <json/value.h>;
-import <type_traits>;
+#include <json/value.h>
+
+export module assets:mesh;
+
+import std.compat;
+
 import :asset;
 import dependency_collector;
 import rhmath;

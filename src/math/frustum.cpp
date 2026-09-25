@@ -1,4 +1,6 @@
-module rhmath:frustum;
+module rhmath;
+
+import :frustum;
 
 bool Frustum::test_aabb_world(const AABB& bounds) const
 {

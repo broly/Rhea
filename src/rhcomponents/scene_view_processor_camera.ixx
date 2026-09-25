@@ -1,9 +1,18 @@
-﻿export module rhcomponents:scene_view_proxy.camera;
+﻿module;
+
+#include <json/value.h>
+
+export module rhcomponents:scene_view_proxy.camera;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import render_scene;
 import glm;
-import <string>;
-import <vector>;
 import name;
 import :rhcomp_camera;
 

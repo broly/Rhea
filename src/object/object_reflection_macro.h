@@ -1,15 +1,10 @@
 ﻿#pragma once
 
-import <set>;
-import <optional>;
-import <string_view>;
-import <json/value.h>;
-import dependency_collector;
 
 #include "common/reflect_macros.h"
 
 #define REFL_OBJECT_TRAITS(cls, base) \
-        export template<> \
+        template<> \
         struct RhObjectTraits<cls> {\
             static constexpr std::string_view type_name = #cls; \
             static std::set<std::string_view> get_bases() {\

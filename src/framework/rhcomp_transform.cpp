@@ -1,7 +1,14 @@
-﻿module framework:rhcomp_transform;
+﻿module;
+
+#include <cassert>
+
+module framework;
+
+import :rhcomp_transform;
+
+import std.compat;
 import rhmath;
 import globals;
-import <cassert>;
 import render_scene;
 
 void RhComp_Transform::on_transform_changed()

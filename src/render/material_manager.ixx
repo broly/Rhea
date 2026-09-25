@@ -1,4 +1,14 @@
-﻿export module render:material_manager;
+﻿module;
+
+#include <json/value.h>
+
+export module render:material_manager;
+
+import std.compat;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import name;
 import rhobject;

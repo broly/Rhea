@@ -1,7 +1,9 @@
 export module assets:material_parameter_type;
 
+import std.compat;
+import assertions;
 
-import <variant>;
+
 import linear_color;
 import :texture;
 import name;

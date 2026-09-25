@@ -1,8 +1,15 @@
 ﻿#pragma once
 
-import assertions;
-import <source_location>;
-import <exception>;
+// Breaks into the debugger right at the call site. __builtin_debugtrap needs no
+// declaration, unlike __debugbreak, whose implicit declarations clash across modules.
+#ifndef RH_DEBUGBREAK
+#if defined(__clang__)
+#define RH_DEBUGBREAK() __builtin_debugtrap()
+#else
+#define RH_DEBUGBREAK() __debugbreak()
+#endif
+#endif
+
 
 #define ENSURE_IMPL(v) \
     [](decltype(v) value, std::source_location sl = std::source_location::current()) -> decltype(v) \
@@ -10,7 +17,7 @@ import <exception>;
         if (!value) \
         { \
             print_error_no_text(sl); \
-            __debugbreak(); \
+            RH_DEBUGBREAK(); \
         }\
         return value; \
     }(v)
@@ -24,7 +31,7 @@ import <exception>;
         if (!(assertion)) \
         { \
             print_error(std::source_location::current(), text, ##__VA_ARGS__); \
-            __debugbreak(); \
+            RH_DEBUGBREAK(); \
             std::terminate(); \
         }\
     } while (false)
@@ -35,7 +42,7 @@ import <exception>;
         if (!(assertion)) \
         { \
             print_error(std::source_location::current(), "assertion failed"); \
-            __debugbreak(); \
+            RH_DEBUGBREAK(); \
             std::terminate(); \
         }\
     } while (false)
@@ -53,14 +60,14 @@ import <exception>;
 #define unreachable(text, ...) \
     {\
         print_error(std::source_location::current(), text, ##__VA_ARGS__); \
-        __debugbreak(); \
+        RH_DEBUGBREAK(); \
         std::terminate(); \
     }
 
 #define todo(...) \
     {\
         print_error(std::source_location::current(), "todo: " __VA_ARGS__); \
-        __debugbreak(); \
+        RH_DEBUGBREAK(); \
         std::terminate(); \
     }
 

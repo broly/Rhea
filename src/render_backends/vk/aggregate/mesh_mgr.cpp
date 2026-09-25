@@ -1,11 +1,20 @@
-﻿module vk:mesh_mgr;
+﻿module;
 
-import <cassert>;
-import <vulkan/vulkan_core.h>;
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :mesh_mgr;
+
+import std.compat;
+import assertions;
+import fixed_string;
+import profile;
+
 import :helpers;
-#include "common/assertion_macros.h"
 import :log;
 import :device_extension_api;
+#include "common/assertion_macros.h"
 #include "logging/log_macro.h"
 #include "profiling/profile.h"
 

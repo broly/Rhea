@@ -1,4 +1,13 @@
-﻿module vk:immediate_commands;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+module vk;
+
+import :immediate_commands;
+
+import std.compat;
+import assertions;
 
 #include "common/assertion_macros.h"
 #include "render_backends/vk/vk_macro.h"

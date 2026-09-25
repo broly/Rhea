@@ -1,18 +1,23 @@
+module;
+
+#include <json/value.h>
+
 export module game:nn_weights;
 
-import <filesystem>;
-import <fstream>;
-import <vector>;
-import <map>;
-import <string>;
-import <cstdint>;
-import <cstring>;
+import std.compat;
+import assertions;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
+
 import rhobject;
 import name;
 import paths;
 import assets;
 import texture_format;
 import render;
+import rhmath;
 
 #include "common/assertion_macros.h"
 #include "object/object_reflection_macro.h"

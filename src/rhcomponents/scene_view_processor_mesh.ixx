@@ -1,9 +1,19 @@
-﻿export module rhcomponents:scene_view_proxy.mesh;
+﻿module;
+
+#include <json/value.h>
+
+export module rhcomponents:scene_view_proxy.mesh;
+
+import std.compat;
+import rhobject;
+import assertions;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import render_scene;
-import <cassert>;
 import glm;
-import <string>;
 import assets;
 import :rhcomp_mesh;
 
@@ -11,7 +21,6 @@ import render;
 import name;
 import rhmath;
 import render;
-import <unordered_map>;
 
 #include "common/assertion_macros.h"
 #include "object/object_reflection_macro.h"

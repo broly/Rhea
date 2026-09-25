@@ -11,7 +11,11 @@ FetchContent_Declare(
 )
 set(FASTGLTF_COMPILE_AS_CPP20 ON CACHE BOOL "" FORCE)
 set(FASTGLTF_ENABLE_CPP_MODULES ON CACHE BOOL "" FORCE)
+# clang + MSVC STL can't include std headers in a module purview; use `import std` (see std_module.cmake)
+set(FASTGLTF_USE_STD_MODULE ON CACHE BOOL "" FORCE)
 
 
 FetchContent_MakeAvailable(fastgltf)
+
+target_link_libraries(fastgltf_module PRIVATE rhea_std)
 

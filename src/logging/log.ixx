@@ -1,10 +1,9 @@
 ﻿export module log;
-import <cstdint>;
-import <iostream>;
-import <ostream>;
-import <utility>;
+
+import std.compat;
 
 import fixed_string;
+import assertions;
 
 #include "log_macro.h"
 
@@ -75,15 +74,15 @@ struct Logger
         if constexpr (verbosity.verbosity_level <= compile_time_verbosity.verbosity_level)
         {
             char const buffer[2048] = {};
-            sprintf_s(
+            std::snprintf(
                 (char* const)buffer, 
                 2048, 
                 (const char*)fmt, 
-                std::forward<Args>(args)...);
+                printf_arg(std::forward<Args>(args))...);
             
             
             char const buffer2[2048] = {};
-            sprintf_s(
+            std::snprintf(
                 (char* const)buffer2, 
                 2048, 
                 "%s: %s", 
@@ -95,8 +94,6 @@ struct Logger
 };
 
 
-export template<LogVerbosity compile_time_verbosity, size_t Num>
-Logger(char const (&)[Num]) -> Logger<compile_time_verbosity, Num - 1>;
 
 
 export DEFINE_LOGGER(LogTemp, Display);

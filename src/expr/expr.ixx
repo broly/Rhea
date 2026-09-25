@@ -1,11 +1,7 @@
 export module expr;
 
-import <variant>;
-import <string_view>;
-import <string>;
-import <locale>;
-import <vector>;
-import <unordered_map>;
+import std.compat;
+
 
 export namespace expr
 {

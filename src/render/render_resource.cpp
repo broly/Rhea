@@ -1,4 +1,6 @@
-module render:render_resource;
+module render;
+
+import :render_resource;
 
 import :pipeline_object;
 import :pipeline_family;

@@ -1,1 +1,3 @@
-﻿module rhmath:transform;
+﻿module rhmath;
+
+import :transform;

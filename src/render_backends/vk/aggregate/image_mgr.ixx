@@ -1,6 +1,11 @@
-﻿export module vk:image_mgr;
+﻿module;
 
-import <vulkan/vulkan_core.h>;
+#include <vulkan/vulkan_core.h>
+
+export module vk:image_mgr;
+
+import std.compat;
+
 import :instance;
 import :immediate_commands;
 import :debug;
@@ -8,7 +13,6 @@ import render;
 import assets;
 import texture_format;
 import rhmath;
-import <optional>;
 
 
 

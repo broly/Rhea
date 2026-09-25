@@ -1,11 +1,16 @@
-﻿export module vk:mesh_mgr;
+﻿module;
+
+#include <vulkan/vulkan_core.h>
+
+export module vk:mesh_mgr;
+
+import std.compat;
+import assertions;
 
 import :instance;
 import :immediate_commands;
 import :buffer_mgr;
 import assets;
-import <unordered_map>;
-import <vulkan/vulkan_core.h>;
 import :mesh_gpu_data;
 import render;
 import glm;

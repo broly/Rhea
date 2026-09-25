@@ -1,13 +1,14 @@
-﻿module rhcomponents:rhcomp_mesh;
+﻿module rhcomponents;
+
+import :rhcomp_mesh;
+
+import std.compat;
 
 import globals;
 import engine;
-#include "common/offsetof.h"
-import <cassert>;
-import <string>;
-import <future>;
 import render;
 import :scene_view_proxy.mesh;
+#include "common/offsetof.h"
 
 
 void RhComp_StaticMesh::on_init()

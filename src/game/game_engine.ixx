@@ -1,4 +1,15 @@
-﻿export module game:engine;
+﻿module;
+
+#include <json/value.h>
+
+export module game:engine;
+
+import std.compat;
+import rhobject;
+import dependency_collector;
+import fixed_string;
+import reflect;
+import type_id;
 
 import engine;
 

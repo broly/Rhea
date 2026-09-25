@@ -1,6 +1,11 @@
-﻿export module vk:pipeline_graphics;
+﻿module;
 
-import <vulkan/vulkan_core.h>;
+#include <vulkan/vulkan_core.h>
+
+export module vk:pipeline_graphics;
+
+import std.compat;
+
 
 import :context;
 import :shader;
@@ -8,9 +13,6 @@ import :instance;
 import :swapchain_control;
 import :buffer_mgr;
 import render;
-import <unordered_map>;
-import <optional>;
-import <cassert>;
 import :render_resource;
 import :render_resource_instance;
 import :reflection;
