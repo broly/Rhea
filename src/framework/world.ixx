@@ -7,6 +7,7 @@ import :core;
 import dependency_collector;
 import rhmath;
 import rhobject;
+import physics;
 // import :scene_extractor;
 
 
@@ -59,7 +60,10 @@ public:
 
     std::shared_ptr<RhActor> find_actor_by_name(const std::string& name);
 
+    phys::PhysicsScene& get_physics() const { return *physics; }
+
     std::vector<std::unique_ptr<WorldScript>> scripts;
+    std::unique_ptr<phys::PhysicsScene> physics;
     std::shared_ptr<EngineClock> clock;
     std::vector<std::shared_ptr<RhActor>> actors;
     DependencyCollector collector;

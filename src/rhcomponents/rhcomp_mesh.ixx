@@ -17,6 +17,7 @@ import framework;
 import name;
 import render_scene;
 import render;
+import physics;
 
 #include "object/object_reflection_macro.h"
 
@@ -52,6 +53,21 @@ public:
     [[=rh::serialize]] MeshHandle mesh;
 
     [[=rh::serialize]] std::vector<std::shared_ptr<Material>> mats;
+
+    // Static triangle mesh collision (level geometry), created on start
+    [[=rh::serialize, =rh::edit]] bool collision = false;
+
+    // Builds collision_shape from mesh_data (= mesh.get(), slow for big meshes, cached on disk under
+    // cache_key). Thread safe: scene importers call it on loading threads with the mesh resolved on
+    // the main thread (AssetManager lookups are not); start() builds it if it's missing.
+    void cook_collision(phys::PhysicsScene& physics, const StaticMesh& mesh_data, std::string_view cache_key);
+
+    phys::Shape collision_shape;
+    phys::BodyId collision_body;
+
+private:
+    void create_collision_body();
+    void destroy_collision_body();
 };
 
 RH_OBJECT(RhComp_StaticMesh)

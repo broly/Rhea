@@ -24,6 +24,7 @@ import texture_format;
 import :constants;
 import :names;
 import :debug_line;
+import debug_draw;
 import dump_exr;
 import paths;
 
@@ -313,6 +314,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     wireframe_pipeline_family = renderer->query_pipeline_family("Wireframe", wireframe_model);
     wireframe_mesh_pipeline_family = renderer->query_pipeline_family("WireframeMesh", wireframe_model);
     skeleton_pipeline_family = renderer->query_pipeline_family("SkeletonOverlay", wireframe_model);
+    debug_lines_pipeline_family = renderer->query_pipeline_family("DebugLines", wireframe_model);
     
     shadow_debug_pipeline_family = renderer->query_pipeline_family("ShadowDebug", shadow_debug_model);
 
@@ -927,6 +929,7 @@ void GenericRenderGraph::on_pso_built()
     wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
     wireframe_mesh_pipeline = request_pipeline(wireframe_mesh_pipeline_family, {});
     skeleton_pipeline = request_pipeline(skeleton_pipeline_family, {});
+    debug_lines_pipeline = request_pipeline(debug_lines_pipeline_family, {});
     tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
     lighting_pipeline = request_pipeline(lighting_pipeline_family, {});
     skinning_pipeline = skinning_pipeline_family->request_pipeline({});
@@ -1601,10 +1604,14 @@ void GenericRenderGraph::draw_debug_overlay(RenderGraphContext& ctx)
 {
     PROFILE("GenericRenderGraph::draw_debug_overlay");
 
+    // taken every frame, so lines don't pile up while nothing is drawn
+    debug_draw::collect(debug_draw_frame);
+
     const bool draw_wireframe = is_wireframe_view_mode(view_mode) && wireframe_mesh_pipeline;
     const bool draw_skeleton = show_skeleton && skeleton_pipeline;
+    const bool draw_lines = !debug_draw_frame.depth_tested.empty() || !debug_draw_frame.on_top.empty();
 
-    if (!draw_wireframe && !draw_skeleton)
+    if (!draw_wireframe && !draw_skeleton && !draw_lines)
         return;
 
     ctx.backend.update_viewport(
@@ -1615,8 +1622,7 @@ void GenericRenderGraph::draw_debug_overlay(RenderGraphContext& ctx)
     if (draw_wireframe)
         draw_mesh_wireframe(ctx);
 
-    if (draw_skeleton)
-        draw_skeletons(ctx);
+    draw_debug_lines(ctx);
 }
 
 void GenericRenderGraph::draw_mesh_wireframe(RenderGraphContext& ctx)
@@ -1646,7 +1652,7 @@ void GenericRenderGraph::draw_mesh_wireframe(RenderGraphContext& ctx)
     }
 }
 
-void GenericRenderGraph::draw_skeletons(RenderGraphContext& ctx)
+void GenericRenderGraph::add_skeleton_lines(std::vector<LineVertex>& vertices)
 {
     auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
 
@@ -1658,7 +1664,6 @@ void GenericRenderGraph::draw_skeletons(RenderGraphContext& ctx)
         { 0.25f, 0.45f, 1.0f, 1.0f },
     };
 
-    std::vector<LineVertex> vertices;
     auto add_line = [&vertices](const glm::vec3& a, const glm::vec3& b, const glm::vec4& color_a, const glm::vec4& color_b)
     {
         vertices.push_back({ a, 0.0f, color_a });
@@ -1723,6 +1728,33 @@ void GenericRenderGraph::draw_skeletons(RenderGraphContext& ctx)
             }
         }
     }
+}
+
+void GenericRenderGraph::draw_debug_lines(RenderGraphContext& ctx)
+{
+    // one upload for all line lists (the buffer is written once per frame), drawn as ranges:
+    // skeletons and on-top lines without depth test, then depth tested lines
+    std::vector<LineVertex>& vertices = debug_line_vertices;
+    vertices.clear();
+
+    if (show_skeleton && skeleton_pipeline)
+        add_skeleton_lines(vertices);
+
+    auto add_lines = [&vertices] (const std::vector<debug_draw::Line>& lines)
+    {
+        for (const debug_draw::Line& l : lines)
+        {
+            vertices.push_back({ l.a, 0.0f, l.color });
+            vertices.push_back({ l.b, 0.0f, l.color });
+        }
+    };
+
+    if (skeleton_pipeline)
+        add_lines(debug_draw_frame.on_top);
+    const uint32_t on_top_count = (uint32_t)vertices.size();
+
+    if (debug_lines_pipeline)
+        add_lines(debug_draw_frame.depth_tested);
 
     if (vertices.empty())
         return;
@@ -1733,13 +1765,22 @@ void GenericRenderGraph::draw_skeletons(RenderGraphContext& ctx)
     auto* dst = static_cast<LineVertex*>(backend->get_vertex_buffer_ptr(debug_line_buffer, ctx.frame));
     memcpy(dst, vertices.data(), vertex_count * sizeof(LineVertex));
 
-    if (ctx.bind_pipeline(skeleton_pipeline))
+    const uint32_t first_count = std::min(on_top_count, vertex_count);
+    if (first_count > 0)
     {
-        ctx.bind(camera_resource);
+        if (ctx.bind_pipeline(skeleton_pipeline))
+            ctx.bind(camera_resource);
+        backend->bind_vertex_buffer(ctx.cmd, debug_line_buffer, ctx.frame);
+        ctx.draw(first_count);
     }
 
-    backend->bind_vertex_buffer(ctx.cmd, debug_line_buffer, ctx.frame);
-    ctx.draw(vertex_count);
+    if (vertex_count > first_count)
+    {
+        if (ctx.bind_pipeline(debug_lines_pipeline))
+            ctx.bind(camera_resource);
+        backend->bind_vertex_buffer(ctx.cmd, debug_line_buffer, ctx.frame);
+        ctx.draw(vertex_count - first_count, first_count);
+    }
 }
 
 void GenericRenderGraph::draw_ssr(RenderGraphContext& ctx)

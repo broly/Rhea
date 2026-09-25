@@ -8,6 +8,9 @@ import log;
 import glm;
 import rhcomponents;
 import assets;
+import physics;
+import globals;
+import engine;
 
 #include "logging/log_macro.h"
 
@@ -32,7 +35,25 @@ void RhComp_GltfScene::on_serialize(const SerializationContext& context)
         comp->mats = mesh_materials;
         comp->transform = obj.transform;
         
+        comp->collision = collision;
+        
         pending_mesh_comps.push_back(comp);  
+    }
+
+    // collision meshes are cooked in parallel with the texture loads (or loaded from the cache)
+    if (collision)
+    {
+        phys::PhysicsScene& physics = RhGlobals::engine->world->get_physics();
+        for (uint32_t index = 0; index < pending_mesh_comps.size(); ++index)
+        {
+            auto comp = pending_mesh_comps[index];
+            const StaticMesh* mesh_data = &comp->mesh.get();
+            std::string cache_key = std::format("{}__{}_{}", asset_path, index, comp->name.to_string());
+            context.dc->push(std::async(std::launch::async, [comp, mesh_data, &physics, cache_key = std::move(cache_key)]
+            {
+                comp->cook_collision(physics, *mesh_data, cache_key);
+            }).share());
+        }
     }
     
     std::vector<std::shared_future<void>> futures;

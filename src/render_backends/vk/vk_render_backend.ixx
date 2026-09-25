@@ -90,7 +90,7 @@ public:   /// API Section
     virtual void begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index) override;
     virtual void end_render_pass(RBCommandList cmd_list) override;
     virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) override;
-    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) override;
+    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0) override;
     virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) override;
     virtual bool acquire_next_image(RBFrameHandle frame_handle) override;
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;

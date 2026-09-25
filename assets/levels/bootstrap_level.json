@@ -511,6 +511,7 @@
 					"class": "RhComp_GltfScene",
 					"fields": {
 						"asset_path": "gltf/New_Sponza_001.gltf",
+						"collision": true,
 						"textures_dir": "textures/sponza",
 						"material": {
 							"blend_mode": "masked",

@@ -100,9 +100,31 @@ bool CharacterController::init(std::shared_ptr<RhActor> in_actor, const std::str
     heading = std::atan2(facing.x, facing.z);
     move_direction = glm::vec3(std::sin(heading), 0, std::cos(heading));
 
-    LogCharacterController.Log("Character controller for '%s': walk %.2f m/s, run %.2f m/s",
-        actor->name.to_string().c_str(), walk.ground_speed, run.ground_speed);
+    // capsule as tall as the mesh
+    const AABB bounds = mesh_component->get_aabb();
+    float height = bounds.max.y - bounds.min.y;
+    if (!(height > 0.5f && height < 3.0f))
+        height = 1.7f;
+
+    physics = &actor->get_world()->get_physics();
+    capsule = physics->create_character({
+        .radius = capsule_radius,
+        .height = height,
+        .position = position + glm::vec3(0.0f, 0.05f, 0.0f),
+        // framework convention: the owning component
+        .user_data = reinterpret_cast<uint64_t>(mesh_component.get()),
+    });
+    camera_probe_shape = physics->create_shape(phys::SphereShape{ camera_probe_radius });
+
+    LogCharacterController.Log("Character controller for '%s': walk %.2f m/s, run %.2f m/s, capsule %.2f x %.2f m",
+        actor->name.to_string().c_str(), walk.ground_speed, run.ground_speed, capsule_radius, height);
     return true;
+}
+
+CharacterController::~CharacterController()
+{
+    if (physics)
+        physics->destroy_character(capsule);
 }
 
 void CharacterController::load_poses(const std::string& poses_json_path)
@@ -282,11 +304,11 @@ void CharacterController::update_movement(float dt, const Input* input, float ca
     if (grounded)
         speed = move_towards(speed, target_speed, (target_speed > speed ? acceleration : deceleration) * dt);
 
-    position += move_direction * speed * dt;
-
     // ---- jump ----
+    bool jumped = false;
     if (jump_down && !jump_was_down && grounded)
     {
+        jumped = true;
         grounded = false;
         vertical_velocity = jump_velocity;
         jump_state = JumpState::start;
@@ -294,16 +316,53 @@ void CharacterController::update_movement(float dt, const Input* input, float ca
     }
     jump_was_down = jump_down;
 
-    if (!grounded)
+    // ---- physics ----
+    const phys::CharacterState previous = physics->get_character_state(capsule);
+
+    glm::vec3 velocity = move_direction * speed;
+    if (grounded)
     {
-        vertical_velocity -= gravity * dt;
-        position.y += vertical_velocity * dt;
-        if (position.y <= 0.0f)
+        // follow the ground (moving platforms); a gravity step keeps the capsule pressed to it
+        velocity += previous.ground_velocity;
+        vertical_velocity = 0.0f;
+        velocity.y -= gravity * dt;
+    }
+    else
+    {
+        if (!jumped)
+            vertical_velocity -= gravity * dt;
+        velocity.y += vertical_velocity;
+    }
+
+    const phys::CharacterState state = physics->move_character(capsule, velocity, dt);
+    position = state.position;
+
+    // blocked by walls: the animation follows the real speed (no running in place)
+    const glm::vec2 horizontal(state.velocity.x - state.ground_velocity.x, state.velocity.z - state.ground_velocity.z);
+    speed = std::min(speed, glm::length(horizontal));
+
+    const bool on_ground = state.ground == phys::GroundState::on_ground;
+    if (on_ground && !jumped && vertical_velocity <= 0.0f)
+    {
+        if (!grounded && jump_state != JumpState::none)
         {
-            position.y = 0.0f;
-            vertical_velocity = 0.0f;
-            grounded = true;
             jump_state = JumpState::land;
+            jump_time = 0.0f;
+        }
+        grounded = true;
+        air_time = 0.0f;
+    }
+    else
+    {
+        grounded = false;
+        air_time += dt;
+        // hit a ceiling / landed on something mid-jump
+        vertical_velocity = state.velocity.y;
+
+        // walked off a ledge
+        if (jump_state == JumpState::none && air_time > fall_animation_delay)
+        {
+            jump_state = JumpState::loop;
             jump_time = 0.0f;
         }
     }
@@ -414,8 +473,21 @@ void CharacterController::update_pose(float dt)
 Transform CharacterController::make_camera_transform(float camera_yaw, float camera_pitch) const
 {
     const glm::vec3 pivot = position + glm::vec3(0.0f, camera_pivot_height, 0.0f);
-    glm::vec3 camera_position = pivot - camera_forward(camera_yaw, camera_pitch) * camera_distance;
-    camera_position.y = std::max(camera_position.y, 0.2f);
+    const glm::vec3 back = -camera_forward(camera_yaw, camera_pitch);
+
+    // sphere sweep from the pivot: the camera stays in front of walls and ceilings
+    float distance = camera_distance;
+    if (physics && camera_probe_shape)
+    {
+        const phys::BodyId character_body = physics->get_character_body(capsule);
+        const phys::QueryFilter filter{
+            .categories = phys::Category::static_world | phys::Category::voxel,
+            .ignore_bodies = std::span(&character_body, 1),
+        };
+        if (auto hit = physics->sweep(camera_probe_shape, { pivot }, back, camera_distance, filter))
+            distance = std::max(hit->distance, 0.1f);
+    }
+    const glm::vec3 camera_position = pivot + back * distance;
 
     Transform t;
     t.position = camera_position;

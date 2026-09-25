@@ -187,7 +187,7 @@ public:
     
     virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) = 0;
     
-    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count) = 0;
+    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0) = 0;
     
     virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) = 0;
     

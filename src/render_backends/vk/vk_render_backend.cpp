@@ -819,12 +819,12 @@ void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, PipelineObject* pipe
     
 }
 
-void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count)
+void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex)
 {
     LogRB.Log("draw");
     
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    vkCmdDraw(cmd, vertex_count, 1, 0, 0);
+    vkCmdDraw(cmd, vertex_count, 1, first_vertex, 0);
 }
 
 void VkRenderBackend::trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth)

@@ -81,6 +81,7 @@ void Engine::run()
         clock->tick();
         
         world->tick();
+        debug_ui.draw_world_debug(*this);
         
         if (ui::is_visible())
             debug_ui.draw(*this);

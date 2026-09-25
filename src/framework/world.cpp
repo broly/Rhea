@@ -18,8 +18,12 @@ import dependency_collector;
 import glm;
 
 import rhobject;
+import physics;
+import paths;
+import profile;
 
 #include "common/assertion_macros.h"
+#include "profiling/profile.h"
 
 
 void World::tick()
@@ -48,11 +52,19 @@ void World::tick()
     
     for (auto& actor : actors)
         actor->internal_tick(dt);
+
+    {
+        PROFILE("World::physics_step");
+        physics->step((float)dt);
+    }
 }
 
 void World::init()
 {
-    
+    physics = std::make_unique<phys::PhysicsScene>(phys::PhysicsSettings{
+        .shape_cache_dir = paths::get_cache_path() / "physics",
+    });
+
     load_bootstrap_level();
     
     for (auto& script : scripts)
@@ -180,6 +192,9 @@ bool World::load_level(std::string level_path)
         actors.push_back(actor);
         actor->internal_start(shared_from_this());
     }
+
+    // level geometry was added one body at a time
+    physics->optimize();
     
     return true;
 }

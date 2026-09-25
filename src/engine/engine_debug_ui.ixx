@@ -4,12 +4,13 @@ import std.compat;
 import glm;
 import rhmath;
 import framework;
+import physics;
 
 
 export class Engine;
 
 // Engine windows of the debug UI (ui module, Dear ImGui): main menu, world outliner, inspector of the
-// selected actor, renderer settings, stats, GPU profiler, cvar catalog, world scripts.
+// selected actor, renderer settings, stats, GPU profiler, cvar catalog, world scripts, physics.
 //
 // Game code extends it with Engine::on_debug_ui_menu / on_debug_ui_render_panel and
 // WorldScript::draw_debug_ui.
@@ -18,6 +19,9 @@ export class EngineDebugUI
 public:
     // Draws all windows, called every frame while the UI is visible
     void draw(Engine& engine);
+
+    // World space debug drawing (physics shapes, probes), every frame, also while the UI is hidden
+    void draw_world_debug(Engine& engine);
 
     void select(const std::shared_ptr<RhActor>& actor);
     std::shared_ptr<RhActor> get_selected() const { return selected.lock(); }
@@ -46,6 +50,7 @@ private:
     void draw_cvars_window(Engine& engine);
     void draw_world_scripts_window(Engine& engine);
     void draw_help_window();
+    void draw_physics_window(Engine& engine);
 
     void draw_viewport_overlay(Engine& engine, const ViewData& view);
     void handle_picking(Engine& engine, const ViewData& view);
@@ -54,6 +59,15 @@ private:
     bool scroll_outliner_to_selection = false;
     std::string outliner_filter;
     std::string cvar_filter;
+
+    // physics window: probe from the camera and test bodies
+    std::optional<phys::Hit> probe_hit;
+    std::string probe_hit_owner;
+    std::vector<phys::BodyId> spawned_bodies;
+    phys::Shape spawn_sphere_shape;
+    phys::Shape spawn_box_shape;
+    phys::Shape probe_sphere_shape;
+    float probe_sphere_radius = 0.0f;
 
     static constexpr size_t FRAME_TIME_HISTORY = 240;
     std::array<float, FRAME_TIME_HISTORY> frame_times_ms{};

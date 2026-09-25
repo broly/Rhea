@@ -12,8 +12,10 @@ import framework;
 import assets;
 import input;
 import rhcomponents;
+import physics;
 
-// Third person locomotion for a skeletal mesh actor, on a flat ground plane (y = 0):
+// Third person locomotion for a skeletal mesh actor, moved as a physics character capsule
+// (collides with the level, climbs steps, falls from ledges):
 //  * WASD relative to the camera, LeftShift walks (run by default), Space jumps,
 //  * idle / walk / run blended by speed (walk and run are phase synchronized),
 //  * jump start / loop / end with simple ballistics,
@@ -23,6 +25,7 @@ export class CharacterController
 {
 public:
     bool init(std::shared_ptr<RhActor> in_actor, const std::string& locomotion_json_path);
+    ~CharacterController();
     
     // Optional set of looping poses (poses.json from tools/ue_import), selected by index.
     void load_poses(const std::string& poses_json_path);
@@ -46,7 +49,7 @@ public:
     // input may be null: the character only plays idle / decelerates
     void tick(float dt, const Input* input, float camera_yaw);
 
-    // orbit camera around the character
+    // orbit camera around the character, pulled in front of walls
     Transform make_camera_transform(float camera_yaw, float camera_pitch) const;
 
     glm::vec3 get_position() const { return position; }
@@ -100,8 +103,14 @@ private:
     BonePose bind_pose;
     BonePose pose_a, pose_b, pose_locomotion, pose_final;
 
+    // physics capsule
+    phys::PhysicsScene* physics = nullptr;
+    phys::CharacterId capsule;
+    phys::Shape camera_probe_shape;
+    float air_time = 0.0f;      // since the capsule left the ground
+
     // movement
-    glm::vec3 position = glm::vec3(0.0f);
+    glm::vec3 position = glm::vec3(0.0f);   // feet
     glm::vec3 move_direction = glm::vec3(0, 0, 1);
     float heading = 0.0f;         // yaw of the character, 0 faces +Z
     float speed = 0.0f;           // horizontal, m/s
@@ -127,4 +136,7 @@ private:
     static constexpr float expression_blend_time = 0.2f;
     static constexpr float camera_distance = 3.2f;
     static constexpr float camera_pivot_height = 1.45f;
+    static constexpr float camera_probe_radius = 0.2f;
+    static constexpr float capsule_radius = 0.3f;
+    static constexpr float fall_animation_delay = 0.15f;     // walking off small ledges stays in locomotion
 };

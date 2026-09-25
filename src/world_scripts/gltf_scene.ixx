@@ -31,6 +31,9 @@ public:
     [[=rh::serialize]] std::shared_ptr<Material> material;
     
     [[=rh::serialize]] std::map<Name, std::string> test;
+
+    // static triangle mesh collision for every mesh of the scene
+    [[=rh::serialize]] bool collision = false;
     
     
     

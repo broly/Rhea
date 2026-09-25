@@ -24,6 +24,8 @@ import gpu_profile;
 import input;
 import ui;
 import cvar;
+import physics;
+import debug_draw;
 
 
 namespace
@@ -38,6 +40,17 @@ namespace
     cvar::Var<bool> cv_window_world_scripts("ui.windows.world_scripts", true, "World scripts window");
     cvar::Var<bool> cv_window_help("ui.windows.help", false, "Hotkeys window");
     cvar::Var<bool> cv_window_imgui_demo("ui.windows.imgui_demo", false, "Dear ImGui demo window (widget reference)");
+    cvar::Var<bool> cv_window_physics("ui.windows.physics", false, "Physics stats, debug drawing and probes");
+
+    cvar::Var<bool> cv_physics_draw("physics.debug.draw", false, "Draw collision shapes near the camera");
+    cvar::Var<bool> cv_physics_draw_fixed("physics.debug.draw_fixed", false,
+        "Also draw fixed bodies (level geometry, many lines)");
+    cvar::Var<bool> cv_physics_draw_bounds("physics.debug.draw_bounds", false, "Draw body bounding boxes");
+    cvar::Var<bool> cv_physics_draw_velocity("physics.debug.draw_velocity", false, "Draw body velocities");
+    cvar::Var<float> cv_physics_draw_distance("physics.debug.draw_distance", 25.0f,
+        "Bodies farther from the camera are not drawn, m", {.has_range = true, .min = 1.0f, .max = 500.0f});
+    cvar::Var<bool> cv_physics_probe("physics.debug.probe", false,
+        "Trace from the camera along its view direction every frame");
 
     cvar::Var<bool> cv_viewport_picking("ui.viewport.picking", true,
         "Click in the viewport selects the actor under the cursor");
@@ -263,6 +276,7 @@ void EngineDebugUI::draw(Engine& engine)
     draw_cvars_window(engine);
     draw_world_scripts_window(engine);
     draw_help_window();
+    draw_physics_window(engine);
     if (cv_window_imgui_demo.get())
     {
         bool open = true;
@@ -314,6 +328,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         item("Stats", cv_window_stats);
         item("GPU Profiler", cv_window_gpu_profiler);
         item("Console Variables", cv_window_cvars);
+        item("Physics", cv_window_physics);
         ImGui::Separator();
         item("Hotkeys", cv_window_help);
         item("ImGui Demo", cv_window_imgui_demo);
@@ -919,4 +934,223 @@ void EngineDebugUI::handle_picking(Engine& engine, const ViewData& view)
     }
 
     select(best_icon ? best_icon : best_box);
+}
+
+
+/************************************************************************
+ * PHYSICS
+ ***********************************************************************/
+
+namespace
+{
+    std::shared_ptr<RhComp_Camera> find_active_camera(Engine& engine)
+    {
+        for (const auto& actor : engine.world->get_actors())
+        {
+            auto camera = actor->find_component<RhComp_Camera>();
+            if (camera && camera->active)
+                return camera;
+        }
+        return nullptr;
+    }
+
+    const char* category_name(phys::Category category)
+    {
+        switch (category)
+        {
+        case phys::Category::static_world: return "static_world";
+        case phys::Category::dynamic:      return "dynamic";
+        case phys::Category::character:    return "character";
+        case phys::Category::hitbox:       return "hitbox";
+        case phys::Category::projectile:   return "projectile";
+        case phys::Category::voxel:        return "voxel";
+        case phys::Category::trigger:      return "trigger";
+        case phys::Category::debris:       return "debris";
+        }
+        return "?";
+    }
+}
+
+void EngineDebugUI::draw_world_debug(Engine& engine)
+{
+    probe_hit.reset();
+    probe_hit_owner.clear();
+
+    if (!engine.world || !engine.world->physics)
+        return;
+
+    phys::PhysicsScene& physics = engine.world->get_physics();
+    const auto camera = find_active_camera(engine);
+    if (!camera)
+        return;
+
+    const glm::vec3 camera_position = camera->transform.position.glm();
+    const glm::vec3 camera_forward = camera->transform.forward();
+
+    if (cv_physics_draw.get())
+    {
+        std::vector<debug_draw::Line> lines;
+        physics.debug_draw({
+                .camera_position = camera_position,
+                .max_distance = cv_physics_draw_distance.get(),
+                .fixed_bodies = cv_physics_draw_fixed.get(),
+                .bounding_boxes = cv_physics_draw_bounds.get(),
+                .velocities = cv_physics_draw_velocity.get(),
+            },
+            [&lines] (const glm::vec3& a, const glm::vec3& b, const glm::vec4& color) {
+                lines.push_back({ a, b, color });
+            });
+        debug_draw::lines(lines);
+    }
+
+    if (!cv_physics_probe.get())
+        return;
+
+    constexpr float probe_distance = 100.0f;
+    // start in front of the near plane, or the line is invisible
+    const glm::vec3 origin = camera_position + camera_forward * 0.5f;
+
+    if (probe_sphere_radius > 0.0f && probe_sphere_shape)
+    {
+        probe_hit = physics.sweep(probe_sphere_shape, { origin }, camera_forward, probe_distance);
+        if (probe_hit)
+            debug_draw::sphere(origin + camera_forward * probe_hit->distance, probe_sphere_radius, { 1.0f, 0.8f, 0.2f, 1.0f });
+    }
+    else
+    {
+        probe_hit = physics.raycast(origin, camera_forward, probe_distance);
+    }
+
+    if (!probe_hit)
+        return;
+
+    debug_draw::cross(probe_hit->position, 0.15f, { 1.0f, 0.2f, 0.2f, 1.0f }, { .depth_test = false });
+    debug_draw::arrow(probe_hit->position, probe_hit->position + probe_hit->normal * 0.5f,
+                      { 0.2f, 1.0f, 0.3f, 1.0f }, { .depth_test = false });
+
+    // framework convention: BodyDesc::user_data is the owning RhComponent (or 0)
+    if (probe_hit->user_data != 0)
+    {
+        const auto* component = reinterpret_cast<const RhComponent*>(probe_hit->user_data);
+        probe_hit_owner = component->owner
+            ? component->owner->name.to_string() + " / " + component->name.to_string()
+            : component->name.to_string();
+    }
+}
+
+void EngineDebugUI::draw_physics_window(Engine& engine)
+{
+    if (!begin_window("Physics", cv_window_physics, viewport_point(0.70f, 0.40f), viewport_size(0.24f, 0.45f)))
+        return;
+
+    if (!engine.world || !engine.world->physics)
+    {
+        ImGui::TextDisabled("No physics scene");
+        ImGui::End();
+        return;
+    }
+
+    phys::PhysicsScene& physics = engine.world->get_physics();
+    const phys::PhysicsStats stats = physics.get_stats();
+
+    ImGui::Text("Bodies: %u (%u active)", stats.bodies, stats.active_bodies);
+    ImGui::Text("Step: %.2f ms, %u substeps", stats.step_ms, stats.steps_last_frame);
+    ImGui::Text("Mesh shapes: %u cooked, %u from cache", stats.shapes_cooked, stats.shapes_from_cache);
+
+    auto checkbox = [] (const char* label, cvar::Var<bool>& value) {
+        bool v = value.get();
+        if (ImGui::Checkbox(label, &v))
+            value.set(v);
+    };
+
+    if (ImGui::CollapsingHeader("Debug draw", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        checkbox("Shapes", cv_physics_draw);
+        ImGui::BeginDisabled(!cv_physics_draw.get());
+        checkbox("Level geometry", cv_physics_draw_fixed);
+        checkbox("Bounding boxes", cv_physics_draw_bounds);
+        checkbox("Velocities", cv_physics_draw_velocity);
+        float distance = cv_physics_draw_distance.get();
+        if (ImGui::SliderFloat("Distance", &distance, 1.0f, 500.0f, "%.0f m", ImGuiSliderFlags_Logarithmic))
+            cv_physics_draw_distance.set(distance);
+        ImGui::EndDisabled();
+    }
+
+    if (ImGui::CollapsingHeader("Probe", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        checkbox("Trace from camera", cv_physics_probe);
+
+        float radius = probe_sphere_radius;
+        if (ImGui::SliderFloat("Sphere radius", &radius, 0.0f, 1.0f, radius > 0.0f ? "%.2f m" : "ray"))
+        {
+            probe_sphere_radius = radius;
+            if (radius > 0.0f)
+                probe_sphere_shape = physics.create_shape(phys::SphereShape{ radius });
+        }
+
+        if (cv_physics_probe.get() && probe_hit)
+        {
+            const phys::Hit& hit = *probe_hit;
+            ImGui::Text("Distance: %.3f m%s", hit.distance, hit.start_penetrating ? " (start penetrating)" : "");
+            ImGui::Text("Position: %.2f %.2f %.2f", hit.position.x, hit.position.y, hit.position.z);
+            ImGui::Text("Normal:   %.2f %.2f %.2f", hit.normal.x, hit.normal.y, hit.normal.z);
+            ImGui::Text("Body: %08x  %s", hit.body.value, category_name(hit.category));
+            if (!probe_hit_owner.empty())
+                ImGui::TextWrapped("Owner: %s", probe_hit_owner.c_str());
+        }
+        else if (cv_physics_probe.get())
+        {
+            ImGui::TextDisabled("No hit");
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Test bodies", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        const auto camera = find_active_camera(engine);
+
+        if (!spawn_sphere_shape)
+            spawn_sphere_shape = physics.create_shape(phys::SphereShape{ 0.2f });
+        if (!spawn_box_shape)
+            spawn_box_shape = physics.create_shape(phys::BoxShape{ glm::vec3(0.25f) });
+
+        auto spawn = [&] (const phys::Shape& shape, float speed)
+        {
+            if (!camera)
+                return;
+            const glm::vec3 forward = camera->transform.forward();
+            const phys::BodyId body = physics.create_body({
+                .shape = shape,
+                .position = camera->transform.position.glm() + forward * 1.5f,
+                .motion = phys::Motion::dynamic,
+                .category = phys::Category::dynamic,
+                .linear_velocity = forward * speed,
+                .continuous_collision = speed > 10.0f,
+            });
+            if (body.is_valid())
+                spawned_bodies.push_back(body);
+        };
+
+        ImGui::BeginDisabled(!camera);
+        if (ImGui::Button("Drop sphere"))
+            spawn(spawn_sphere_shape, 0.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Drop box"))
+            spawn(spawn_box_shape, 0.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Throw sphere"))
+            spawn(spawn_sphere_shape, 25.0f);
+        ImGui::EndDisabled();
+
+        ImGui::BeginDisabled(spawned_bodies.empty());
+        if (ImGui::Button(std::format("Remove {} test bodies", spawned_bodies.size()).c_str()))
+        {
+            for (phys::BodyId body : spawned_bodies)
+                physics.destroy_body(body);
+            spawned_bodies.clear();
+        }
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("Test bodies are visible with debug draw");
+    }
+
+    ImGui::End();
 }

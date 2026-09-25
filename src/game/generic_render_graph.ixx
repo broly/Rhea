@@ -18,6 +18,7 @@ import name;
 import engine;
 import assets;
 import rhmath;
+import debug_draw;
 import :nn_denoiser_passes;
 import :debug_view;
 #include "object/object_reflection_macro.h"
@@ -144,12 +145,14 @@ public:
     void draw_ssr_composite(RenderGraphContext& ctx);
     void draw_rtxgi(RenderGraphContext& ctx);
     
-    // Debug views drawn over the tonemapped image: mesh wireframe (DebugViewMode::WIREFRAME*)
-    // and skeletons of skinned meshes. Must be added after the pass that writes the swapchain.
+    // Debug views drawn over the tonemapped image: mesh wireframe (DebugViewMode::WIREFRAME*),
+    // skeletons of skinned meshes and debug_draw lines. Must be added after the pass that writes
+    // the swapchain.
     void add_debug_overlay_pass();
     void draw_debug_overlay(RenderGraphContext& ctx);
     void draw_mesh_wireframe(RenderGraphContext& ctx);
-    void draw_skeletons(RenderGraphContext& ctx);
+    void add_skeleton_lines(std::vector<LineVertex>& vertices);
+    void draw_debug_lines(RenderGraphContext& ctx);
     
     void add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong = true);
     
@@ -228,6 +231,7 @@ public:
     PipelineObject* skinning_pipeline = nullptr;
     PipelineObject* wireframe_mesh_pipeline = nullptr;
     PipelineObject* skeleton_pipeline = nullptr;
+    PipelineObject* debug_lines_pipeline = nullptr;
 
     
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
@@ -244,6 +248,7 @@ public:
     std::shared_ptr<PipelineFamily> skinning_pipeline_family;
     std::shared_ptr<PipelineFamily> wireframe_mesh_pipeline_family;
     std::shared_ptr<PipelineFamily> skeleton_pipeline_family;
+    std::shared_ptr<PipelineFamily> debug_lines_pipeline_family;
     
     bool use_swapchain_extent;
     
@@ -265,6 +270,9 @@ public:
     // read from the renderer int params every frame (see DebugViewParams)
     DebugViewMode view_mode = DebugViewMode::LIT;
     bool show_skeleton = false;
+
+    debug_draw::Frame debug_draw_frame;
+    std::vector<LineVertex> debug_line_vertices;
     
     NNDenoiserState nn_denoiser_state;
     

@@ -14,6 +14,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Must be identical for every target: module BMIs are only importable with matching flags.
 add_compile_options(-freflection-latest)
 
+# x86-64-v3. Jolt Physics is built for these instruction sets and its headers use them in inline
+# functions, so every target gets the same flags (also required for importable module BMIs).
+set(RHEA_SIMD_FLAGS -mavx2 -mbmi -mpopcnt -mlzcnt -mf16c -mfma -mfpmath=sse)
+add_compile_options(${RHEA_SIMD_FLAGS})
+
 include(cmake/std_module.cmake)
 include(cmake/dependencies.cmake)
 
@@ -57,6 +62,8 @@ set(RHEA_MODULE_DIRS
     src/assets
     src/platform
     src/render_scene
+    src/physics
+    src/debug_draw
     src/framework
     src/rhcomponents
     src/render
@@ -111,6 +118,7 @@ target_link_libraries(rhea
 		fastgltf::module
 		unofficial::tinyexr::tinyexr
 		imgui
+		Jolt
 )
 
 target_compile_definitions(rhea
