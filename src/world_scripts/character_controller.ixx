@@ -41,6 +41,7 @@ public:
     void select_expression(int32_t expression_index);
     int32_t get_expression_count() const { return (int32_t)expressions.size(); }
     int32_t get_active_expression() const { return active_expression; }
+    const std::string& get_expression_name(int32_t expression_index) const { return expressions[expression_index].name; }
 
     // input may be null: the character only plays idle / decelerates
     void tick(float dt, const Input* input, float camera_yaw);

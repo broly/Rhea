@@ -1,4 +1,4 @@
-export module reflect;
+﻿export module reflect;
 
 import std.compat;
 import assertions;
@@ -39,6 +39,41 @@ export namespace rh
     // Without it every public non-static data member (including ones of public bases) is reflected.
     struct ExplicitFields {};
     inline constexpr ExplicitFields explicit_fields;
+
+    // Field shown and editable in the debug UI inspector. Independent of rh::serialize, works on any class:
+    //
+    //     [[=rh::serialize, =rh::edit, =rh::range<0.f, 100.f>]] float intensity;
+    //     [[=rh::edit, =rh::color]] vec4 color;
+    //
+    // After an edit the inspector calls RhObject::on_property_changed(field name).
+    struct Edit {};
+    inline constexpr Edit edit;
+
+    // Slider range of an edited number: [[=rh::range<0.f, 1.f>]]
+    // (values are template arguments: std::meta::extract of an annotation object declared in
+    // another module fails in clang-p2996, "read of object outside its lifetime")
+    template<float Min, float Max>
+    struct Range {};
+    template<float Min, float Max>
+    inline constexpr Range<Min, Max> range;
+
+    // Drag speed of an edited number (units per pixel): [[=rh::speed<0.01f>]]
+    template<float Value>
+    struct Speed {};
+    template<float Value>
+    inline constexpr Speed<Value> speed;
+
+    // Edited vec3 / vec4 is a color
+    struct Color {};
+    inline constexpr Color color;
+
+    // Edited float is an angle in radians, shown in degrees
+    struct Degrees {};
+    inline constexpr Degrees degrees;
+
+    // Shown in the inspector, but not editable
+    struct ReadOnly {};
+    inline constexpr ReadOnly read_only;
 }
 
 
@@ -58,6 +93,42 @@ export namespace reflect
     consteval bool has_annotation(std::meta::info entity)
     {
         return !std::meta::annotations_of(entity, ^^Annotation).empty();
+    }
+
+    // Debug UI editing hints of a field, from rh::Range / rh::Speed / rh::color / ... annotations
+    struct PropertyMeta
+    {
+        bool has_range = false;
+        float min = 0.f;
+        float max = 0.f;
+        float speed = 0.f;      // drag speed, 0: automatic
+        bool color = false;
+        bool degrees = false;
+        bool read_only = false;
+    };
+
+    consteval PropertyMeta property_meta_of(std::meta::info field)
+    {
+        PropertyMeta meta;
+        for (std::meta::info annotation : std::meta::annotations_of(field))
+        {
+            const std::meta::info type = std::meta::dealias(std::meta::remove_cv(std::meta::type_of(annotation)));
+            if (!std::meta::has_template_arguments(type))
+                continue;
+            const auto arguments = std::meta::template_arguments_of(type);
+            if (std::meta::template_of(type) == ^^rh::Range)
+            {
+                meta.has_range = true;
+                meta.min = std::meta::extract<float>(arguments[0]);
+                meta.max = std::meta::extract<float>(arguments[1]);
+            }
+            else if (std::meta::template_of(type) == ^^rh::Speed)
+                meta.speed = std::meta::extract<float>(arguments[0]);
+        }
+        meta.color = has_annotation<rh::Color>(field);
+        meta.degrees = has_annotation<rh::Degrees>(field);
+        meta.read_only = has_annotation<rh::ReadOnly>(field);
+        return meta;
     }
 
     namespace detail
@@ -123,6 +194,17 @@ export namespace reflect
         return detail::field_offset(std::meta::dealias(^^T), field);
     }
 
+    // PropertyMeta of every field, evaluated at once: clang-p2996 silently turned per-field constant
+    // initializers (all but the first field of a class) into runtime calls of the consteval function
+    template<typename T>
+    constexpr auto field_metas = [] consteval {
+        constexpr auto fields = fields_of<T>();
+        std::array<PropertyMeta, fields.size()> metas{};
+        for (size_t index = 0; index < fields.size(); index++)
+            metas[index] = property_meta_of(fields[index]);
+        return metas;
+    }();
+
     // I-th reflected field of T, passed to for_each_field callbacks
     template<typename T, size_t I>
     struct Field
@@ -130,6 +212,7 @@ export namespace reflect
         static constexpr std::meta::info info = fields_of<T>()[I];
         static constexpr std::string_view name = std::meta::identifier_of(info);
         static constexpr size_t offset = field_offset<T>(info);
+        static constexpr PropertyMeta meta = field_metas<T>[I];
         using type = typename [:std::meta::type_of(info):];
     };
 
@@ -146,6 +229,58 @@ export namespace reflect
         [&]<size_t... I>(std::index_sequence<I...>) {
             (func.template operator()<Field<T, I>>(), ...);
         }(std::make_index_sequence<fields_of<T>().size()>());
+    }
+
+    namespace detail
+    {
+        consteval void collect_editable_fields(std::meta::info type, std::vector<std::meta::info>& fields)
+        {
+            const auto ctx = std::meta::access_context::unprivileged();
+            for (std::meta::info base : std::meta::bases_of(type, ctx))
+                collect_editable_fields(std::meta::type_of(base), fields);
+            for (std::meta::info member : std::meta::nonstatic_data_members_of(type, ctx))
+                if (std::meta::has_identifier(member) && has_annotation<rh::Edit>(member))
+                    fields.push_back(member);
+        }
+    }
+
+    // [[=rh::edit]] fields of T in declaration order, fields of bases first
+    template<typename T>
+    consteval std::span<const std::meta::info> editable_fields_of()
+    {
+        std::vector<std::meta::info> fields;
+        detail::collect_editable_fields(std::meta::dealias(^^T), fields);
+        return std::define_static_array(fields);
+    }
+
+    // see field_metas
+    template<typename T>
+    constexpr auto editable_field_metas = [] consteval {
+        constexpr auto fields = editable_fields_of<T>();
+        std::array<PropertyMeta, fields.size()> metas{};
+        for (size_t index = 0; index < fields.size(); index++)
+            metas[index] = property_meta_of(fields[index]);
+        return metas;
+    }();
+
+    // I-th [[=rh::edit]] field of T, passed to for_each_editable_field callbacks
+    template<typename T, size_t I>
+    struct EditableField
+    {
+        static constexpr std::meta::info info = editable_fields_of<T>()[I];
+        static constexpr std::string_view name = std::meta::identifier_of(info);
+        static constexpr size_t offset = field_offset<T>(info);
+        static constexpr PropertyMeta meta = editable_field_metas<T>[I];
+        using type = typename [:std::meta::type_of(info):];
+    };
+
+    // Like for_each_field, but for [[=rh::edit]] fields
+    template<typename T, typename Func>
+    void for_each_editable_field(Func&& func)
+    {
+        [&]<size_t... I>(std::index_sequence<I...>) {
+            (func.template operator()<EditableField<T, I>>(), ...);
+        }(std::make_index_sequence<editable_fields_of<T>().size()>());
     }
 
     template<typename T>

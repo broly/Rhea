@@ -46,11 +46,12 @@ public:
     void update_scene_proxy();
     
     void on_serialize(const SerializationContext& context) override;
+    void on_property_changed(std::string_view property) override;
     
-    [[=rh::serialize]] vec4 color;
-    [[=rh::serialize]] float intensity;
-    [[=rh::serialize]] float falloff;
-    [[=rh::serialize]] LightType type = LightType::point;
+    [[=rh::serialize, =rh::edit, =rh::color]] vec4 color;
+    [[=rh::serialize, =rh::edit, =rh::speed<0.05f>]] float intensity;
+    [[=rh::serialize, =rh::edit, =rh::speed<0.01f>]] float falloff;
+    [[=rh::serialize, =rh::edit]] LightType type = LightType::point;
     
     SceneViewProxy_Light scene_proxy;
 };

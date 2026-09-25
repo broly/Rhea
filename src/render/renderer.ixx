@@ -49,6 +49,26 @@ public:  // public API
         runtime_int_params[name] = value;
     }
     
+    const std::map<Name, int>& get_int_params() const
+    {
+        return runtime_int_params;
+    }
+    
+    std::shared_ptr<RenderGraph> get_main_render_graph() const
+    {
+        return main_render_graph;
+    }
+    
+    uint32_t get_frame_id() const
+    {
+        return frame_id;
+    }
+    
+    uint8_t get_num_runs_per_frame() const
+    {
+        return main_render_graph_num_runs;
+    }
+    
     void hot_reload();
 
     RBImageHandle create_texture_from_asset(TextureHandle handle, bool generate_mips = true, 

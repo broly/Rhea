@@ -97,6 +97,12 @@ AABB RhComp_StaticMesh::get_aabb() const
 }
 
 
+void RhComp_StaticMesh::on_property_changed(std::string_view property)
+{
+    update_scene_proxy();
+    RhComp_Renderable::on_property_changed(property);
+}
+
 void RhComp_StaticMesh::update_scene_proxy()
 {
     scene_proxy.materials = mats;

@@ -44,6 +44,12 @@ void RhComp_Light::update_scene_proxy()
     scene_proxy.light_type = type;
 }
 
+void RhComp_Light::on_property_changed(std::string_view property)
+{
+    update_scene_proxy();
+    RhComp_Renderable::on_property_changed(property);
+}
+
 void RhComp_Light::on_serialize(const SerializationContext& context)
 {
     RhComp_Renderable::on_serialize(context);

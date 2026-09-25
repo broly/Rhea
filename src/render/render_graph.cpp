@@ -922,6 +922,13 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         callback(ctx);
     }
 
+    if (params.draw_ui_overlay && get_swapchain_texture())
+    {
+        gpuprof::pass_begin(cmd, "UIOverlay");
+        backend->render_ui_overlay(cmd, frame);
+        gpuprof::pass_end(cmd);
+    }
+
     // ---------------------------------------------------------------
     // Explicit end-of-frame Present transition for swapchain images.
     //

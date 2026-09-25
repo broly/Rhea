@@ -32,6 +32,11 @@ void RhComp_Transform::set_transform(const Transform& in_transform)
     }
 }
 
+void RhComp_Transform::on_property_changed(std::string_view property)
+{
+    set_transform(transform);
+}
+
 Transform RhComp_Transform::get_transform()
 {
     return transform;

@@ -65,6 +65,7 @@ set(RHEA_MODULE_DIRS
     src/render_backends/vk
     src/render_backends/vk/aggregate
     src/render_backends/vk/pipelines
+    src/ui
     src/game
 )
 
@@ -109,6 +110,7 @@ target_link_libraries(rhea
 		unofficial::spirv-reflect
 		fastgltf::module
 		unofficial::tinyexr::tinyexr
+		imgui
 )
 
 target_compile_definitions(rhea

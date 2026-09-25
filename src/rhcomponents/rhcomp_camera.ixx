@@ -36,12 +36,13 @@ public:
     void start() override;
     void finish() override;
     
-    [[=rh::serialize]] float fov;
-    [[=rh::serialize]] float near_plane;
-    [[=rh::serialize]] float far_plane;
-    [[=rh::serialize]] bool active;
+    [[=rh::serialize, =rh::edit, =rh::degrees, =rh::range<10.f, 120.f>]] float fov;
+    [[=rh::serialize, =rh::edit, =rh::speed<0.001f>]] float near_plane;
+    [[=rh::serialize, =rh::edit, =rh::speed<1.f>]] float far_plane;
+    [[=rh::serialize, =rh::edit]] bool active;
     
     void update_scene_proxy();
+    void on_property_changed(std::string_view property) override;
     
     SceneViewProxy_Camera scene_proxy;
 };

@@ -33,6 +33,12 @@ void RhComp_Camera::finish()
     RhGlobals::engine->scene_view->unregister_scene_view_proxy(scene_proxy, render_info.type_id);
 }
 
+void RhComp_Camera::on_property_changed(std::string_view property)
+{
+    update_scene_proxy();
+    RhComp_Renderable::on_property_changed(property);
+}
+
 void RhComp_Camera::update_scene_proxy()
 {
     scene_proxy.fov = fov;

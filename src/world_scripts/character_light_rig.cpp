@@ -123,6 +123,22 @@ const char* CharacterLightRig::get_preset_name() const
     return PRESETS[preset_index].name;
 }
 
+size_t CharacterLightRig::get_preset_count() const
+{
+    return NUM_PRESETS;
+}
+
+const char* CharacterLightRig::get_preset_name(size_t index) const
+{
+    return PRESETS[index].name;
+}
+
+void CharacterLightRig::set_preset(size_t index)
+{
+    preset_index = index % NUM_PRESETS;
+    apply_preset_log();
+}
+
 glm::vec3 CharacterLightRig::get_sun_tint() const
 {
     return PRESETS[preset_index].sun_tint;

@@ -111,6 +111,15 @@ public:
     virtual void reset_frame_fence(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
 
+    // --- Debug UI overlay (Dear ImGui draw data of the current frame) ----------
+    // The ImGui context and the platform backend are owned by the ui module; the render
+    // backend only uploads and draws ImGui::GetDrawData() over the swapchain image.
+    virtual void init_ui_overlay() {}
+    virtual void shutdown_ui_overlay() {}
+    virtual void ui_overlay_new_frame() {}
+    // Called at the end of the main render graph, before the swapchain image goes to Present
+    virtual void render_ui_overlay(RBCommandList cmd, RBFrameHandle frame) {}
+
     // --- GPU timestamp queries (used by the gpu_profile pass profiler) -------
     virtual double get_timestamp_period_ns() const = 0;
     virtual RBQueryPool create_timestamp_pool(uint32_t query_count) = 0;

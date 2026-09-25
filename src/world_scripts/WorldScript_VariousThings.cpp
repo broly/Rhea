@@ -1,3 +1,7 @@
+module;
+
+#include <imgui.h>
+
 module WorldScript_RotateAroundObject;
 
 import std.compat;
@@ -38,7 +42,6 @@ bool WorldScript_VariousThings::frame_character(Transform& t, bool face)
 void WorldScript_VariousThings::tick_debug_views()
 {
     auto input = RhGlobals::engine->input;
-    auto& renderer = RhGlobals::engine->renderer;
     
     const Key keys[4] = { Key::F1, Key::F2, Key::F3, Key::F4 };
     bool pressed[4] = {};
@@ -49,7 +52,7 @@ void WorldScript_VariousThings::tick_debug_views()
         debug_view_keys_were_down[i] = down;
     }
     
-    const DebugViewMode mode = (DebugViewMode)debug_view_mode;
+    const DebugViewMode mode = cv_debug_view_mode.get();
     DebugViewMode new_mode = mode;
 
     if (pressed[0])
@@ -79,16 +82,14 @@ void WorldScript_VariousThings::tick_debug_views()
     
     if (new_mode != mode)
     {
-        debug_view_mode = (uint32_t)new_mode;
-        renderer->set_int_param(DebugViewParams::view_mode, (int)new_mode);
+        cv_debug_view_mode.set(new_mode);
         std::cout << "View mode: " << get_debug_view_mode_name(new_mode) << std::endl;
     }
     
     if (pressed[3])
     {
-        show_skeleton = !show_skeleton;
-        renderer->set_int_param(DebugViewParams::show_skeleton, show_skeleton ? 1 : 0);
-        std::cout << "Skeleton overlay: " << (show_skeleton ? "on" : "off") << std::endl;
+        cv_debug_show_skeleton.set(!cv_debug_show_skeleton.get());
+        std::cout << "Skeleton overlay: " << (cv_debug_show_skeleton.get() ? "on" : "off") << std::endl;
     }
 }
 
@@ -209,7 +210,8 @@ void WorldScript_VariousThings::tick(double dt)
     // =========================
     glm::vec2 mouse{ input->mouse_x, input->mouse_y };
 
-    bool handled = false;
+    // yaw / pitch edited in the debug UI
+    bool handled = yaw != applied_yaw || pitch != applied_pitch;
     
     auto aabb = world->get_world_aabb();
     auto origin = t.position.glm();
@@ -286,17 +288,8 @@ void WorldScript_VariousThings::tick(double dt)
         light_preset_key_was_down = l_down;
         
         const bool m_down = input->is_key_down(Key::M);
-        if (m_down && !sun_freeze_key_was_down && rail)
-        {
-            sun_frozen = !sun_frozen;
-            if (sun_frozen)
-            {
-                sun_time_dilation = rail->time_dilation;
-                rail->time_dilation = 0.0f;
-            }
-            else
-                rail->time_dilation = sun_time_dilation;
-        }
+        if (m_down && !sun_freeze_key_was_down)
+            set_sun_frozen(!sun_frozen);
         sun_freeze_key_was_down = m_down;
         
         light_rig->tick();
@@ -510,6 +503,91 @@ void WorldScript_VariousThings::tick(double dt)
         camera_actor->set_transform(t);
         // dir_light_actor->set_transform(t);
     }
+    applied_yaw = yaw;
+    applied_pitch = pitch;
     
     
+}
+
+void WorldScript_VariousThings::set_sun_frozen(bool frozen)
+{
+    auto rail = world->find_actor_by_name<Rail>("rail");
+    if (!rail || frozen == sun_frozen)
+        return;
+    
+    sun_frozen = frozen;
+    if (sun_frozen)
+    {
+        sun_time_dilation = rail->time_dilation;
+        rail->time_dilation = 0.0f;
+    }
+    else
+        rail->time_dilation = sun_time_dilation;
+}
+
+void WorldScript_VariousThings::draw_debug_ui()
+{
+    if (camera_actor)
+    {
+        ImGui::SeparatorText("Camera");
+        for (bool face : {false, true})
+        {
+            if (face)
+                ImGui::SameLine();
+            if (ImGui::Button(face ? "Face close-up (V)" : "Frame character (F)"))
+            {
+                Transform t = camera_actor->get_transform();
+                if (frame_character(t, face))
+                {
+                    character_mode = false;
+                    camera_actor->set_transform(t);
+                }
+            }
+        }
+    }
+    
+    if (character)
+    {
+        ImGui::SeparatorText("Character");
+        
+        // -1: locomotion / neutral face
+        auto index_combo = [] (const char* label, int32_t count, int32_t active, const char* none_name,
+                               auto&& get_name, auto&& select)
+        {
+            const std::string preview = active >= 0 ? get_name(active) : none_name;
+            if (ImGui::BeginCombo(label, preview.c_str()))
+            {
+                for (int32_t index = -1; index < count; index++)
+                {
+                    const std::string item = index >= 0 ? get_name(index) : none_name;
+                    if (ImGui::Selectable(item.c_str(), index == active))
+                        select(index);
+                }
+                ImGui::EndCombo();
+            }
+        };
+        
+        index_combo("Pose (T)", character->get_pose_count(), character->get_active_pose(), "Locomotion",
+            [&] (int32_t i) { return character->get_pose_name(i); },
+            [&] (int32_t i) { character->select_pose(i); });
+        index_combo("Expression (N)", character->get_expression_count(), character->get_active_expression(), "Neutral",
+            [&] (int32_t i) { return character->get_expression_name(i); },
+            [&] (int32_t i) { character->select_expression(i); });
+    }
+    
+    if (light_rig)
+    {
+        ImGui::SeparatorText("Lighting");
+        if (ImGui::BeginCombo("Preset (L)", light_rig->get_preset_name()))
+        {
+            for (size_t index = 0; index < light_rig->get_preset_count(); index++)
+                if (ImGui::Selectable(light_rig->get_preset_name(index), index == light_rig->get_preset_index()))
+                    light_rig->set_preset(index);
+            ImGui::EndCombo();
+        }
+        
+        bool frozen = sun_frozen;
+        if (ImGui::Checkbox("Freeze sun (M)", &frozen))
+            set_sun_frozen(frozen);
+    }
 }

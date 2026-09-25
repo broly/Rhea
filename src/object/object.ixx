@@ -57,6 +57,9 @@ public:
     
     virtual void on_serialize(const SerializationContext& context) {}
     
+    // A [[=rh::edit]] field was changed by the debug UI inspector (field name as declared)
+    virtual void on_property_changed(std::string_view property) {}
+    
     Name type_name;
     Name name;
     uint32_t unique_id;

@@ -33,10 +33,13 @@ public:
     bool has_virtual_transform_callback = false;
     bool renderable = false;
     
-    [[=rh::serialize]] Transform transform;
+    [[=rh::serialize, =rh::edit]] Transform transform;
     
     
     virtual void on_transform_changed();
+    
+    // applies an edited transform (submits the scene proxy)
+    void on_property_changed(std::string_view property) override;
     void set_transform(const Transform& in_transform);
     Transform get_transform();
     

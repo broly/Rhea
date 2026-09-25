@@ -35,6 +35,11 @@ public:
     void next_preset();
     void previous_preset();
     const char* get_preset_name() const;
+    
+    size_t get_preset_count() const;
+    size_t get_preset_index() const { return preset_index; }
+    const char* get_preset_name(size_t index) const;
+    void set_preset(size_t index);
     glm::vec3 get_sun_tint() const;
 
     void tick();

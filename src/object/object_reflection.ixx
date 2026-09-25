@@ -20,6 +20,7 @@ import static_name;
 import container_traits;
 import type_utils;
 import string_utils;
+import properties;
 #include "common/assertion_macros.h"
 
 #define DEBUG_SERIALIZATION_PATH 1
@@ -138,6 +139,8 @@ export namespace reflect
     using ObjectFactoryType = std::function<std::shared_ptr<RhObject>(const ObjectInitData& init_data)>;
     using UniqueObjectFactoryType = std::function<std::unique_ptr<RhObject>(const ObjectInitData& init_data)>;
     using JsonSerializer = std::function<bool(const Json::Value&, RhObject* Ptr, const SerializationContext& context)>;
+    // [[=rh::edit]] fields of the object's class (see properties.ixx)
+    using PropertiesGetter = PropertyObject (*)(RhObject* object);
     
     struct ObjectReflectionInfo
     {
@@ -148,6 +151,7 @@ export namespace reflect
         UniqueObjectFactoryType unique_factory;
         std::optional<JsonSerializer> serializer;
         bool is_abstract;
+        PropertiesGetter get_properties = nullptr;
         
         template<typename T>
         std::shared_ptr<T> instantiate() const;
@@ -382,7 +386,8 @@ export namespace reflect
         UniqueObjectFactoryType&& unique_factory, 
         std::set<std::string_view>&& bases,
         std::optional<JsonSerializer> serializer,
-        bool is_abstract);
+        bool is_abstract,
+        PropertiesGetter get_properties);
         
     namespace detail
     {
@@ -449,13 +454,18 @@ export namespace reflect
             }
             unreachable("Could not create object from abstract class");
         };
+        PropertiesGetter get_properties = [] (RhObject* object) -> PropertyObject
+        {
+            return make_property_object(*static_cast<T*>(object));
+        };
         register_object_class_impl(
             name,
             std::move(factory),
             std::move(unique_factory),
             detail::get_object_classes<T>(),
             std::move(serializer),
-            std::is_abstract_v<T>);
+            std::is_abstract_v<T>,
+            get_properties);
         return true;
     }
 

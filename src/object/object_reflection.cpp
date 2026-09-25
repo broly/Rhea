@@ -17,7 +17,8 @@ void reflect::register_object_class_impl(
     UniqueObjectFactoryType&& unique_factory, 
     std::set<std::string_view>&& bases,
     std::optional<JsonSerializer> serializer,
-    bool is_abstract)
+    bool is_abstract,
+    PropertiesGetter get_properties)
 {
     auto data = 
         ObjectReflectionInfo{
@@ -26,7 +27,8 @@ void reflect::register_object_class_impl(
             std::move(factory),
             std::move(unique_factory),
             std::move(serializer),
-            is_abstract
+            is_abstract,
+            get_properties
         };
     
     Name in_name = name;

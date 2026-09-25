@@ -19,6 +19,7 @@ import texture_format;
 import paths;
 import :cubemap_capture_render_graph;
 import :brdf_lut_capture_render_graph;
+import :debug_view;
 
 import log;
 #include "render_layout.h"
@@ -50,6 +51,18 @@ void GameRenderer::init(RBWindowHandle in_window)
     
     
     Renderer::init(in_window);
+    
+    // debug view cvars -> renderer int params (read by the render graph every frame)
+    set_int_param(DebugViewParams::view_mode, (int)cv_debug_view_mode.get());
+    set_int_param(DebugViewParams::show_skeleton, cv_debug_show_skeleton.get() ? 1 : 0);
+    cv_debug_view_mode.on_changed([this] (DebugViewMode mode)
+    {
+        set_int_param(DebugViewParams::view_mode, (int)mode);
+    });
+    cv_debug_show_skeleton.on_changed([this] (bool show)
+    {
+        set_int_param(DebugViewParams::show_skeleton, show ? 1 : 0);
+    });
     
     // auto aux_graph1 = reflect::get_object_type_name<CubemapCaptureRenderGraph>();
     // create_render_graph(aux_graph1, {{"capture_ibl", true}}, "ibl");

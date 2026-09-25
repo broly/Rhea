@@ -45,6 +45,7 @@ public:
     AABB get_aabb() const override;
     
     virtual void update_scene_proxy();
+    void on_property_changed(std::string_view property) override;
     
     SceneViewProxy_Mesh scene_proxy;
     

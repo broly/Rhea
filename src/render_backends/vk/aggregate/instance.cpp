@@ -202,6 +202,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     VkPhysicalDeviceVulkan13Features features13{};
     features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     features13.shaderDemoteToHelperInvocation = VK_TRUE;
+    features13.dynamicRendering = VK_TRUE;               // debug UI overlay (ImGui), see vk_ui_overlay.cpp
     features13.pNext = &features12;
 
     // Cooperative-matrix (KHR) feature for the GEMM denoiser path. Placed at the

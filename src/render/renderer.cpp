@@ -61,6 +61,7 @@ void Renderer::execute()
         params.num_runs = main_render_graph_num_runs;
         params.output_frame_id = frame_id;
         params.int_params = runtime_int_params;
+        params.draw_ui_overlay = i + 1 == main_render_graph_num_runs;
         execute_graph(main_render_graph, params);
     }
     

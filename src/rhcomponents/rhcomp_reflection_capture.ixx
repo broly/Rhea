@@ -35,7 +35,7 @@ public:
     void start() override;
     void finish() override;
     
-    [[=rh::serialize]] bool active;
+    [[=rh::serialize, =rh::edit]] bool active;
     
     CubemapHandle irradiance;
     CubemapHandle prefiltered_env;

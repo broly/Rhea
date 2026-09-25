@@ -125,6 +125,11 @@ public:   /// API Section
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
 
+    virtual void init_ui_overlay() override;
+    virtual void shutdown_ui_overlay() override;
+    virtual void ui_overlay_new_frame() override;
+    virtual void render_ui_overlay(RBCommandList cmd, RBFrameHandle frame) override;
+
     virtual double get_timestamp_period_ns() const override;
     virtual RBQueryPool create_timestamp_pool(uint32_t query_count) override;
     virtual void destroy_timestamp_pool(RBQueryPool pool) override;
@@ -212,7 +217,10 @@ public:   /// cache and state section:
     
     std::unordered_map<RenderPassDesc, VkRenderPass, RenderPassDescHash> render_pass_cache;
     VkRenderPass current_render_pass = VK_NULL_HANDLE;
-    
+
+    bool ui_overlay_initialized = false;
+    VkFormat ui_overlay_format = VK_FORMAT_UNDEFINED;
+
     
 private:
     struct PendingReadbackEntry

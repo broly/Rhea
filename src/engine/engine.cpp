@@ -13,6 +13,8 @@ import vk;
 import WorldScript_RotateAroundObject;
 import profile;
 import gpu_profile;
+import ui;
+import cvar;
 
 
 void Engine::engine_init()
@@ -24,6 +26,9 @@ void Engine::engine_init()
 
 void Engine::run()
 {    
+    // saved settings (cache/cvars.json), before anything reads them
+    cvar::load();
+    
     window_create(window, 1280, 720, "Rhea");
     
     window_handle = {window.handle};
@@ -44,6 +49,10 @@ void Engine::run()
     // Toggle at runtime with P (start) / O (dump+stop) — see the loop below.
     gpuprof::init(renderer->get_backend().get());
     
+    // debug UI: ` shows / hides it
+    ui::init(window.handle);
+    renderer->get_backend()->init_ui_overlay();
+    
     std::shared_ptr<EngineClock> clock = std::make_shared<EngineClock>();
     
     clock->start();
@@ -62,12 +71,22 @@ void Engine::run()
     while (!window_should_close(window)) {
         prof::frame_start();
         
+        platform::window::window_poll_events();
+        
+        renderer->get_backend()->ui_overlay_new_frame();
+        ui::begin_frame();
+        // the game does not see the mouse / keyboard while the UI uses them
+        input->set_ui_capture(ui::wants_mouse(), ui::wants_keyboard());
+        
         clock->tick();
         
         world->tick();
-        scene_view->perform_extraction();
         
-        platform::window::window_poll_events();
+        if (ui::is_visible())
+            debug_ui.draw(*this);
+        ui::end_frame();
+        
+        scene_view->perform_extraction();
 
         // GPU profiler runtime control (edge-detected):
         //   P -> start timing (clears previous results)
@@ -92,6 +111,10 @@ void Engine::run()
         renderer->execute();
         prof::frame_end();
     }
+    renderer->get_backend()->shutdown_ui_overlay();
+    ui::shutdown();
+    cvar::save();
+    
     gpuprof::shutdown();
     window_destroy(window);
 }

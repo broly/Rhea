@@ -322,6 +322,7 @@ public:
     void set_flag(Name name, bool value, bool needs_rebuild = false, bool one_time = false);
     void toggle_flag(Name name, bool needs_rebuild = false);
     bool get_render_flag(Name name) const;
+    const std::map<Name, bool>& get_render_flags() const { return render_flags; }
     
 
     uint8_t num_frames_in_flight;

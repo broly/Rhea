@@ -1,6 +1,8 @@
 export module game:debug_view;
 
 import std.compat;
+import reflect;
+import cvar;
 
 
 
@@ -23,7 +25,7 @@ export enum class DebugViewMode : uint32_t
     MOTION_VECTORS,
     EMISSIVE,
 
-    COUNT
+    COUNT [[=rh::transient]]
 };
 
 export constexpr DebugViewMode first_gbuffer_view_mode = DebugViewMode::BASE_COLOR;
@@ -64,3 +66,10 @@ export namespace DebugViewParams
     inline constexpr const char* view_mode = "view_mode";
     inline constexpr const char* show_skeleton = "show_skeleton";
 }
+
+// Debug view settings, pushed to the renderer int params by GameRenderer
+// (hotkeys: F1-F4, see WorldScript_VariousThings::tick_debug_views)
+export cvar::Var<DebugViewMode> cv_debug_view_mode(
+    "render.debug.view_mode", DebugViewMode::LIT, "What the tonemap pass outputs (F1 / F2 / F3)", {}, cvar::none);
+export cvar::Var<bool> cv_debug_show_skeleton(
+    "render.debug.show_skeleton", false, "Skeletons of skinned meshes over the image (F4)", {}, cvar::none);

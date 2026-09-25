@@ -13,6 +13,8 @@ export struct RenderGraphParameters
     std::map<Name, int> int_params;
     std::map<Name, bool> bool_params;
     std::map<Name, glm::vec3> vec3_params;
+    // draw the debug UI over the swapchain image at the end of the graph
+    bool draw_ui_overlay = false;
     
     int get_int(Name param, int default_value = 0) const
     {
