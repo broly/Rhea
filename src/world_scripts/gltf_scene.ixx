@@ -25,15 +25,14 @@ class RhComp_GltfScene : public RhComponent
 {
 public:
     void on_serialize(const SerializationContext& context) override;
-    std::string asset_path;
-    std::string textures_dir;
+    [[=rh::serialize]] std::string asset_path;
+    [[=rh::serialize]] std::string textures_dir;
     
-    std::shared_ptr<Material> material;
+    [[=rh::serialize]] std::shared_ptr<Material> material;
     
-    std::map<Name, std::string> test;
+    [[=rh::serialize]] std::map<Name, std::string> test;
     
     
     
 };
-REFLECT_OBJECT_FIELDS(RhComp_GltfScene, RhComponent,
-    asset_path, textures_dir, material, test);
+RH_OBJECT(RhComp_GltfScene)

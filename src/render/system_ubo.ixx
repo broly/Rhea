@@ -16,8 +16,7 @@ export struct MaterialUBO
     float roughness_factor;
     float metallic_factor;
 };
-REFLECT_STRUCT_RUNTIME(MaterialUBO,
-    base_color_factor, emissive_factor, occlusion_factor, roughness_factor, metallic_factor);
+RH_REGISTER_TYPE(MaterialUBO)
 
 export struct PointLight
 {
@@ -36,15 +35,13 @@ export struct alignas(16) LightUBO
 {
     PointLight lights[8];
     int light_count;
-    glm::vec3 _pad0;
+    [[=rh::padding]] glm::vec3 _pad0;
     
     DirectionalLight dir_light;
     int has_dir_light;
-    glm::vec3 _pad1;
+    [[=rh::padding]] glm::vec3 _pad1;
 };
-REFLECT_STRUCT_RUNTIME(LightUBO,
-    lights, light_count, dir_light, has_dir_light);
-
+RH_REGISTER_TYPE(LightUBO)
 
 
 export struct CloudsUBO
@@ -76,5 +73,4 @@ export struct CloudsUBO
     glm::vec4 sky_ambient;
     glm::vec4 horizon_color;
 };
-REFLECT_STRUCT_RUNTIME(CloudsUBO,
-    planet_center, cloud_base, sun_direction, sun_color, cloud_color, scattering, wind, sky_ambient, horizon_color);
+RH_REGISTER_TYPE(CloudsUBO)

@@ -27,13 +27,6 @@ export struct NNTensorDesc
     std::vector<uint32_t> activation_slots; 
 };
 
-REFLECT_STRUCT(NNTensorDesc,
-    name,
-    channels,
-    scale,
-    slices,
-    activation_slots);
-
 
 export struct NNPassIndicesData 
 {
@@ -48,16 +41,6 @@ export struct NNPassIndicesData
     int32_t uBaselineFlatCh = -1;
 };
 
-REFLECT_STRUCT(NNPassIndicesData,
-    uActIn,
-    uActOut,
-    uActRes,
-    uPwIdx,
-    uDwIdx,
-    uBiasIdx,
-    uAlbedoFlatCh,
-    uBaselineFlatCh);
-
 
 export struct NNWeightRef
 {
@@ -66,11 +49,6 @@ export struct NNWeightRef
     NNWeightKind kind; 
 };
 
-REFLECT_STRUCT(NNWeightRef,
-    weight_name,
-    slot,
-    kind);
-
 
 export struct NNPermutationOptions
 {
@@ -78,17 +56,12 @@ export struct NNPermutationOptions
     std::map<Name, uint32_t> variants;    // IN_CH -> 32, OUT_CH -> 64, ...
 };
 
-REFLECT_STRUCT(NNPermutationOptions,
-    enums,
-    variants);
-
 
 export enum class NNPassKind
 {
     input, enc, dec, bottleneck, down, up, cat, head
 };
-REFLECT_ENUM(NNPassKind,
-    input, enc, dec, bottleneck, down, up, cat, head);
+
 
 export struct NNPassDesc
 {
@@ -110,17 +83,6 @@ export struct NNPassDesc
     }
 };
 
-REFLECT_STRUCT(NNPassDesc, 
-    name,
-    kind,
-    pipeline_pass,
-    output_tensor,
-    workgroup_size,
-    pass_indices,
-    permutation_options,
-    weight_refs,
-    disabled);
-
 
 // defines arrays sizes (NN_NUM_ACTIVATION_SLOTS, ...).
 export struct NNArraySizes 
@@ -131,18 +93,11 @@ export struct NNArraySizes
     uint32_t biases = 0;
 };
 
-REFLECT_STRUCT(NNArraySizes,
-    activations,
-    pw_weights,
-    dw_weights,
-    biases);
 
 export enum class NNAOVKind
 {
     noisy, normal, depth, albedo_roughness, mvec, custom
 };
-REFLECT_ENUM(NNAOVKind,
-    noisy, normal, depth, albedo_roughness, mvec, custom);
 
 
 export enum class NNGLFormat
@@ -152,34 +107,23 @@ export enum class NNGLFormat
 
 export struct NNIOSpec : RhObject
 {
-    Name name;
-    uint32_t channels = 0;
-    NNAOVKind aov_kind; 
-    NNGLFormat gl_format;
+    [[=rh::serialize]] Name name;
+    [[=rh::serialize]] uint32_t channels = 0;
+    [[=rh::serialize]] NNAOVKind aov_kind; 
+    [[=rh::serialize]] NNGLFormat gl_format;
 };
 
-REFLECT_STRUCT(NNIOSpec, 
-    name,
-    channels,
-    aov_kind,
-    gl_format);
 
 // root nn pipeline json object
 export class NNPipeline : public RhObject
 {
 public:
-    NNGLFormat                 image_format = NNGLFormat::rgba16f;
-    NNDType                    weight_dtype;
-    NNArraySizes               array_sizes;
-    std::vector<NNIOSpec>      io_spec;
-    std::vector<NNTensorDesc>  tensors;
-    std::vector<NNPassDesc>    passes;
+    [[=rh::serialize]] NNGLFormat                 image_format = NNGLFormat::rgba16f;
+    [[=rh::serialize]] NNDType                    weight_dtype;
+    [[=rh::serialize]] NNArraySizes               array_sizes;
+    [[=rh::serialize]] std::vector<NNIOSpec>      io_spec;
+    [[=rh::serialize]] std::vector<NNTensorDesc>  tensors;
+    [[=rh::serialize]] std::vector<NNPassDesc>    passes;
 };
 
-REFLECT_OBJECT_FIELDS(NNPipeline, RhObject,
-    image_format,
-    weight_dtype,
-    array_sizes,
-    io_spec,
-    tensors,
-    passes);
+RH_OBJECT(NNPipeline)

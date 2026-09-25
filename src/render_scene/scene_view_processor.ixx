@@ -144,4 +144,4 @@ private:
         return factories;
     }
 };
-REFLECT_OBJECT(SceneViewProcessor, RhObject);
+RH_OBJECT(SceneViewProcessor)

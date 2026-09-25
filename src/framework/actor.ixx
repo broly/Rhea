@@ -95,4 +95,4 @@ public:
 };
 
 
-REFLECT_OBJECT(RhActor, RhObject);
+RH_OBJECT(RhActor)

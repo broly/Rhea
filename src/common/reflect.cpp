@@ -45,6 +45,19 @@ bool reflect::register_basic_type(TypeId id, size_t size, type_initializer initi
     return true;
 }
 
+template<typename T>
+static bool register_basic_type()
+{
+    return reflect::register_basic_type(get_type_id<T>(), sizeof(T), [] (void* ptr) { new (ptr) T(); });
+}
+
+[[maybe_unused]] static const bool basic_types_registered = 
+    register_basic_type<uint32_t>() &&
+    register_basic_type<uint64_t>() &&
+    register_basic_type<std::string>() &&
+    register_basic_type<float>() &&
+    register_basic_type<double>();
+
 const reflect::RuntimeReflectionInfo* reflect::find_runtime_info(TypeId type_id)
 {
     auto& registry = get_types_registry();

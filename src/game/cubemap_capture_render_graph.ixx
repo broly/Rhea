@@ -25,8 +25,7 @@ struct LevelAndMip
     uint32_t level;
     float roghness;
 };
-REFLECT_STRUCT_RUNTIME(LevelAndMip,
-    level, roghness);
+RH_REGISTER_TYPE(LevelAndMip)
 
 class CubemapCaptureRenderGraph : public GenericRenderGraph
 {
@@ -58,4 +57,4 @@ public:
     std::shared_ptr<PipelineFamily> brdf_lut_pipeline_family;
 
 };
-REFLECT_OBJECT(CubemapCaptureRenderGraph, GenericRenderGraph)
+RH_OBJECT(CubemapCaptureRenderGraph)

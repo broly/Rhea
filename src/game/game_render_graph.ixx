@@ -26,8 +26,7 @@ struct TonemapPushConstants
     uint32_t fps;
     uint32_t view_mode;   // DebugViewMode
 };
-REFLECT_STRUCT_RUNTIME(TonemapPushConstants, 
-    time, mode, fps, view_mode);
+RH_REGISTER_TYPE(TonemapPushConstants)
 
 
 class GameRenderGraph : public GenericRenderGraph
@@ -51,4 +50,4 @@ public:
     //bool capture_ibl;
     
 };
-REFLECT_OBJECT(GameRenderGraph, GenericRenderGraph);
+RH_OBJECT(GameRenderGraph)

@@ -58,18 +58,7 @@ enum class COLOR_OUTPUT_HDR : uint8_t
     RESERVED_2 = 10,
     
 };
-REFLECT_ENUM(COLOR_OUTPUT_HDR,
-    BASE,
-    RTXGI,
-    SSR,
-    INTERMEDIATE,
-    RESERVED_0,
-    RTXGI_REPROJECTED,
-    RTXGI_ACCUM,
-    RTXGI_MOMENTS,
-    RTXGI_FILTERED,
-    RTXGI_NEURAL_DENOISED,
-    RESERVED_2);
+
 
 enum class GBUFFER_SLOTS : uint8_t
 {
@@ -83,16 +72,6 @@ enum class GBUFFER_SLOTS : uint8_t
     GEOMETRY_NORMAL = 7,
     EMISSIVE = 8,
 };
-REFLECT_ENUM(GBUFFER_SLOTS,
-    NORMAL,
-    WORLD_NORMAL,
-    DEPTH,
-    LINEAR_DEPTH,
-    ALBEDO_ROUGHNESS,
-    POSITION,
-    MOTION_VECTORS,
-    GEOMETRY_NORMAL,
-    EMISSIVE)
 
 
 struct HDROutputTextureArray : std::vector<RGTextureHandle>
@@ -130,8 +109,7 @@ struct ColorOutputConstants
 {
     uint32_t buffer_index;
 };
-REFLECT_STRUCT_RUNTIME(ColorOutputConstants,
-    buffer_index);
+RH_REGISTER_TYPE(ColorOutputConstants)
 
 class GenericRenderGraph : public RenderGraph
 {
@@ -282,7 +260,7 @@ public:
 
     uint32_t debug_line_capacity = 19440*32;
     
-    bool readback_nn = false;
+    [[=rh::serialize]] bool readback_nn = false;
     
     // read from the renderer int params every frame (see DebugViewParams)
     DebugViewMode view_mode = DebugViewMode::LIT;
@@ -291,5 +269,4 @@ public:
     NNDenoiserState nn_denoiser_state;
     
 };
-REFLECT_OBJECT_FIELDS(GenericRenderGraph, RenderGraph,
-    readback_nn)
+RH_OBJECT(GenericRenderGraph)

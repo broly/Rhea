@@ -82,4 +82,4 @@ private:
     std::unordered_map<uint64_t, PipelineObject*> pipelines;
     
 };
-REFLECT_OBJECT(PipelineFamily, RhObject)
+RH_OBJECT(PipelineFamily)

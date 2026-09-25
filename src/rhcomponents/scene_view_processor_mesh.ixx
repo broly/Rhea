@@ -149,4 +149,4 @@ public:
     std::vector<uint32_t> moved_this_frame;
     std::vector<uint32_t> moved_last_frame;
 };
-REFLECT_OBJECT(SceneViewProcessor_Mesh, SceneViewProcessor);
+RH_OBJECT(SceneViewProcessor_Mesh)

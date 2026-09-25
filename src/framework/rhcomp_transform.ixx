@@ -33,7 +33,7 @@ public:
     bool has_virtual_transform_callback = false;
     bool renderable = false;
     
-    Transform transform;
+    [[=rh::serialize]] Transform transform;
     
     
     virtual void on_transform_changed();
@@ -53,5 +53,4 @@ public:
     RhCompRenderInfo render_info;
 };
 
-REFLECT_OBJECT_FIELDS(RhComp_Transform, RhComponent, 
-    transform);
+RH_OBJECT(RhComp_Transform)

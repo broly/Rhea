@@ -28,7 +28,6 @@ export struct SceneViewProxy_Camera : public SceneViewProxy_Transform
 };
 
 
-
 export class RhComp_Camera : public RhComp_Renderable
 {
 public:
@@ -37,15 +36,14 @@ public:
     void start() override;
     void finish() override;
     
-    float fov;
-    float near_plane;
-    float far_plane;
-    bool active;
+    [[=rh::serialize]] float fov;
+    [[=rh::serialize]] float near_plane;
+    [[=rh::serialize]] float far_plane;
+    [[=rh::serialize]] bool active;
     
     void update_scene_proxy();
     
     SceneViewProxy_Camera scene_proxy;
 };
 
-REFLECT_OBJECT_FIELDS(RhComp_Camera, RhComp_Renderable, 
-    transform, fov, near_plane, far_plane, active);
+RH_OBJECT(RhComp_Camera)

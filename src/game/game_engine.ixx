@@ -20,4 +20,4 @@ class GameEngine : public Engine
 public:
     void engine_init() override;
 };
-REFLECT_OBJECT(GameEngine, Engine);
+RH_OBJECT(GameEngine)

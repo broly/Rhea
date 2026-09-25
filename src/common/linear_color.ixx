@@ -6,7 +6,6 @@ import reflect;
 import type_id;
 
 import glm;
-#include "reflect_macros.h"
 
 export struct LinearColor
 {
@@ -27,5 +26,3 @@ export struct LinearColor
     {
     }
 };
-REFLECT_STRUCT(LinearColor, 
-    r, g, b, a);

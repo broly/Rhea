@@ -26,13 +26,13 @@ export enum class NNWeightKind
 {
     pointwise, depthwise, bias
 };
-REFLECT_ENUM(NNWeightKind, pointwise, depthwise, bias);
+
 
 export enum class NNGLTarget
 {
     TEXTURE_2D, TEXTURE_2D_ARRAY
 };
-REFLECT_ENUM(NNGLTarget, TEXTURE_2D, TEXTURE_2D_ARRAY);
+
 
 export struct NNWeightDesc
 {
@@ -45,21 +45,18 @@ export struct NNWeightDesc
     uint64_t    file_bytes = 0;
 };
 
-REFLECT_STRUCT(NNWeightDesc,
-    kind, gl_target, width, height, depth, file, file_bytes);
-
 
 export enum class NNDType
 {
     fp16, fp32
 };
-REFLECT_ENUM(NNDType, fp16, fp32);
+
 
 export class NNWeightsIndex : public RhObject
 {
 public:
-    NNDType dtype {};
-    std::map<std::string, NNWeightDesc> weights; 
+    [[=rh::serialize]] NNDType dtype {};
+    [[=rh::serialize]] std::map<std::string, NNWeightDesc> weights; 
 
     // -------------------------------------------------------------------------
     // GPU loading
@@ -186,6 +183,4 @@ public:
     }
 };
 
-REFLECT_OBJECT_FIELDS(NNWeightsIndex, RhObject,
-    dtype,
-    weights);
+RH_OBJECT(NNWeightsIndex)

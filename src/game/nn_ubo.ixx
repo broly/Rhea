@@ -16,13 +16,13 @@ import glm;
 #include "object/object_reflection_macro.h"
 
 struct NNPassIndicesSSBO {
-    glm::ivec2 _pad0;
-    glm::ivec2 _pad1;
+    [[=rh::padding]] glm::ivec2 _pad0;
+    [[=rh::padding]] glm::ivec2 _pad1;
     glm::ivec4 uActIn [16];
     glm::ivec4 uActOut[16];
     glm::ivec4 uActRes[16];
     int32_t uPwIdx, uDwIdx, uBiasIdx;
-    int32_t _pad2;
+    [[=rh::padding]] int32_t _pad2;
     
     // Head-only: flat-channel indices into input_packed for the AOVs
     // the head pass needs to reconstruct (baseline and albedo). Encoded
@@ -35,12 +35,11 @@ struct NNPassIndicesSSBO {
     // -1 in non-head passes (and ignored by their shaders).
     int  uBaselineFlatCh;
     int  uAlbedoFlatCh;
-    int  _pad3;
-    int  _pad4;
+    [[=rh::padding]] int  _pad3;
+    [[=rh::padding]] int  _pad4;
 };
 
-REFLECT_STRUCT_RUNTIME(NNPassIndicesSSBO,
-    uActIn, uActOut, uActRes, uPwIdx, uDwIdx, uBiasIdx);
+RH_REGISTER_TYPE(NNPassIndicesSSBO)
 
 struct NNPassPC
 {
@@ -49,4 +48,4 @@ struct NNPassPC
     int32_t nn_layout_dw_base;
     int32_t nn_layout_bias_base;
 };
-REFLECT_STRUCT_RUNTIME(NNPassPC, out_size, pass_idx);
+RH_REGISTER_TYPE(NNPassPC)

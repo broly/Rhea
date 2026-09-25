@@ -43,4 +43,4 @@ public:
     std::vector<RenderObject_ReflectionCapture> cubemaps;
     std::vector<RenderId> vacated_cubemap_ids;
 };
-REFLECT_OBJECT(SceneViewProcessor_ReflectionCapture, SceneViewProcessor);
+RH_OBJECT(SceneViewProcessor_ReflectionCapture)

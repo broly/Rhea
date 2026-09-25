@@ -48,12 +48,11 @@ public:
     
     SceneViewProxy_Mesh scene_proxy;
     
-    MeshHandle mesh;
+    [[=rh::serialize]] MeshHandle mesh;
 
-    std::vector<std::shared_ptr<Material>> mats;
+    [[=rh::serialize]] std::vector<std::shared_ptr<Material>> mats;
 };
 
-REFLECT_OBJECT_FIELDS(RhComp_StaticMesh, RhComp_Renderable, 
-    transform, mesh, mats);
+RH_OBJECT(RhComp_StaticMesh)
 
 

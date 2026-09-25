@@ -62,4 +62,4 @@ public:
     
     RenderId active_camera_id {0};
 };
-REFLECT_OBJECT(SceneViewProcessor_Camera, SceneViewProcessor);
+RH_OBJECT(SceneViewProcessor_Camera)

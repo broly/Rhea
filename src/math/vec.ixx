@@ -42,8 +42,6 @@ export struct vec2
         return glm_type(x, y);
     }
 };
-REFLECT_STRUCT(vec2,
-    x, y);
 
 
 export struct vec3
@@ -78,8 +76,7 @@ export struct vec3
         return glm_type(x, y, z);
     }
 };
-REFLECT_STRUCT(vec3,
-    x, y, z);
+
 
 export struct vec4
 {
@@ -115,8 +112,7 @@ export struct vec4
         return glm_type(x, y, z, w);
     }
 };
-REFLECT_STRUCT(vec4,
-    x, y, z, w);
+
 
 export struct quat
 {
@@ -151,8 +147,7 @@ export struct quat
         return glm_type(w, x, y, z);
     }
 };
-REFLECT_STRUCT(quat,
-    x, y, z, w);
+
 
 export void serialize_json_value(quat& target, const Json::Value& value, const SerializationContext& context)
 {
@@ -210,8 +205,4 @@ export struct mat4
         std::memcpy(this, glm::value_ptr(mat), sizeof(mat4));
     }
 };
-REFLECT_STRUCT_RUNTIME(mat4,
-    m00, m01, m02, m03,
-    m10, m11, m12, m13,
-    m20, m21, m22, m23,
-    m30, m31, m32, m33);
+RH_REGISTER_TYPE(mat4)

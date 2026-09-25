@@ -27,7 +27,6 @@ export struct SceneViewProxy_ReflectionCapture : public SceneViewProxy_Transform
 };
 
 
-
 export class RhComp_ReflectionCapture : public RhComp_Renderable
 {
 public:
@@ -36,7 +35,7 @@ public:
     void start() override;
     void finish() override;
     
-    bool active;
+    [[=rh::serialize]] bool active;
     
     CubemapHandle irradiance;
     CubemapHandle prefiltered_env;
@@ -46,5 +45,4 @@ public:
     SceneViewProxy_ReflectionCapture scene_proxy;
 };
 
-REFLECT_OBJECT_FIELDS(RhComp_ReflectionCapture, RhComp_Renderable, 
-    transform, active);
+RH_OBJECT(RhComp_ReflectionCapture)

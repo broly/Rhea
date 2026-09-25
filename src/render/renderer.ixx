@@ -13,7 +13,6 @@ import :pipeline_family;
 import :common;
 import :rg_params;
 
-#include "common/reflect_macros.h"
 
 export class MaterialInstance;
 export class RenderGraph;

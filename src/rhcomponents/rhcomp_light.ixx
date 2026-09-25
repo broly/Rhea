@@ -25,8 +25,7 @@ export enum class LightType
     point,
     directional
 };
-REFLECT_ENUM(LightType, 
-    point, directional);
+
 
 export struct SceneViewProxy_Light : public SceneViewProxy_Transform
 {
@@ -48,13 +47,12 @@ public:
     
     void on_serialize(const SerializationContext& context) override;
     
-    vec4 color;
-    float intensity;
-    float falloff;
-    LightType type = LightType::point;
+    [[=rh::serialize]] vec4 color;
+    [[=rh::serialize]] float intensity;
+    [[=rh::serialize]] float falloff;
+    [[=rh::serialize]] LightType type = LightType::point;
     
     SceneViewProxy_Light scene_proxy;
 };
 
-REFLECT_OBJECT_FIELDS(RhComp_Light, RhComp_Renderable, 
-    transform, color, intensity, falloff, type);
+RH_OBJECT(RhComp_Light)

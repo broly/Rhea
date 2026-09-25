@@ -14,7 +14,7 @@ import rhmath;
 #define PAD_COMBINE(a,b) PAD_COMBINE_INNER(a,b)
 
 
-#define PAD_INNER(v) float PAD_COMBINE(__pad,__LINE__)[v] = {}
+#define PAD_INNER(v) [[=rh::padding]] float PAD_COMBINE(__pad,__LINE__)[v] = {}
 
 #define PAD(v) PAD_INNER(v)
 
@@ -36,8 +36,7 @@ export struct CameraUBO
     float near;
     float far;
 };
-REFLECT_STRUCT_RUNTIME(CameraUBO,
-    proj, view, prev_proj, prev_view, inv_view, inv_proj, inv_viewproj, camera_pos, near, far);
+RH_REGISTER_TYPE(CameraUBO)
 
 
 export struct ModelPushConstants
@@ -47,11 +46,7 @@ export struct ModelPushConstants
     uint32_t material_id;
     uint32_t debug_id;
 };
-REFLECT_STRUCT_RUNTIME(ModelPushConstants,
-    mesh_id, 
-    primitive_id, 
-    material_id,
-    debug_id);
+RH_REGISTER_TYPE(ModelPushConstants)
 
 
 export struct PushRTXGIValidate
@@ -60,27 +55,22 @@ export struct PushRTXGIValidate
     float position_threshold;
     float normal_threshold;
 };
-REFLECT_STRUCT_RUNTIME(PushRTXGIValidate,
-    resolution, 
-    position_threshold, 
-    normal_threshold);
+RH_REGISTER_TYPE(PushRTXGIValidate)
 
 
 export struct TemporalAccumPC
 {
     bool reset;
-    uint8_t pad[3] = {0,0,0};
+    [[=rh::padding]] uint8_t pad[3] = {0,0,0};
 };
-REFLECT_STRUCT_RUNTIME(TemporalAccumPC,
-    reset);
+RH_REGISTER_TYPE(TemporalAccumPC)
 
 
 export struct PushRTXGISpatial
 {
     glm::vec2 resolution;
 };
-REFLECT_STRUCT_RUNTIME(PushRTXGISpatial,
-    resolution);
+RH_REGISTER_TYPE(PushRTXGISpatial)
 
 
 export struct RTXGIPushConstants
@@ -89,5 +79,4 @@ export struct RTXGIPushConstants
     float intensity;
     uint32_t spp;
 };
-REFLECT_STRUCT_RUNTIME(RTXGIPushConstants,
-    frame, intensity);
+RH_REGISTER_TYPE(RTXGIPushConstants)

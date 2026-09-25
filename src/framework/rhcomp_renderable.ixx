@@ -31,5 +31,5 @@ public:
     
 };
 
-REFLECT_OBJECT(RhComp_Renderable, RhComp_Transform);
+RH_OBJECT(RhComp_Renderable)
 

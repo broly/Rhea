@@ -61,10 +61,8 @@ export struct SkinningPushConstants
     uint64_t morph_deltas;
     uint64_t morph_weights;
     uint32_t morph_count;
-    uint32_t _pad;
+    [[=rh::padding]] uint32_t _pad;
 };
-REFLECT_STRUCT_RUNTIME(SkinningPushConstants,
-    src_vertices, skin, bones, dst_vertices, vertex_count, bone_count,
-    morph_offsets, morph_deltas, morph_weights, morph_count, _pad);
+RH_REGISTER_TYPE(SkinningPushConstants)
 
 export constexpr uint32_t SKINNING_GROUP_SIZE = 64;

@@ -18,7 +18,8 @@ export struct ObjectInitData
 
 export struct SerializationContext;
 
-export class RhObject : public std::enable_shared_from_this<RhObject>
+// Only [[=rh::serialize]] fields of RhObject descendants are reflected (see reflect::fields_of)
+export class [[=rh::explicit_fields]] RhObject : public std::enable_shared_from_this<RhObject>
 {
 public:
     

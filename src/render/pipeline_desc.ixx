@@ -10,7 +10,6 @@ import :rg_types;
 
 import name;
 #include "common/assertion_macros.h"
-#include "common/reflect_macros.h"
 #include "common/type_macros.h"
 
 export class RenderResource;

@@ -9,8 +9,6 @@ import :math;
 
 import glm;
 import :vec;
-#include "common/reflect_macros.h"
-
 
 
 export struct Transform {
@@ -133,9 +131,6 @@ export struct Transform {
         return Transform::make_from_euler(location, rotation, scale);
     }
 };
-
-REFLECT_STRUCT(Transform, 
-    position, rotation, scale);
 
 
 inline bool convert_from_string(Transform& target, const std::string& value)

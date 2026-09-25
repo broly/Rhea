@@ -21,7 +21,6 @@ import container_traits;
 import type_utils;
 import string_utils;
 #include "common/assertion_macros.h"
-#include "common/reflect_macros.h"
 
 #define DEBUG_SERIALIZATION_PATH 1
 
@@ -134,24 +133,6 @@ export inline void serialize_json_value(bool& target, const Json::Value& value, 
 }
 
 
-export namespace reflect_inner
-{
-    template<typename T>
-    struct RhObjectTraits;
-    
-    
-    template<typename Class, typename Base>
-    constexpr std::set<std::string_view> get_bases_impl(std::string_view ClassName)
-    {
-        std::set<std::string_view> current_bases;
-        if constexpr (!std::is_same_v<Class, RhObject> && !std::is_same_v<Base, void>) { 
-            current_bases.merge(RhObjectTraits<Base>::get_bases()); 
-        }
-        current_bases.emplace(ClassName); 
-        return current_bases; 
-    }
-}
-
 export namespace reflect
 {
     using ObjectFactoryType = std::function<std::shared_ptr<RhObject>(const ObjectInitData& init_data)>;
@@ -179,9 +160,9 @@ export namespace reflect
         std::unique_ptr<RhObject> default_object = nullptr;
     };
     template<typename T>
-    std::string_view get_object_type_name()
+    constexpr std::string_view get_object_type_name()
     {
-        return reflect_inner::RhObjectTraits<T>::type_name;
+        return type_name_of<T>();
     }
     
     extern const ObjectReflectionInfo* find_object_reflection_info(Name name);
@@ -197,33 +178,24 @@ export namespace reflect::json
     template<typename T>
     void do_serialize_json_value(T& target, const Json::Value& value, const SerializationContext& context)
     {
-
         if constexpr (requires { serialize_json_value(target, value, context); })
         {
-            // visit_serialize(value, target, is_loading);
-            // if constexpr (!requires { serialize_json_value(target, value); })
-            // {
-            //     ReflectionInfo<T>::reflected;
-            // }
-            // static_assert(requires { serialize_json_value(target, value); });
             serialize_json_value(target, value, context);
-            return;
         }
-        
-        if constexpr (std::is_enum_v<T> && reflect::is_reflected_v<T>)
+        else if constexpr (std::is_enum_v<T>)
         {
             std::string value_str = value.asString();
             checkf(reflect::is_valid_enum_name<T>(value_str), "Wrong member name '%s' for enum '%s'. Path: %s",
                             value_str.c_str(), reflect::get_name<T>().to_string().c_str(),
                             context.get_debug_path().c_str());
-            
-            target = reflect::ReflectionInfo<T>::enum_name_to_value(value.asString());
+
+            target = reflect::name_to_enum<T>(value_str);
         } else if constexpr (is_shared_ptr_v<T>)
         {
             auto type_id = reflect::get_object_type_name<typename T::element_type>();
             auto info = reflect::find_object_reflection_info(type_id);
             target = info->template instantiate<typename T::element_type>();
-            
+
             do_serialize_json_value(*target, value, context);
         } else if constexpr (is_variant_v<T>)
         {
@@ -234,9 +206,9 @@ export namespace reflect::json
                             context.get_debug_path().c_str());
             checkf(type_name_ptr->isString(), "__type__ must be string. Path: %s",
                             context.get_debug_path().c_str());
-            
+
             const Name type_name = type_name_ptr->asString();
-            
+
             visit_variadic_types(target, [&] <typename U> () {
                 if (type_name == reflect::get_name<U>())
                 {
@@ -245,12 +217,6 @@ export namespace reflect::json
                     do_serialize_json_value(variant_target_value, value, context);
                 }
             });
-        }
-        else if constexpr (reflect::is_reflected_v<T>)
-        {
-            assert(value.isObject());
-            auto names = value.getMemberNames();
-            visit_serialize(value, target, context);
         } else if constexpr (is_vector_v<std::decay_t<T>>)
         {
             checkf(value.isArray(), "Provided JSON value is not an array (meant as array). Path: %s",
@@ -259,7 +225,6 @@ export namespace reflect::json
             for (uint32_t index = 0; auto& json_item : value)
             {
                 typename T::value_type array_item;
-                // serialize_json_value(array_item, json_item);
                 target.push_back(array_item);
                 DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", index));
                 do_serialize_json_value(target.back(), json_item, context);
@@ -272,17 +237,9 @@ export namespace reflect::json
             target.clear();
             for (uint32_t index = 0; auto& json_item : value)
             {
-                using value_type = typename T::value_type;
-                value_type set_item;
-                if constexpr (std::is_enum_v<value_type> && is_reflected_v<value_type>)
-                {
-                    // todo: crutch
-                    set_item = reflect::ReflectionInfo<value_type>::enum_name_to_value(json_item.asString());
-                } else
-                {
-                    DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", index));
-                    serialize_json_value(set_item, json_item, context);
-                }
+                typename T::value_type set_item;
+                DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", index));
+                do_serialize_json_value(set_item, json_item, context);
                 target.emplace(set_item);
                 index++;
             }
@@ -294,12 +251,12 @@ export namespace reflect::json
             for (auto& json_item : value)
             {
                 using value_type = typename T::enum_type;
+                static_assert(std::is_enum_v<value_type>);
                 value_type enum_value;
-                static_assert(std::is_enum_v<value_type> && is_reflected_v<value_type>);
-                enum_value = reflect::ReflectionInfo<value_type>::enum_name_to_value(json_item.asString());
+                do_serialize_json_value(enum_value, json_item, context);
                 target |= enum_value;
             }
-        }else if constexpr (is_optional_v<std::decay_t<T>>)
+        } else if constexpr (is_optional_v<std::decay_t<T>>)
         {
             if (value.isNull())
             {
@@ -316,24 +273,24 @@ export namespace reflect::json
             checkf(value.isObject(), "Provided JSON value is not an object (meant as map). Path: %s",
                             context.get_debug_path().c_str());
             auto member_names = value.getMemberNames();
-            
+
             using KEY = T::key_type;
-            
+
             static_assert(
-                std::is_same_v<KEY, std::string> || 
+                std::is_same_v<KEY, std::string> ||
                 std::is_same_v<KEY, Name> ||
-                (std::is_enum_v<KEY> && reflect::is_reflected_v<KEY>));
-            
+                std::is_enum_v<KEY>);
+
             for (auto& member_name : member_names)
             {
                 typename T::mapped_type map_value;
-                
+
                 auto from_string = [&context] (const std::string& name) -> KEY
                 {
                     if constexpr (std::is_enum_v<KEY>)
                     {
                         checkf(reflect::is_valid_enum_name<KEY>(name), "Wrong member name '%s' for enum '%s'. Path: %s",
-                            name.c_str(), reflect::get_name<KEY>().to_string().c_str(), 
+                            name.c_str(), reflect::get_name<KEY>().to_string().c_str(),
                             context.get_debug_path().c_str());
                         return reflect::name_to_enum<KEY>(name);
                     }
@@ -342,45 +299,49 @@ export namespace reflect::json
                         return std::string(name);
                     }
                 };
-            
+
                 KEY key = from_string(member_name);
-            
+
                 auto [it, inserted] = target.try_emplace(key, map_value);
-            
+
                 auto& json_value = value[member_name];
-            
-                DEBUG_SERIALIZATION_SCOPE(context, format("[%i]", member_name.c_str()));
+
+                DEBUG_SERIALIZATION_SCOPE(context, format("[%s]", member_name.c_str()));
                 do_serialize_json_value(it->second, json_value, context);
             }
-        } 
+        } else if constexpr (std::is_class_v<T>)
+        {
+            checkf(value.isObject(), "Provided JSON value is not an object (meant as '%s'). Path: %s",
+                            reflect::get_name<T>().to_string().c_str(), context.get_debug_path().c_str());
+            visit_serialize(value, target, context);
+        } else
+        {
+            static_assert(false, "No JSON serialization for this type: add serialize_json_value() overload");
+        }
     }
 
+    // Serializes reflected fields of T (see reflect::fields_of): for RhObject descendants these are
+    // [[=rh::serialize]] fields, for other classes all public fields except [[=rh::transient]] ones.
     template<typename T>
     void visit_serialize(const Json::Value& json_object, T& struct_ref, const SerializationContext& context)
     {
-        reflect::visit<T>([&] <auto PtrToField, FixedString Name> ()
-        {
-            const std::string name = std::string(Name); // todo: inefficient
-            Json::Value const* json_value = json_object.find(std::string(name));
-            
-            if (is_optional_v<std::decay_t<decltype(struct_ref.*PtrToField)>> && !json_value)
-                return;
-            
-            if (context.strict_checking_enabled)
+        reflect::for_each_field<T>([&] <typename Field> () {
+            constexpr std::string_view name = Field::name;
+            Json::Value const* json_value = json_object.find(name.data(), name.data() + name.size());
+
+            if (!json_value && context.strict_checking_enabled && !is_optional_v<std::remove_cv_t<typename Field::type>>)
             {
                 checkf(context.current_file.has_value(), "Strict checking mode not supported for non-file serialization");
-                checkf(json_value, "During parsing '%s', required field '%s' is missing. Path: %s", 
-                    context.current_file->c_str(), 
-                    name.c_str(),
+                checkf(false, "During parsing '%s', required field '%s' is missing. Path: %s",
+                    context.current_file->c_str(),
+                    std::string(name).c_str(),
                     context.get_debug_path().c_str());
             }
-            if (!json_value)
-                return;
-            auto& field_ref = struct_ref.*PtrToField;
-            
-            DEBUG_SERIALIZATION_SCOPE(context, name);
-            do_serialize_json_value(field_ref, *json_value, context);
-            
+            if (json_value)
+            {
+                DEBUG_SERIALIZATION_SCOPE(context, std::string(name));
+                do_serialize_json_value(struct_ref.[:Field::info:], *json_value, context);
+            }
         });
     }
 }
@@ -423,9 +384,51 @@ export namespace reflect
         std::optional<JsonSerializer> serializer,
         bool is_abstract);
         
-    template <typename T>
-    inline bool register_object_class(std::string_view name, const std::optional<JsonSerializer>& Serializer)
+    namespace detail
     {
+        // T and all its RhObject ancestors
+        consteval void collect_object_classes(std::meta::info type, std::vector<std::meta::info>& classes)
+        {
+            classes.push_back(type);
+            for (std::meta::info base : std::meta::bases_of(type, std::meta::access_context::unchecked()))
+            {
+                std::meta::info base_type = std::meta::type_of(base);
+                if (base_type == ^^RhObject || std::meta::is_base_of_type(^^RhObject, base_type))
+                    collect_object_classes(base_type, classes);
+            }
+        }
+
+        template<typename T>
+        std::set<std::string_view> get_object_classes()
+        {
+            constexpr auto class_names = [] consteval {
+                std::vector<std::meta::info> classes;
+                collect_object_classes(^^T, classes);
+                std::vector<const char*> names;
+                for (std::meta::info cls : classes)
+                    names.push_back(std::define_static_string(std::meta::identifier_of(cls)));
+                return std::define_static_array(names);
+            }();
+            return std::set<std::string_view>(class_names.begin(), class_names.end());
+        }
+    }
+
+    // Use RH_OBJECT(T) (object/object_reflection_macro.h) instead of calling it directly
+    template <typename T>
+    bool register_object_class()
+    {
+        static_assert(std::is_base_of_v<RhObject, T>, "Can't register non-RhObject types");
+
+        constexpr std::string_view name = get_object_type_name<T>();
+
+        JsonSerializer serializer = [] (const Json::Value& json_object, RhObject* object_ptr, const SerializationContext& context) -> bool
+        {
+            T* object = static_cast<T*>(object_ptr);
+            json::visit_serialize(json_object, *object, context);
+            object->on_serialize(context);
+            return true;
+        };
+
         ObjectFactoryType factory = [name](const ObjectInitData& init_data) -> std::shared_ptr<T>
         {
             if constexpr (!std::is_abstract_v<T>)
@@ -446,23 +449,16 @@ export namespace reflect
             }
             unreachable("Could not create object from abstract class");
         };
-        std::set<std::string_view> class_bases = reflect_inner::RhObjectTraits<T>::get_bases();
         register_object_class_impl(
-            name, 
-            std::move(factory), 
-            std::move(unique_factory), 
-            std::move(class_bases), 
-            Serializer, 
+            name,
+            std::move(factory),
+            std::move(unique_factory),
+            detail::get_object_classes<T>(),
+            std::move(serializer),
             std::is_abstract_v<T>);
         return true;
     }
-    
-    template<typename T>
-    const std::set<Name>& get_object_bases()
-    {
-        return reflect_inner::RhObjectTraits<T>::bases;
-    }
-    
+
     
     template <typename T>
     std::shared_ptr<T> ObjectReflectionInfo::instantiate() const

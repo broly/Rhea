@@ -13,7 +13,6 @@ import glm;
 import rhmath;
 import :nn_ubo;
 #include "common/assertion_macros.h"
-#include "common/reflect_macros.h"
 
 
 

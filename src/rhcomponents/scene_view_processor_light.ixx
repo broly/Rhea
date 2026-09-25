@@ -95,4 +95,4 @@ public:
         return std::nullopt;
     }
 };
-REFLECT_OBJECT(SceneViewProcessor_Light, SceneViewProcessor);
+RH_OBJECT(SceneViewProcessor_Light)

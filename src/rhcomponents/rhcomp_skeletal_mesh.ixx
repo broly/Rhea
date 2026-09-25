@@ -40,7 +40,7 @@ public:
     void set_morph_weights(const std::vector<float>& in_weights);
     const std::vector<float>& get_morph_weights() const { return pose->morph_weights; }
 
-    SkeletalMeshHandle skeletal_mesh;
+    [[=rh::serialize]] SkeletalMeshHandle skeletal_mesh;
 
 private:
     void rebuild_skinning_matrices();
@@ -49,5 +49,4 @@ private:
     std::shared_ptr<SkinningPose> pose;
 };
 
-REFLECT_OBJECT_FIELDS(RhComp_SkeletalMesh, RhComp_StaticMesh,
-    skeletal_mesh);
+RH_OBJECT(RhComp_SkeletalMesh)

@@ -46,10 +46,7 @@ export struct GPUMaterial
     glm::vec4 params15 = glm::vec4{0.f};
 };
 static_assert(sizeof(GPUMaterial) == 288);
-REFLECT_STRUCT_RUNTIME(GPUMaterial,
-    params0, params1, textures0, textures1,
-    params2, params3, params4, params5, params6, params7, params8, params9,
-    params10, params11, params12, params13, params14, params15);
+RH_REGISTER_TYPE(GPUMaterial)
 
 export class MaterialManager : public RhObject
 {
@@ -78,7 +75,6 @@ public:
     
 public: // to serialize
     
-    Name material_resource_name;
+    [[=rh::serialize]] Name material_resource_name;
 };
-REFLECT_OBJECT_FIELDS(MaterialManager, RhObject,
-    material_resource_name);
+RH_OBJECT(MaterialManager)

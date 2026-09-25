@@ -26,7 +26,6 @@ import :rg_params;
 constexpr uint8_t MAX_ALLOWED_FRAMES_IN_FLIGHT = 5;
 
 
-
 export struct RenderGraphPass
 {
     Name name;
@@ -47,7 +46,6 @@ export struct RenderGraphPass
     
     RenderPassType type = RenderPassType::graphics;
 };
-
 
 
 struct RGTexture
@@ -349,4 +347,4 @@ public:
     // Call after each execute
     void flush_pending_exr_saves();
 };
-REFLECT_OBJECT(RenderGraph, RhObject);
+RH_OBJECT(RenderGraph)

@@ -51,12 +51,7 @@ export enum class ShaderStage : uint16_t
     all = all_graphics | all_compute | all_rtx,
     
 };
-REFLECT_ENUM(ShaderStage,
-    none, 
-    vertex, fragment, geometry,
-    tesselation_control, tesselation_evaluation,
-    compute,
-    rtx_raygen, rtx_any_hit, rtx_closest_hit, rtx_miss, rtx_intersection, rtx_callable);
+
 ENUM_MASK_OPS(ShaderStage, export);
 
 export bool is_graphics_stage(ShaderStage stage)
@@ -89,8 +84,7 @@ export enum class CullMode
 {
     none, front, back, both
 };
-REFLECT_ENUM(CullMode,
-    none, front, back, both);
+
 
 struct DepthBiasInfo
 {
@@ -99,8 +93,7 @@ struct DepthBiasInfo
     float clamp = 0.0;
     float slope_factor = 0.0;
 };
-REFLECT_STRUCT(DepthBiasInfo,
-    enable, constant_factor, clamp, slope_factor);
+
 
 export enum class CompareOp 
 {
@@ -113,16 +106,13 @@ export enum class CompareOp
     greater_or_equal = 6,
     always = 7,
 };
-REFLECT_ENUM(CompareOp,
-    never, less, equal, less_or_equal, greater, not_equal, greater_or_equal, always);
 
 
 export enum class FrontFace
 {
     CW, CCW,
 };
-REFLECT_ENUM(FrontFace,
-    CW, CCW);
+
 
 struct VertexAttributeInfo
 {
@@ -144,8 +134,7 @@ export struct PermutationVariant
     std::vector<int32_t> values;
     std::optional<uint32_t> default_index = std::nullopt;
 };
-REFLECT_STRUCT(PermutationVariant,
-    values, default_index);
+
 
 export struct MatModel_Permutations
 {
@@ -153,8 +142,6 @@ export struct MatModel_Permutations
     std::optional<std::map<Name, std::map<Name, Name>>> enums;
     std::optional<std::map<Name, PermutationVariant>> variants;
 };
-REFLECT_STRUCT(MatModel_Permutations,
-    flags, enums, variants);
 
 
 export struct MatModel_PushConstant
@@ -163,9 +150,6 @@ export struct MatModel_PushConstant
     Name type;
     Mask<ShaderStage> stages;
 };
-REFLECT_STRUCT(MatModel_PushConstant,
-    name, type, stages);
-
 
 
 export struct MatModel_LayoutAttributeInfo
@@ -174,16 +158,14 @@ export struct MatModel_LayoutAttributeInfo
     Name definition;
     Name variable;
 };
-REFLECT_STRUCT(MatModel_LayoutAttributeInfo,
-    name, definition, variable);
+
 
 export struct MatModel_AttributesLayout
 {
     Name vertex_type;
     std::vector<MatModel_LayoutAttributeInfo> attributes;
 };
-REFLECT_STRUCT(MatModel_AttributesLayout,
-    vertex_type, attributes);
+
 
 export enum class ShaderLanguage
 {
@@ -191,8 +173,7 @@ export enum class ShaderLanguage
     hlsl,
     slang,
 };
-REFLECT_ENUM(ShaderLanguage,
-    glsl, hlsl, slang);
+
 
 export enum RBBufferTopology
 {
@@ -208,9 +189,6 @@ export enum RBBufferTopology
     triangle_strip_with_adjacency,
     patch_list,
 };
-REFLECT_ENUM(RBBufferTopology, 
-    point_list, line_list, line_strip, triangle_list, triangle_strip, triangle_fan, line_list_with_adjacency, 
-    line_strip_with_adjacency, triangle_list_with_adjacency, triangle_strip_with_adjacency, patch_list)
 
 
 export enum class MaterialParamType
@@ -242,9 +220,6 @@ export enum class MaterialParamType
     vec3,
     vec4,
 };
-REFLECT_ENUM(MaterialParamType,
-    definition, uniform, sampler, image, storage_image, ssbo, tlas, Float, vec2, vec4, vec4);
-
 
 
 export struct MatModel_Parameter
@@ -276,7 +251,7 @@ export struct MatModel_Parameter
     
     std::optional<Name> array_size_definition;
     
-    std::optional<size_t> ubo_size; // not serializable
+    [[=rh::transient]] std::optional<size_t> ubo_size;
     
     bool is_descriptor() const
     {
@@ -286,8 +261,6 @@ export struct MatModel_Parameter
     
     void validate();
 };
-REFLECT_STRUCT(MatModel_Parameter,
-    type, variable, ubo, binding, storage, sampler, definition, initial_buffer_size, initial_array_size, array_size_definition);
 
 
 export struct MatModel_PassStage
@@ -301,8 +274,6 @@ export struct MatModel_PassStage
         return lang.value_or(ShaderLanguage::glsl);
     }
 };
-REFLECT_STRUCT(MatModel_PassStage,
-    shader, resources, lang);
 
 
 export enum class ResourceUsageType
@@ -310,8 +281,7 @@ export enum class ResourceUsageType
     frame,      // per-frame (camera, per-frame UBOs)
     persistent  // materials, textures etc.
 };
-REFLECT_ENUM(ResourceUsageType,
-    frame, persistent);
+
 
 export struct ResourceUsage
 {
@@ -343,10 +313,8 @@ export struct MatModel_Resource
     Name set;
     Mask<ShaderStage> allowed_stages;
     
-    uint32_t set_index; // not serialized
+    [[=rh::transient]] uint32_t set_index;
 };
-REFLECT_STRUCT(MatModel_Resource,
-    name, usage, parameters, set, allowed_stages);
 
 
 export struct PipelineInfoShaderStageInfo
@@ -367,9 +335,6 @@ export struct PipelineInfo
     virtual ~PipelineInfo() {}
     virtual std::vector<PipelineInfoShaderStageInfo> get_stages() const pure;
 };
-REFLECT_STRUCT(PipelineInfo,
-    pass, push_constants);
-
 
 
 /************************************************************************
@@ -381,16 +346,13 @@ export enum class MatModel_WriteMaskEnum
 {
     R, G, B, A
 };
-REFLECT_ENUM(MatModel_WriteMaskEnum,
-    R, G, B, A);
+
 
 export struct MatModel_ColorAttachmentInfo
 {
     std::set<MatModel_WriteMaskEnum> write_mask;
     bool translucent;
 };
-REFLECT_STRUCT(MatModel_ColorAttachmentInfo,
-    write_mask, translucent);
 
 
 export struct PipelineInfo_Graphics : public PipelineInfo
@@ -423,9 +385,6 @@ export struct PipelineInfo_Graphics : public PipelineInfo
         return result;
     }
 };
-REFLECT_STRUCT_DERIVED(PipelineInfo_Graphics, PipelineInfo,
-    requirements, depth_test, depth_write, stages, color_attachments, topology, cull_mode, front_face, compare_op, depth_bias, vertex_layouts);
-
 
 
 /************************************************************************
@@ -450,8 +409,6 @@ export struct PipelineInfo_Compute : public PipelineInfo
         return result;
     }
 };
-REFLECT_STRUCT_DERIVED(PipelineInfo_Compute, PipelineInfo, 
-    shader_stage);
 
 
 /************************************************************************
@@ -472,8 +429,6 @@ export struct RTShaderInfo
         return lang.value_or(ShaderLanguage::glsl);
     }
 };
-REFLECT_STRUCT(RTShaderInfo,
-    name, stage, shader, resources);
 
 
 export enum class RayTracingGroupType
@@ -482,8 +437,6 @@ export enum class RayTracingGroupType
     triangles_hit,
     procedural_hit
 };
-REFLECT_ENUM(RayTracingGroupType,
-    general, triangles_hit, procedural_hit);
 
 
 export struct RayTracingShaderGroup
@@ -497,21 +450,14 @@ export struct RayTracingShaderGroup
     std::optional<Name> any_hit;
     std::optional<Name> intersection;
 };
-REFLECT_STRUCT(RayTracingShaderGroup,
-    name,
-    type,
-    general,
-    closest_hit,
-    any_hit,
-    intersection);
+
 
 export struct RayTracingSBTLayoutEntry
 {
     Name group;
     Name define;
 };
-REFLECT_STRUCT(RayTracingSBTLayoutEntry,
-    group, define);
+
 
 export struct RayTracingSBTLayout
 {
@@ -520,8 +466,7 @@ export struct RayTracingSBTLayout
     std::vector<RayTracingSBTLayoutEntry> hit;
     std::vector<RayTracingSBTLayoutEntry> callable;
 };
-REFLECT_STRUCT(RayTracingSBTLayout,
-    raygen, miss, hit, callable);
+
 
 export struct PipelineInfo_RayTracing : public PipelineInfo
 {
@@ -546,12 +491,7 @@ export struct PipelineInfo_RayTracing : public PipelineInfo
         return result;
     }
 };
-REFLECT_STRUCT_DERIVED(PipelineInfo_RayTracing, PipelineInfo,
-    max_recursion_depth,
-    shaders,
-    shader_groups,
-    sbt
-);
+
 
 /***********************************************************************/
 
@@ -564,8 +504,7 @@ export enum class MatParamType
     vec4,
     texture,
 };
-REFLECT_ENUM(MatParamType,
-    definition, Float, vec2, vec3, vec4, texture);
+
 
 export size_t get_mat_param_size(MatParamType type)
 {
@@ -609,30 +548,33 @@ export struct MaterialParamInfo
         return offset.value();
     }
 };
-REFLECT_STRUCT(MaterialParamInfo,
-    type, member, offset, definition);
+
 
 export struct MaterialInfo
 {
     Name structure;
     std::map<Name, MaterialParamInfo> params;
 };
-REFLECT_STRUCT(MaterialInfo,
-    structure, params);
+
 
 export using MatModel_PipelineVariant = std::variant<PipelineInfo_Graphics, PipelineInfo_Compute, PipelineInfo_RayTracing>;
 
 export class MaterialModel : public RhObject
 {
 public:
+    [[=rh::serialize]] 
     Name model_name;
     
     // Masked materials of this model are rendered in the base pass (alpha test in shader).
     // Legacy models leave it unset: their masked materials are not drawn.
+    [[=rh::serialize]] 
     std::optional<bool> supports_masked;
+    [[=rh::serialize]] 
     MatModel_Permutations permutations;
+    [[=rh::serialize]] 
     std::vector<MatModel_PipelineVariant> pipelines;
     
+    [[=rh::serialize]] 
     std::optional<MaterialInfo> material_info;
     
     Name set;
@@ -641,10 +583,7 @@ public:
     
     void on_serialize(const SerializationContext& context) override;
 };
-REFLECT_OBJECT_FIELDS(MaterialModel, RhObject,
-                      model_name, permutations, pipelines, material_info, supports_masked);
-
-
+RH_OBJECT(MaterialModel)
 
 
 export class RenderResourceInfo : public RhObject
@@ -657,8 +596,7 @@ public:
         resource.set_index = set_index;
     }
     
-    MatModel_Resource resource;
+    [[=rh::serialize]] MatModel_Resource resource;
     
 };
-REFLECT_OBJECT_FIELDS(RenderResourceInfo, RhObject,
-    resource);
+RH_OBJECT(RenderResourceInfo)

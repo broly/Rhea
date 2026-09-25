@@ -21,7 +21,6 @@ import input;
 #include "object/object_reflection_macro.h"
 
 
-
 export class Engine : public RhObject
 {
 public:
@@ -38,4 +37,4 @@ public:
     std::shared_ptr<SceneView> scene_view = nullptr;
     std::shared_ptr<Renderer> renderer = nullptr;
 };
-REFLECT_OBJECT(Engine, RhObject);
+RH_OBJECT(Engine)

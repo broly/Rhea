@@ -30,4 +30,4 @@ public:
     void set_owner(std::shared_ptr<RhActor> actor);
 };
 
-REFLECT_OBJECT(RhComponent, RhObject)
+RH_OBJECT(RhComponent)

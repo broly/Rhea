@@ -21,10 +21,7 @@ import :material_model;
 import type_utils;
 import enum_helpers;
 #include "common/assertion_macros.h"
-#include "common/reflect_macros.h"
 #include "common/type_macros.h"
-
-
 
 
 export enum class RBImageLayout
@@ -40,18 +37,6 @@ export enum class RBImageLayout
     preinitialized,
     transfer_present,
 };
-REFLECT_ENUM(RBImageLayout,
-    undefined,
-    general,
-    color_attachment_optimal,
-    depth_stencil_attachment_optimal,
-    depth_stencil_read_only_optimal,
-    shader_read_only_optimal,
-    transfer_src_optimal,
-    transfer_dst_optimal,
-    preinitialized,
-    transfer_present);
-
 
 
 export enum class RBImageUsageType
@@ -73,19 +58,6 @@ export enum class RBImageUsageType
 
     Present
 };
-REFLECT_ENUM(RBImageUsageType,
-    Undefined,
-    ColorAttachment,
-    DepthStencilAttachment,
-    DepthStencilReadOnly,
-    SampledFragment,
-    SampledVertex,
-    Sampled,
-    TransferSrc,
-    TransferDst,
-    StorageImage,
-    Present
-    );
 
 
 export enum class RBLoadOp
@@ -94,8 +66,7 @@ export enum class RBLoadOp
     Clear,
     DontCare
 };
-REFLECT_ENUM(RBLoadOp,
-    Load, Clear, DontCare);
+
     
     
 export enum class RBStoreOp
@@ -103,8 +74,6 @@ export enum class RBStoreOp
     Store,
     DontCare,
 };
-REFLECT_ENUM(RBStoreOp,
-    Store, DontCare);
 
 
 export enum class RenderPassType

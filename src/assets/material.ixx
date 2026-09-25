@@ -28,15 +28,13 @@ export enum class BlendMode
     translucent,
     masked,
 };
-REFLECT_ENUM(BlendMode,
-    opaque, translucent, masked);
 
 
 export class Material : public RhObject
 {
 public:
-    Name model;
-    std::map<Name, MaterialParameterType> parameters;
+    [[=rh::serialize]] Name model;
+    [[=rh::serialize]] std::map<Name, MaterialParameterType> parameters;
     
     void ctor() {}
     
@@ -61,5 +59,4 @@ public:
     std::map<Name, ShaderOptionValue> get_shader_options(Name pass_name) const;
     
 };
-REFLECT_OBJECT_FIELDS(Material, RhObject,
-    model, parameters);
+RH_OBJECT(Material)

@@ -10,6 +10,7 @@ import profile;
 import paths;
 import file_helpers;
 import string_helpers;
+import hash_utils;
 import expr;
 import assets;
 import :renderer;
@@ -616,8 +617,22 @@ std::filesystem::path PipelineFamily::request_permutation(
     if (!std::filesystem::exists(shader_permutations_dir))
         std::filesystem::create_directories(shader_permutations_dir);
     
-    std::string shader_hash = std::to_string(key.key);
-    
+    // Defines are part of the cache key: SET_* values depend on the resources order,
+    // which is not fixed across runs (resources are ordered by Name id)
+    std::vector<std::string> define_strings;
+    for (const auto& [define_name, value] : defines)
+    {
+        const std::string svalue = std::holds_alternative<bool>(value) ?
+            std::to_string(std::get<bool>(value)) : std::to_string(std::get<int>(value));
+        define_strings.push_back(define_name.to_string() + "=" + svalue);
+    }
+    std::ranges::sort(define_strings);
+    size_t defines_hash = 0;
+    for (const auto& define_string : define_strings)
+        hash_combine(defines_hash, std::hash<std::string>{}(define_string));
+
+    std::string shader_hash = std::to_string(key.key) + "_" + std::format("{:016x}", defines_hash);
+
     const std::string hashed_shader_name = pure_shader_name + "_" + shader_hash + "." + shader_extension;
     
     const std::string compiled_permutation_filename = hashed_shader_name + ".spv";
