@@ -66,6 +66,24 @@ SkeletalMeshHandle AssetManager::load_skeletal_mesh(const std::string& rel_path)
     return handle;
 }
 
+AnimationClipHandle AssetManager::load_animation(const std::string& rel_path)
+{
+    if (auto it = animation_by_path.find(rel_path); it != animation_by_path.end())
+        return it->second;
+    LogAssets.Log("Loading animation: %s", rel_path.c_str());
+    
+    std::optional<AnimationClip> clip = AnimationClip::create_from_file(paths::get_assets_path() / rel_path);
+    if (!clip.has_value())
+        return AnimationClipHandle::invalid();
+    
+    AnimationClipHandle handle;
+    handle.id = ++animations_counter;
+    
+    animation_by_path.insert({rel_path, handle});
+    loaded_animations.insert({handle, std::move(*clip)});
+    return handle;
+}
+
 TextureHandle AssetManager::load_texture(const std::string& rel_path)
 {
     if (texture_by_path.contains(rel_path))
@@ -242,6 +260,13 @@ const SkeletalMesh& AssetManager::get_skeletal_mesh(SkeletalMeshHandle id)
 {
     auto it = loaded_skeletal_meshes.find(id);
     checkf(it != loaded_skeletal_meshes.end(), "Skeletal mesh %u is not loaded", id.id);
+    return it->second;
+}
+
+const AnimationClip& AssetManager::get_animation(AnimationClipHandle id)
+{
+    auto it = loaded_animations.find(id);
+    checkf(it != loaded_animations.end(), "Animation %u is not loaded", id.id);
     return it->second;
 }
 

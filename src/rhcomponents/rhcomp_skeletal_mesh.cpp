@@ -25,6 +25,7 @@ void RhComp_SkeletalMesh::on_serialize(const SerializationContext& context)
 
     pose = std::make_shared<SkinningPose>();
     pose->mesh = skeletal_mesh;
+    pose->morph_weights.assign(skeletal.num_morph_targets(), 0.0f);
 
     reset_to_bind_pose();
 }
@@ -40,6 +41,15 @@ void RhComp_SkeletalMesh::set_local_pose(const std::vector<glm::mat4>& in_local_
     checkf(in_local_pose.size() == skeletal_mesh.get().skeleton.num_bones(), "Pose size mismatch");
     local_pose = in_local_pose;
     rebuild_skinning_matrices();
+}
+
+void RhComp_SkeletalMesh::set_morph_weights(const std::vector<float>& in_weights)
+{
+    checkf(in_weights.size() == pose->morph_weights.size(), "Morph weight count mismatch");
+    if (in_weights == pose->morph_weights)
+        return;
+    pose->morph_weights = in_weights;
+    pose->version++;
 }
 
 void RhComp_SkeletalMesh::reset_to_bind_pose()

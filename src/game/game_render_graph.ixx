@@ -15,9 +15,10 @@ struct TonemapPushConstants
     float time;
     uint32_t mode;
     uint32_t fps;
+    uint32_t view_mode;   // DebugViewMode
 };
 REFLECT_STRUCT_RUNTIME(TonemapPushConstants, 
-    time, mode);
+    time, mode, fps, view_mode);
 
 
 class GameRenderGraph : public GenericRenderGraph

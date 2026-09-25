@@ -211,10 +211,10 @@ public:
     
     // Creates a per-instance skinned copy of `source` (output vertices + optional BLAS + mesh table entry).
     // Output vertices are initialized with the bind pose.
-    virtual SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, RTBuildMode rt_build_mode) = 0;
+    virtual SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, const PrimitiveMorphs& morphs, uint32_t morph_count, RTBuildMode rt_build_mode) = 0;
     
     // Writes bone matrices into the `frame` slot, returns device address of the slot
-    virtual RBDeviceAddress upload_bone_matrices(uint32_t instance_id, RBFrameHandle frame, const std::vector<glm::mat4>& matrices) = 0;
+    virtual RBDeviceAddress upload_bone_matrices(uint32_t instance_id, RBFrameHandle frame, const std::vector<glm::mat4>& matrices, const std::vector<float>& morph_weights) = 0;
     
     // Before skinning: previous readers of skinned vertices -> compute write
     virtual void cmd_skinning_begin_barrier(RBCommandList cmd) = 0;

@@ -27,6 +27,11 @@ export struct RenderObject_Mesh
 
     std::vector<RenderPrimitiveId> primitives;
     bool dirty;
+    
+    // world matrix of the previous frame (motion vectors)
+    glm::mat4 prev_world = glm::mat4(1.0f);
+    // moved this frame: prev_world must be synced once the object stops
+    bool moved = false;
 };
 
 export struct RenderPrimitivePassInfo
@@ -47,6 +52,8 @@ export struct RenderPrimitive
     AABB bounds;
     
     uint64_t mesh_index;
+    // material written into the primitive table
+    uint32_t primitive_material_id = 0;
     uint32_t debug_texture_id;
     std::string debug_texture_name;
     
@@ -119,6 +126,8 @@ public:
     
     bool dirty = false;
     
+    void write_primitive_info(RenderResource& primitive_table, const RenderObject_Mesh& ro, const RenderPrimitive& rp);
+    
     bool is_dirty() const { return dirty; }
     
     void set_dirty(bool in_dirty)
@@ -127,5 +136,8 @@ public:
     }
     
     RenderPrimitiveId render_primitive_id_counter = 0;
+    
+    std::vector<uint32_t> moved_this_frame;
+    std::vector<uint32_t> moved_last_frame;
 };
 REFLECT_OBJECT(SceneViewProcessor_Mesh, SceneViewProcessor);

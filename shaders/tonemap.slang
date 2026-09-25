@@ -33,7 +33,104 @@ struct PushConstants
     float time;
     uint32_t output_mode;
     uint32_t fps;
+    uint32_t view_mode;
 };
+
+// view_mode, keep in sync with DebugViewMode (src/game/debug_view.ixx)
+static const uint VIEW_LIT             = 0;
+static const uint VIEW_WIREFRAME       = 1;
+static const uint VIEW_LIT_WIREFRAME   = 2;
+static const uint VIEW_BASE_COLOR      = 3;
+static const uint VIEW_ROUGHNESS       = 4;
+static const uint VIEW_WORLD_NORMAL    = 5;
+static const uint VIEW_VIEW_NORMAL     = 6;
+static const uint VIEW_GEOMETRY_NORMAL = 7;
+static const uint VIEW_LINEAR_DEPTH    = 8;
+static const uint VIEW_WORLD_POSITION  = 9;
+static const uint VIEW_MOTION_VECTORS  = 10;
+static const uint VIEW_EMISSIVE        = 11;
+
+static const float3 DEBUG_VIEW_BACKGROUND = float3(0.03, 0.03, 0.035);
+
+// Debug views output display values directly (no exposure / tonemapping).
+// Returns false for the views that go through the regular tonemapping.
+bool get_debug_view_color(uint view_mode, float2 uv, out float3 color)
+{
+    color = float3(0.0);
+    
+    if (view_mode == VIEW_LIT || view_mode == VIEW_LIT_WIREFRAME)
+        return false;
+    
+    // linear depth is cleared to 0, any surface written by the base pass is in front of the near plane
+    const float linear_depth = GBuffer::get<GBuffer::Slot::LINEAR_DEPTH>(uv).r;
+    if (linear_depth <= 0.0)
+    {
+        color = DEBUG_VIEW_BACKGROUND;
+        return true;
+    }
+    
+    const float4 world_normal = GBuffer::get<GBuffer::Slot::WORLD_NORMAL>(uv);
+    
+    switch (view_mode)
+    {
+        case VIEW_WIREFRAME:
+        {
+            // dim clay shading: keeps shapes readable under the wires
+            const float3 N = normalize(world_normal.xyz * 2.0 - 1.0);
+            const float ndl = dot(N, normalize(float3(0.35, 0.85, 0.4))) * 0.5 + 0.5;
+            color = float3(0.05, 0.055, 0.065) + ndl * float3(0.09, 0.09, 0.1);
+            break;
+        }
+        case VIEW_BASE_COLOR:
+            // stored linear (pow 2.2 in geometry.frag)
+            color = pow(GBuffer::get<GBuffer::Slot::ALBEDO_ROUGHNESS>(uv).rgb, float3(1.0 / 2.2));
+            break;
+        case VIEW_ROUGHNESS:
+            color = GBuffer::get<GBuffer::Slot::ALBEDO_ROUGHNESS>(uv).aaa;
+            break;
+        case VIEW_WORLD_NORMAL:
+            color = world_normal.rgb;
+            break;
+        case VIEW_VIEW_NORMAL:
+            color = GBuffer::get<GBuffer::Slot::NORMAL>(uv).rgb;
+            break;
+        case VIEW_GEOMETRY_NORMAL:
+            color = GBuffer::get<GBuffer::Slot::GEOMETRY_NORMAL>(uv).rgb;
+            break;
+        case VIEW_LINEAR_DEPTH:
+        {
+            // log scale: near is white, ~500 m fades to black
+            const float t = saturate(log2(1.0 + linear_depth) / log2(1.0 + 500.0));
+            color = float3(1.0 - t);
+            break;
+        }
+        case VIEW_WORLD_POSITION:
+        {
+            // 1 m cells + thin grid lines on the cell borders
+            const float3 p = GBuffer::get<GBuffer::Slot::POSITION>(uv).xyz;
+            const float3 cell = frac(p);
+            const float3 border = min(cell, 1.0 - cell);
+            const float grid = step(min(border.x, min(border.y, border.z)), 0.02);
+            color = lerp(cell, float3(1.0), grid * 0.6);
+            break;
+        }
+        case VIEW_MOTION_VECTORS:
+        {
+            // uv delta per frame, gray = static
+            const float2 mv = GBuffer::get<GBuffer::Slot::MOTION_VECTORS>(uv).xy;
+            color = float3(saturate(0.5 + mv * 25.0), 0.5);
+            break;
+        }
+        case VIEW_EMISSIVE:
+            color = GBuffer::get<GBuffer::Slot::EMISSIVE>(uv).rgb;
+            break;
+        default:
+            // unknown mode -> magenta
+            color = float3(1.0, 0.0, 1.0);
+            break;
+    }
+    return true;
+}
 
 [[vk::push_constant]]
 ConstantBuffer<PushConstants> pc;
@@ -45,6 +142,14 @@ PSOutput main(VSOutput input)
     
     float time_clamped = max(pc.time - 20, 0.0) * 2;
     int index = 0;
+    
+    float3 debug_color;
+    if (get_debug_view_color(pc.view_mode, input.uv, debug_color))
+    {
+        PSOutput debug_output;
+        debug_output.color = float4(DrawNumber9999(input.uv, debug_color, pc.fps, float2(0.12), 0.08, float3(1.0, 0.2, 0.1)), 1.0f);
+        return debug_output;
+    }
     
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI>(input.uv).rgb;
     // hdr_color = read_hdr_color_present<COLOR_OUTPUT_HDR::RTXGI_FILTERED>(input.uv).rgb;

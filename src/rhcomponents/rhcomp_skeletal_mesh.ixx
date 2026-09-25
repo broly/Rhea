@@ -27,6 +27,10 @@ public:
 
     void reset_to_bind_pose();
 
+    // Morph target (blend shape) weights, one per morph target of the mesh, applied before skinning.
+    void set_morph_weights(const std::vector<float>& in_weights);
+    const std::vector<float>& get_morph_weights() const { return pose->morph_weights; }
+
     SkeletalMeshHandle skeletal_mesh;
 
 private:

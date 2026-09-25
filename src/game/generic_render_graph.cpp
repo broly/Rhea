@@ -306,6 +306,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     tonemap_pipeline_family = renderer->query_pipeline_family("ToneMapping", tonemap_model);
     
     wireframe_pipeline_family = renderer->query_pipeline_family("Wireframe", wireframe_model);
+    wireframe_mesh_pipeline_family = renderer->query_pipeline_family("WireframeMesh", wireframe_model);
+    skeleton_pipeline_family = renderer->query_pipeline_family("SkeletonOverlay", wireframe_model);
     
     shadow_debug_pipeline_family = renderer->query_pipeline_family("ShadowDebug", shadow_debug_model);
 
@@ -811,6 +813,12 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
    
     rebuild_camera_ubo(ctx);
     
+    const int requested_view_mode = ctx.params.get_int(DebugViewParams::view_mode, 0);
+    view_mode = requested_view_mode >= 0 && requested_view_mode < (int)DebugViewMode::COUNT
+        ? (DebugViewMode)requested_view_mode
+        : DebugViewMode::LIT;
+    show_skeleton = ctx.params.get_int(DebugViewParams::show_skeleton, 0) != 0;
+    
     prepared_batches.clear();
 
     // -------- resources --------
@@ -912,6 +920,8 @@ void GenericRenderGraph::on_pso_built()
     ssr_pipeline = ssr_pipeline_family->request_pipeline({});
     shadow_debug_pipeline = shadow_debug_pipeline_family->request_pipeline({});
     wireframe_pipeline = request_pipeline(wireframe_pipeline_family, {});
+    wireframe_mesh_pipeline = request_pipeline(wireframe_mesh_pipeline_family, {});
+    skeleton_pipeline = request_pipeline(skeleton_pipeline_family, {});
     tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
     lighting_pipeline = request_pipeline(lighting_pipeline_family, {});
     skinning_pipeline = skinning_pipeline_family->request_pipeline({});
@@ -1302,7 +1312,7 @@ void GenericRenderGraph::dispatch_skinning(RenderGraphContext& ctx)
         const SkinnedMeshGPU& gpu = *prim->skinned;
         
         const RBDeviceAddress bones = backend->upload_bone_matrices(
-            gpu.instance_id, ctx.frame, prim->skinning->skinning_matrices);
+            gpu.instance_id, ctx.frame, prim->skinning->skinning_matrices, prim->skinning->morph_weights);
         
         SkinningPushConstants pc{};
         pc.src_vertices = gpu.src_vertex_address;
@@ -1311,6 +1321,11 @@ void GenericRenderGraph::dispatch_skinning(RenderGraphContext& ctx)
         pc.dst_vertices = gpu.dst_vertex_address;
         pc.vertex_count = gpu.vertex_count;
         pc.bone_count = gpu.bone_count;
+        pc.morph_offsets = gpu.morph_offsets_address;
+        pc.morph_deltas = gpu.morph_deltas_address;
+        // weights follow the bone matrices in the same ring slot
+        pc.morph_weights = gpu.morph_count > 0 ? bones.handle + sizeof(glm::mat4) * gpu.bone_count : 0;
+        pc.morph_count = gpu.morph_count;
         ctx.push_constants(pc);
         
         ctx.compute({ (gpu.vertex_count + SKINNING_GROUP_SIZE - 1) / SKINNING_GROUP_SIZE, 1, 1 });
@@ -1559,6 +1574,167 @@ void GenericRenderGraph::draw_wireframe(RenderGraphContext& ctx)
     backend->draw(
         cmd,
         vertex_count);
+}
+
+void GenericRenderGraph::add_debug_overlay_pass()
+{
+    add_pass({
+        .name = "DebugOverlay",
+        .writes = {
+            { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Load },
+            // depth tested wireframe
+            { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::DepthStencilAttachment, RBLoadOp::Load },
+        },
+        .execute = [this](RenderGraphContext& ctx)
+        {
+            draw_debug_overlay(ctx);
+        },
+    });
+}
+
+void GenericRenderGraph::draw_debug_overlay(RenderGraphContext& ctx)
+{
+    PROFILE("GenericRenderGraph::draw_debug_overlay");
+
+    const bool draw_wireframe = is_wireframe_view_mode(view_mode) && wireframe_mesh_pipeline;
+    const bool draw_skeleton = show_skeleton && skeleton_pipeline;
+
+    if (!draw_wireframe && !draw_skeleton)
+        return;
+
+    ctx.backend.update_viewport(
+        ctx.cmd,
+        resolution,
+        use_swapchain_extent);
+
+    if (draw_wireframe)
+        draw_mesh_wireframe(ctx);
+
+    if (draw_skeleton)
+        draw_skeletons(ctx);
+}
+
+void GenericRenderGraph::draw_mesh_wireframe(RenderGraphContext& ctx)
+{
+    auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
+
+    if (ctx.bind_pipeline(wireframe_mesh_pipeline))
+    {
+        ctx.bind(camera_resource, mesh_table_resource, primitive_table_resource);
+    }
+
+    for (const RenderPrimitive& prim : mesh_processor.primitives)
+    {
+        // only primitives drawn by the scene passes (skips released slots)
+        if (!prim.get_pass_info(Names::pass_geometry_base) && !prim.get_pass_info(Names::pass_geometry_translucent))
+            continue;
+
+        ModelPushConstants pc;
+        pc.mesh_id = prim.mesh_index;
+        pc.primitive_id = prim.id;
+        pc.material_id = 0;
+        pc.debug_id = 0;
+        ctx.push_constants(pc);
+
+        // wireframe_mesh.vert: 3 edges (6 line vertices) per triangle
+        ctx.draw((uint32_t)prim.mesh.get().indices.size() * 2);
+    }
+}
+
+void GenericRenderGraph::draw_skeletons(RenderGraphContext& ctx)
+{
+    auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
+
+    const glm::vec4 bone_color_parent = { 1.0f, 0.45f, 0.05f, 1.0f };
+    const glm::vec4 bone_color_child = { 1.0f, 0.95f, 0.55f, 1.0f };
+    const glm::vec4 axis_colors[3] = {
+        { 1.0f, 0.15f, 0.15f, 1.0f },
+        { 0.15f, 1.0f, 0.15f, 1.0f },
+        { 0.25f, 0.45f, 1.0f, 1.0f },
+    };
+
+    std::vector<LineVertex> vertices;
+    auto add_line = [&vertices](const glm::vec3& a, const glm::vec3& b, const glm::vec4& color_a, const glm::vec4& color_b)
+    {
+        vertices.push_back({ a, 0.0f, color_a });
+        vertices.push_back({ b, 0.0f, color_b });
+    };
+
+    // all primitives of a skeletal mesh share one pose
+    std::set<const SkinningPose*> drawn_poses;
+    std::vector<glm::mat4> bone_world;
+
+    for (const RenderPrimitive& prim : mesh_processor.primitives)
+    {
+        if (!prim.skinning || !drawn_poses.insert(prim.skinning.get()).second)
+            continue;
+
+        const SkinningPose& pose = *prim.skinning;
+        if (!pose.mesh.is_valid())
+            continue;
+
+        const Skeleton& skeleton = pose.mesh.get().skeleton;
+        const uint32_t num_bones = skeleton.num_bones();
+        if (num_bones == 0 || pose.skinning_matrices.size() != num_bones)
+            continue;
+
+        // skinning = bone_global * inverse_bind  ->  bone_global = skinning * bind
+        bone_world.resize(num_bones);
+        for (uint32_t bone = 0; bone < num_bones; ++bone)
+            bone_world[bone] = *prim.world * pose.skinning_matrices[bone] * glm::inverse(skeleton.bones[bone].inverse_bind);
+
+        // joint axes scale with the skeleton: a quarter of the average bone length
+        float total_bone_length = 0.0f;
+        uint32_t num_bone_segments = 0;
+        for (uint32_t bone = 0; bone < num_bones; ++bone)
+        {
+            const int32_t parent = skeleton.bones[bone].parent;
+            if (parent < 0)
+                continue;
+            total_bone_length += glm::distance(glm::vec3(bone_world[bone][3]), glm::vec3(bone_world[parent][3]));
+            num_bone_segments++;
+        }
+        const float axis_length = num_bone_segments > 0 ? 0.25f * total_bone_length / (float)num_bone_segments : 0.05f;
+
+        for (uint32_t bone = 0; bone < num_bones; ++bone)
+        {
+            const glm::mat4& m = bone_world[bone];
+            const glm::vec3 position = glm::vec3(m[3]);
+            const int32_t parent = skeleton.bones[bone].parent;
+
+            // bone: parent joint (orange) -> child joint (light yellow)
+            if (parent >= 0)
+                add_line(glm::vec3(bone_world[parent][3]), position, bone_color_parent, bone_color_child);
+
+            // joint orientation: X red, Y green, Z blue; roots get longer axes
+            const float length = parent >= 0 ? axis_length : axis_length * 2.5f;
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                const glm::vec3 dir = glm::vec3(m[axis]);
+                const float dir_length = glm::length(dir);
+                if (dir_length < 1e-6f)
+                    continue;
+                add_line(position, position + dir * (length / dir_length), axis_colors[axis], axis_colors[axis]);
+            }
+        }
+    }
+
+    if (vertices.empty())
+        return;
+
+    // whole lines only
+    const uint32_t vertex_count = std::min<uint32_t>((uint32_t)vertices.size(), debug_line_capacity & ~1u);
+
+    auto* dst = static_cast<LineVertex*>(backend->get_vertex_buffer_ptr(debug_line_buffer, ctx.frame));
+    memcpy(dst, vertices.data(), vertex_count * sizeof(LineVertex));
+
+    if (ctx.bind_pipeline(skeleton_pipeline))
+    {
+        ctx.bind(camera_resource);
+    }
+
+    backend->bind_vertex_buffer(ctx.cmd, debug_line_buffer, ctx.frame);
+    ctx.draw(vertex_count);
 }
 
 void GenericRenderGraph::draw_ssr(RenderGraphContext& ctx)

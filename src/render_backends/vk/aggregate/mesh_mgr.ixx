@@ -25,7 +25,14 @@ namespace vk
         VkBuffer vertex_buffer = VK_NULL_HANDLE;
         VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
         
-        // bone matrices ring: one slot per frame in flight (host visible, persistently mapped)
+        // sparse morph deltas (CSR by vertex), null when the primitive has no morphs
+        VkBuffer morph_offsets_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory morph_offsets_memory = VK_NULL_HANDLE;
+        VkBuffer morph_deltas_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory morph_deltas_memory = VK_NULL_HANDLE;
+
+        // bone matrices ring: one slot per frame in flight (host visible, persistently mapped).
+        // A slot holds the bone matrices followed by the morph target weights.
         VkBuffer bones_buffer = VK_NULL_HANDLE;
         VkDeviceMemory bones_memory = VK_NULL_HANDLE;
         void* bones_mapped = nullptr;
@@ -43,6 +50,7 @@ namespace vk
         uint32_t vertex_count = 0;
         uint32_t index_count = 0;
         uint32_t bone_count = 0;
+        uint32_t morph_count = 0;
         uint32_t mesh_table_index = 0;
         
         SkinnedMeshGPU info;
@@ -73,9 +81,9 @@ namespace vk
         
         void bind(const RBCommandList& cmd, MeshPrimHandle mesh);
         
-        SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, RTBuildMode rt_build_mode);
+        SkinnedMeshGPU create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, const PrimitiveMorphs& morphs, uint32_t morph_count, RTBuildMode rt_build_mode);
         
-        VkDeviceAddress upload_bone_matrices(uint32_t instance_id, uint32_t frame, const std::vector<glm::mat4>& matrices);
+        VkDeviceAddress upload_bone_matrices(uint32_t instance_id, uint32_t frame, const std::vector<glm::mat4>& matrices, const std::vector<float>& morph_weights);
         
         void cmd_refit_skinned_blas(VkCommandBuffer cmd, const std::vector<uint32_t>& instance_ids);
         

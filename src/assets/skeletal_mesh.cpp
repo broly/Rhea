@@ -7,8 +7,10 @@ import <array>;
 import <cmath>;
 import <algorithm>;
 import <functional>;
+import <fstream>;
 import glm;
 import <json/value.h>;
+import <json/reader.h>;
 
 import dependency_collector;
 import fastgltf;
@@ -108,6 +110,26 @@ static glm::mat4 get_node_matrix(const fastgltf::Node& node)
     glm::quat r;
     get_node_trs(node, t, r, s);
     return glm::translate(glm::mat4(1.0f), t) * glm::mat4_cast(r) * glm::scale(glm::mat4(1.0f), s);
+}
+
+
+// fastgltf does not keep mesh extras: morph target names are read from the raw json
+static std::vector<std::string> read_morph_target_names(const std::filesystem::path& path, size_t mesh_index)
+{
+    std::vector<std::string> names;
+
+    std::ifstream file(path);
+    Json::Value root;
+    Json::CharReaderBuilder builder;
+    std::string errors;
+    if (!file || !Json::parseFromStream(builder, file, &root, &errors))
+        return names;
+
+    const Json::Value& target_names = root["meshes"][(Json::ArrayIndex)mesh_index]["extras"]["targetNames"];
+    if (target_names.isArray())
+        for (const Json::Value& n : target_names)
+            names.push_back(n.asString());
+    return names;
 }
 
 
@@ -338,6 +360,89 @@ std::optional<SkeletalMesh> SkeletalMesh::create_from_file(const std::filesystem
     }
 
     // ---------------------------------------------------------------
+    // Morph targets: only non-zero deltas are kept (most targets are empty on most primitives)
+    // ---------------------------------------------------------------
+    size_t num_targets = 0;
+    for (const auto& primitive : gltf_mesh.primitives)
+        num_targets = std::max(num_targets, primitive.targets.size());
+
+    if (num_targets > 0)
+    {
+        result.morph_target_names = read_morph_target_names(path, *skinned_node.meshIndex);
+        if (result.morph_target_names.size() != num_targets)
+        {
+            LogSkeletalMesh.Log("%s: %zu morph target names for %zu targets, using indices",
+                path.filename().string().c_str(), result.morph_target_names.size(), num_targets);
+            result.morph_target_names.clear();
+            for (size_t i = 0; i < num_targets; ++i)
+                result.morph_target_names.push_back("target_" + std::to_string(i));
+        }
+        for (uint32_t i = 0; i < num_targets; ++i)
+            result.morph_target_by_name[result.morph_target_names[i]] = i;
+    }
+
+    result.primitive_morphs.resize(gltf_mesh.primitives.size());
+    size_t total_deltas = 0;
+
+    for (size_t prim_index = 0; prim_index < gltf_mesh.primitives.size(); ++prim_index)
+    {
+        const auto& primitive = gltf_mesh.primitives[prim_index];
+        const size_t vertex_count = render_mesh.mesh_geometry[0].primitives[prim_index].vertices.size();
+
+        std::vector<std::vector<MorphDelta>> per_vertex(vertex_count);
+
+        for (uint32_t target = 0; target < primitive.targets.size(); ++target)
+        {
+            const auto* pos_attr = primitive.findTargetAttribute(target, "POSITION");
+            const auto* nrm_attr = primitive.findTargetAttribute(target, "NORMAL");
+            if (pos_attr == primitive.targets[target].cend())
+                continue;
+
+            std::vector<glm::vec3> positions(vertex_count, glm::vec3(0.0f));
+            std::vector<glm::vec3> normals(vertex_count, glm::vec3(0.0f));
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset,
+                asset.accessors[pos_attr->accessorIndex],
+                [&](const fastgltf::math::fvec3& d, size_t i) { positions[i] = fastgltf_to_glm(d); });
+
+            if (nrm_attr != primitive.targets[target].cend())
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset,
+                    asset.accessors[nrm_attr->accessorIndex],
+                    [&](const fastgltf::math::fvec3& d, size_t i) { normals[i] = fastgltf_to_glm(d); });
+
+            constexpr float epsilon = 1e-6f;
+            for (size_t i = 0; i < vertex_count; ++i)
+            {
+                const glm::vec3 m = glm::max(glm::abs(positions[i]), glm::abs(normals[i]));
+                const float magnitude = std::max(m.x, std::max(m.y, m.z));
+                if (magnitude > epsilon)
+                    per_vertex[i].push_back(MorphDelta{ positions[i], target, normals[i], 0.0f });
+            }
+        }
+
+        PrimitiveMorphs& morphs = result.primitive_morphs[prim_index];
+        size_t count = 0;
+        for (const auto& deltas : per_vertex)
+            count += deltas.size();
+        if (count == 0)
+            continue;
+
+        morphs.offsets.reserve(vertex_count + 1);
+        morphs.deltas.reserve(count);
+        for (const auto& deltas : per_vertex)
+        {
+            morphs.offsets.push_back((uint32_t)morphs.deltas.size());
+            morphs.deltas.insert(morphs.deltas.end(), deltas.begin(), deltas.end());
+        }
+        morphs.offsets.push_back((uint32_t)morphs.deltas.size());
+        total_deltas += count;
+    }
+
+    if (num_targets > 0)
+        LogSkeletalMesh.Log("%s: %zu morph targets, %zu non-zero deltas",
+            path.filename().string().c_str(), num_targets, total_deltas);
+
+    // ---------------------------------------------------------------
     // Validate: bind pose skinning matrices must be ~identity
     // ---------------------------------------------------------------
     {
@@ -358,6 +463,14 @@ std::optional<SkeletalMesh> SkeletalMesh::create_from_file(const std::filesystem
     result.render_mesh = AssetManager::get().store_mesh(std::move(render_mesh));
 
     return result;
+}
+
+std::optional<uint32_t> SkeletalMesh::find_morph_target(const std::string& target_name) const
+{
+    auto it = morph_target_by_name.find(target_name);
+    if (it == morph_target_by_name.end())
+        return std::nullopt;
+    return it->second;
 }
 
 const SkeletalMesh& SkeletalMeshHandle::get() const

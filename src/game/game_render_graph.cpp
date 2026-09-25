@@ -76,13 +76,16 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 // GI debug views (1-3) show ray tracing outputs
                 if constexpr (!render_settings::enable_raytracing)
                     mode = 0;
-                TonemapPushConstants pc {time, mode, avg_fps};
+                TonemapPushConstants pc {time, mode, avg_fps, (uint32_t)view_mode};
                 ctx.push_constants(pc);
                          
                 ctx.backend.draw_fullscreen(ctx.cmd);
                 
             },
     });
+    
+    // wireframe / skeleton on top of the tonemapped image
+    add_debug_overlay_pass();
 }
 
 void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)

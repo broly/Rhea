@@ -31,8 +31,8 @@ namespace vk
                 desc.attachments[i].layer != in_desc.attachments[i].layer ||
                 desc.attachments[i].mip_level != in_desc.attachments[i].mip_level)
                     return false;
-            
-            return false;
+
+            return true;
         }
     };
     

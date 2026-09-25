@@ -5,6 +5,7 @@ import framework;
 import globals;
 import profile;
 import render;
+import <algorithm>;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -153,6 +154,8 @@ void SceneViewProcessor_Mesh::process()
                             rp.mesh,
                             skeletal.primitive_skins[prim_index],
                             skeletal.skeleton.num_bones(),
+                            skeletal.primitive_morphs[prim_index],
+                            skeletal.num_morph_targets(),
                             rt_build_mode);
                         rp.skinning = submitted.skinning;
                         rp.mesh_index = rp.skinned->mesh_index;
@@ -173,18 +176,14 @@ void SceneViewProcessor_Mesh::process()
                     if (auto shadow_it = rp.info_by_pass.find("ShadowMap"); shadow_it != rp.info_by_pass.end())
                         shadow_it->second.material_index = mat_instance_TODO_EXACT_PASS->material_id;
                         
+                    rp.primitive_material_id = mat_instance_TODO_EXACT_PASS->material_id;
+                        
                     rp.debug_texture_name = 
                     rp.id = render_primitive_id_counter++;
                     primitives.push_back(rp);
                     
-                    const GPUPrimitiveInfo primitive_info {
-                        ro.world,
-                        ro.world, // todo: make previous frame support
-                        (uint32_t)rp.mesh_index,
-                        mat_instance_TODO_EXACT_PASS->material_id
-                        
-                    };
-                    primitive_table_resource.update_ssbo_element("u_primitive_table", sizeof(GPUPrimitiveInfo), rp.id, &primitive_info);
+                    ro.prev_world = ro.world;
+                    write_primitive_info(primitive_table_resource, ro, rp);
                     
                         
                     ro.primitives.push_back(primitives.size() - 1);
@@ -195,8 +194,54 @@ void SceneViewProcessor_Mesh::process()
         }
 
         if (transform_changed)
+        {
+            // moving meshes: primitive table holds the transforms used by every pass
+            ro.prev_world = ro.world;
             ro.world = new_world;
+            // proxy bounds are computed once at registration: recompute for the new transform
+            // (otherwise frustum culling tests the spawn position)
+            ro.bounds = submitted.mesh.get().bounds * submitted.transform;
+            ro.moved = true;
+            
+            for (RenderPrimitiveId prim_index : ro.primitives)
+            {
+                RenderPrimitive& rp = primitives[prim_index];
+                rp.bounds = ro.bounds;
+                write_primitive_info(primitive_table_resource, ro, rp);
+            }
+            
+            moved_this_frame.push_back(submitted.render_id.identifier);
+        }
     }
+    
+    // objects which stopped: previous transform catches up so motion vectors become zero
+    for (uint32_t mesh_id : moved_last_frame)
+    {
+        auto& ro = meshes[mesh_id];
+        if (std::find(moved_this_frame.begin(), moved_this_frame.end(), mesh_id) != moved_this_frame.end())
+            continue;
+        ro.prev_world = ro.world;
+        ro.moved = false;
+        for (RenderPrimitiveId prim_index : ro.primitives)
+            write_primitive_info(primitive_table_resource, ro, primitives[prim_index]);
+    }
+    moved_last_frame = std::move(moved_this_frame);
+    moved_this_frame.clear();
+    
+    // TLAS instance transforms follow moved meshes
+    if (!moved_last_frame.empty() && render_settings::enable_raytracing)
+        dirty = true;
+}
+
+void SceneViewProcessor_Mesh::write_primitive_info(RenderResource& primitive_table, const RenderObject_Mesh& ro, const RenderPrimitive& rp)
+{
+    const GPUPrimitiveInfo primitive_info {
+        ro.world,
+        ro.prev_world,
+        (uint32_t)rp.mesh_index,
+        rp.primitive_material_id
+    };
+    primitive_table.update_ssbo_element("u_primitive_table", sizeof(GPUPrimitiveInfo), rp.id, &primitive_info);
 }
 
 static float compute_view_depth(

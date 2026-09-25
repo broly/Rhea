@@ -33,6 +33,28 @@ export struct SkinVertex
 static_assert(sizeof(SkinVertex) == 48);
 
 
+// One non-zero morph target delta of a vertex (std430 friendly, 32 bytes).
+export struct MorphDelta
+{
+    glm::vec3 position = glm::vec3(0.0f);
+    uint32_t target = 0;
+    glm::vec3 normal = glm::vec3(0.0f);
+    float _pad = 0.0f;
+};
+static_assert(sizeof(MorphDelta) == 32);
+
+
+// Sparse morph targets of one primitive, CSR by vertex:
+// deltas of vertex i are deltas[offsets[i] .. offsets[i + 1]).
+export struct PrimitiveMorphs
+{
+    std::vector<uint32_t> offsets;
+    std::vector<MorphDelta> deltas;
+
+    bool empty() const { return deltas.empty(); }
+};
+
+
 export struct SkeletonBone
 {
     std::string name;
@@ -93,6 +115,17 @@ export struct SkeletalMesh
 
     // skin data per primitive of render_mesh (geometry 0), parallel to its primitives
     std::vector<std::vector<SkinVertex>> primitive_skins;
+
+    // morph targets (blend shapes), shared by all primitives (glTF mesh targets).
+    // Names come from mesh extras "targetNames" (target_<i> when absent).
+    std::vector<std::string> morph_target_names;
+    std::unordered_map<std::string, uint32_t> morph_target_by_name;
+
+    // parallel to primitive_skins, empty for primitives without non-zero deltas
+    std::vector<PrimitiveMorphs> primitive_morphs;
+
+    uint32_t num_morph_targets() const { return (uint32_t)morph_target_names.size(); }
+    std::optional<uint32_t> find_morph_target(const std::string& target_name) const;
 };
 
 

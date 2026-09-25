@@ -31,6 +31,20 @@ static std::map<int, Key> GLFW_KEYS = {
     {GLFW_KEY_X, Key::X}, 
     {GLFW_KEY_Y, Key::Y}, 
     {GLFW_KEY_Z, Key::Z},
+    {GLFW_KEY_SPACE, Key::Space},
+    {GLFW_KEY_LEFT_SHIFT, Key::LeftShift},
+    {GLFW_KEY_F1, Key::F1},
+    {GLFW_KEY_F2, Key::F2},
+    {GLFW_KEY_F3, Key::F3},
+    {GLFW_KEY_F4, Key::F4},
+    {GLFW_KEY_F5, Key::F5},
+    {GLFW_KEY_F6, Key::F6},
+    {GLFW_KEY_F7, Key::F7},
+    {GLFW_KEY_F8, Key::F8},
+    {GLFW_KEY_F9, Key::F9},
+    {GLFW_KEY_F10, Key::F10},
+    {GLFW_KEY_F11, Key::F11},
+    {GLFW_KEY_F12, Key::F12},
     {GLFW_KEY_0, Key::_0},
     {GLFW_KEY_1, Key::_1},
     {GLFW_KEY_2, Key::_2},
@@ -66,8 +80,17 @@ void set_input(Input* input) {
 static void key_callback(GLFWwindow* w, int key, int scancode, int action, int mods) {
     if (!g_input) 
         return;
-    if (!mods)
-        g_input->set_key(GLFW_KEYS[key], action != GLFW_RELEASE);
+    // modifiers must not filter events: pressing Shift itself reports the Shift modifier,
+    // and a release with a modifier held would leave the key stuck
+    auto it = GLFW_KEYS.find(key);
+    if (it != GLFW_KEYS.end())
+        g_input->set_key(it->second, action != GLFW_RELEASE);
+}
+
+static void scroll_callback(GLFWwindow* w, double x_offset, double y_offset) {
+    if (!g_input) 
+        return;
+    g_input->add_scroll(y_offset);
 }
 
 static void mouse_callback(GLFWwindow* w, double x, double y) {
@@ -106,6 +129,7 @@ bool platform::window::window_create(Window& window, int width, int height, cons
     glfwSetKeyCallback(window.handle, key_callback);
     glfwSetMouseButtonCallback(window.handle, mouse_button_callback);
     glfwSetCursorPosCallback(window.handle, mouse_callback);
+    glfwSetScrollCallback(window.handle, scroll_callback);
 
     return true;
 }

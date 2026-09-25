@@ -282,7 +282,7 @@ static constexpr VkBuildAccelerationStructureFlagsKHR skinned_blas_flags =
     VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
     VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 
-SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, RTBuildMode rt_build_mode)
+SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, const PrimitiveMorphs& morphs, uint32_t morph_count, RTBuildMode rt_build_mode)
 {
     PROFILE(__FUNCTION__);
 
@@ -308,6 +308,26 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
         data.skin_buffer,
         data.skin_memory);
 
+    // ---- morph targets ----
+    if (!morphs.empty() && morph_count > 0)
+    {
+        checkf(morphs.offsets.size() == primitive.vertices.size() + 1, "Morph offsets do not match vertex count");
+
+        data.morph_count = morph_count;
+        buffer_manager.create_device_local_buffer_with_data(
+            morphs.offsets.data(),
+            morphs.offsets.size() * sizeof(uint32_t),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            data.morph_offsets_buffer,
+            data.morph_offsets_memory);
+        buffer_manager.create_device_local_buffer_with_data(
+            morphs.deltas.data(),
+            morphs.deltas.size() * sizeof(MorphDelta),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            data.morph_deltas_buffer,
+            data.morph_deltas_memory);
+    }
+
     // ---- skinned output vertices, initialized with bind pose ----
     buffer_manager.create_device_local_buffer_with_data(
         primitive.vertices.data(),
@@ -320,7 +340,8 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
         data.vertex_memory);
 
     // ---- bone matrices ring ----
-    data.bones_slot_size = sizeof(glm::mat4) * bone_count;
+    // weights are padded to 16 bytes: slots stay mat4 aligned
+    data.bones_slot_size = sizeof(glm::mat4) * bone_count + ((sizeof(float) * data.morph_count + 15) & ~size_t(15));
     create_buffer(
         instance.device,
         instance.physical_device,
@@ -427,23 +448,41 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     info.dst_vertex_address = vertex_address;
     info.vertex_count = data.vertex_count;
     info.bone_count = bone_count;
+    if (data.morph_count > 0)
+    {
+        info.morph_offsets_address = buffer_manager.get_buffer_device_address(data.morph_offsets_buffer);
+        info.morph_deltas_address = buffer_manager.get_buffer_device_address(data.morph_deltas_buffer);
+        info.morph_count = data.morph_count;
+    }
 
     skinned_meshes.push_back(data);
 
-    LogVkMeshManager.Log("Created skinned mesh instance %u (%u vertices, %u bones)",
-        info.instance_id, info.vertex_count, bone_count);
+    LogVkMeshManager.Log("Created skinned mesh instance %u (%u vertices, %u bones, %zu morph deltas)",
+        info.instance_id, info.vertex_count, bone_count, data.morph_count > 0 ? morphs.deltas.size() : size_t(0));
 
     return info;
 }
 
-VkDeviceAddress vk::MeshManager::upload_bone_matrices(uint32_t instance_id, uint32_t frame, const std::vector<glm::mat4>& matrices)
+VkDeviceAddress vk::MeshManager::upload_bone_matrices(uint32_t instance_id, uint32_t frame, const std::vector<glm::mat4>& matrices, const std::vector<float>& morph_weights)
 {
     SkinnedMeshGPUData& data = skinned_meshes.at(instance_id);
     checkf(matrices.size() == data.bone_count, "Bone count mismatch");
     checkf(frame < kRenderMaxFramesInFlight, "Invalid frame index");
 
     const VkDeviceSize offset = data.bones_slot_size * frame;
-    memcpy(static_cast<uint8_t*>(data.bones_mapped) + offset, matrices.data(), data.bones_slot_size);
+    uint8_t* slot = static_cast<uint8_t*>(data.bones_mapped) + offset;
+    const size_t matrices_size = sizeof(glm::mat4) * data.bone_count;
+    memcpy(slot, matrices.data(), matrices_size);
+
+    if (data.morph_count > 0)
+    {
+        // missing weights (pose without morphs) are zero
+        float* weights = reinterpret_cast<float*>(slot + matrices_size);
+        const size_t provided = std::min<size_t>(morph_weights.size(), data.morph_count);
+        std::fill(weights, weights + data.morph_count, 0.0f);
+        if (provided > 0)
+            memcpy(weights, morph_weights.data(), provided * sizeof(float));
+    }
 
     // note: RBDeviceAddress must be unwrapped explicitly, `handle + offset` would go through operator bool
     const VkDeviceAddress base = buffer_manager.get_buffer_device_address(data.bones_buffer).handle;
