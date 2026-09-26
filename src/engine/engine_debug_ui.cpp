@@ -26,13 +26,14 @@ import ui;
 import cvar;
 import physics;
 import debug_draw;
+import ecs;
 
 
 namespace
 {
     // open windows, saved with the other cvars
     cvar::Var<bool> cv_window_outliner("ui.windows.outliner", true, "World outliner window");
-    cvar::Var<bool> cv_window_inspector("ui.windows.inspector", true, "Inspector of the selected actor");
+    cvar::Var<bool> cv_window_inspector("ui.windows.inspector", true, "Inspector of the selected entity");
     cvar::Var<bool> cv_window_render("ui.windows.render", true, "Renderer settings window");
     cvar::Var<bool> cv_window_stats("ui.windows.stats", true, "Frame stats window");
     cvar::Var<bool> cv_window_gpu_profiler("ui.windows.gpu_profiler", false, "GPU pass timings window");
@@ -41,6 +42,7 @@ namespace
     cvar::Var<bool> cv_window_help("ui.windows.help", false, "Hotkeys window");
     cvar::Var<bool> cv_window_imgui_demo("ui.windows.imgui_demo", false, "Dear ImGui demo window (widget reference)");
     cvar::Var<bool> cv_window_physics("ui.windows.physics", false, "Physics stats, debug drawing and probes");
+    cvar::Var<bool> cv_window_ecs("ui.windows.ecs", false, "ECS: simulation tick, systems, archetypes");
 
     cvar::Var<bool> cv_physics_draw("physics.debug.draw", false, "Draw collision shapes near the camera");
     cvar::Var<bool> cv_physics_draw_fixed("physics.debug.draw_fixed", false,
@@ -53,11 +55,11 @@ namespace
         "Trace from the camera along its view direction every frame");
 
     cvar::Var<bool> cv_viewport_picking("ui.viewport.picking", true,
-        "Click in the viewport selects the actor under the cursor");
+        "Click in the viewport selects the entity under the cursor");
     cvar::Var<bool> cv_viewport_selection_bounds("ui.viewport.selection_bounds", true,
-        "Bounding box of the selected actor");
+        "Bounding box of the selected entity");
     cvar::Var<bool> cv_viewport_icons("ui.viewport.icons", true,
-        "Icons of actors without geometry (lights, cameras, probes)");
+        "Icons of entities without geometry (lights, cameras, probes)");
 
     constexpr ImU32 selection_color = IM_COL32(255, 170, 40, 255);
     constexpr float icon_pick_radius = 12.0f;
@@ -106,9 +108,47 @@ namespace
         return !it.empty();
     }
 
-    std::shared_ptr<RhComp_Transform> find_transform(const RhActor& actor)
+    // Position of an entity for icons / labels: its WorldTransform
+    std::optional<glm::vec3> get_entity_position(const ecs::Registry& registry, ecs::Entity e)
     {
-        return actor.find_component<RhComp_Transform>();
+        if (const WorldTransform* world = registry.get<WorldTransform>(e))
+            return world->value.position.glm();
+        return std::nullopt;
+    }
+
+    std::string get_entity_label(const ecs::Registry& registry, ecs::Entity e)
+    {
+        std::string name = scene::get_name(registry, e);
+        return name.empty() ? std::format("entity {}", e) : name;
+    }
+
+    std::string get_component_names(const ecs::Registry& registry, ecs::Entity e)
+    {
+        std::string result;
+        for (ecs::ComponentId id : registry.get_component_ids(e))
+        {
+            if (!result.empty())
+                result += ", ";
+            result += ecs::component_info(id).name;
+        }
+        return result;
+    }
+
+    bool is_active_camera(const ecs::Registry& registry, ecs::Entity e)
+    {
+        const Camera* camera = registry.get<Camera>(e);
+        return camera && camera->active;
+    }
+
+    // World transform and settings of the active camera
+    std::optional<std::pair<Transform, Camera>> find_active_camera(ecs::Registry& registry)
+    {
+        std::optional<std::pair<Transform, Camera>> result;
+        ecs::Query<const Camera, const WorldTransform>(registry).each([&] (const Camera& camera, const WorldTransform& world) {
+            if (!result && camera.active)
+                result.emplace(world.value, camera);
+        });
+        return result;
     }
 
     bool is_empty_aabb(const AABB& aabb)
@@ -229,22 +269,19 @@ EngineDebugUI::ViewData EngineDebugUI::compute_view(Engine& engine) const
     if (!engine.world || io.DisplaySize.x <= 0.0f || io.DisplaySize.y <= 0.0f)
         return view;
 
-    for (const auto& actor : engine.world->get_actors())
+    if (const auto active = find_active_camera(engine.world->registry))
     {
-        auto camera = actor->find_component<RhComp_Camera>();
-        if (!camera || !camera->active)
-            continue;
+        const auto& [transform, camera] = *active;
 
         // same as RenderObject_Camera::get_projection
-        glm::mat4 proj = glm::perspectiveRH_ZO(camera->fov, io.DisplaySize.x / io.DisplaySize.y,
-            camera->near_plane, camera->far_plane);
+        glm::mat4 proj = glm::perspectiveRH_ZO(camera.fov, io.DisplaySize.x / io.DisplaySize.y,
+            camera.near_plane, camera.far_plane);
         proj[1][1] *= -1;
 
         view.valid = true;
-        view.position = camera->transform.position.glm();
-        view.view_proj = proj * camera->transform.get_view();
+        view.position = transform.position.glm();
+        view.view_proj = proj * transform.get_view();
         view.viewport = glm::vec2(io.DisplaySize.x, io.DisplaySize.y);
-        break;
     }
     return view;
 }
@@ -254,10 +291,17 @@ EngineDebugUI::ViewData EngineDebugUI::compute_view(Engine& engine) const
  * FRAME
  ***********************************************************************/
 
-void EngineDebugUI::select(const std::shared_ptr<RhActor>& actor)
+void EngineDebugUI::select(ecs::Entity e)
 {
-    selected = actor;
-    scroll_outliner_to_selection = actor != nullptr;
+    selected = e;
+    scroll_outliner_to_selection = !e.is_null();
+}
+
+ecs::Entity EngineDebugUI::get_selected(Engine& engine)
+{
+    if (selected && !engine.world->registry.alive(selected))
+        selected = ecs::null_entity;
+    return selected;
 }
 
 void EngineDebugUI::draw(Engine& engine)
@@ -277,6 +321,7 @@ void EngineDebugUI::draw(Engine& engine)
     draw_world_scripts_window(engine);
     draw_help_window();
     draw_physics_window(engine);
+    draw_ecs_window(engine);
     if (cv_window_imgui_demo.get())
     {
         bool open = true;
@@ -329,6 +374,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         item("GPU Profiler", cv_window_gpu_profiler);
         item("Console Variables", cv_window_cvars);
         item("Physics", cv_window_physics);
+        item("ECS", cv_window_ecs);
         ImGui::Separator();
         item("Hotkeys", cv_window_help);
         item("ImGui Demo", cv_window_imgui_demo);
@@ -343,7 +389,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         };
         item("Click to select", cv_viewport_picking);
         item("Selection bounds", cv_viewport_selection_bounds);
-        item("Actor icons", cv_viewport_icons);
+        item("Entity icons", cv_viewport_icons);
         ImGui::EndMenu();
     }
 
@@ -390,46 +436,89 @@ void EngineDebugUI::draw_outliner(Engine& engine)
     if (!begin_window("Outliner", cv_window_outliner, viewport_point(0.0f, 0.0f), viewport_size(0.2f, 0.45f)))
         return;
 
-    const auto& actors = engine.world->get_actors();
+    ecs::Registry& registry = engine.world->registry;
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::InputTextWithHint("##filter", "Filter by name or class", &outliner_filter);
-    ImGui::TextDisabled("%zu actors", actors.size());
+    ImGui::InputTextWithHint("##filter", "Filter by name or component", &outliner_filter);
+    ImGui::TextDisabled("%zu entities", registry.entity_count());
 
-    const std::shared_ptr<RhActor> current = selected.lock();
+    const ecs::Entity current = get_selected(engine);
 
-    if (ImGui::BeginChild("##actors", ImVec2(0, 0), ImGuiChildFlags_Borders))
-    {
-        for (const auto& actor : actors)
+    // hierarchy: roots, children by parent
+    std::vector<ecs::Entity> roots;
+    std::unordered_map<ecs::Entity, std::vector<ecs::Entity>> children;
+    for (const auto& archetype : registry.get_archetypes())
+        for (ecs::Entity e : archetype->get_entities())
         {
-            const std::string& name = actor->name.to_string();
-            const std::string& type = actor->get_type_name().to_string();
-            if (!contains_case_insensitive(name, outliner_filter) && !contains_case_insensitive(type, outliner_filter))
-                continue;
+            const ChildOf* child_of = registry.get<ChildOf>(e);
+            if (child_of && registry.alive(child_of->parent))
+                children[child_of->parent].push_back(e);
+            else
+                roots.push_back(e);
+        }
+    // spawn order
+    auto by_index = [] (ecs::Entity a, ecs::Entity b) { return a.index < b.index; };
+    std::ranges::sort(roots, by_index);
+    for (auto& [parent, list] : children)
+        std::ranges::sort(list, by_index);
 
-            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-            if (actor == current)
-                flags |= ImGuiTreeNodeFlags_Selected;
-            if (actor->instanced_components.empty())
-                flags |= ImGuiTreeNodeFlags_Leaf;
+    // with a filter: a flat list of matching entities
+    const bool filtering = !outliner_filter.empty();
 
-            const bool open = ImGui::TreeNodeEx(actor.get(), flags, "%s", name.c_str());
-            if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
-                select(actor);
-            if (actor == current && scroll_outliner_to_selection)
-            {
-                ImGui::SetScrollHereY();
-                scroll_outliner_to_selection = false;
-            }
+    auto draw_entity = [&] (this auto&& self, ecs::Entity e) -> void
+    {
+        const std::string label = get_entity_label(registry, e);
+        const std::string components = get_component_names(registry, e);
+        auto child_it = children.find(e);
+        const bool has_children = !filtering && child_it != children.end();
+
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+        if (e == current)
+            flags |= ImGuiTreeNodeFlags_Selected;
+        if (!has_children)
+            flags |= ImGuiTreeNodeFlags_Leaf;
+
+        const bool open = ImGui::TreeNodeEx((void*)(uintptr_t)e.bits(), flags, "%s", label.c_str());
+        if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+            select(e);
+        if (e == current && scroll_outliner_to_selection)
+        {
+            ImGui::SetScrollHereY();
+            scroll_outliner_to_selection = false;
+        }
+        ImGui::SetItemTooltip("%s", components.c_str());
+        if (has_children)
+        {
             ImGui::SameLine();
-            ImGui::TextDisabled("%s", type.c_str());
+            ImGui::TextDisabled("(%zu)", child_it->second.size());
+        }
 
-            if (open)
-            {
-                for (const auto& component : actor->instanced_components)
-                    ImGui::BulletText("%s  (%s)", component->name.to_string().c_str(),
-                        component->get_type_name().to_string().c_str());
-                ImGui::TreePop();
-            }
+        if (open)
+        {
+            if (has_children)
+                for (ecs::Entity child : child_it->second)
+                    self(child);
+            ImGui::TreePop();
+        }
+    };
+
+    if (ImGui::BeginChild("##entities", ImVec2(0, 0), ImGuiChildFlags_Borders))
+    {
+        if (filtering)
+        {
+            std::vector<ecs::Entity> all;
+            for (const auto& archetype : registry.get_archetypes())
+                for (ecs::Entity e : archetype->get_entities())
+                    if (contains_case_insensitive(get_entity_label(registry, e), outliner_filter)
+                        || contains_case_insensitive(get_component_names(registry, e), outliner_filter))
+                        all.push_back(e);
+            std::ranges::sort(all, by_index);
+            for (ecs::Entity e : all)
+                draw_entity(e);
+        }
+        else
+        {
+            for (ecs::Entity e : roots)
+                draw_entity(e);
         }
     }
     ImGui::EndChild();
@@ -441,60 +530,75 @@ void EngineDebugUI::draw_inspector(Engine& engine)
     if (!begin_window("Inspector", cv_window_inspector, viewport_point(0.0f, 0.45f), viewport_size(0.2f, 0.55f)))
         return;
 
-    const std::shared_ptr<RhActor> actor = selected.lock();
-    if (!actor)
+    ecs::Registry& registry = engine.world->registry;
+    const ecs::Entity e = get_selected(engine);
+    if (!e)
     {
         ImGui::TextWrapped("Nothing selected.");
-        ImGui::TextDisabled("Click an object in the viewport or an actor in the Outliner.");
+        ImGui::TextDisabled("Click an object in the viewport or an entity in the Outliner.");
         ImGui::End();
         return;
     }
 
-    ImGui::Text("%s", actor->name.to_string().c_str());
+    ImGui::Text("%s", get_entity_label(registry, e).c_str());
     ImGui::SameLine();
-    ImGui::TextDisabled("%s  #%u", actor->get_type_name().to_string().c_str(), actor->unique_id);
+    ImGui::TextDisabled("%s", std::format("{}", e).c_str());
     ImGui::SameLine();
-    const float button_width = ImGui::CalcTextSize("Deselect").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - button_width));
+    const float buttons_width = ImGui::CalcTextSize("DeselectDestroy").x + ImGui::GetStyle().FramePadding.x * 4.0f
+        + ImGui::GetStyle().ItemSpacing.x;
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - buttons_width));
     if (ImGui::SmallButton("Deselect"))
     {
-        select(nullptr);
+        select(ecs::null_entity);
         ImGui::End();
         return;
     }
-
-    // [[=rh::edit]] fields of an object, notifies it about changes
-    auto edit_object = [] (RhObject& object, const char* table_id) {
-        const reflect::ObjectReflectionInfo* info = reflect::find_object_reflection_info(object.get_type_name());
-        const reflect::PropertyObject properties = info && info->get_properties
-            ? info->get_properties(&object)
-            : reflect::PropertyObject{};
-        if (properties.empty())
-        {
-            ImGui::TextDisabled("No [[=rh::edit]] fields");
-            return;
-        }
-        std::vector<std::string_view> changed;
-        if (ui::edit_properties(properties, &changed, table_id))
-            for (std::string_view property : changed)
-                object.on_property_changed(property);
-    };
-
-    const reflect::ObjectReflectionInfo* actor_info = reflect::find_object_reflection_info(actor->get_type_name());
-    if (actor_info && actor_info->get_properties && !actor_info->get_properties(actor.get()).empty())
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Destroy"))
     {
-        ImGui::SeparatorText("Actor");
-        edit_object(*actor, "##actor_properties");
+        engine.world->destroy_recursive(e);
+        select(ecs::null_entity);
+        ImGui::End();
+        return;
+    }
+    if (const ChildOf* child_of = registry.get<ChildOf>(e); child_of && registry.alive(child_of->parent))
+    {
+        ImGui::TextDisabled("child of");
+        ImGui::SameLine();
+        if (ImGui::SmallButton(get_entity_label(registry, child_of->parent).c_str()))
+            select(child_of->parent);
     }
 
     ImGui::SeparatorText("Components");
-    for (const auto& component : actor->instanced_components)
+    // copy: editing may not change the component set, but keep it safe against hooks
+    const std::vector<ecs::ComponentId> ids(registry.get_component_ids(e).begin(), registry.get_component_ids(e).end());
+    std::vector<ecs::ComponentId> runtime_ids;
+    for (ecs::ComponentId id : ids)
     {
-        ImGui::PushID(component.get());
-        const std::string header = component->name.to_string() + "  (" + component->get_type_name().to_string() + ")";
+        const ComponentType* type = scene::find_component_type(id);
+        if (!type)
+        {
+            runtime_ids.push_back(id);
+            continue;
+        }
+        ImGui::PushID((int)id);
+        const std::string header(type->name);
         if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
-            edit_object(*component, "##component_properties");
+        {
+            const reflect::PropertyObject properties = type->properties ? type->properties(registry.get_raw(e, id)) : reflect::PropertyObject{};
+            if (properties.empty())
+                ImGui::TextDisabled("No editable fields");
+            else
+                ui::edit_properties(properties, nullptr, "##component_properties");
+        }
         ImGui::PopID();
+    }
+    // not registered with scene::register_component_type: engine state (WorldTransform, render proxies...)
+    if (!runtime_ids.empty())
+    {
+        ImGui::SeparatorText("Runtime");
+        for (ecs::ComponentId id : runtime_ids)
+            ImGui::BulletText("%s", std::string(ecs::component_info(id).name).c_str());
     }
 
     ImGui::End();
@@ -582,7 +686,7 @@ void EngineDebugUI::draw_stats_window(Engine& engine)
         overlay, 0.0f, std::max(max_ms * 1.1f, 1.0f), ImVec2(-FLT_MIN, ImGui::GetFontSize() * 4.0f));
 
     ImGui::Text("World time: %.1f s", engine.world->get_time_seconds());
-    ImGui::Text("Actors: %zu", engine.world->get_actors().size());
+    ImGui::Text("Entities: %zu", engine.world->registry.entity_count());
     ImGui::End();
 }
 
@@ -761,6 +865,101 @@ void EngineDebugUI::draw_world_scripts_window(Engine& engine)
     ImGui::End();
 }
 
+namespace
+{
+    std::string component_names(std::span<const ecs::ComponentId> ids)
+    {
+        std::string result;
+        for (ecs::ComponentId id : ids)
+        {
+            if (!result.empty())
+                result += ", ";
+            result += ecs::component_info(id).name;
+        }
+        return result;
+    }
+}
+
+void EngineDebugUI::draw_ecs_window(Engine& engine)
+{
+    if (!begin_window("ECS", cv_window_ecs, viewport_point(0.3f, 0.1f), viewport_size(0.4f, 0.6f)))
+        return;
+
+    ecs::Registry& registry = engine.world->registry;
+    ecs::Schedule& schedule = engine.world->schedule;
+
+    const ecs::SimTime* sim = registry.find_resource<ecs::SimTime>();
+    const ecs::FrameTime* frame = registry.find_resource<ecs::FrameTime>();
+    ImGui::Text("tick %llu  (%.3f s)   alpha %.2f", sim ? (unsigned long long)sim->tick : 0ull,
+        sim ? sim->time : 0.0, frame ? frame->alpha : 0.0);
+    int tick_rate = int(std::round(1.0 / schedule.fixed_dt));
+    if (ImGui::SliderInt("tick rate, Hz", &tick_rate, 10, 240))
+        schedule.fixed_dt = 1.0 / tick_rate;
+    ImGui::Text("%zu entities, %zu archetypes, %zu component types", registry.entity_count(),
+        registry.get_archetypes().size(), ecs::registered_component_count());
+
+    if (ImGui::CollapsingHeader("Systems", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (schedule.get_systems().empty())
+            ImGui::TextDisabled("No systems");
+
+        constexpr ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
+        if (!schedule.get_systems().empty() && ImGui::BeginTable("##systems", 4, flags))
+        {
+            ImGui::TableSetupColumn("Phase", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("System");
+            ImGui::TableSetupColumn("ms", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Access");
+            ImGui::TableHeadersRow();
+            for (int phase = 0; phase < int(ecs::Phase::Count); ++phase)
+            {
+                for (const ecs::System& system : schedule.get_systems())
+                {
+                    if (int(system.phase) != phase)
+                        continue;
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(ecs::phase_name(system.phase).data());
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(system.name.c_str());
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.3f", system.last_ms);
+                    ImGui::TableNextColumn();
+                    if (system.access.exclusive)
+                        ImGui::TextUnformatted("exclusive");
+                    else
+                        ImGui::Text("W: %s  R: %s", component_names(system.access.writes).c_str(),
+                            component_names(system.access.reads).c_str());
+                }
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Archetypes", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (const auto& archetype : registry.get_archetypes())
+        {
+            if (archetype->size() == 0)
+                continue;
+            ImGui::PushID(archetype.get());
+            const std::string types = archetype->get_types().empty() ? "<empty>" : component_names(archetype->get_types());
+            if (ImGui::TreeNode("##archetype", "%zu  |  %s", archetype->size(), types.c_str()))
+            {
+                constexpr size_t max_listed = 200;
+                const auto entities = archetype->get_entities();
+                for (size_t i = 0; i < std::min(entities.size(), max_listed); ++i)
+                    ImGui::BulletText("%s", std::format("{}", entities[i]).c_str());
+                if (entities.size() > max_listed)
+                    ImGui::TextDisabled("... %zu more", entities.size() - max_listed);
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+        }
+    }
+    ImGui::End();
+}
+
 void EngineDebugUI::draw_help_window()
 {
     if (!begin_window("Hotkeys", cv_window_help, viewport_point(0.35f, 0.25f), viewport_size(0.3f, 0.5f)))
@@ -768,7 +967,7 @@ void EngineDebugUI::draw_help_window()
 
     static constexpr std::pair<const char*, const char*> hotkeys[] = {
         {"`", "Show / hide the debug UI"},
-        {"Click", "Select the actor under the cursor"},
+        {"Click", "Select the entity under the cursor"},
         {"LMB drag", "Rotate the camera"},
         {"WASD / Q E", "Move (free camera) or walk (character)"},
         {"C", "Character / free camera"},
@@ -810,29 +1009,26 @@ void EngineDebugUI::draw_viewport_overlay(Engine& engine, const ViewData& view)
     if (!view.valid)
         return;
 
+    ecs::Registry& registry = engine.world->registry;
     ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
-    const std::shared_ptr<RhActor> current = selected.lock();
+    const ecs::Entity current = get_selected(engine);
 
     auto to_imvec = [] (glm::vec2 p) { return ImVec2(p.x, p.y); };
 
     if (cv_viewport_icons.get())
     {
-        for (const auto& actor : engine.world->get_actors())
-        {
-            if (!is_empty_aabb(actor->get_aabb()))
-                continue;
-            const auto transform = find_transform(*actor);
-            if (!transform)
-                continue;
-            // the active camera is the view itself
-            if (auto camera = actor->find_component<RhComp_Camera>(); camera && camera->active)
-                continue;
-            const auto screen = view.project(transform->transform.position.glm());
+        ecs::Query<const WorldTransform>(registry).each([&] (ecs::Entity e, const WorldTransform& world) {
+            // entities without geometry: lights, cameras, probes, groups
+            if (get_entity_bounds(registry, e) || is_active_camera(registry, e))   // the active camera is the view itself
+                return;
+            if (!registry.has<Light>(e) && !registry.has<Camera>(e) && !registry.has<ReflectionCapture>(e))
+                return;
+            const auto screen = view.project(world.value.position.glm());
             if (!screen)
-                continue;
+                return;
 
             ImU32 color = IM_COL32(200, 200, 200, 200);
-            if (auto light = actor->find_component<RhComp_Light>())
+            if (const Light* light = registry.get<Light>(e))
             {
                 const glm::vec3 c = glm::clamp(glm::vec3(light->color.x, light->color.y, light->color.z), glm::vec3(0.0f), glm::vec3(1.0f));
                 color = IM_COL32(int(c.x * 255), int(c.y * 255), int(c.z * 255), 230);
@@ -840,16 +1036,16 @@ void EngineDebugUI::draw_viewport_overlay(Engine& engine, const ViewData& view)
             draw_list->AddCircleFilled(to_imvec(*screen), 5.0f, color);
             draw_list->AddCircle(to_imvec(*screen), 6.0f, IM_COL32(0, 0, 0, 180), 0, 1.5f);
             draw_list->AddText(ImVec2(screen->x + 9.0f, screen->y - 8.0f), IM_COL32(230, 230, 230, 180),
-                actor->name.to_string().c_str());
-        }
+                get_entity_label(registry, e).c_str());
+        });
     }
 
     if (current && cv_viewport_selection_bounds.get())
     {
-        const AABB aabb = current->get_aabb();
         std::optional<glm::vec2> label_pos;
-        if (!is_empty_aabb(aabb))
+        if (const std::optional<AABB> bounds = get_entity_bounds(registry, current); bounds && !is_empty_aabb(*bounds))
         {
+            const AABB& aabb = *bounds;
             glm::vec3 corners[8];
             for (int i = 0; i < 8; i++)
                 corners[i] = glm::vec3(i & 1 ? aabb.max.x : aabb.min.x, i & 2 ? aabb.max.y : aabb.min.y, i & 4 ? aabb.max.z : aabb.min.z);
@@ -867,16 +1063,16 @@ void EngineDebugUI::draw_viewport_overlay(Engine& engine, const ViewData& view)
                 }
             label_pos = view.project(glm::vec3(aabb.min.x, aabb.max.y, aabb.min.z));
         }
-        else if (const auto transform = find_transform(*current))
+        else if (const auto position = get_entity_position(registry, current))
         {
-            label_pos = view.project(transform->transform.position.glm());
+            label_pos = view.project(*position);
             if (label_pos)
                 draw_list->AddCircle(to_imvec(*label_pos), 10.0f, selection_color, 0, 2.5f);
         }
 
         if (label_pos)
             draw_list->AddText(ImVec2(label_pos->x + 12.0f, label_pos->y - 18.0f), selection_color,
-                current->name.to_string().c_str());
+                get_entity_label(registry, current).c_str());
     }
 }
 
@@ -900,38 +1096,37 @@ void EngineDebugUI::handle_picking(Engine& engine, const ViewData& view)
     const glm::vec3 origin = view.position;
     const glm::vec3 direction = glm::normalize(glm::vec3(far_point) - glm::vec3(near_point));
 
-    std::shared_ptr<RhActor> best_icon;
+    ecs::Registry& registry = engine.world->registry;
+    ecs::Entity best_icon;
     float best_icon_distance = icon_pick_radius;
-    std::shared_ptr<RhActor> best_box;
+    ecs::Entity best_box;
     float best_box_t = std::numeric_limits<float>::max();
 
-    for (const auto& actor : engine.world->get_actors())
-    {
-        const AABB aabb = actor->get_aabb();
-        if (is_empty_aabb(aabb))
+    ecs::Query<const WorldTransform>(registry).each([&] (ecs::Entity e, const WorldTransform& world) {
+        if (const std::optional<AABB> bounds = get_entity_bounds(registry, e))
         {
-            // actors without geometry are picked by their icon
-            const auto transform = find_transform(*actor);
-            if (!transform || !cv_viewport_icons.get())
-                continue;
-            if (auto camera = actor->find_component<RhComp_Camera>(); camera && camera->active)
-                continue;
-            if (const auto screen = view.project(transform->transform.position.glm()))
+            if (const auto t = intersect_ray_aabb(origin, direction, *bounds); t && *t < best_box_t)
             {
-                const float distance = glm::length(*screen - mouse);
-                if (distance < best_icon_distance)
-                {
-                    best_icon_distance = distance;
-                    best_icon = actor;
-                }
+                best_box_t = *t;
+                best_box = e;
+            }
+            return;
+        }
+        // entities without geometry are picked by their icon
+        if (!cv_viewport_icons.get() || is_active_camera(registry, e))
+            return;
+        if (!registry.has<Light>(e) && !registry.has<Camera>(e) && !registry.has<ReflectionCapture>(e))
+            return;
+        if (const auto screen = view.project(world.value.position.glm()))
+        {
+            const float distance = glm::length(*screen - mouse);
+            if (distance < best_icon_distance)
+            {
+                best_icon_distance = distance;
+                best_icon = e;
             }
         }
-        else if (const auto t = intersect_ray_aabb(origin, direction, aabb); t && *t < best_box_t)
-        {
-            best_box_t = *t;
-            best_box = actor;
-        }
-    }
+    });
 
     select(best_icon ? best_icon : best_box);
 }
@@ -943,17 +1138,6 @@ void EngineDebugUI::handle_picking(Engine& engine, const ViewData& view)
 
 namespace
 {
-    std::shared_ptr<RhComp_Camera> find_active_camera(Engine& engine)
-    {
-        for (const auto& actor : engine.world->get_actors())
-        {
-            auto camera = actor->find_component<RhComp_Camera>();
-            if (camera && camera->active)
-                return camera;
-        }
-        return nullptr;
-    }
-
     const char* category_name(phys::Category category)
     {
         switch (category)
@@ -980,12 +1164,12 @@ void EngineDebugUI::draw_world_debug(Engine& engine)
         return;
 
     phys::PhysicsScene& physics = engine.world->get_physics();
-    const auto camera = find_active_camera(engine);
+    const auto camera = find_active_camera(engine.world->registry);
     if (!camera)
         return;
 
-    const glm::vec3 camera_position = camera->transform.position.glm();
-    const glm::vec3 camera_forward = camera->transform.forward();
+    const glm::vec3 camera_position = camera->first.position.glm();
+    const glm::vec3 camera_forward = camera->first.forward();
 
     if (cv_physics_draw.get())
     {
@@ -1028,13 +1212,11 @@ void EngineDebugUI::draw_world_debug(Engine& engine)
     debug_draw::arrow(probe_hit->position, probe_hit->position + probe_hit->normal * 0.5f,
                       { 0.2f, 1.0f, 0.3f, 1.0f }, { .depth_test = false });
 
-    // framework convention: BodyDesc::user_data is the owning RhComponent (or 0)
+    // framework convention: BodyDesc::user_data is the owning entity (ecs::Entity::bits), or 0
     if (probe_hit->user_data != 0)
     {
-        const auto* component = reinterpret_cast<const RhComponent*>(probe_hit->user_data);
-        probe_hit_owner = component->owner
-            ? component->owner->name.to_string() + " / " + component->name.to_string()
-            : component->name.to_string();
+        const ecs::Entity owner{ uint32_t(probe_hit->user_data), uint32_t(probe_hit->user_data >> 32) };
+        probe_hit_owner = engine.world->registry.alive(owner) ? get_entity_label(engine.world->registry, owner) : "<destroyed>";
     }
 }
 
@@ -1106,7 +1288,7 @@ void EngineDebugUI::draw_physics_window(Engine& engine)
 
     if (ImGui::CollapsingHeader("Test bodies", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        const auto camera = find_active_camera(engine);
+        const auto camera = find_active_camera(engine.world->registry);
 
         if (!spawn_sphere_shape)
             spawn_sphere_shape = physics.create_shape(phys::SphereShape{ 0.2f });
@@ -1117,10 +1299,10 @@ void EngineDebugUI::draw_physics_window(Engine& engine)
         {
             if (!camera)
                 return;
-            const glm::vec3 forward = camera->transform.forward();
+            const glm::vec3 forward = camera->first.forward();
             const phys::BodyId body = physics.create_body({
                 .shape = shape,
-                .position = camera->transform.position.glm() + forward * 1.5f,
+                .position = camera->first.position.glm() + forward * 1.5f,
                 .motion = phys::Motion::dynamic,
                 .category = phys::Category::dynamic,
                 .linear_velocity = forward * speed,

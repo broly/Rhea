@@ -16,26 +16,51 @@ import render;
 
 RenderId SceneViewProcessor_Mesh::register_proxy()
 {
+    RenderId render_id;
     if (!vacated_mesh_ids.empty())
     {
-        RenderId reuse_id = vacated_mesh_ids.back();
-        reuse_id.generation++;
+        render_id = vacated_mesh_ids.back();
+        render_id.generation++;
         vacated_mesh_ids.pop_back();
-        return reuse_id;
     }
-    uint32_t identifier = meshes.size();
-    meshes.push_back({});
-    const RenderId render_id(identifier, 0);
-    
+    else
+    {
+        render_id = RenderId(meshes.size(), 0);
+        meshes.push_back({});
+    }
+    RenderObject_Mesh& ro = meshes[render_id.identifier];
+    ro.alive = true;
+    ro.generation = render_id.generation;
+
     dirty = true;
-    
+
     return render_id;
 }
 
 void SceneViewProcessor_Mesh::unregister_proxy(RenderId render_id)
 {
-    meshes[render_id.identifier] = {}; 
+    RenderObject_Mesh& ro = meshes[render_id.identifier];
+    if (!ro.alive || ro.generation != render_id.generation)
+        return;
+
+    retire_primitives(ro);
+    const uint32_t generation = ro.generation;
+    ro = {};
+    ro.generation = generation;
     vacated_mesh_ids.push_back(render_id);
+    dirty = true;
+}
+
+void SceneViewProcessor_Mesh::retire_primitives(RenderObject_Mesh& ro)
+{
+    for (RenderPrimitiveId prim_index : ro.primitives)
+    {
+        RenderPrimitive& rp = primitives[prim_index];
+        rp.passes.clear();
+        rp.info_by_pass.clear();
+        rp.skinning.reset();
+    }
+    ro.primitives.clear();
 }
 
 
@@ -44,16 +69,18 @@ void SceneViewProcessor_Mesh::process()
 {
     auto& renderer = *RhGlobals::engine->renderer;
 
-    RenderResource& primitive_table_resource = renderer.find_resource_checked("primitive_table");
-    
     constexpr RTBuildMode rt_build_mode = render_settings::enable_raytracing ? RTBuildMode::build_blas : RTBuildMode::none;
 
     for (const auto& submitted : read_submission_buffer<SceneViewProxy_Mesh>())
     {
         
-        dirty = true;
-        
         auto& ro = meshes[submitted.render_id.identifier];
+
+        // submitted before its proxy was unregistered (in the same frame), or by a previous owner of the slot
+        if (!ro.alive || ro.generation != submitted.render_id.generation)
+            continue;
+
+        dirty = true;
 
         bool is_new = ro.primitives.empty();
         bool mesh_changed = ro.mesh != submitted.mesh;
@@ -63,7 +90,7 @@ void SceneViewProcessor_Mesh::process()
 
         if (is_new || mesh_changed)
         {
-            ro.primitives.clear();
+            retire_primitives(ro);
 
             ro.mesh   = submitted.mesh;
             ro.world  = new_world;
@@ -187,7 +214,7 @@ void SceneViewProcessor_Mesh::process()
                     primitives.push_back(rp);
                     
                     ro.prev_world = ro.world;
-                    write_primitive_info(primitive_table_resource, ro, rp);
+                    write_primitive_info(ro, rp);
                     
                         
                     ro.primitives.push_back(primitives.size() - 1);
@@ -211,7 +238,7 @@ void SceneViewProcessor_Mesh::process()
             {
                 RenderPrimitive& rp = primitives[prim_index];
                 rp.bounds = ro.bounds;
-                write_primitive_info(primitive_table_resource, ro, rp);
+                write_primitive_info(ro, rp);
             }
             
             moved_this_frame.push_back(submitted.render_id.identifier);
@@ -227,7 +254,7 @@ void SceneViewProcessor_Mesh::process()
         ro.prev_world = ro.world;
         ro.moved = false;
         for (RenderPrimitiveId prim_index : ro.primitives)
-            write_primitive_info(primitive_table_resource, ro, primitives[prim_index]);
+            write_primitive_info(ro, primitives[prim_index]);
     }
     moved_last_frame = std::move(moved_this_frame);
     moved_this_frame.clear();
@@ -237,15 +264,29 @@ void SceneViewProcessor_Mesh::process()
         dirty = true;
 }
 
-void SceneViewProcessor_Mesh::write_primitive_info(RenderResource& primitive_table, const RenderObject_Mesh& ro, const RenderPrimitive& rp)
+void SceneViewProcessor_Mesh::write_primitive_info(const RenderObject_Mesh& ro, const RenderPrimitive& rp)
 {
-    const GPUPrimitiveInfo primitive_info {
+    if (primitive_table_cpu.size() <= rp.id)
+        primitive_table_cpu.resize(rp.id + 1, GPUPrimitiveInfo{ glm::mat4(1.0f), glm::mat4(1.0f), 0, 0 });
+    primitive_table_cpu[rp.id] = GPUPrimitiveInfo {
         ro.world,
         ro.prev_world,
         (uint32_t)rp.mesh_index,
         rp.primitive_material_id
     };
-    primitive_table.update_ssbo_element("u_primitive_table", sizeof(GPUPrimitiveInfo), rp.id, &primitive_info);
+    ++primitive_table_version;
+}
+
+void SceneViewProcessor_Mesh::upload_primitive_table(RenderResource& primitive_table, RBFrameHandle frame)
+{
+    if (primitive_table_uploaded_version.size() <= frame)
+        primitive_table_uploaded_version.resize(frame + 1, 0);
+    if (primitive_table_uploaded_version[frame] == primitive_table_version || primitive_table_cpu.empty())
+        return;
+
+    primitive_table.update_ssbo("u_primitive_table", primitive_table_cpu.size() * sizeof(GPUPrimitiveInfo),
+        primitive_table_cpu.data(), frame);
+    primitive_table_uploaded_version[frame] = primitive_table_version;
 }
 
 static float compute_view_depth(

@@ -224,7 +224,8 @@ bool vk::SwapchainControl::submit_frame(
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &signal_sem;
 
-    (vkQueueSubmit(instance.graphics_queue, 1, &submit, f.in_flight));
+    // a lost device shows up here first (otherwise only at the next fence wait)
+    VK_CHECK(vkQueueSubmit(instance.graphics_queue, 1, &submit, f.in_flight));
 
     VkPresentInfoKHR present{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;

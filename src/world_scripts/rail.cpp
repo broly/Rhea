@@ -1,24 +1,29 @@
 module rail;
 
 import std.compat;
+import ecs;
 
-void Rail::set_accum_time(float t)
+void Rail::start()
 {
-    accumulated_time = t;
+    active = true;
+    accumulated_time = 0.0f;
+
+    for (auto& [name, track] : samples)
+    {
+        std::ranges::sort(track, [] (const RailSample& a, const RailSample& b) {
+            return a.timestamp_seconds < b.timestamp_seconds;
+        });
+    }
 }
 
-void Rail::tick(const double dt)
+void Rail::tick(double dt)
 {
-    RhActor::tick(dt);
-
     if (!active || samples.empty())
         return;
-    
-    const double delta = fixed_timestep ? timestep.value() : dt;
 
-    accumulated_time += delta * time_dilation;
-
-    float t = get_passed_time();
+    const double delta = fixed_timestep ? timestep.value_or(0.0f) : dt;
+    accumulated_time += float(delta * time_dilation);
+    const float t = accumulated_time;
 
     bool all_done = true;
 
@@ -27,106 +32,62 @@ void Rail::tick(const double dt)
         if (track.empty())
             continue;
 
-        auto cb_it = on_tick_map.find(name);
-        if (cb_it == on_tick_map.end())
-            continue;
-
-        auto& on_tick = cb_it->second;
-
-        if (!on_tick)
+        auto callback = on_tick.find(name);
+        if (callback == on_tick.end() || !callback->second)
             continue;
 
         if (t < track.back().timestamp_seconds)
             all_done = false;
 
-        if (track.size() == 1)
-        {
-            RailSampleData data{
-                track[0].position,
-                track[0].rotation,
-                track[0].color
-            };
-            on_tick(data);
-            continue;
-        }
-
-        if (t >= track.back().timestamp_seconds)
+        if (track.size() == 1 || t >= track.back().timestamp_seconds)
         {
             const RailSample& last = track.back();
-
-            RailSampleData data{
-                last.position,
-                last.rotation,
-                last.color
-            };
-
-            on_tick(data);
+            callback->second(RailSampleData{ last.position, last.rotation, last.color });
             continue;
         }
 
         int segment = -1;
         for (int i = 0; i < (int)track.size() - 1; ++i)
         {
-            if (t >= track[i].timestamp_seconds &&
-                t < track[i + 1].timestamp_seconds)
+            if (t >= track[i].timestamp_seconds && t < track[i + 1].timestamp_seconds)
             {
                 segment = i;
                 break;
             }
         }
-
         if (segment == -1)
             continue;
 
         const RailSample& a = track[segment];
         const RailSample& b = track[segment + 1];
-
-        float duration = b.timestamp_seconds - a.timestamp_seconds;
-
-        float alpha = duration > 0.0f
-            ? (t - a.timestamp_seconds) / duration
-            : 0.0f;
+        const float duration = b.timestamp_seconds - a.timestamp_seconds;
+        const float alpha = duration > 0.0f ? (t - a.timestamp_seconds) / duration : 0.0f;
 
         RailSampleData data;
         data.position = glm::mix(a.position.glm(), b.position.glm(), alpha);
         data.rotation = glm::slerp(a.rotation.glm(), b.rotation.glm(), alpha);
-        data.color    = glm::mix(a.color.glm(), b.color.glm(), alpha);
-
-        on_tick(data);
+        data.color = glm::mix(a.color.glm(), b.color.glm(), alpha);
+        callback->second(data);
     }
 
     if (all_done)
     {
         active = false;
         if (loop)
-        {
-            startup();
-        }
+            start();
     }
 }
-void Rail::startup()
+
+namespace
 {
-    start_time = world->get_time_seconds();
-    active = true;
-    accumulated_time = 0.0;
-    
-    for (auto& [name, track] : samples)
+    void tick_rails(ecs::Query<Rail> rails, ecs::Res<ecs::FrameTime> time)
     {
-        std::sort(track.begin(), track.end(),
-            [](const RailSample& a,
-               const RailSample& b)
-            {
-                return a.timestamp_seconds < b.timestamp_seconds;
-            });
+        rails.each([&] (Rail& rail) { rail.tick(time->dt); });
     }
 }
 
-void Rail::on_serialize(const SerializationContext& context)
+void install_rail(World& world)
 {
-    RhActor::on_serialize(context);
-}
-
-float Rail::get_passed_time() const
-{
-    return accumulated_time;
+    scene::register_component_type<Rail>();
+    world.schedule.add<&tick_rails>(ecs::Phase::Update);
 }

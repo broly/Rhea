@@ -11,6 +11,10 @@ import framework;
 import render;
 import vk;
 import WorldScript_RotateAroundObject;
+import rhcomponents;
+import gltf_scene;
+import rail;
+import character_controller;
 import profile;
 import gpu_profile;
 import ui;
@@ -60,6 +64,13 @@ void Engine::run()
     
     
     world->set_clock(clock);
+
+    // component types and systems of the world, before the level is loaded
+    install_render_components(*world, *scene_view);
+    install_gltf_scene(*world);
+    install_rail(*world);
+    install_character_controller(*world, *input);
+
     world->add_script<WorldScript_VariousThings>(); // TODO hardcoded
     
     world->init();    

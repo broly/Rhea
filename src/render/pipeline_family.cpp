@@ -25,6 +25,53 @@ import log;
 
 DEFINE_LOGGER(LogPipelineFamily, Display);
 
+namespace
+{
+    // Newest modification time of a shader and of everything it #includes, recursively. The permutation
+    // cache is keyed by it: a permutation compiled against an older header (a struct layout, a binding)
+    // must be rebuilt, not reused next to C++ code that already writes the new layout.
+    std::filesystem::file_time_type newest_source_time(
+        const std::filesystem::path& file,
+        const std::filesystem::path& shaders_dir,
+        std::set<std::filesystem::path>& visited)
+    {
+        std::filesystem::file_time_type newest = std::filesystem::last_write_time(file);
+
+        std::ifstream stream(file);
+        std::string line;
+        while (std::getline(stream, line))
+        {
+            const size_t directive = line.find("#include");
+            if (directive == std::string::npos)
+                continue;
+            const size_t open = line.find('"', directive);
+            const size_t close = open == std::string::npos ? std::string::npos : line.find('"', open + 1);
+            if (close == std::string::npos)
+                continue;
+            const std::string included = line.substr(open + 1, close - open - 1);
+
+            // same lookup as the compiler: next to the including file, then the -I shaders directory
+            for (const std::filesystem::path& candidate : { file.parent_path() / included, shaders_dir / included })
+            {
+                std::error_code error;
+                if (!std::filesystem::exists(candidate, error))
+                    continue;
+                const std::filesystem::path canonical = std::filesystem::weakly_canonical(candidate, error);
+                if (visited.insert(canonical).second)
+                    newest = std::max(newest, newest_source_time(canonical, shaders_dir, visited));
+                break;
+            }
+        }
+        return newest;
+    }
+
+    std::string source_timestamp(const std::filesystem::path& shader, const std::filesystem::path& shaders_dir)
+    {
+        std::set<std::filesystem::path> visited;
+        return file_helpers::file_time_to_string(newest_source_time(shader, shaders_dir, visited));
+    }
+}
+
 
 void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> model, std::shared_ptr<RenderBackend> in_backend,
                                std::shared_ptr<Renderer> in_renderer)
@@ -652,8 +699,7 @@ std::filesystem::path PipelineFamily::request_permutation(
     if (std::filesystem::exists(compiled_shader_permutation_file))
     {
         
-        std::filesystem::file_time_type filetime = std::filesystem::last_write_time(shader_path);
-        std::string actual_timestamp = file_helpers::file_time_to_string(filetime);
+        std::string actual_timestamp = source_timestamp(shader_path, shaders_dir);
         std::string saved_timestamp = string_helpers::trim_and_remove_newlines(file_helpers::load_text_from_file(timestamp_file_name));
         if (actual_timestamp == saved_timestamp)
         {
@@ -745,9 +791,7 @@ void PipelineFamily::compile_shader_checked(
 
     if (result == 0)
     {
-        auto filetime = std::filesystem::last_write_time(source);
-        std::string timestamp = file_helpers::file_time_to_string(filetime);
-        file_helpers::save_text_to_file(timestamp_file_name, timestamp);
+        file_helpers::save_text_to_file(timestamp_file_name, source_timestamp(source, shaders_dir));
     }
     else
     {

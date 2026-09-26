@@ -6,36 +6,27 @@ export module gltf_scene;
 
 import std.compat;
 import rhobject;
-import fixed_string;
 import reflect;
-import type_id;
-import dependency_collector;
 
 import framework;
-import fastgltf;
-import glm;
 import render;
 import name;
 import assets;
-#include "common/reflect_macros.h"
 
-#include "object/object_reflection_macro.h"
-
-class RhComp_GltfScene : public RhComponent
+// Imports a glTF scene into the world: every mesh object of the file becomes a child entity
+// (Name, Transform, MeshRenderer and, with `collision`, MeshCollider) of the entity with this component.
+//
+//     "GltfScene": { "asset_path": "gltf/sponza/Sponza.gltf", "textures_dir": "textures/sponza", "collision": true }
+export struct GltfScene
 {
-public:
-    void on_serialize(const SerializationContext& context) override;
-    [[=rh::serialize]] std::string asset_path;
-    [[=rh::serialize]] std::string textures_dir;
-    
-    [[=rh::serialize]] std::shared_ptr<Material> material;
-    
-    [[=rh::serialize]] std::map<Name, std::string> test;
+    [[=rh::edit, =rh::read_only]] std::string asset_path;
+    [[=rh::edit, =rh::read_only]] std::string textures_dir;
+    std::shared_ptr<Material> material;
+    std::map<Name, std::string> test;
 
     // static triangle mesh collision for every mesh of the scene
-    [[=rh::serialize]] bool collision = false;
-    
-    
-    
+    [[=rh::edit, =rh::read_only]] bool collision = false;
 };
-RH_OBJECT(RhComp_GltfScene)
+
+// Component type and its import on spawn
+export void install_gltf_scene(World& world);

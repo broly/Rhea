@@ -5,31 +5,64 @@ module;
 module framework;
 
 import :world;
+import :scene;
 
 import std.compat;
 import assertions;
+import fixed_string;
 
 import json_utils;
 import rhmath;
 import :engine_clock;
 import :world_script;
-import :actor;
 import dependency_collector;
 import glm;
+import name;
+import log;
 
 import rhobject;
 import physics;
+import ecs;
 import paths;
 import profile;
 
 #include "common/assertion_macros.h"
+#include "logging/log_macro.h"
 #include "profiling/profile.h"
 
+DEFINE_LOGGER(LogWorld, Log);
+
+namespace
+{
+    // prefabs referencing prefabs
+    constexpr int max_prefab_depth = 16;
+
+    void physics_step(ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
+    {
+        PROFILE("World::physics_step");
+        physics->step((float)time->dt);
+    }
+
+    // first in Late: render sync and debug tools read WorldTransform
+    void propagate_transforms(ecs::Registry& registry)
+    {
+        scene::propagate_transforms(registry);
+    }
+}
+
+World::World()
+{
+    scene::register_component_type<Transform>();
+    scene::register_component_type<ChildOf>();
+
+    schedule.add<&physics_step>(ecs::Phase::FixedPost);
+    schedule.add<&propagate_transforms>(ecs::Phase::Late);
+}
 
 void World::tick()
 {
     double dt = clock->get_delta_seconds();
-    
+
     if constexpr (COUNT_AVG_FPS)
     {
         if (dt > 0.0)
@@ -46,16 +79,22 @@ void World::tick()
                 ++fps_sample_count;
         }
     }
-    
-    for (auto& script : scripts)
-        script->tick(dt);
-    
-    for (auto& actor : actors)
-        actor->internal_tick(dt);
 
     {
-        PROFILE("World::physics_step");
-        physics->step((float)dt);
+        PROFILE("World::fixed_ticks");
+        schedule.run_fixed(registry, dt);
+    }
+    {
+        PROFILE("World::update");
+        schedule.run_phase(registry, ecs::Phase::Update);
+    }
+
+    for (auto& script : scripts)
+        script->tick(dt);
+
+    {
+        PROFILE("World::late");
+        schedule.run_phase(registry, ecs::Phase::Late);
     }
 }
 
@@ -64,9 +103,10 @@ void World::init()
     physics = std::make_unique<phys::PhysicsScene>(phys::PhysicsSettings{
         .shape_cache_dir = paths::get_cache_path() / "physics",
     });
+    registry.set_resource_ref(*physics);
 
     load_bootstrap_level();
-    
+
     for (auto& script : scripts)
     {
         script->init(this->shared_from_this());
@@ -81,146 +121,173 @@ bool World::load_bootstrap_level()
 bool World::load_level(std::string level_path)
 {
     std::optional<Json::Value> root_opt = json_utils::load_json_asset(level_path);
-    
-    world_load_serialization_context = { &collector, true };
-    
-    
-    std::vector<std::shared_ptr<RhActor>> pending_actors;
-    
     if (!root_opt.has_value())
-    {
         return false;
-    }
 
     const Json::Value& root = root_opt.value();
-
-    std::string name = root["name"].asString();
-    std::cout << "Name: " << name << std::endl;
-
-    const Json::Value& json_actors = root["actors"];
-    
-    if (!json_actors.isArray()) 
+    const Json::Value& entities = root["entities"];
+    if (!entities.isArray())
     {
-        std::cerr << "'actors' is not an array" << std::endl;
+        LogWorld.Log("Level '%s': 'entities' is not an array", level_path.c_str());
         return false;
     }
 
-    std::cout << "Number of actors: " << json_actors.size() << std::endl;
+    SerializationContext context{ &collector, true };
+    context.current_file = level_path;
 
-    for (const Json::Value& level_actor_json_value : json_actors)
-    {
-        std::optional<Json::Value> ref_json_value_opt;
-        
-        if (auto skip_field_ptr = level_actor_json_value.find("__skip__"))
-        {
-            if (skip_field_ptr && skip_field_ptr->asBool())
-            {
-                continue;
-            }
-        }
-        
-        if (auto ref = level_actor_json_value.find("__ref__"))
-        {
-            auto str = ref->asString();
-            auto opt = json_utils::load_json_asset(str);
-            if (opt.has_value())
-            {
-                ref_json_value_opt = opt.value();
-            }
-        }
+    std::vector<ecs::Entity> spawned;
+    for (const Json::Value& desc : entities)
+        spawn_from_json(desc, ecs::null_entity, context, spawned);
 
-        std::string actor_name = level_actor_json_value["name"].asString();
-        
-        std::string actor_class = ref_json_value_opt.has_value() ? 
-            (*ref_json_value_opt)["class"].asString() :
-            level_actor_json_value["class"].asString();
-        
-        if (actor_class == "")
-            actor_class = level_actor_json_value["class"].asString();
-        
-        std::cout << "Actor: " << actor_class << std::endl;
-        auto reflection_info = reflect::find_object_reflection_info(actor_class);
-        if ensure(reflection_info != nullptr)
-        {
-            ObjectInitData init_data {
-                actor_name,
-            };
-            
-            std::shared_ptr<RhObject> obj = std::invoke(reflection_info->factory, init_data);
-            
-            if (ref_json_value_opt.has_value())
-            {
-                ensure(ref_json_value_opt->isObject());                
-                if ( auto ref_fields_object = ref_json_value_opt->find("fields"))
-                {
-                    if (reflection_info->serializer != std::nullopt)
-                    {
-                        std::invoke(reflection_info->serializer.value(), *ref_fields_object, obj.get(), world_load_serialization_context);
-                    }
-                }
-            }
-            ensure(level_actor_json_value.isObject());
-               
-            if ( auto level_actor_fields_object = level_actor_json_value.find("fields"))
-            {
-                if (reflection_info->serializer != std::nullopt)
-                {
-                    std::invoke(reflection_info->serializer.value(), *level_actor_fields_object, obj.get(), world_load_serialization_context);
-                }
-            }
-            
-            if (obj->is_actor())
-            {
-                auto actor = std::static_pointer_cast<RhActor>(obj);
-                
-                ref_json_value_opt.has_value() ?
-                    actor->import_from_json_object(*ref_json_value_opt, &level_actor_json_value, world_load_serialization_context) :
-                    actor->import_from_json_object(level_actor_json_value, nullptr, world_load_serialization_context);
-                pending_actors.push_back(actor);
-            }
-        }
-        
-        
-    }
-    
-    collector.wait();
-    
-    for (uint32_t index = 0; index < pending_actors.size(); index++)
-    {
-        auto& actor = pending_actors[index];
-        actor->finish_importing();
-        actors.push_back(actor);
-        actor->internal_start(shared_from_this());
-    }
+    finish_spawning(spawned, context);
 
     // level geometry was added one body at a time
     physics->optimize();
-    
+
+    LogWorld.Log("Level '%s' (%s): %zu entities", level_path.c_str(), root["name"].asString().c_str(), registry.entity_count());
     return true;
 }
 
-void World::add_actor(std::shared_ptr<RhActor> actor)
+ecs::Entity World::spawn(Name name, const Transform& transform)
 {
-    actors.push_back(actor);
+    const ecs::Entity e = registry.create();
+    registry.add<Name>(e, name);
+    registry.add<Transform>(e, transform);
+    return e;
 }
 
-std::shared_ptr<RhActor> World::spawn(const std::string& name)
+ecs::Entity World::spawn_prefab(std::string_view prefab_path, Name name, std::optional<Transform> transform)
 {
-    std::shared_ptr<RhActor> actor = std::make_shared<RhActor>();
-    actor->name = name;
-    actors.push_back(actor);
-    actor->internal_start(shared_from_this());
-    return actor;
+    Json::Value desc(Json::objectValue);
+    desc["prefab"] = std::string(prefab_path);
+    if (!name.is_none())
+        desc["name"] = name.to_string();
+
+    SerializationContext context{ &collector, true };
+    context.current_file = std::string(prefab_path);
+
+    std::vector<ecs::Entity> spawned;
+    const ecs::Entity e = spawn_from_json(desc, ecs::null_entity, context, spawned);
+    if (e && transform)
+        registry.add<Transform>(e, *transform);
+    finish_spawning(spawned, context);
+    return e;
 }
 
-AABB World::get_world_aabb() const
+ecs::Entity World::find_entity(Name name) const
 {
-    AABB result = {glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f)};
-    for (auto& actor : actors)
-    {
-        result += actor->get_aabb();
-    }
+    ecs::Entity result = ecs::null_entity;
+    ecs::Query<const Name>(const_cast<ecs::Registry&>(registry)).each([&] (ecs::Entity e, const Name& entity_name) {
+        if (!result && entity_name == name)
+            result = e;
+    });
     return result;
+}
+
+void World::destroy_recursive(ecs::Entity e)
+{
+    std::vector<ecs::Entity> children;
+    ecs::Query<const ChildOf>(registry).each([&] (ecs::Entity child, const ChildOf& child_of) {
+        if (child_of.parent == e)
+            children.push_back(child);
+    });
+    for (ecs::Entity child : children)
+        destroy_recursive(child);
+    registry.destroy(e);
+}
+
+ecs::Entity World::spawn_from_json(const Json::Value& desc, ecs::Entity parent, const SerializationContext& context,
+    std::vector<ecs::Entity>& spawned)
+{
+    if (!desc.isObject())
+        return ecs::null_entity;
+    if (const Json::Value* skip = desc.find("skip"); skip && skip->asBool())
+        return ecs::null_entity;
+
+    const ecs::Entity e = registry.create();
+    if (parent)
+        registry.add<ChildOf>(e, parent);
+    apply_json(e, desc, context, spawned, 0);
+    spawned.push_back(e);
+    return e;
+}
+
+void World::apply_json(ecs::Entity e, const Json::Value& desc, const SerializationContext& context,
+    std::vector<ecs::Entity>& spawned, int prefab_depth)
+{
+    // the prefab first: this description overrides it
+    if (const Json::Value* prefab = desc.find("prefab"))
+    {
+        checkf(prefab_depth < max_prefab_depth, "Prefab '%s': references nest too deep (a cycle?)", prefab->asString().c_str());
+        if (std::optional<Json::Value> prefab_desc = json_utils::load_json_asset(prefab->asString()))
+            apply_json(e, *prefab_desc, context, spawned, prefab_depth + 1);
+        else
+            LogWorld.Log("Prefab '%s' not found", prefab->asString().c_str());
+    }
+
+    if (const Json::Value* name = desc.find("name"))
+        registry.add<Name>(e, name->asString());
+
+    if (const Json::Value* components = desc.find("components"))
+    {
+        checkf(components->isObject(), "'components' of '%s' must be an object: { \"Type\": { fields } }",
+            scene::get_name(registry, e).c_str());
+        for (const std::string& type_name : components->getMemberNames())
+        {
+            const ComponentType* type = scene::find_component_type(type_name);
+            if (!type || !type->load)
+            {
+                LogWorld.Log("Entity '%s': unknown component type '%s' (not registered with scene::register_component_type)",
+                    scene::get_name(registry, e).c_str(), type_name.c_str());
+                continue;
+            }
+            SerializationContext::__Scope scope(context, scene::get_name(registry, e) + "." + type_name);
+            type->load(registry, e, (*components)[type_name], context);
+        }
+    }
+
+    if (const Json::Value* children = desc.find("children"))
+    {
+        for (const Json::Value& child_desc : *children)
+        {
+            // same name as an existing child (from the prefab): override it
+            ecs::Entity existing = ecs::null_entity;
+            if (const Json::Value* child_name = child_desc.find("name"))
+            {
+                const Name name = child_name->asString();
+                ecs::Query<const ChildOf, const Name>(registry).each([&] (ecs::Entity child, const ChildOf& child_of, const Name& n) {
+                    if (child_of.parent == e && n == name)
+                        existing = child;
+                });
+            }
+            if (existing)
+                apply_json(existing, child_desc, context, spawned, prefab_depth);
+            else
+                spawn_from_json(child_desc, e, context, spawned);
+        }
+    }
+}
+
+void World::finish_spawning(const std::vector<ecs::Entity>& spawned, const SerializationContext& context)
+{
+    for (ecs::Entity e : spawned)
+    {
+        if (!registry.alive(e))
+            continue;
+        // copy: on_spawned may add components (the span would move)
+        const std::vector<ecs::ComponentId> ids(registry.get_component_ids(e).begin(), registry.get_component_ids(e).end());
+        for (ecs::ComponentId id : ids)
+        {
+            const ComponentType* type = scene::find_component_type(id);
+            if (type && type->on_spawned && registry.alive(e))
+                type->on_spawned(*this, e, context);
+        }
+    }
+
+    collector.wait();
+    collector.async_load_operations.clear();
+
+    schedule.run_phase(registry, ecs::Phase::PostLoad);
 }
 
 double World::get_time_seconds() const
@@ -239,12 +306,4 @@ double World::get_avg_fps() const
         return 0.0;
 
     return fps_sum / static_cast<double>(fps_sample_count);
-}
-
-std::shared_ptr<RhActor> World::find_actor_by_name(const std::string& name)
-{
-    for (auto& actor : actors)
-        if (actor->name == name)
-            return actor;
-    return nullptr;
 }

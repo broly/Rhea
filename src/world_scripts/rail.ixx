@@ -5,16 +5,12 @@ module;
 export module rail;
 
 import std.compat;
-import dependency_collector;
-import fixed_string;
 import reflect;
-import type_id;
 import framework;
 import glm;
 import name;
 import rhmath;
 import rhobject;
-#include "object/object_reflection_macro.h"
 
 export struct RailSampleData
 {
@@ -32,47 +28,38 @@ export struct RailSample : RailSampleData
 
 export using RailCallback = std::function<void(const RailSampleData& data)>;
 
-export class Rail : public RhActor
+// Named tracks of timed samples (position, rotation, color), played back after start():
+// every frame the callback of each track gets the interpolated sample.
+//
+//     "Rail": { "time_dilation": 1, "samples": { "light": [ { "timestamp_seconds": 0, "position": {...}, ... } ] } }
+export struct Rail
 {
-public:
-    [[=rh::serialize]] 
     std::map<Name, std::vector<RailSample>> samples;
-    
-    [[=rh::edit, =rh::read_only]] 
-    float accumulated_time = 0.0f;
-    
-    [[=rh::serialize, =rh::edit, =rh::range<0.f, 5.f>]] 
+
+    [[=rh::edit, =rh::range<0.f, 5.f>]]
     float time_dilation = 1.0f;
-    
-    [[=rh::serialize, =rh::edit]] 
+
+    // advance by `timestep` per frame instead of the frame time
+    [[=rh::edit]]
     bool fixed_timestep = false;
-    
-    void set_accum_time(float t);
-    
-    [[=rh::serialize]] 
     std::optional<float> timestep = std::nullopt;
-    
-    void tick(const double dt) override;
-    
-    void startup();
-    
-    void on_serialize(const SerializationContext& context) override;
-    
-    [[=rh::edit, =rh::read_only]] 
-    bool active = false;
-    
-    float start_time = 0;
-    
-    float get_passed_time() const;
-    
-    void add_on_tick(Name name, RailCallback cb)
-    {
-        on_tick_map.insert({name, cb});
-    }
-    
-    [[=rh::edit]] 
+
+    [[=rh::edit]]
     bool loop = false;
-    
-    std::map<Name, RailCallback> on_tick_map;
+
+    [[=rh::edit, =rh::read_only, =rh::transient]]
+    bool active = false;
+
+    [[=rh::edit, =rh::read_only, =rh::transient]]
+    float accumulated_time = 0.0f;
+
+    [[=rh::transient]]
+    std::map<Name, RailCallback> on_tick;
+
+    // (Re)starts the playback from the first sample
+    void start();
+    void tick(double dt);
 };
-RH_OBJECT(Rail)
+
+// Component type and the playback system (Update phase)
+export void install_rail(World& world);

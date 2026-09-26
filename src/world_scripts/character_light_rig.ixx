@@ -4,6 +4,7 @@ import std.compat;
 
 import glm;
 import rhmath;
+import ecs;
 import framework;
 import rhcomponents;
 
@@ -29,8 +30,8 @@ public:
         glm::vec3 sun_tint;  // multiplies the (animated) sun color
     };
 
-    // light actors are named <prefix>0 .. <prefix>5, each with a RhComp_Light
-    bool init(World& world, std::shared_ptr<RhActor> in_character, const std::string& light_actor_prefix);
+    // light entities are named <prefix>0 .. <prefix>5, each with a Light
+    bool init(World& world, ecs::Entity in_character, const std::string& light_entity_prefix);
 
     void next_preset();
     void previous_preset();
@@ -42,12 +43,12 @@ public:
     void set_preset(size_t index);
     glm::vec3 get_sun_tint() const;
 
-    void tick();
+    void tick(ecs::Registry& registry);
 
 private:
     void apply_preset_log() const;
 
-    std::shared_ptr<RhActor> character;
-    std::vector<std::shared_ptr<RhActor>> light_actors;
+    ecs::Entity character;
+    std::vector<ecs::Entity> lights;
     size_t preset_index = 0;
 };

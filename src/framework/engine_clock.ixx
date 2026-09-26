@@ -15,8 +15,8 @@ export struct EngineClock
     void tick()
     {
         auto frame_time = std::chrono::steady_clock::now();
-        auto frame_duration = std::chrono::duration_cast<std::chrono::milliseconds>(frame_time - current_frame_time);
-        delta_seconds = (double)frame_duration.count() / 1000.f;
+        // full precision: the fixed-step accumulator sums these every frame
+        delta_seconds = std::chrono::duration<double>(frame_time - current_frame_time).count();
         current_frame_time = frame_time;
         num_ticks++;
     }
@@ -28,16 +28,14 @@ export struct EngineClock
     
     double get_total_seconds() const
     {
-        auto frame_time = std::chrono::steady_clock::now();
-        auto frame_duration = std::chrono::duration_cast<std::chrono::milliseconds>(current_frame_time - start_time);
-        return (double)frame_duration.count() / 1000.f;
+        return std::chrono::duration<double>(current_frame_time - start_time).count();
     }
     
-    double delta_seconds;
+    double delta_seconds = 0.0;
     std::chrono::time_point<std::chrono::steady_clock> current_frame_time;
     std::chrono::time_point<std::chrono::steady_clock> start_time;
     
-    unsigned long long num_ticks;
+    unsigned long long num_ticks = 0;
     
 };
 

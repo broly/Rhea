@@ -106,9 +106,34 @@ struct GBufferArray : std::vector<RGTextureHandle>
 // lighting.frag: take indirect light from the reflection capture IBL instead of the RTXGI output
 constexpr uint32_t LIGHTING_GI_FROM_IBL = 0xFFFFFFFFu;
 
+// Renderer int param "lighting_debug" (bit mask, lighting.frag): drops one lighting term to bisect artifacts
+namespace LightingDebug
+{
+    inline constexpr const char* param = "lighting_debug";
+    inline constexpr uint32_t no_diffuse_gi = 1;    // irradiance / GI buffer
+    inline constexpr uint32_t no_specular_ibl = 2;  // prefiltered environment (character shading models)
+    inline constexpr uint32_t no_emissive = 4;      // g-buffer emissive (and character default lit emissive)
+    inline constexpr uint32_t no_shadows = 8;       // directional shadow map
+    inline constexpr uint32_t no_decals = 16;       // decal albedo
+    // counts legacy-model pixels on the screen periphery (the level: no emissive textures) with a non-zero
+    // g-buffer emissive (discarded, so they show black), logs frames where they appear and auto-dumps
+    // g-buffer EXRs (see read_diag_queries)
+    inline constexpr uint32_t emissive_watch = 32;
+}
+
+// Renderer int param "geometry_debug" (bit mask, ModelPushConstants.debug_id of the base pass draws)
+namespace GeometryDebug
+{
+    inline constexpr const char* param = "geometry_debug";
+    inline constexpr uint32_t zero_emissive = 1;         // g-buffer emissive written as 0 (pbr and character)
+    inline constexpr uint32_t emissive_index_check = 2;  // pbr: emissive = red where the material has an emissive texture
+    inline constexpr uint32_t solid_emissive = 4;        // emissive target = solid red (checks the switch reaches the shaders)
+}
+
 struct ColorOutputConstants
 {
     uint32_t buffer_index;
+    uint32_t debug_flags = 0;  // LightingDebug bits
 };
 RH_REGISTER_TYPE(ColorOutputConstants)
 
@@ -184,7 +209,24 @@ public:
     
     RGTextureHandle ssr_texture;
     uint32_t history_index = 0;
-    
+
+    // Full-screen "sky flash" diagnostics: occlusion queries per frame in flight, [frame * DIAG_COUNT + DIAG_*]:
+    // samples drawn by the clouds pass (sky where depth is empty) and by the base geometry pass.
+    // Read back when the frame slot comes around again, logged when the sky covers most of the screen.
+    // DIAG_LIGHTING: samples the lighting pass kept with LightingDebug::emissive_watch.
+    static constexpr uint32_t DIAG_CLOUDS = 0;
+    static constexpr uint32_t DIAG_GEOMETRY = 1;
+    static constexpr uint32_t DIAG_LIGHTING = 2;
+    static constexpr uint32_t DIAG_COUNT = 3;
+    RBQueryPool diag_queries;
+    uint64_t diag_frame_counter = 0;
+    uint32_t emissive_watch_dumps = 0;
+    double emissive_watch_last_dump_time = -1.0e9;
+    double emissive_watch_last_log_time = -1.0e9;
+    uint32_t emissive_watch_frames_since_log = 0;
+    bool diag_enabled() const { return num_pass_instances == 1 && diag_queries.handle != 0; }
+    void read_diag_queries(RenderGraphContext& ctx);
+
     RGTextureHandle brdf_lut;
     
     RBAccelStruct tlas = {};

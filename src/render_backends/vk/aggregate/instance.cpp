@@ -48,16 +48,24 @@ void vk::Instance::init(GLFWwindow* in_window)
     ici.enabledLayerCount = 1;
     ici.ppEnabledLayerNames = VALIDATION_LAYERS;
     
+    // RHEA_GPU_AV=1: GPU-assisted validation (slow). It instruments shaders and reports what the CPU side
+    // can't see: unwritten / out of range bindless descriptors, out of bounds buffer device address accesses.
+    // Use it for device lost / garbage pixels before guessing.
+    const char* gpu_av_env = std::getenv("RHEA_GPU_AV");
+    const bool gpu_av = gpu_av_env && gpu_av_env[0] == '1';
+
     VkValidationFeatureEnableEXT enables[] = {
-        // VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
-        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
+        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+        VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
     };
 
     VkValidationFeaturesEXT validationFeatures{};
     validationFeatures.sType =
         VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-    validationFeatures.enabledValidationFeatureCount = 1;
+    validationFeatures.enabledValidationFeatureCount = gpu_av ? 2 : 1;
     validationFeatures.pEnabledValidationFeatures = enables;
+    if (gpu_av)
+        LogVkInstance.Log("GPU-assisted validation enabled (RHEA_GPU_AV)");
 
     ici.pNext = &validationFeatures;
 
@@ -135,6 +143,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     VkPhysicalDeviceFeatures features{};
     features.samplerAnisotropy = VK_TRUE;
     features.shaderInt64 = VK_TRUE;
+    features.occlusionQueryPrecise = VK_TRUE;   // exact sample counts (render graph diagnostics)
     
     for (uint32_t family : unique_families) {
         VkDeviceQueueCreateInfo qi{
@@ -193,6 +202,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     // features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
     // features12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
     features12.descriptorBindingPartiallyBound = VK_TRUE;
+    features12.hostQueryReset = VK_TRUE;                 // vkResetQueryPool from the host (GPU profiler pools)
     // features12.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
     features12.shaderFloat16 = VK_TRUE;                  // fp16 in cooperative-matrix denoiser
     features12.vulkanMemoryModel = VK_TRUE;              // required by cooperative matrices

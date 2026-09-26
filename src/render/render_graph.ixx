@@ -237,6 +237,9 @@ export struct ExrDumpPassDesc
     std::vector<ExrDumpEntry> entries;
 
     std::function<bool(const RenderGraphParameters&)> condition = {};
+    // Pass-level condition: false skips the pass together with its barriers (a debug dump that must not
+    // change the frame when it is not requested)
+    std::function<bool()> pass_condition = nullptr;
 };
 
 export class RenderGraph : public RhObject

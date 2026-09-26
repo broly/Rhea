@@ -55,6 +55,7 @@ set(RHEA_MODULE_DIRS
     src/stb_image_wrap
     src/fastgltf_helper
     src/common
+    src/ecs
     src/profiling
     src/math
     src/logging
@@ -233,3 +234,16 @@ target_compile_definitions(rhea PRIVATE WIN32)
 
 # printf-style helpers (Logger::Log, print_error) take the format string as a parameter by design
 target_compile_options(rhea PRIVATE -Wno-format-security)
+
+
+# Tests of the ecs module: it depends only on std and assertions, so it builds without the engine
+add_executable(rhea_ecs_tests tests/ecs_tests.cpp)
+add_module_dir(rhea_ecs_tests src/ecs)
+target_sources(rhea_ecs_tests
+    PRIVATE FILE_SET CXX_MODULES
+    BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
+    FILES src/common/assertions.ixx
+)
+target_include_directories(rhea_ecs_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(rhea_ecs_tests PRIVATE rhea_std)
+target_compile_options(rhea_ecs_tests PRIVATE -Wno-format-security)

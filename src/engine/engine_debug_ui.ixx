@@ -5,12 +5,13 @@ import glm;
 import rhmath;
 import framework;
 import physics;
+import ecs;
 
 
 export class Engine;
 
-// Engine windows of the debug UI (ui module, Dear ImGui): main menu, world outliner, inspector of the
-// selected actor, renderer settings, stats, GPU profiler, cvar catalog, world scripts, physics.
+// Engine windows of the debug UI (ui module, Dear ImGui): main menu, world outliner (entities), inspector of
+// the selected entity, renderer settings, stats, GPU profiler, cvar catalog, world scripts, physics, ECS.
 //
 // Game code extends it with Engine::on_debug_ui_menu / on_debug_ui_render_panel and
 // WorldScript::draw_debug_ui.
@@ -23,8 +24,9 @@ public:
     // World space debug drawing (physics shapes, probes), every frame, also while the UI is hidden
     void draw_world_debug(Engine& engine);
 
-    void select(const std::shared_ptr<RhActor>& actor);
-    std::shared_ptr<RhActor> get_selected() const { return selected.lock(); }
+    void select(ecs::Entity e);
+    // null if nothing is selected or the entity was destroyed
+    ecs::Entity get_selected(Engine& engine);
 
 private:
     // camera of the last frame, for picking and 3D overlays
@@ -51,11 +53,12 @@ private:
     void draw_world_scripts_window(Engine& engine);
     void draw_help_window();
     void draw_physics_window(Engine& engine);
+    void draw_ecs_window(Engine& engine);
 
     void draw_viewport_overlay(Engine& engine, const ViewData& view);
     void handle_picking(Engine& engine, const ViewData& view);
 
-    std::weak_ptr<RhActor> selected;
+    ecs::Entity selected;
     bool scroll_outliner_to_selection = false;
     std::string outliner_filter;
     std::string cvar_filter;

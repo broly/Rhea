@@ -128,6 +128,22 @@ public:
     virtual void cmd_write_timestamp(RBCommandList cmd, RBQueryPool pool, uint32_t query_index, bool bottom_of_pipe) = 0;
     virtual bool read_timestamps(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values) = 0;
 
+    // Waits until the GPU has finished all submitted work (debug readbacks, teardown)
+    virtual void wait_idle() = 0;
+
+    // Debug: ALL_COMMANDS -> ALL_COMMANDS memory barrier (outside a render pass). Waits for all work
+    // submitted earlier to the queue, including the previous frames in flight
+    virtual void debug_full_barrier(RBCommandList cmd) = 0;
+
+    // --- occlusion queries (samples passing the per-fragment tests; diagnostics) ---
+    virtual RBQueryPool create_occlusion_pool(uint32_t query_count) = 0;
+    virtual void cmd_begin_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index) = 0;
+    virtual void cmd_end_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index) = 0;
+    // results without waiting; false if not available (never written since the last reset)
+    virtual bool read_query_results(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values) = 0;
+    // host reset (the queries must not be in use by pending command buffers)
+    virtual void reset_queries(RBQueryPool pool, uint32_t first_query, uint32_t query_count) = 0;
+
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) = 0;
     virtual ImageReadback readback_image(RBImageHandle img) const = 0;
     

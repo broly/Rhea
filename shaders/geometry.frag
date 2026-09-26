@@ -26,15 +26,17 @@ layout(location = 5) in vec4 v_curr_clip;
 layout(location = 6) in vec4 v_prev_clip;
 
 // ================== OUTPUT ==================
+// Every output has as many components as its attachment format (RGBA8 / RGBA16F targets take vec4):
+// components the shader doesn't write are undefined in Vulkan and come out as register garbage.
 #if !BLEND_MODE_TRANSLUCENT
 layout(location = 0) out vec4 out_g_normal;
 layout(location = 1) out vec4 out_g_world_normal;
 layout(location = 2) out vec2 out_g_motion_vectors;
 layout(location = 3) out vec4 out_g_albedo_roughness;
-layout(location = 4) out vec3 out_g_position;
+layout(location = 4) out vec4 out_g_position;
 layout(location = 5) out float out_g_linear_depth;
 layout(location = 6) out vec4 out_g_geometry_normal;
-layout(location = 7) out vec3 out_g_emissive;
+layout(location = 7) out vec4 out_g_emissive;
 #endif 
 
 
@@ -49,6 +51,12 @@ void main()
     vec3 albedo = pow(base_tx.rgb, vec3(2.2));
     
     vec3 emissive = get_emissive(mat, v_uv).rgb;
+    if ((get_debug_index() & GEOMETRY_DEBUG_ZERO_EMISSIVE) != 0u)
+        emissive = vec3(0.0);
+    if ((get_debug_index() & GEOMETRY_DEBUG_EMISSIVE_INDEX_CHECK) != 0u)
+        emissive = vec3(mat.textures0.w != 0u ? 1.0 : 0.0, 0.0, 0.0);
+    if ((get_debug_index() & GEOMETRY_DEBUG_SOLID_EMISSIVE) != 0u)
+        emissive = vec3(1.0, 0.0, 0.0);
 
     vec3 orm = get_orm(mat, v_uv);
     float ao        = orm.r;
@@ -84,13 +92,13 @@ void main()
     out_g_motion_vectors = curr_uv - prev_uv;
 
     out_g_albedo_roughness = vec4(albedo, roughness);
-    out_g_position = v_world_pos;
+    out_g_position = vec4(v_world_pos, 1.0);
 
     vec4 view_pos = camera_ubo.view * vec4(v_world_pos, 1.0);
     out_g_linear_depth = -view_pos.z;
 
     out_g_geometry_normal = vec4(Ng * 0.5 + 0.5, 1.0);
 
-    out_g_emissive = emissive;
+    out_g_emissive = vec4(emissive, 0.0);
 #endif
 }

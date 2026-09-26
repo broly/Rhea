@@ -200,11 +200,7 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
     view_info.subresourceRange.baseArrayLayer = array_layer_index;
     view_info.subresourceRange.baseMipLevel = mip_level;
     view_info.subresourceRange.levelCount = mip_level_count;
-    if (is_cubemap)
-    {
-        view_info.subresourceRange.levelCount = 1;
-    }
-    
+
 
     VkImageView view;
     VK_CHECK(vkCreateImageView(instance.device, &view_info, nullptr, &view));
@@ -263,7 +259,16 @@ VkImageView vk::ImageManager::get_array_view(RBImageHandle image_handle, uint32_
 
 VkImageView vk::ImageManager::get_cubemap_view(RBImageHandle image_handle)
 {
-    return fetch_image_view_generic(image_handle, 0, 0, 0, true);
+    // (was fetch_image_view_generic(image_handle, 0, 0, 0, true): `true` landed in num_layers, so cubemaps
+    // were bound through a 2D view of face 0 - undefined sampling in every samplerCube)
+    return fetch_image_view_generic(
+        image_handle,
+        /*layer_index=*/0,
+        /*mip_level=*/0,
+        /*num_mips=*/0,         // = all mips (prefiltered environment maps store roughness in them)
+        /*num_layers=*/6,
+        /*is_cubemap=*/true,
+        /*as_array_2d=*/false);
 }
 
 
@@ -1072,10 +1077,33 @@ void vk::ImageManager::transition_image(
         }
     };
 
-    if (old_layout == new_layout &&
+    // Read after read: nothing to do if the stages already made visible cover this one. A read in a new
+    // stage (e.g. sampled in fragment, then in compute) still needs a barrier: it extends the dependency
+    // chain from the last writer (the barrier which made the image readable) to the new stage.
+    const bool read_after_read = old_layout == new_layout &&
         sub.usage == params.dst_usage &&
-        is_pure_read(sub.usage))
+        is_pure_read(sub.usage);
+    if (read_after_read && (dst.stage & ~sub.stage) == 0)
     {
+        return;
+    }
+    if (read_after_read)
+    {
+        VkMemoryBarrier read_barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+        read_barrier.srcAccessMask = 0;
+        read_barrier.dstAccessMask = dst.access;
+        vkCmdPipelineBarrier(
+            cmd.as<VkCommandBuffer>(),
+            sub.stage,
+            dst.stage,
+            0,
+            1, &read_barrier,
+            0, nullptr,
+            0, nullptr);
+        // all reader stages are kept: the next write must wait for every one of them (WAR)
+        sub.stage |= dst.stage;
+        sub.access |= dst.access;
+        img.set_state(sub, params.base_layer, layer_count, params.base_mip, mip_count);
         return;
     }
 

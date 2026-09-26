@@ -12,7 +12,7 @@ import reflect;
 import type_id;
 import assets;
 import name;
-import :rhcomp_reflection_capture;
+import :reflection_capture;
 
 import render_scene;
 import glm;

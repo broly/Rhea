@@ -10,6 +10,8 @@ import std.compat;
 
 import :renderer;
 import :debug_view;
+import ecs;
+import name;
 import framework;
 import rhcomponents;
 import rhmath;
@@ -26,9 +28,10 @@ void GameEngine::engine_init()
 void GameEngine::capture_reflection_probes()
 {
     auto game_renderer = std::static_pointer_cast<GameRenderer>(renderer);
-    for (const auto& actor : world->get_actors())
-        if (actor->find_component<RhComp_ReflectionCapture>())
-            game_renderer->capture_ibl(actor->get_transform().position, actor->name);
+    ecs::Registry& registry = world->registry;
+    ecs::Query<const ReflectionCapture, const Name>(registry).each([&] (ecs::Entity e, const ReflectionCapture&, const Name& name) {
+        game_renderer->capture_ibl(scene::get_world_transform(registry, e).position.glm(), name);
+    });
 }
 
 void GameEngine::on_debug_ui_menu()

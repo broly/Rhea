@@ -302,6 +302,7 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
                 buffers[index].buffer,
                 buffers[index].memory);
             vkMapMemory(device, buffers[index].memory, 0, VK_WHOLE_SIZE, 0, &buffers[index].mapped_ptr);
+            buffers[index].size = buffer_size;
             index++;
         }
         frames_ubos.emplace(handle.get_identifier(), buffers);
@@ -325,6 +326,7 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
             buffer_info.buffer,
             buffer_info.memory);
         vkMapMemory(device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
+        buffer_info.size = buffer_size;
         
         persistent_ubos[handle.get_identifier()] = buffer_info;
         return handle;
@@ -350,6 +352,7 @@ RBBufferHandle vk::BufferManager::create_storage_buffer(size_t buffer_size, Reso
                               buffers[i].buffer, buffers[i].memory);
             if (host_visible)
                 vkMapMemory(device, buffers[i].memory, 0, VK_WHOLE_SIZE, 0, &buffers[i].mapped_ptr);
+            buffers[i].size = buffer_size;
         }
 
         frames_ubos.emplace(handle.get_identifier(), buffers);
@@ -364,6 +367,7 @@ RBBufferHandle vk::BufferManager::create_storage_buffer(size_t buffer_size, Reso
                           buffer_info.buffer, buffer_info.memory);
         if (host_visible)
             vkMapMemory(device, buffer_info.memory, 0, VK_WHOLE_SIZE, 0, &buffer_info.mapped_ptr);
+        buffer_info.size = buffer_size;
         persistent_ubos[handle.get_identifier()] = buffer_info;
         return handle;
     }
@@ -372,7 +376,10 @@ RBBufferHandle vk::BufferManager::create_storage_buffer(size_t buffer_size, Reso
 void vk::BufferManager::update_any_buffer(RBBufferHandle buffer_handle, size_t size, void* data, RBFrameHandle frame)
 {
     auto& buf = get_buffer(buffer_handle, frame);
-    
+
+    // writing past the mapping silently corrupts other allocations
+    checkf(buf.mapped_ptr && size <= buf.size, "Buffer update out of bounds: %zu bytes into a %llu byte buffer (mapped: %d)",
+        size, (unsigned long long)buf.size, buf.mapped_ptr != nullptr);
     memcpy(buf.mapped_ptr, data, size);
     
     VkMappedMemoryRange range{};
@@ -398,6 +405,8 @@ void vk::BufferManager::update_buffer_element(RBBufferHandle buffer_handle, size
     VkDeviceSize aligned_end = (raw_offset + raw_size + atom_size - 1) & ~(atom_size - 1);
     VkDeviceSize aligned_size = aligned_end - aligned_offset;
 
+    checkf(buf.mapped_ptr && raw_offset + raw_size <= buf.size, "Buffer element %zu out of bounds (%zu bytes each, %llu byte buffer)",
+        index, element_size, (unsigned long long)buf.size);
     memcpy(static_cast<uint8_t*>(buf.mapped_ptr) + raw_offset, data, raw_size);
 
     VkMappedMemoryRange range{};

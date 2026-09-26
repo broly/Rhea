@@ -101,7 +101,9 @@ namespace vk
         uint32_t get_array_index(uint32_t layer_index = 0, uint32_t mip_index = 0) const
         {
             checkf(!destroyed, "Image has been destroyed");
-            return mip_index * mip_levels + layer_index;
+            // row per mip, one entry per layer (was mip_index * mip_levels: views of different
+            // layer / mip pairs collided when an image had more layers than mips, e.g. a cubemap)
+            return mip_index * num_layers + layer_index;
         }
         
         void set_img_view(VkImageView view, uint32_t layer_index = 0, uint32_t mip_index = 0)

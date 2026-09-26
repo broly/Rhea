@@ -16,10 +16,10 @@ import container_traits;
 //         [[=rh::padding]] float pad0;
 //     };
 //
-//     class RhComp_Light : public RhComp_Renderable
+//     struct Light   // plain struct (ECS component): all public fields are reflected
 //     {
-//         [[=rh::serialize]] float intensity;
-//         SceneViewProxy_Light scene_proxy;   // not reflected: RhObject fields are opt-in
+//         [[=rh::edit, =rh::speed<0.05f>]] float intensity;
+//         [[=rh::transient]] CubemapHandle cache;   // runtime state, not serialized
 //     };
 export namespace rh
 {

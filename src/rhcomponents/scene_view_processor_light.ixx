@@ -12,7 +12,7 @@ import reflect;
 import type_id;
 
 import render_scene;
-import :rhcomp_light;
+import :light;
 import glm;
 #include "object/object_reflection_macro.h"
 

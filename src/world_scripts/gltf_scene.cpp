@@ -1,127 +1,80 @@
-﻿module gltf_scene;
+﻿module;
+
+#include <json/value.h>
+
+module gltf_scene;
 
 import std.compat;
 import fixed_string;
 
-
 import log;
 import glm;
+import ecs;
+import rhmath;
 import rhcomponents;
 import assets;
 import physics;
-import globals;
-import engine;
 
 #include "logging/log_macro.h"
 
 DEFINE_LOGGER(LogImportGltf, Log);
 
-void RhComp_GltfScene::on_serialize(const SerializationContext& context)
+namespace
 {
-    AssetSceneInfo scene = AssetManager::get().load_scene(asset_path, textures_dir);
-    
-    std::vector<std::shared_ptr<RhComp_StaticMesh>> pending_mesh_comps;
-    for (auto& obj : scene.objects)
+    void import_scene(World& world, ecs::Entity root, const SerializationContext& context)
     {
-        std::vector<std::shared_ptr<Material>> mesh_materials;
-        for (auto& mat_name : obj.mesh.material_names)
-            mesh_materials.push_back(scene.materials[mat_name]);
-            
-        auto mesh_name = obj.mesh.name;
-        auto mesh_handle = AssetManager::get().store_mesh(std::move(obj.mesh));
-        std::shared_ptr<RhComp_StaticMesh> comp = owner->add_component<RhComp_StaticMesh>(true);
-        comp->name = mesh_name;
-        comp->mesh = mesh_handle;
-        comp->mats = mesh_materials;
-        comp->transform = obj.transform;
-        
-        comp->collision = collision;
-        
-        pending_mesh_comps.push_back(comp);  
-    }
+        ecs::Registry& registry = world.registry;
+        const GltfScene scene_desc = *registry.get<GltfScene>(root);
+        AssetSceneInfo scene = AssetManager::get().load_scene(scene_desc.asset_path, scene_desc.textures_dir);
 
-    // collision meshes are cooked in parallel with the texture loads (or loaded from the cache)
-    if (collision)
-    {
-        phys::PhysicsScene& physics = RhGlobals::engine->world->get_physics();
-        for (uint32_t index = 0; index < pending_mesh_comps.size(); ++index)
+        std::vector<std::shared_future<void>> texture_loads;
+        for (uint32_t index = 0; index < scene.objects.size(); ++index)
         {
-            auto comp = pending_mesh_comps[index];
-            const StaticMesh* mesh_data = &comp->mesh.get();
-            std::string cache_key = std::format("{}__{}_{}", asset_path, index, comp->name.to_string());
-            context.dc->push(std::async(std::launch::async, [comp, mesh_data, &physics, cache_key = std::move(cache_key)]
+            AssetSceneObject& object = scene.objects[index];
+
+            MeshRenderer renderer;
+            for (const auto& material_name : object.mesh.material_names)
+                renderer.materials.push_back(scene.materials[material_name]);
+            const std::string mesh_name = object.mesh.name;
+            renderer.mesh = AssetManager::get().store_mesh(std::move(object.mesh));
+
+            for (const auto& material : renderer.materials)
+                for (auto& [name, param] : material->parameters)
+                    if (param.is<TextureHandle>() && param.as<TextureHandle>() != TextureHandle::invalid())
+                        texture_loads.push_back(param.as<TextureHandle>().resolve_async());
+
+            const ecs::Entity child = registry.create();
+            registry.add<Name>(child, mesh_name);
+            registry.add<Transform>(child, object.transform);
+            registry.add<ChildOf>(child, root);
+
+            if (scene_desc.collision)
             {
-                comp->cook_collision(physics, *mesh_data, cache_key);
-            }).share());
-        }
-    }
-    
-    std::vector<std::shared_future<void>> futures;
-    
-    for (auto comp : pending_mesh_comps)
-    {
-        for (auto& mat: comp->mats)
-        {
-            for (auto& [name, param] : mat->parameters)
-            {
-                if (param.is<TextureHandle>())
-                {
-                    if (param.as<TextureHandle>() != TextureHandle::invalid())
-                        futures.push_back(param.as<TextureHandle>().resolve_async());
-                }
+                // cooked in parallel with the texture loads (or loaded from the cache); the body is created in PostLoad
+                MeshCollider collider;
+                collider.pending = std::make_shared<phys::Shape>();
+                phys::PhysicsScene& physics = world.get_physics();
+                const StaticMesh* mesh_data = &renderer.mesh.get();
+                const glm::vec3 scale = object.transform.scale.glm();
+                std::string cache_key = std::format("{}__{}_{}", scene_desc.asset_path, index, mesh_name);
+                context.dc->push(std::async(std::launch::async,
+                    [shape = collider.pending, mesh_data, scale, &physics, cache_key = std::move(cache_key)]
+                    {
+                        *shape = cook_mesh_collision(physics, *mesh_data, scale, cache_key);
+                    }).share());
+                registry.add<MeshCollider>(child, std::move(collider));
             }
+            registry.add<MeshRenderer>(child, std::move(renderer));
         }
+
+        for (auto& load : texture_loads)
+            context.dc->push(std::async(std::launch::async, [load] { load.wait(); }).share());
+
+        LogImportGltf.Log("Scene '%s': %zu meshes", scene_desc.asset_path.c_str(), scene.objects.size());
     }
-    
-    auto materials_task = std::async([this, futures] ()
-    {
-        for (auto& fut : futures)
-        {
-            fut.wait();
-        }
-    });
-    for (auto fut : futures)
-        context.dc->push(std::async(std::launch::async, [fut]() { fut.wait(); }));
-    
-    context.dc->push(std::move(materials_task));
-    // auto base_color_fut = AssetManager::get().load_texture_async(base_color_path);
-    // auto normal_fut     = AssetManager::get().load_texture_async(normal_path);
-    // auto orm_fut        = AssetManager::get().load_texture_async(orm_path);
-    //
-    // auto material_task = std::async(
-    //     std::launch::async,
-    //     [this,
-    //      material_name,
-    //      base_color_fut,
-    //      normal_fut,
-    //      orm_fut]()
-    //     {
-    //         PBRMaterial mat;
-    //
-    //         if (auto tex = base_color_fut.get(); tex.is_valid())
-    //             mat.base_color = tex;
-    //
-    //         if (auto tex = normal_fut.get(); tex.is_valid())
-    //             mat.normal = tex;
-    //
-    //         if (auto tex = orm_fut.get(); tex.is_valid())
-    //             mat.occlusion_roughness_metallic = tex;
-    //
-    //         mat.emissive = TextureHandle::invalid();
-    //
-    //         mat.emissive_mult  = 1.f;
-    //         mat.base_color_mult = 1.f;
-    //         mat.occlusion_mult  = 1.f;
-    //         mat.metallic_mult   = 1.f;
-    //         mat.roughness_mult  = 1.f;
-    //
-    //         materials.emplace(material_name, std::move(mat));
-    //     });
-    //
-    // dc->push(std::async(std::launch::async, [base_color_fut]() { base_color_fut.wait(); }));
-    // dc->push(std::async(std::launch::async, [normal_fut]()     { normal_fut.wait(); }));
-    // dc->push(std::async(std::launch::async, [orm_fut]()        { orm_fut.wait(); }));
-    //
-    // dc->push(std::move(material_task));
-    
+}
+
+void install_gltf_scene(World& world)
+{
+    scene::register_component_type<GltfScene>(import_scene);
 }

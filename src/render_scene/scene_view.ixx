@@ -51,5 +51,6 @@ public:
     
     std::vector<std::unique_ptr<SceneViewProcessor>> processors;
     
+    // bounds of all meshes, updated every frame by the render sync of the world (shadow fitting)
     AABB world_aabb;
 };

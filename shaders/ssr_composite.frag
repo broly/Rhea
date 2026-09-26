@@ -16,6 +16,12 @@ void main()
 
     vec3 ssr = ssr_sample.rgb;
     float ssr_alpha = ssr_sample.a;
+    // a non-finite reflection must not reach the frame (it spreads through every later pass)
+    if (any(isnan(ssr_sample)) || any(isinf(ssr_sample)))
+    {
+        ssr = vec3(0.0);
+        ssr_alpha = 0.0;
+    }
     
     vec4 albedo_roughness = get_gbuffer_ALBEDO_ROUGHNESS(uv);
     float roughness = albedo_roughness.a;

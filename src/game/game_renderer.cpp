@@ -14,6 +14,7 @@ import profile;
 import name;
 import rhcomponents;
 import :render_graph;
+import :generic_render_graph;
 import :constants;
 import texture_format;
 import paths;
@@ -55,6 +56,10 @@ void GameRenderer::init(RBWindowHandle in_window)
     // debug view cvars -> renderer int params (read by the render graph every frame)
     set_int_param(DebugViewParams::view_mode, (int)cv_debug_view_mode.get());
     set_int_param(DebugViewParams::show_skeleton, cv_debug_show_skeleton.get() ? 1 : 0);
+    // bisection switches for rendering artifacts, editable in Render > Render graph int params
+    set_int_param(SyncDebug::param, 0);
+    set_int_param(LightingDebug::param, 0);
+    set_int_param(GeometryDebug::param, 0);
     cv_debug_view_mode.on_changed([this] (DebugViewMode mode)
     {
         set_int_param(DebugViewParams::view_mode, (int)mode);

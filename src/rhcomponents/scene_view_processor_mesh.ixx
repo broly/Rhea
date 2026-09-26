@@ -15,7 +15,7 @@ import type_id;
 import render_scene;
 import glm;
 import assets;
-import :rhcomp_mesh;
+import :mesh;
 
 import render;
 import name;
@@ -41,6 +41,11 @@ export struct RenderObject_Mesh
     glm::mat4 prev_world = glm::mat4(1.0f);
     // moved this frame: prev_world must be synced once the object stops
     bool moved = false;
+
+    // registered and the owner of this slot (render ids are reused with a new generation):
+    // submissions of an unregistered / older owner are ignored
+    bool alive = false;
+    uint32_t generation = 0;
 };
 
 export struct RenderPrimitivePassInfo
@@ -66,7 +71,7 @@ export struct RenderPrimitive
     uint32_t debug_texture_id;
     std::string debug_texture_name;
     
-    // ---- skinning (RhComp_SkeletalMesh) ----
+    // ---- skinning (SkinnedMesh) ----
     std::shared_ptr<SkinningPose> skinning;
     std::optional<SkinnedMeshGPU> skinned;
     // pose version last written to the skinned vertices
@@ -126,8 +131,12 @@ public:
     
     virtual void on_hot_reload() override;
 
-    std::vector<RenderObject_Mesh> meshes;
+    // deque: RenderPrimitive::world points into it, registering more meshes must not move them
+    std::deque<RenderObject_Mesh> meshes;
     std::vector<RenderId> vacated_mesh_ids;
+
+    // Stops drawing the object's primitives (their slots stay allocated: ids index the primitive table)
+    void retire_primitives(RenderObject_Mesh& ro);
     
     std::vector<RenderPrimitive> primitives;
     
@@ -135,7 +144,16 @@ public:
     
     bool dirty = false;
     
-    void write_primitive_info(RenderResource& primitive_table, const RenderObject_Mesh& ro, const RenderPrimitive& rp);
+    // Primitive table (u_primitive_table: transforms, mesh / material ids by RenderPrimitive::id) is kept on the
+    // CPU and copied into the buffer of the frame being recorded (the resource is per frame in flight): writing
+    // one shared buffer would change data a frame still in flight on the GPU is reading.
+    void write_primitive_info(const RenderObject_Mesh& ro, const RenderPrimitive& rp);
+    // Uploads the table into `frame`'s buffer if it changed since that buffer was written
+    void upload_primitive_table(RenderResource& primitive_table, RBFrameHandle frame);
+
+    std::vector<GPUPrimitiveInfo> primitive_table_cpu;
+    uint64_t primitive_table_version = 1;
+    std::vector<uint64_t> primitive_table_uploaded_version;   // per frame in flight
     
     bool is_dirty() const { return dirty; }
     

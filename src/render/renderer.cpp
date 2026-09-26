@@ -25,10 +25,12 @@ import :material_manager;
 void Renderer::init(RBWindowHandle in_window)
 {
     load_schemas();
-    
+
     load_resources();
-    
-    
+
+    write_null_texture();
+
+
     SerializationContext ctx;
     ctx.strict_checking_enabled = true;
     const char* mat_manager_object = "render/material_manager.json";
@@ -105,14 +107,8 @@ void Renderer::execute_graph(
     RBFrameHandle frame = backend.get_current_frame();
 
     backend.wait_for_frame(frame);
-    
-    backend.reset_frame_fence(frame);
 
     rg->flush_pending_exr_saves();
-
-    backend.flush_frame_garbage(frame);
-
-    backend.reset_frame_fence(frame);
 
     backend.flush_frame_garbage(frame);
 
@@ -121,6 +117,9 @@ void Renderer::execute_graph(
         rg->rebuild_resources();
         return;
     }
+
+    // only once this frame is surely submitted: a reset fence that is never signaled hangs the next wait
+    backend.reset_frame_fence(frame);
 
     RBCommandList cmd = backend.begin_commands(frame);
 
@@ -133,6 +132,9 @@ void Renderer::execute_graph(
         rg->rebuild_resources();
         return;
     }
+
+    if (params.get_int(SyncDebug::param, 0) >= SyncDebug::wait_idle)
+        backend.wait_idle();
     
     if (NVTX_Finish)
         NVTX_Finish();
@@ -327,6 +329,33 @@ RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle, bool gen
     
     texture_cache.emplace(handle, image);
     return image;
+}
+
+void Renderer::write_null_texture()
+{
+    RenderResource* textures = find_resource("textures");
+    if (!textures)
+        return;
+
+    Texture null_texture;
+    null_texture.name = "null_texture";
+    null_texture.extent = Extent(1, 1);
+    null_texture.format = TextureFormat::RGBA8;
+    null_texture.id = 0;
+    null_texture.bulk.assign(4, std::byte{0});
+
+    null_texture_image = render_backend->create_texture_2d(
+        null_texture,
+        TextureCreationInfo{
+            .format_override = TextureFormat::RGBA8,
+            .generate_mips = false,
+            .imported = true,
+            // no mip generation to leave TransferDst: transition for sampling explicitly
+            .initial_layout = RBImageLayout::shader_read_only_optimal,
+            .current_layout = RBImageLayout::shader_read_only_optimal,
+        }
+    );
+    textures->update_image("u_textures_array", null_texture_image, {.array_index = 0});
 }
 
 RBImageHandle Renderer::create_cubemap_from_asset(CubemapHandle handle)

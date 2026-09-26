@@ -88,6 +88,32 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     
     // wireframe / skeleton on top of the tonemapped image
     add_debug_overlay_pass();
+
+    // F9: intermediate buffers of one frame -> cache/debug_dump/<buffer>/frame_<N>.exr.
+    // Last pass on purpose, and skipped (with its barriers) unless requested: the frame is unchanged otherwise.
+    add_exr_dump_pass({
+        .name = "DebugDumpFrame",
+        .subdir = "debug_dump",
+        .entries = {
+            { .texture = gbuffer[GBUFFER_SLOTS::NORMAL], .subdir = "g_normal" },
+            { .texture = gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], .subdir = "g_world_normal" },
+            { .texture = gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], .subdir = "g_linear_depth" },
+            { .texture = gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], .subdir = "g_albedo_roughness" },
+            { .texture = gbuffer[GBUFFER_SLOTS::POSITION], .subdir = "g_position" },
+            { .texture = gbuffer[GBUFFER_SLOTS::MOTION_VECTORS], .subdir = "g_motion_vectors", .out_channels = 3 },
+            { .texture = gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL], .subdir = "g_geometry_normal" },
+            { .texture = gbuffer[GBUFFER_SLOTS::EMISSIVE], .subdir = "g_emissive" },
+            { .texture = decal_albedo, .subdir = "decal_albedo" },
+            { .texture = hdr_color_present[COLOR_OUTPUT_HDR::BASE], .subdir = "hdr_base" },
+            { .texture = hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE], .subdir = "hdr_intermediate" },
+        },
+        .condition = [] (const RenderGraphParameters&) { return true; },
+        .pass_condition = [this] ()
+        {
+            auto it = one_time_render_flags.find("debug_dump_frame");
+            return it != one_time_render_flags.end() && it->second;
+        },
+    });
 }
 
 void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)

@@ -21,6 +21,7 @@ namespace vk
         VkBuffer buffer;
         VkDeviceMemory memory;
         void* mapped_ptr = nullptr;
+        VkDeviceSize size = 0;
     };
     
     class BufferManager

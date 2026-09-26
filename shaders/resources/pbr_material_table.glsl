@@ -79,6 +79,15 @@ vec4 read_texture(uint index, vec2 uv)
     return texture(u_textures_array[nonuniformEXT(index)], uv);
 }
 
+// Index 0 means "no texture" (texture ids start at 1): the fallback is used, the material factors apply.
+// Slot 0 holds a black 1x1 texture (Renderer::write_null_texture), so it is sampled unconditionally:
+// no texture() in divergent control flow (implicit derivatives), no unwritten descriptor.
+vec4 read_texture_or(uint index, vec2 uv, vec4 fallback)
+{
+    vec4 texel = texture(u_textures_array[nonuniformEXT(index)], uv);
+    return index == 0u ? fallback : texel;
+}
+
 GPUMaterial get_material(uint index)
 {
     return materials.materials[nonuniformEXT(index)];
@@ -88,15 +97,16 @@ GPUMaterial get_material(uint index)
 vec4 get_base_color(in GPUMaterial mat, vec2 uv)
 {
     uint base_color_tex_index = mat.textures0.x;
-    vec4 base_color = read_texture(base_color_tex_index, uv);
+    vec4 base_color = read_texture_or(base_color_tex_index, uv, vec4(1.0));
     return base_color * mat.params0.x;
 }
 
 
+// tangent space normal map texel (no texture: flat, see geometry.frag for the decoding)
 vec4 get_normal(in GPUMaterial mat, vec2 uv)
 {
     uint normal_tex_index = mat.textures0.y;
-    vec4 normal = read_texture(normal_tex_index, uv);
+    vec4 normal = read_texture_or(normal_tex_index, uv, vec4(0.5, 0.5, 1.0, 1.0));
     return normal;
 }
 
@@ -105,7 +115,7 @@ vec4 get_normal(in GPUMaterial mat, vec2 uv)
 vec4 get_emissive(in GPUMaterial mat, vec2 uv)
 {
     uint emissive_color_tex_index = mat.textures0.w;
-    vec4 emissive_color = read_texture(emissive_color_tex_index, uv);
+    vec4 emissive_color = read_texture_or(emissive_color_tex_index, uv, vec4(0.0));
     return emissive_color * mat.params0.y;
 }
 
@@ -113,7 +123,7 @@ vec4 get_emissive(in GPUMaterial mat, vec2 uv)
 vec3 get_orm(in GPUMaterial mat, vec2 uv)
 {
     uint orm_tex_index = mat.textures0.z;
-    vec3 orm_color = read_texture(orm_tex_index, uv).rgb;
+    vec3 orm_color = read_texture_or(orm_tex_index, uv, vec4(1.0)).rgb;
     vec3 orm_factor = mat.params1.xyz;
     return orm_color * orm_factor;
 }

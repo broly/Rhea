@@ -205,7 +205,10 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         {
             .name = "g_emissive",
             .extent = resolution,
-            .format = TextureFormat::RGBA8_UNORM,
+            // HDR emissive (RGBA8 clamped it to 1). As RGBA8 (the 8th color target) its B/A bytes intermittently
+            // came back as 4x8 texel blocks of garbage under heavy load on an RTX 4080 Laptop, with correct
+            // shaders and full GPU serialization: compression / driver level, see memory notes
+            .format = TextureFormat::RGBA16F,
             .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
             .external = false,
             .dimension = capture_dimension
@@ -287,7 +290,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         {
             .name = "g_emissive_hist",
             .extent = resolution,
-            .format = TextureFormat::RGBA8_UNORM,
+            .format = TextureFormat::RGBA16F,
             .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
             .external = false,
             .dimension = capture_dimension,
@@ -667,9 +670,15 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             pc.buffer_index = render_settings::enable_raytracing
                 ? (uint32_t)COLOR_OUTPUT_HDR::RTXGI_FILTERED
                 : LIGHTING_GI_FROM_IBL;
+            pc.debug_flags = (uint32_t)ctx.params.get_int(LightingDebug::param, 0);
             ctx.push_constants(pc);
             
+            const bool emissive_watch = diag_enabled() && (pc.debug_flags & LightingDebug::emissive_watch) != 0;
+            if (emissive_watch)
+                backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_LIGHTING);
             ctx.draw_fullscreen();
+            if (emissive_watch)
+                backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_LIGHTING);
         },
         .num_layers = num_pass_instances
     });
@@ -828,7 +837,12 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     prepared_batches.clear();
 
+    read_diag_queries(ctx);
+
     // -------- resources --------
+    // this frame's copy of the primitive table (the previous frame may still be reading its own on the GPU)
+    engine->scene_view->get_processor<SceneViewProcessor_Mesh>().upload_primitive_table(*primitive_table_resource, ctx.frame);
+    
     prepare_geometry_resources(ctx);
     
     
@@ -858,7 +872,8 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
 
             for (auto& prim : mesh_processor.primitives)
             {
-                if (!prim.passes.contains("GeometryTranslucent"))
+                // retired primitives (their mesh was unregistered) have no passes
+                if (!prim.passes.empty() && !prim.passes.contains("GeometryTranslucent"))
                 {
                     tlas_objs.push_back({
                         prim.mesh,
@@ -1301,7 +1316,8 @@ void GenericRenderGraph::dispatch_skinning(RenderGraphContext& ctx)
     std::vector<RenderPrimitive*> pending;
     for (auto& prim : mesh_processor.primitives)
     {
-        if (prim.is_skinned() && prim.skinned_pose_version != prim.skinning->version)
+        // no pose: retired primitive (its mesh was unregistered)
+        if (prim.is_skinned() && prim.skinning && prim.skinned_pose_version != prim.skinning->version)
             pending.push_back(&prim);
     }
     
@@ -1394,6 +1410,10 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     std::shared_ptr<PipelineFamily> family = renderer->query_pipeline_family(ctx.pass_name, pbr);
     
     PROFILE("GenericRenderGraph::draw_scene - items");
+    const uint32_t geometry_debug = (uint32_t)ctx.params.get_int(GeometryDebug::param, 0);
+    const bool diag_geometry = diag_enabled() && ctx.pass_name == Names::pass_geometry_base;
+    if (diag_geometry)
+        backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
     for (auto& item : items)
     {
         const RenderPrimitive& prim = *item.primitive;
@@ -1420,13 +1440,83 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         pc.mesh_id = prim.mesh_index;
         pc.primitive_id = prim.id;
         pc.material_id = prim_info->material_index;
-        pc.debug_id = 0;
+        pc.debug_id = geometry_debug;
         
         ctx.push_constants(pc);
-        
+
         ctx.draw(prim.mesh.get().indices.size());
     }
-    
+    if (diag_geometry)
+        backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
+
+}
+
+void GenericRenderGraph::read_diag_queries(RenderGraphContext& ctx)
+{
+    if (num_pass_instances != 1)
+        return;
+    if (diag_queries.handle == 0)
+        diag_queries = backend->create_occlusion_pool(kRenderMaxFramesInFlight * DIAG_COUNT);
+    if (diag_queries.handle == 0)
+        return;
+
+    // this frame slot's fence was waited: its previous queries are complete (or were never written)
+    const uint32_t first = ctx.frame * DIAG_COUNT;
+    ++diag_frame_counter;
+    uint64_t clouds = 0;
+    uint64_t geometry = 0;
+    uint64_t lighting = 0;
+    const bool has_clouds = backend->read_query_results(diag_queries, first + DIAG_CLOUDS, 1, &clouds);
+    const bool has_geometry = backend->read_query_results(diag_queries, first + DIAG_GEOMETRY, 1, &geometry);
+    const bool has_lighting = backend->read_query_results(diag_queries, first + DIAG_LIGHTING, 1, &lighting);
+    backend->reset_queries(diag_queries, first, DIAG_COUNT);
+
+    const Extent extent = backend->get_swapchain_extent();
+    const double pixels = double(extent.width) * double(extent.height);
+
+    // emissive watch: the lighting pass discarded every legacy-model pixel with a non-zero emissive
+    // (these frames were recorded MAX_FRAMES_IN_FLIGHT frames ago)
+    if (has_lighting && pixels > 0.0)
+    {
+        const double bad = std::max(0.0, pixels - double(lighting));
+        const double now = RhGlobals::engine->world->get_time_seconds();
+        // the checked periphery (see lighting.frag) is 58% of the screen
+        if (bad > pixels * 0.01)
+        {
+            ++emissive_watch_frames_since_log;
+            if (now - emissive_watch_last_log_time > 0.5)
+            {
+                LogGenericRG.Log("Emissive watch (frame %llu, t=%.2f s): %.0f corrupted pixels (%.1f%% of the screen), %u flagged frames since the last message",
+                    (unsigned long long)diag_frame_counter, now, bad, 100.0 * bad / pixels, emissive_watch_frames_since_log);
+                emissive_watch_last_log_time = now;
+                emissive_watch_frames_since_log = 0;
+            }
+            // the flash usually lasts several frames: this frame is likely still corrupted
+            constexpr uint32_t max_dumps = 5;
+            if (emissive_watch_dumps < max_dumps && now - emissive_watch_last_dump_time > 1.0)
+            {
+                ++emissive_watch_dumps;
+                emissive_watch_last_dump_time = now;
+                set_flag("debug_dump_frame", true, false, true);
+                LogGenericRG.Log("Emissive watch: dumping g-buffer of frame %llu to cache/debug_dump (%u/%u)",
+                    (unsigned long long)diag_frame_counter, emissive_watch_dumps, max_dumps);
+            }
+        }
+    }
+
+    if (!has_clouds)
+        return;
+    if (diag_frame_counter == 300)
+        LogGenericRG.Log("Sky flash diagnostics active: frame 300 clouds %.1f%% of the screen, base pass samples %s",
+            pixels > 0.0 ? 100.0 * double(clouds) / pixels : 0.0,
+            has_geometry ? std::to_string(geometry).c_str() : "n/a");
+    if (pixels > 0.0 && double(clouds) > pixels * 0.9)
+    {
+        LogGenericRG.Log("Sky flash (frame %llu, t=%.2f s): clouds covered %.0f%% of the screen, base pass samples: %s",
+            (unsigned long long)diag_frame_counter, RhGlobals::engine->world->get_time_seconds(),
+            100.0 * double(clouds) / pixels,
+            has_geometry ? std::to_string(geometry).c_str() : "n/a");
+    }
 }
 
 
@@ -1478,7 +1568,11 @@ void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle de
     {
         ctx.bind(camera_resource, clouds_resource, gbuffer_resource);
     }
+    if (diag_enabled())
+        backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_CLOUDS);
     ctx.draw_fullscreen();
+    if (diag_enabled())
+        backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_CLOUDS);
 
 }
 

@@ -4,6 +4,8 @@ import std.compat;
 import fixed_string;
 
 import log;
+import name;
+import ecs;
 
 #include "logging/log_macro.h"
 
@@ -85,7 +87,7 @@ static const CharacterLightRig::Preset PRESETS[] =
 static constexpr size_t NUM_PRESETS = sizeof(PRESETS) / sizeof(PRESETS[0]);
 
 
-bool CharacterLightRig::init(World& world, std::shared_ptr<RhActor> in_character, const std::string& light_actor_prefix)
+bool CharacterLightRig::init(World& world, ecs::Entity in_character, const std::string& light_entity_prefix)
 {
     character = in_character;
     if (!character)
@@ -93,13 +95,13 @@ bool CharacterLightRig::init(World& world, std::shared_ptr<RhActor> in_character
 
     for (size_t i = 0; i < NUM_LIGHTS; ++i)
     {
-        auto actor = world.find_actor_by_name(light_actor_prefix + std::to_string(i));
-        if (!actor || !actor->find_component<RhComp_Light>())
+        const ecs::Entity light = world.find_entity(Name(light_entity_prefix + std::to_string(i)));
+        if (!light || !world.registry.has<Light>(light))
         {
-            LogLightRig.Log("Light rig: no light actor '%s%zu'", light_actor_prefix.c_str(), i);
+            LogLightRig.Log("Light rig: no light entity '%s%zu'", light_entity_prefix.c_str(), i);
             return false;
         }
-        light_actors.push_back(actor);
+        lights.push_back(light);
     }
 
     apply_preset_log();
@@ -149,9 +151,12 @@ void CharacterLightRig::apply_preset_log() const
     LogLightRig.Log("Lighting preset %zu/%zu: %s", preset_index + 1, NUM_PRESETS, get_preset_name());
 }
 
-void CharacterLightRig::tick()
+void CharacterLightRig::tick(ecs::Registry& registry)
 {
-    const Transform ct = character->get_transform();
+    if (!registry.alive(character))
+        return;
+
+    const Transform ct = scene::get_world_transform(registry, character);
     const glm::vec3 base = ct.position.glm();
     const glm::vec3 forward = ct.rotation.glm() * glm::vec3(0, 0, 1);   // glTF characters face +Z
     const glm::vec3 right = ct.rotation.glm() * glm::vec3(-1, 0, 0);
@@ -162,13 +167,11 @@ void CharacterLightRig::tick()
     for (size_t i = 0; i < NUM_LIGHTS; ++i)
     {
         const RigLight& rig_light = preset.lights[i];
-        auto light = light_actors[i]->find_component<RhComp_Light>();
+        if (Light* light = registry.get<Light>(lights[i]))
+            light->color = glm::vec4(rig_light.color, 0.0f);
 
-        light->color = glm::vec4(rig_light.color, 0.0f);
-        light->update_scene_proxy();
-
-        Transform t = light_actors[i]->get_transform();
+        Transform t = scene::get_world_transform(registry, lights[i]);
         t.position = base + forward * rig_light.offset.x + right * rig_light.offset.y + up * rig_light.offset.z;
-        light_actors[i]->set_transform(t);   // submits the proxy (color included)
+        scene::set_world_transform(registry, lights[i], t);
     }
 }

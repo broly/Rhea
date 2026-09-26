@@ -354,6 +354,7 @@ void RenderGraph::add_exr_dump_pass(const ExrDumpPassDesc& desc)
 
     add_pass({
         .name    = desc.name,
+        .condition = desc.pass_condition,
         .reads   = std::move(reads),
         .writes  = {},
         .execute = [this, entries = std::move(entries), subdir = std::move(subdir), condition_fn]
@@ -738,6 +739,10 @@ void RenderGraph::flush_pending_exr_saves()
 {
     if (pending_exr_saves.empty()) return;
 
+    // the readbacks were recorded by the previous frame, which may still be running (only this frame
+    // slot's fence was waited)
+    backend->wait_idle();
+
     for (auto& job : pending_exr_saves)
     {
         ImageReadback readback = backend->finalize_readback(job.readback);
@@ -746,16 +751,20 @@ void RenderGraph::flush_pending_exr_saves()
         checkf(e.layer < readback.layers, "...");
         checkf(e.mip   < readback.mips,   "...");
 
-        const std::vector<float>& pixels = readback.data[e.layer][e.mip];
         const Extent mip_extent = ImageReadback::mip_extent(readback.extent, e.mip);
 
         const uint32_t src_channels = readback.channels;
         const uint32_t out_channels = (e.out_channels == 0) ? src_channels : e.out_channels;
 
-        exr_dump::save_exr_padded(
-            job.full_path, pixels.data(),
-            mip_extent.width, mip_extent.height,
-            src_channels, out_channels, e.placeholder);
+        // compressing big EXRs takes seconds (minutes in debug builds at full screen): not on the frame
+        std::thread([pixels = std::move(readback.data[e.layer][e.mip]), path = job.full_path, mip_extent,
+                     src_channels, out_channels, placeholder = e.placeholder]
+        {
+            exr_dump::save_exr_padded(
+                path, pixels.data(),
+                mip_extent.width, mip_extent.height,
+                src_channels, out_channels, placeholder);
+        }).detach();
     }
     pending_exr_saves.clear();
 }
@@ -772,6 +781,10 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     RenderGraphContext ctx(*backend, cmd, {}, *this, params);
     ctx.frame = frame;
 
+    const int sync_debug = params.get_int(SyncDebug::param, 0);
+    if (sync_debug >= SyncDebug::frame_barrier)
+        backend->debug_full_barrier(cmd);
+
     // Initialize external images (swapchain)
     for (auto& tex : textures)
         tex.reset_layout();  // for swapchain: transfer_present
@@ -786,6 +799,9 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         
         if (pass.condition && !pass.condition())
             continue;
+
+        if (sync_debug >= SyncDebug::pass_barriers)
+            backend->debug_full_barrier(cmd);
         
         for (const auto& [tex, barrier] : pass.pass_barriers)
         {

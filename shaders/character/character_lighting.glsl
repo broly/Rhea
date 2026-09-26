@@ -146,7 +146,7 @@ vec3 character_env_brdf_approx(vec3 F0, float roughness, float NdotV)
 
 // gi: irradiance-like signal (RT GI or IBL irradiance, same term as legacy: gi * albedo)
 // Specular comes from the prefiltered environment of the nearest reflection capture.
-vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi, vec3 pos)
+vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi, vec3 pos, bool specular_ibl)
 {
     float NdotV = max(dot(g.N, V), 1e-4);
 
@@ -156,7 +156,7 @@ vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi, vec3 pos)
 
     vec3 R = reflect(-V, g.N);
     float max_lod = float(textureQueryLevels(u_prefilter_map) - 1);
-    vec3 prefiltered = textureLod(u_prefilter_map, R, g.roughness * max_lod).rgb;
+    vec3 prefiltered = specular_ibl ? textureLod(u_prefilter_map, R, g.roughness * max_lod).rgb : vec3(0.0);
 
     vec3 specular = prefiltered * character_env_brdf_approx(F0, g.roughness, NdotV);
 

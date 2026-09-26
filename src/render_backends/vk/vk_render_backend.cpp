@@ -955,6 +955,67 @@ void VkRenderBackend::cmd_write_timestamp(
         query_index);
 }
 
+void VkRenderBackend::wait_idle()
+{
+    vkDeviceWaitIdle(instance.get_device());
+}
+
+void VkRenderBackend::debug_full_barrier(RBCommandList cmd)
+{
+    VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    vkCmdPipelineBarrier(
+        cmd.as<VkCommandBuffer>(),
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        0,
+        1, &barrier,
+        0, nullptr,
+        0, nullptr);
+}
+
+RBQueryPool VkRenderBackend::create_occlusion_pool(uint32_t query_count)
+{
+    VkQueryPoolCreateInfo qpci{ VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+    qpci.queryType  = VK_QUERY_TYPE_OCCLUSION;
+    qpci.queryCount = query_count;
+
+    VkQueryPool pool = VK_NULL_HANDLE;
+    if (vkCreateQueryPool(instance.get_device(), &qpci, nullptr, &pool) != VK_SUCCESS)
+        return RBQueryPool{};
+    vkResetQueryPool(instance.get_device(), pool, 0, query_count);
+    return RBQueryPool{ pool };
+}
+
+void VkRenderBackend::cmd_begin_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index)
+{
+    vkCmdBeginQuery(cmd.as<VkCommandBuffer>(), pool.as<VkQueryPool>(), query_index, VK_QUERY_CONTROL_PRECISE_BIT);
+}
+
+void VkRenderBackend::cmd_end_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index)
+{
+    vkCmdEndQuery(cmd.as<VkCommandBuffer>(), pool.as<VkQueryPool>(), query_index);
+}
+
+bool VkRenderBackend::read_query_results(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values)
+{
+    const VkResult res = vkGetQueryPoolResults(
+        instance.get_device(),
+        pool.as<VkQueryPool>(),
+        first_query, query_count,
+        query_count * sizeof(uint64_t),
+        out_values,
+        sizeof(uint64_t),
+        VK_QUERY_RESULT_64_BIT);
+    return res == VK_SUCCESS;
+}
+
+void VkRenderBackend::reset_queries(RBQueryPool pool, uint32_t first_query, uint32_t query_count)
+{
+    vkResetQueryPool(instance.get_device(), pool.as<VkQueryPool>(), first_query, query_count);
+}
+
 bool VkRenderBackend::read_timestamps(
     RBQueryPool pool_handle, uint32_t first_query, uint32_t query_count,
     uint64_t* out_values)

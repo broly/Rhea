@@ -109,7 +109,12 @@ protected:  // internal functions
     
     void load_schemas();
     void load_resources();
-    
+
+    // Writes u_textures_array[0]: texture ids start at 1, materials without a texture keep index 0, and a
+    // partially bound array must never be read at an unwritten slot (undefined behavior: garbage texels,
+    // NaN, device lost). Shaders are expected to skip index 0, this makes a miss harmless (black).
+    void write_null_texture();
+
 protected:  // internal system accessors
     std::shared_ptr<RenderBackend> render_backend;
     std::shared_ptr<RenderGraph> main_render_graph;
@@ -135,7 +140,8 @@ protected: // materials and resources
 protected:  // textures
     std::map<TextureHandle, RBImageHandle> texture_cache;
     std::map<CubemapHandle, RBImageHandle> cubemap_cache;
-    
+    RBImageHandle null_texture_image;
+
     struct RenderGraphJob
     {
         Name render_graph_name;

@@ -1,7 +1,7 @@
 {
 	"resource": {
 		"name": "primitive_table",
-		"usage": "persistent",
+		"usage": "frame",
 		"allowed_stages": ["vertex", "rtx_raygen", "rtx_any_hit", "rtx_closest_hit", "rtx_miss", "rtx_intersection"],
 		"parameters": {
 			"mesh_table": {

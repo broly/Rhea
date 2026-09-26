@@ -14,7 +14,7 @@ import type_id;
 import render_scene;
 import glm;
 import name;
-import :rhcomp_camera;
+import :camera;
 
 #include "object/object_reflection_macro.h"
 

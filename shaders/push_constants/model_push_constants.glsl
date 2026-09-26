@@ -24,9 +24,14 @@ uint get_primitive_index()
     return model_pc.primitive_id;
 }
 
+// base pass: GeometryDebug bits (generic_render_graph.ixx)
 uint get_debug_index()
 {
     return model_pc.debug_id;
 }
+
+const uint GEOMETRY_DEBUG_ZERO_EMISSIVE = 1u;
+const uint GEOMETRY_DEBUG_EMISSIVE_INDEX_CHECK = 2u;
+const uint GEOMETRY_DEBUG_SOLID_EMISSIVE = 4u;
 
 #endif // PUSH_CONSTANTS_MODEL

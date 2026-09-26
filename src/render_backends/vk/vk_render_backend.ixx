@@ -136,6 +136,13 @@ public:   /// API Section
     virtual void cmd_reset_timestamp_pool(RBCommandList cmd, RBQueryPool pool, uint32_t query_count) override;
     virtual void cmd_write_timestamp(RBCommandList cmd, RBQueryPool pool, uint32_t query_index, bool bottom_of_pipe) override;
     virtual bool read_timestamps(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values) override;
+    virtual void wait_idle() override;
+    virtual void debug_full_barrier(RBCommandList cmd) override;
+    virtual RBQueryPool create_occlusion_pool(uint32_t query_count) override;
+    virtual void cmd_begin_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index) override;
+    virtual void cmd_end_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index) override;
+    virtual bool read_query_results(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values) override;
+    virtual void reset_queries(RBQueryPool pool, uint32_t first_query, uint32_t query_count) override;
     virtual void copy_image_to_buffer(RBImageHandle img, std::vector<float>& buf, TextureFormat& format, Extent extent) override;
     virtual RBVertexBufferHandle create_vertex_buffer(const VertexBufferDesc& desc) override;
     virtual void* get_vertex_buffer_ptr(RBVertexBufferHandle handle, RBFrameHandle frame) override;
