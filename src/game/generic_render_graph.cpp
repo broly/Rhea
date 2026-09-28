@@ -301,6 +301,7 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     
     
+    if (emissive_diagnostics_enabled())
     emissive_ring = create_texture({
         .name = "g_emissive_ring",
         .extent = resolution,
@@ -495,6 +496,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
     
     // emissive watch ring (see EMISSIVE_RING_SIZE): g_emissive as the base pass left it
+    if (emissive_diagnostics_enabled())
     add_pass({
         .name = "COPY_gbuffer_emissive_to_watch_ring",
         .condition = [this] () { return emissive_watch_active; },
@@ -736,6 +738,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 ? (uint32_t)COLOR_OUTPUT_HDR::RTXGI_FILTERED
                 : LIGHTING_GI_FROM_IBL;
             pc.debug_flags = (uint32_t)ctx.params.get_int(LightingDebug::param, 0);
+            if (!emissive_diagnostics_enabled())
+                pc.debug_flags &= ~LightingDebug::emissive_watch;
             ctx.push_constants(pc);
             
             const bool emissive_watch = diag_enabled() && (pc.debug_flags & LightingDebug::emissive_watch) != 0;
@@ -1550,9 +1554,20 @@ void GenericRenderGraph::draw_items(RenderGraphContext& ctx, const std::vector<c
     }
 }
 
+bool GenericRenderGraph::emissive_diagnostics_enabled()
+{
+    static const bool enabled = []
+    {
+        const char* watch = std::getenv("RHEA_EMISSIVE_WATCH");
+        return (watch && watch[0] == '1') || std::getenv("RHEA_SOAK_SECONDS") != nullptr;
+    }();
+    return enabled;
+}
+
 void GenericRenderGraph::read_diag_queries(RenderGraphContext& ctx)
 {
-    if (num_pass_instances != 1)
+    // without the pool diag_enabled() stays false: no queries are recorded anywhere
+    if (num_pass_instances != 1 || !emissive_diagnostics_enabled())
         return;
     if (diag_queries.handle == 0)
         diag_queries = backend->create_occlusion_pool(kRenderMaxFramesInFlight * DIAG_COUNT);

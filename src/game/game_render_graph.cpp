@@ -91,26 +91,28 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
 
     // F9: intermediate buffers of one frame -> cache/debug_dump/<buffer>/frame_<N>.exr.
     // Last pass on purpose, and skipped (with its barriers) unless requested: the frame is unchanged otherwise.
+    std::vector<ExrDumpEntry> dump_entries = {
+        { .texture = gbuffer[GBUFFER_SLOTS::NORMAL], .subdir = "g_normal" },
+        { .texture = gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], .subdir = "g_world_normal" },
+        { .texture = gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], .subdir = "g_linear_depth" },
+        { .texture = gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], .subdir = "g_albedo_roughness" },
+        { .texture = gbuffer[GBUFFER_SLOTS::POSITION], .subdir = "g_position" },
+        { .texture = gbuffer[GBUFFER_SLOTS::MOTION_VECTORS], .subdir = "g_motion_vectors", .out_channels = 3 },
+        { .texture = gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL], .subdir = "g_geometry_normal" },
+        { .texture = gbuffer[GBUFFER_SLOTS::EMISSIVE], .subdir = "g_emissive" },
+        { .texture = decal_albedo, .subdir = "decal_albedo" },
+        { .texture = hdr_color_present[COLOR_OUTPUT_HDR::BASE], .subdir = "hdr_base" },
+        { .texture = hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE], .subdir = "hdr_intermediate" },
+    };
+    // emissive watch ring (GenericRenderGraph::EMISSIVE_RING_SIZE layers, the log names the corrupted one)
+    if (emissive_diagnostics_enabled())
+        for (uint32_t layer = 0; layer < EMISSIVE_RING_SIZE; ++layer)
+            dump_entries.push_back({ .texture = emissive_ring, .subdir = "g_emissive_ring_" + std::to_string(layer), .layer = layer });
+
     add_exr_dump_pass({
         .name = "DebugDumpFrame",
         .subdir = "debug_dump",
-        .entries = {
-            { .texture = gbuffer[GBUFFER_SLOTS::NORMAL], .subdir = "g_normal" },
-            { .texture = gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], .subdir = "g_world_normal" },
-            { .texture = gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], .subdir = "g_linear_depth" },
-            { .texture = gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], .subdir = "g_albedo_roughness" },
-            { .texture = gbuffer[GBUFFER_SLOTS::POSITION], .subdir = "g_position" },
-            { .texture = gbuffer[GBUFFER_SLOTS::MOTION_VECTORS], .subdir = "g_motion_vectors", .out_channels = 3 },
-            { .texture = gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL], .subdir = "g_geometry_normal" },
-            { .texture = gbuffer[GBUFFER_SLOTS::EMISSIVE], .subdir = "g_emissive" },
-            // emissive watch ring (GenericRenderGraph::EMISSIVE_RING_SIZE layers, the log names the corrupted one)
-            { .texture = emissive_ring, .subdir = "g_emissive_ring_0", .layer = 0 },
-            { .texture = emissive_ring, .subdir = "g_emissive_ring_1", .layer = 1 },
-            { .texture = emissive_ring, .subdir = "g_emissive_ring_2", .layer = 2 },
-            { .texture = decal_albedo, .subdir = "decal_albedo" },
-            { .texture = hdr_color_present[COLOR_OUTPUT_HDR::BASE], .subdir = "hdr_base" },
-            { .texture = hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE], .subdir = "hdr_intermediate" },
-        },
+        .entries = std::move(dump_entries),
         .condition = [] (const RenderGraphParameters&) { return true; },
         .pass_condition = [this] ()
         {

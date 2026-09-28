@@ -249,6 +249,10 @@ public:
     double renderdoc_last_request_time = -1.0e9;
     bool diag_enabled() const { return num_pass_instances == 1 && diag_queries.handle != 0; }
     void read_diag_queries(RenderGraphContext& ctx);
+    // Diagnostics of the blocky g-buffer emissive garbage (GPU load-step transient, see the emissive watch):
+    // occlusion queries (sky flash, base pass, emissive watch), the watch ring and its F9 dump entries.
+    // Off by default; RHEA_EMISSIVE_WATCH=1 turns them on (implied by RHEA_SOAK_SECONDS soak runs)
+    static bool emissive_diagnostics_enabled();
 
     RGTextureHandle brdf_lut;
     
