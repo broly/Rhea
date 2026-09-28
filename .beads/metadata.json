@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "Rhea",
+  "project_id": "376f134c-b605-4dc2-9e8e-548ece558e8d"
+}
