@@ -144,6 +144,9 @@ void vk::Instance::init(GLFWwindow* in_window)
     features.samplerAnisotropy = VK_TRUE;
     features.shaderInt64 = VK_TRUE;
     features.occlusionQueryPrecise = VK_TRUE;   // exact sample counts (render graph diagnostics)
+    // indirect mesh draws (DrawList): several draws per vkCmdDrawIndirect, the draw record index in firstInstance
+    features.multiDrawIndirect = VK_TRUE;
+    features.drawIndirectFirstInstance = VK_TRUE;
     
     for (uint32_t family : unique_families) {
         VkDeviceQueueCreateInfo qi{
@@ -155,14 +158,27 @@ void vk::Instance::init(GLFWwindow* in_window)
         queue_infos.push_back(qi);
     }
     
-    const char* device_extensions[] = {
+    std::vector<const char*> device_extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
         VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-        VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,   // cooperative-matrix denoiser path
     };
+
+    // cooperative-matrix denoiser path: optional, RenderDoc (1.44) hides the extension
+    uint32_t available_extension_count = 0;
+    vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &available_extension_count, nullptr);
+    std::vector<VkExtensionProperties> available_extensions(available_extension_count);
+    vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &available_extension_count, available_extensions.data());
+    const bool has_cooperative_matrix = std::ranges::any_of(available_extensions, [] (const VkExtensionProperties& ext)
+    {
+        return std::string_view(ext.extensionName) == VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME;
+    });
+    if (has_cooperative_matrix)
+        device_extensions.push_back(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+    else
+        LogVkInstance.Log("VK_KHR_cooperative_matrix not available (RenderDoc?): the cooperative-matrix denoiser path is unusable");
     
     
     VkDeviceCreateInfo dci{
@@ -171,8 +187,8 @@ void vk::Instance::init(GLFWwindow* in_window)
     dci.queueCreateInfoCount = static_cast<uint32_t>(queue_infos.size());
     dci.pQueueCreateInfos = queue_infos.data();
     dci.pEnabledFeatures = &features;
-    dci.enabledExtensionCount = array_size(device_extensions);
-    dci.ppEnabledExtensionNames = device_extensions;
+    dci.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size());
+    dci.ppEnabledExtensionNames = device_extensions.data();
     //
     // VkPhysicalDeviceBufferDeviceAddressFeatures bufferAddress{
     //     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES
@@ -222,7 +238,7 @@ void vk::Instance::init(GLFWwindow* in_window)
     coopMatFeatures.cooperativeMatrix = VK_TRUE;
     coopMatFeatures.pNext = &features13;
 
-    dci.pNext = &coopMatFeatures;
+    dci.pNext = has_cooperative_matrix ? (void*)&coopMatFeatures : (void*)&features13;
 
     VK_CHECK(
         vkCreateDevice(physical_device, &dci, nullptr, &device)

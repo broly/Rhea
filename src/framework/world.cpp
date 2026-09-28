@@ -29,6 +29,8 @@ import profile;
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
 #include "profiling/profile.h"
+#include "ecs/ecs_macros.h"
+#include "framework/scene_macros.h"
 
 DEFINE_LOGGER(LogWorld, Log);
 
@@ -37,27 +39,29 @@ namespace
     // prefabs referencing prefabs
     constexpr int max_prefab_depth = 16;
 
+    [[=ecs::system<ecs::Phase::FixedPost>]]
     void physics_step(ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
     {
         PROFILE("World::physics_step");
         physics->step((float)time->dt);
     }
 
-    // first in Late: render sync and debug tools read WorldTransform
+    [[=ecs::system<ecs::Phase::Late>, =ecs::in_set<scene::TransformPropagation>]]
     void propagate_transforms(ecs::Registry& registry)
     {
         scene::propagate_transforms(registry);
     }
+
+    ECS_REGISTER()
+    SCENE_REGISTER_COMPONENTS(Transform, ChildOf)
 }
 
 World::World()
 {
-    scene::register_component_type<Transform>();
-    scene::register_component_type<ChildOf>();
-
-    schedule.add<&physics_step>(ecs::Phase::FixedPost);
-    schedule.add<&propagate_transforms>(ecs::Phase::Late);
-}
+    // everything registered with ECS_REGISTER / SCENE_REGISTER_COMPONENTS, in any module
+    scene::register_auto_components();
+    ecs::add_auto_hooks(registry);
+    schedule.add_auto_systems();}
 
 void World::tick()
 {
@@ -104,6 +108,13 @@ void World::init()
         .shape_cache_dir = paths::get_cache_path() / "physics",
     });
     registry.set_resource_ref(*physics);
+
+    for (const ecs::Ambiguity& a : schedule.find_ambiguities())
+    {
+        LogWorld.Log("Systems %s and %s (%s) both access %s without an order: add ecs::before / ecs::after, "
+            "or ecs::ambiguous_with if the order does not matter", a.first->name.c_str(), a.second->name.c_str(),
+            std::string(ecs::phase_name(a.first->phase)).c_str(), a.conflict.c_str());
+    }
 
     load_bootstrap_level();
 

@@ -94,11 +94,114 @@ export
             return detail::add_component_type(std::move(type));
         }
 
+        // Component types that register themselves (scene_macros.h), no central list:
+        //
+        //     struct [[=scene::runtime_only]] CharacterInput { ... };      // .ixx: inspector only, not in JSON
+        //
+        //     namespace                                                     // .cpp of the module
+        //     {
+        //         [[=scene::on_spawned<GltfScene>]]
+        //         void import_scene(World& world, ecs::Entity e, const SerializationContext& context) { ... }
+        //
+        //         SCENE_REGISTER_COMPONENTS(GltfScene, CharacterInput)     // after the on_spawned functions
+        //     }
+        //
+        // Static initialization only records them; register_auto_components (World) does the registration,
+        // which needs Name, reflection tables, ... - initialized in any order before main.
+        struct RuntimeOnly {};
+        inline constexpr RuntimeOnly runtime_only;
+
+        template<ecs::Component T>
+        struct OnSpawned {};
+        template<ecs::Component T>
+        inline constexpr OnSpawned<T> on_spawned;
+
+        void register_auto_components();
+
+        namespace detail
+        {
+            void register_auto_component(void (*registration)());
+
+            template<ecs::Component T>
+            void register_annotated_component_type(
+                std::function<void(World&, ecs::Entity, const SerializationContext&)> on_spawned = {})
+            {
+                register_component_type<T, !reflect::has_annotation<RuntimeOnly>(^^T)>(std::move(on_spawned));
+            }
+
+            template<ecs::Component T>
+            void register_annotated_component_type_thunk()
+            {
+                register_annotated_component_type<T>();
+            }
+
+            struct OnSpawnedDecl
+            {
+                std::meta::info function;
+                std::meta::info component;
+            };
+
+            // Functions of a namespace annotated with scene::on_spawned<T>
+            consteval std::vector<OnSpawnedDecl> annotated_on_spawned(std::meta::info ns)
+            {
+                std::vector<OnSpawnedDecl> result;
+                for (std::meta::info member : std::meta::members_of(ns, std::meta::access_context::unchecked()))
+                {
+                    if (!std::meta::is_function(member))
+                        continue;
+                    for (std::meta::info annotation : std::meta::annotations_of(member))
+                    {
+                        const std::meta::info type = ecs::detail::annotation_type(annotation);
+                        if (ecs::detail::is_annotation_of(type, ^^OnSpawned))
+                            result.push_back({ member, std::meta::template_arguments_of(type)[0] });
+                    }
+                }
+                return result;
+            }
+
+            // Keyed by the marker type of SCENE_REGISTER_COMPONENTS, not by std::meta::info (see ecs::detail::SystemsOf)
+            template<typename Marker>
+            struct OnSpawnedOf
+            {
+                static constexpr std::span<const OnSpawnedDecl> decls =
+                    std::define_static_array(annotated_on_spawned(std::meta::parent_of(^^Marker)));
+            };
+
+            template<typename Marker, size_t I>
+            struct OnSpawnedAt
+            {
+                static constexpr OnSpawnedDecl decl = OnSpawnedOf<Marker>::decls[I];
+                static constexpr void (*function)(World&, ecs::Entity, const SerializationContext&) = &[:decl.function:];
+                using Component = [:decl.component:];
+
+                // registration is idempotent: fills on_spawned of a type listed in another file
+                static void add() { register_annotated_component_type<Component>(function); }
+            };
+
+            template<typename Marker, size_t... I>
+            void register_on_spawned(std::index_sequence<I...>)
+            {
+                (register_auto_component(&OnSpawnedAt<Marker, I>::add), ...);
+            }
+
+            template<typename Marker, ecs::Component... Ts>
+            bool register_components()
+            {
+                (register_auto_component(&register_annotated_component_type_thunk<Ts>), ...);
+                register_on_spawned<Marker>(std::make_index_sequence<OnSpawnedOf<Marker>::decls.size()>{});
+                return true;
+            }
+        }
+
         const ComponentType* find_component_type(std::string_view name);
         const ComponentType* find_component_type(ecs::ComponentId id);
 
         // Root to child order is not needed: each entity composes its parent chain
         void propagate_transforms(ecs::Registry& registry);
+
+        // System set of the Late system that computes WorldTransform: systems reading it run
+        // [[=ecs::after<scene::TransformPropagation>]]
+        struct TransformPropagation {};
 
         // World transform composed from the local transforms right now (WorldTransform lags until the Late phase)
         Transform get_world_transform(const ecs::Registry& registry, ecs::Entity e);

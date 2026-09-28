@@ -203,7 +203,12 @@ public:
     
     virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) = 0;
     
-    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0) = 0;
+    // first_instance: gl_InstanceIndex of the (single) instance, mesh draws pass their draw record index
+    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0, uint32_t first_instance = 0) = 0;
+
+    // draw_count VkDrawIndirectCommands (16 bytes each, tightly packed) at byte `offset` of the storage buffer
+    // `buffer` (copy of `frame`)
+    virtual void draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset, uint32_t draw_count) = 0;
     
     virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) = 0;
     
@@ -262,6 +267,10 @@ public:
     virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<TLASInfo>& objects) = 0;
     
     virtual void copy_image(RBCommandList cmd, const CopyImageParams& params) = 0;
+    
+    // Fills mips 1..N-1 of every layer from mip 0 (linear blits). Mip 0 of all layers must be in the same
+    // state; afterwards every subresource is TransferSrc (transition the whole image to where it is read next).
+    virtual void generate_mips(RBCommandList cmd, RBImageHandle image) = 0;
     
     virtual void transition_image(
         RBCommandList cmd, const ImageBarrierParams& params) = 0;

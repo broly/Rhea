@@ -39,14 +39,22 @@ export struct CameraUBO
 RH_REGISTER_TYPE(CameraUBO)
 
 
+// Mesh draws: what is drawn comes from the GPUDrawRecord (first_instance = record index), the push
+// constants carry pass wide switches (shaders/push_constants/model_push_constants.glsl)
 export struct ModelPushConstants
 {
-    uint32_t mesh_id;
-    uint32_t primitive_id;
-    uint32_t material_id;
     uint32_t debug_id;
 };
 RH_REGISTER_TYPE(ModelPushConstants)
+
+// One mesh draw (resource "draw_list", shaders/resources/draw_list.glsl)
+export struct GPUDrawRecord
+{
+    uint32_t mesh_id;        // mesh table entry (skinned primitives: their own copy)
+    uint32_t primitive_id;   // primitive table entry (transforms)
+    uint32_t material_id;    // material table entry of the pass
+    uint32_t user = 0;       // pass specific (reflection probe capture: cube face)
+};
 
 
 export struct PushRTXGIValidate

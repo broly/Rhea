@@ -81,6 +81,10 @@ namespace vk
         
         void generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image, uint32_t width, uint32_t height, uint32_t mip_levels);
         
+        // Mip chain of all layers by linear blits, barriers through transition_image (state stays tracked).
+        // Every subresource ends in TransferSrc.
+        void cmd_generate_mips(RBCommandList cmd, RBImageHandle image);
+        
         void create_staging_buffer(
             VkDeviceSize size,
             VkBuffer& out_buffer,

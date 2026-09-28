@@ -107,14 +107,14 @@ export namespace ecs
     struct SystemParam<Res<T>>
     {
         static Res<T> fetch(SystemContext& c) { return Res<T>(c.registry.resource<T>()); }
-        static void access(Access& a) { a.resource_reads.push_back(Registry::resource_key<T>()); }
+        static void access(Access& a) { a.resource_reads.push_back({ Registry::resource_key<T>(), detail::type_name<T>() }); }
     };
 
     template<typename T>
     struct SystemParam<ResMut<T>>
     {
         static ResMut<T> fetch(SystemContext& c) { return ResMut<T>(c.registry.resource<T>()); }
-        static void access(Access& a) { a.resource_writes.push_back(Registry::resource_key<T>()); }
+        static void access(Access& a) { a.resource_writes.push_back({ Registry::resource_key<T>(), detail::type_name<T>() }); }
     };
 
     namespace detail
@@ -135,36 +135,78 @@ export namespace ecs
         struct callable_params<R(C::*)(P...) const> { using type = std::tuple<P...>; };
     }
 
+    namespace detail
+    {
+        // Qualified name of a type, e.g. "scene::TransformPropagation"
+        consteval std::string qualified_name(std::meta::info type)
+        {
+            type = std::meta::dealias(type);
+            std::string name(std::meta::display_string_of(type));
+            for (std::meta::info scope = std::meta::parent_of(type); scope != ^^::; scope = std::meta::parent_of(scope))
+            {
+                if (std::meta::has_identifier(scope))
+                    name = std::string(std::meta::identifier_of(scope)) + "::" + name;
+            }
+            return name;
+        }
+    }
+
+    // Name of a system set: any type used as a label, e.g. `struct TransformPropagation {};`
+    template<typename Set>
+    consteval std::string_view set_name()
+    {
+        return std::define_static_string(detail::qualified_name(^^Set));
+    }
+
     struct System
     {
         std::string name;
         Phase phase = Phase::Update;
         Access access;
+        // Order inside the phase, by set names (set_name<T>()): the system runs after every system of
+        // the phase that is in one of its `after` sets, and before every one in its `before` sets
+        std::vector<std::string_view> sets;
+        std::vector<std::string_view> before;
+        std::vector<std::string_view> after;
+        // Unordered access conflicts with systems of these sets are intended: not reported as ambiguities
+        std::vector<std::string_view> ambiguous_with;
         std::move_only_function<void(SystemContext&)> run;
         double last_ms = 0.0;
+
+        bool in_set(std::string_view set) const { return std::ranges::contains(sets, set); }
+    };
+
+    // Two systems of a phase that access the same data (at least one writes) with no order between them:
+    // the result depends on an order nobody chose
+    struct Ambiguity
+    {
+        const System* first = nullptr;
+        const System* second = nullptr;
+        std::string conflict;   // what both access
     };
 
     // Systems are plain functions (or non-generic lambdas) whose parameters say what they need:
     //
     //     void apply_velocity(Query<Transform, const Velocity> q, Res<SimTime> time) { ... }
     //     schedule.add<&apply_velocity>(Phase::Fixed);
-    //     schedule.add(Phase::Update, "spin", [](Query<Transform> q) { ... });
+    //     schedule.add(Phase::Update, "spin", [](Query<Transform> q) { ... }).after.push_back(set_name<Physics>());
     //
-    // Within a phase systems run in registration order; their Commands are applied at the end of the phase.
+    // Within a phase systems run in an order that satisfies their before / after sets (registration order
+    // where that leaves a choice); their Commands are applied at the end of the phase, in the same order.
     class Schedule
     {
     public:
         // Name comes from the function itself
         template<auto Fn>
-        void add(Phase phase)
+        System& add(Phase phase)
         {
             constexpr std::string_view name =
                 std::define_static_string(std::meta::identifier_of(std::meta::reflect_function(*Fn)));
-            add(phase, name, Fn);
+            return add(phase, name, Fn);
         }
 
         template<typename F>
-        void add(Phase phase, std::string_view name, F&& fn)
+        System& add(Phase phase, std::string_view name, F&& fn)
         {
             using Fn = std::remove_cvref_t<F>;
             using Params = typename detail::callable_params<std::remove_pointer_t<Fn>>::type;
@@ -173,6 +215,8 @@ export namespace ecs
             system.name = name;
             system.phase = phase;
             bind(system, std::forward<F>(fn), std::type_identity<Params>{});
+            order_dirty = true;
+            return system;
         }
 
         // One frame: run_fixed, then Update and Late
@@ -181,7 +225,15 @@ export namespace ecs
         void run_fixed(Registry& registry, double real_dt);
         void run_phase(Registry& registry, Phase phase);
 
+        // Systems annotated with [[=ecs::system<...>]] and registered with ECS_REGISTER (ecs_macros.h)
+        void add_auto_systems();
+
+        // In registration order
         const std::deque<System>& get_systems() const { return systems; }
+        // In execution order
+        std::span<System* const> get_phase_systems(Phase phase) const;
+
+        std::vector<Ambiguity> find_ambiguities() const;
 
         double fixed_dt = 1.0 / 60.0;
         // After a hitch, drop time instead of simulating a growing backlog
@@ -198,7 +250,238 @@ export namespace ecs
             };
         }
 
+        // Topological sort of every phase by before / after
+        void build_order() const;
+
         std::deque<System> systems;
+        mutable std::array<std::vector<System*>, size_t(Phase::Count)> phase_order;
+        mutable bool order_dirty = true;
         double accumulator = 0.0;
     };
+
+    // Annotations of a system that registers itself: no central list of systems.
+    //
+    //     struct TransformPropagation {};   // a set: any type, used as a label
+    //
+    //     namespace
+    //     {
+    //         [[=ecs::system<Phase::Late>, =ecs::in_set<TransformPropagation>]]
+    //         void propagate_transforms(Registry& registry) { ... }
+    //
+    //         [[=ecs::system<Phase::Late>, =ecs::after<TransformPropagation>]]
+    //         void sync_render(Query<const WorldTransform, const Mesh> meshes) { ... }
+    //
+    //         [[=ecs::system<Phase::PostLoad>, =ecs::system<Phase::Late>]]   // runs in both phases
+    //         void create_colliders(Registry& registry) { ... }
+    //
+    //         ECS_REGISTER()   // after the systems, in the same namespace
+    //     }
+    //
+    // Order inside a phase comes only from before / after. Where they leave a choice the order is by source
+    // file and name (deterministic, but not the declaration order), and Schedule::find_ambiguities reports
+    // systems whose access conflicts without an order between them. ambiguous_with<Set> marks such a
+    // conflict as intended.
+    template<Phase P>
+    struct SystemTag {};
+    template<Phase P>
+    inline constexpr SystemTag<P> system;
+
+    template<typename Set>
+    struct InSet {};
+    template<typename Set>
+    inline constexpr InSet<Set> in_set;
+
+    template<typename Set>
+    struct Before {};
+    template<typename Set>
+    inline constexpr Before<Set> before;
+
+    template<typename Set>
+    struct After {};
+    template<typename Set>
+    inline constexpr After<Set> after;
+
+    template<typename Set>
+    struct AmbiguousWith {};
+    template<typename Set>
+    inline constexpr AmbiguousWith<Set> ambiguous_with;
+
+    // Component hooks found by the same ECS_REGISTER, installed into a registry by add_auto_hooks:
+    //
+    //     [[=ecs::on_remove]]
+    //     void destroy_body(Registry& registry, Entity e, MeshCollider& collider) { ... }
+    //
+    // The component type is the third parameter. See Registry::on_add / on_remove.
+    struct OnAddTag {};
+    inline constexpr OnAddTag on_add;
+    struct OnRemoveTag {};
+    inline constexpr OnRemoveTag on_remove;
+
+    // Hooks annotated with [[=ecs::on_add]] / [[=ecs::on_remove]] and registered with ECS_REGISTER
+    void add_auto_hooks(Registry& registry);
+
+    namespace detail
+    {
+        // A system (add_system) or a hook (add_hook) found by ECS_REGISTER
+        struct AutoSystem
+        {
+            std::string_view file;
+            std::string_view name;
+            uint32_t index = 0;     // annotations of one function
+            void (*add_system)(Schedule&) = nullptr;
+            void (*add_hook)(Registry&) = nullptr;
+        };
+
+        void register_auto_system(const AutoSystem& system);
+
+        struct SystemDecl
+        {
+            std::meta::info function;
+            Phase phase;
+        };
+
+        consteval std::meta::info annotation_type(std::meta::info annotation)
+        {
+            return std::meta::dealias(std::meta::remove_cv(std::meta::type_of(annotation)));
+        }
+
+        consteval bool is_annotation_of(std::meta::info type, std::meta::info tag_template)
+        {
+            return std::meta::has_template_arguments(type) && std::meta::template_of(type) == tag_template;
+        }
+
+        // One entry per ecs::system annotation of the functions of a namespace
+        consteval std::vector<SystemDecl> annotated_systems(std::meta::info ns)
+        {
+            std::vector<SystemDecl> result;
+            for (std::meta::info member : std::meta::members_of(ns, std::meta::access_context::unchecked()))
+            {
+                if (!std::meta::is_function(member))
+                    continue;
+                for (std::meta::info annotation : std::meta::annotations_of(member))
+                {
+                    const std::meta::info type = annotation_type(annotation);
+                    if (is_annotation_of(type, ^^SystemTag))
+                        result.push_back({ member, std::meta::extract<Phase>(std::meta::template_arguments_of(type)[0]) });
+                }
+            }
+            return result;
+        }
+
+        // Set names of the in_set / before / after / ambiguous_with (tag_template) annotations of a function
+        consteval std::vector<const char*> annotated_sets(std::meta::info function, std::meta::info tag_template)
+        {
+            std::vector<const char*> result;
+            for (std::meta::info annotation : std::meta::annotations_of(function))
+            {
+                const std::meta::info type = annotation_type(annotation);
+                if (is_annotation_of(type, tag_template))
+                    result.push_back(std::define_static_string(qualified_name(std::meta::template_arguments_of(type)[0])));
+            }
+            return result;
+        }
+
+        inline void assign_sets(std::vector<std::string_view>& to, std::span<const char* const> names)
+        {
+            to.assign(names.begin(), names.end());
+        }
+
+        struct HookDecl
+        {
+            std::meta::info function;
+            bool on_remove;
+        };
+
+        // One entry per ecs::on_add / ecs::on_remove annotation of the functions of a namespace
+        consteval std::vector<HookDecl> annotated_hooks(std::meta::info ns)
+        {
+            std::vector<HookDecl> result;
+            for (std::meta::info member : std::meta::members_of(ns, std::meta::access_context::unchecked()))
+            {
+                if (!std::meta::is_function(member))
+                    continue;
+                for (std::meta::info annotation : std::meta::annotations_of(member))
+                {
+                    const std::meta::info type = annotation_type(annotation);
+                    if (type == ^^OnAddTag || type == ^^OnRemoveTag)
+                        result.push_back({ member, type == ^^OnRemoveTag });
+                }
+            }
+            return result;
+        }
+
+        // Marker: a type declared by ECS_REGISTER in the namespace of the systems.
+        // Templates are keyed by it, not by std::meta::info (specializations differing only in an info
+        // argument get the same mangled name in clang-p2996 and are merged by the linker).
+        template<typename Marker>
+        struct SystemsOf
+        {
+            static constexpr std::span<const SystemDecl> decls =
+                std::define_static_array(annotated_systems(std::meta::parent_of(^^Marker)));
+            static constexpr std::span<const HookDecl> hooks =
+                std::define_static_array(annotated_hooks(std::meta::parent_of(^^Marker)));
+        };
+
+        template<typename Marker, size_t I>
+        struct SystemAt
+        {
+            static constexpr SystemDecl decl = SystemsOf<Marker>::decls[I];
+            static constexpr auto function = &[:decl.function:];
+            static constexpr Phase phase = decl.phase;
+            static constexpr std::string_view name = std::define_static_string(std::meta::identifier_of(decl.function));
+            static constexpr std::span<const char* const> sets = std::define_static_array(annotated_sets(decl.function, ^^InSet));
+            static constexpr std::span<const char* const> before = std::define_static_array(annotated_sets(decl.function, ^^Before));
+            static constexpr std::span<const char* const> after = std::define_static_array(annotated_sets(decl.function, ^^After));
+            static constexpr std::span<const char* const> ambiguous_with =
+                std::define_static_array(annotated_sets(decl.function, ^^AmbiguousWith));
+
+            static void add(Schedule& schedule)
+            {
+                System& system = schedule.add<function>(phase);
+                assign_sets(system.sets, sets);
+                assign_sets(system.before, before);
+                assign_sets(system.after, after);
+                assign_sets(system.ambiguous_with, ambiguous_with);
+            }
+        };
+
+        template<typename Marker, size_t I>
+        struct HookAt
+        {
+            static constexpr HookDecl decl = SystemsOf<Marker>::hooks[I];
+            static constexpr auto function = &[:decl.function:];
+            static constexpr bool on_remove = decl.on_remove;
+            static constexpr std::string_view name = std::define_static_string(std::meta::identifier_of(decl.function));
+
+            using Params = typename callable_params<std::remove_pointer_t<decltype(function)>>::type;
+            static_assert(std::tuple_size_v<Params> == 3, "component hook: void(Registry&, Entity, T& component)");
+            using T = std::remove_cvref_t<std::tuple_element_t<2, Params>>;
+
+            static void add(Registry& registry)
+            {
+                if constexpr (on_remove)
+                    registry.on_remove<T>(function);
+                else
+                    registry.on_add<T>(function);
+            }
+        };
+
+        template<typename Marker, size_t... S, size_t... H>
+        bool register_systems(std::string_view file, std::index_sequence<S...>, std::index_sequence<H...>)
+        {
+            (register_auto_system({ file, SystemAt<Marker, S>::name, uint32_t(S), &SystemAt<Marker, S>::add, nullptr }), ...);
+            (register_auto_system({ file, HookAt<Marker, H>::name, uint32_t(H), nullptr, &HookAt<Marker, H>::add }), ...);
+            return true;
+        }
+
+        template<typename Marker>
+        bool register_systems(std::string_view file)
+        {
+            constexpr size_t systems = SystemsOf<Marker>::decls.size();
+            constexpr size_t hooks = SystemsOf<Marker>::hooks.size();
+            static_assert(systems + hooks > 0,
+                "ECS_REGISTER: no [[=ecs::system<...>]] / [[=ecs::on_add]] / [[=ecs::on_remove]] functions declared before it in this namespace");
+            return register_systems<Marker>(file, std::make_index_sequence<systems>{}, std::make_index_sequence<hooks>{});
+        }
+    }
 }

@@ -24,6 +24,8 @@ export struct RenderObject_Light
     glm::vec4 color;
     float attenuation;
     LightType type;
+    // Light::visible_in_reflection_probes (false for unregistered slots)
+    bool visible_in_reflection_probes = false;
 };
 
 export class SceneViewProcessor_Light : public SceneViewProcessor

@@ -19,7 +19,7 @@ namespace ColorOutput
         RTXGI                 = 1,
         SSR                   = 2,
         INTERMEDIATE          = 3,
-        RESERVED_0            = 4,
+        SPECULAR_WEIGHT       = 4,
         RTXGI_REPROJECTED     = 5,
         RTXGI_ACCUM           = 6,
         RTXGI_MOMENTS         = 7,

@@ -39,6 +39,7 @@ void SceneViewProcessor_Light::process()
         light_ro.color = submitted.color;
         light_ro.direction = glm::normalize(submitted.transform.forward());
         light_ro.type = submitted.light_type;
+        light_ro.visible_in_reflection_probes = submitted.visible_in_reflection_probes;
         // light_ro.attenuation = submitted.attenuation;
     }
 }

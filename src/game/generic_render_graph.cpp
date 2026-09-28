@@ -27,6 +27,7 @@ import :debug_line;
 import debug_draw;
 import dump_exr;
 import paths;
+import platform;
 
 import log;
 #include "common/assertion_macros.h"
@@ -300,6 +301,16 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     
     
+    emissive_ring = create_texture({
+        .name = "g_emissive_ring",
+        .extent = resolution,
+        .format = TextureFormat::RGBA16F,
+        .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst | RenderTextureUsage::TransferSrc,
+        .external = false,
+        .dimension = capture_dimension,
+        .num_layers = EMISSIVE_RING_SIZE
+    });
+    
     ssr_texture = create_texture({
         .name = NAME(ssr_texture),
         .extent = resolution,
@@ -361,6 +372,14 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     });
     
     
+    draw_list.init(*renderer, *backend);
+
+    if (num_pass_instances == 1)
+    {
+        reflection_probes = std::make_unique<ReflectionProbeSystem>();
+        reflection_probes->init(*renderer, *backend);
+    }
+    
     if constexpr (render_settings::enable_nn_denoiser)
     {
         // nn_denoiser::add_nn_denoiser_passes(nn_denoiser_state, *this, *renderer);
@@ -394,6 +413,24 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             draw_scene_shadow(ctx);
         },
     });
+    
+    // time sliced probe baking: capture faces sample the shadow map, the lighting samples the probes
+    if (reflection_probes)
+    {
+        add_pass({
+            .name = "ReflectionProbes",
+            .reads = {
+                { shadow_map, RBImageUsageType::SampledFragment }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("ReflectionProbes");
+                reflection_probes->execute(ctx, *engine->scene_view, draw_list);
+            },
+            // records its own render passes and barriers (capture cube faces, filtered probe slots)
+            .type = RenderPassType::transfer
+        });
+    }
     
     if (allow_shadow_debug)
     {
@@ -455,6 +492,32 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             draw_scene(ctx);
         },
         .num_layers = num_pass_instances
+    });
+    
+    // emissive watch ring (see EMISSIVE_RING_SIZE): g_emissive as the base pass left it
+    add_pass({
+        .name = "COPY_gbuffer_emissive_to_watch_ring",
+        .condition = [this] () { return emissive_watch_active; },
+        .reads = {
+            { gbuffer[GBUFFER_SLOTS::EMISSIVE], RBImageUsageType::TransferSrc }
+        },
+        .writes = {
+            { emissive_ring, RBImageUsageType::TransferDst, RBLoadOp::Load }
+        },
+        .execute = [this] (RenderGraphContext& ctx)
+        {
+            const uint32_t layer = emissive_ring_next;
+            emissive_ring_next = (layer + 1) % EMISSIVE_RING_SIZE;
+            emissive_ring_layer_of_slot[ctx.frame] = layer;
+
+            CopyImageParams params;
+            params.source = get_image(gbuffer[GBUFFER_SLOTS::EMISSIVE]);
+            params.dest = get_image(emissive_ring);
+            params.dst_layer = layer;
+            ctx.copy_img(params);
+        },
+        .num_layers = 1,
+        .type = RenderPassType::transfer
     });
     
     
@@ -654,6 +717,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .writes = { 
             { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
+            // image based specular is added by SSRComposite (SSR or reflection probes)
+            { hdr_color_present[COLOR_OUTPUT_HDR::SPECULAR_WEIGHT], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -707,8 +772,10 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     
     add_pass({
         .name = "SSR",
+        .condition = [] () { return cv_ssr_enabled.get(); },
         .reads = {
             { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },
+            { hdr_color_present[COLOR_OUTPUT_HDR::SPECULAR_WEIGHT], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::NORMAL], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment },
@@ -728,7 +795,11 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .name = "SSRComposite",
         .reads = {
             { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },
+            { hdr_color_present[COLOR_OUTPUT_HDR::SPECULAR_WEIGHT], RBImageUsageType::SampledFragment },
             { ssr_texture, RBImageUsageType::SampledFragment },
+            { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
+            { gbuffer[GBUFFER_SLOTS::POSITION], RBImageUsageType::SampledFragment },
+            { gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment }
         },
         .writes = {
@@ -837,6 +908,9 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     prepared_batches.clear();
 
+    draw_list.begin_frame(ctx.frame);
+
+    emissive_watch_active = (ctx.params.get_int(LightingDebug::param, 0) & LightingDebug::emissive_watch) != 0;
     read_diag_queries(ctx);
 
     // -------- resources --------
@@ -845,6 +919,15 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     prepare_geometry_resources(ctx);
     
+    if (reflection_probes)
+    {
+        reflection_probes->prepare(ctx, *engine->scene_view, {
+            .camera_position = current_camera_ubo.camera_pos,
+            .time = RhGlobals::engine->world->get_time_seconds(),
+            .sky_noise = get_image(noise_texture),
+            .brdf_lut = get_image(brdf_lut),
+        });
+    }
     
     prepare_wireframe_pass(ctx);
     prepare_ssr(ctx);
@@ -1062,42 +1145,7 @@ void GenericRenderGraph::prepare_geometry_resources(
         
         if (!is_depth_prepass)
         {
-            // ---------- Reflection ----------
-
-            auto& reflection_capture_processor = engine->scene_view->get_processor<SceneViewProcessor_ReflectionCapture>();
-
-            auto reflection_capture =
-                reflection_capture_processor.query_nearest(
-                    current_camera_ubo.camera_pos);
-
-            if (reflection_capture)
-            {
-                
-                
-                reflection_resource->update_image(
-                    "u_irradiance",
-                    renderer->get_cubemap(reflection_capture->irradiance),
-                    {
-                        .frame = frame,
-                        .cubemap = true
-                    });
-
-                reflection_resource->update_image(
-                    "u_prefilter_map",
-                    renderer->get_cubemap(reflection_capture->prefiltered_env),
-                    {
-                        .frame = ctx.frame,
-                        .cubemap = true
-                    });
-
-                reflection_resource->update_image(
-                    "u_brdf_lut",
-                    get_image(brdf_lut),
-                    {
-                        .frame = ctx.frame
-                    });
-            }
-
+            // reflection probes: ReflectionProbeSystem::prepare (after this function)
 
             // ---------- Lights ----------
 
@@ -1406,49 +1454,100 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
     }
     
     
-    auto pbr = renderer->find_model("pbr");
-    std::shared_ptr<PipelineFamily> family = renderer->query_pipeline_family(ctx.pass_name, pbr);
-    
     PROFILE("GenericRenderGraph::draw_scene - items");
+    const bool translucent = ctx.pass_name == Names::pass_geometry_translucent;
+
+    std::vector<const RenderPrimitive*> primitives;
+    primitives.reserve(items.size());
+    for (const ViewRenderItem& item : items)
+        primitives.push_back(item.primitive);
+
     const uint32_t geometry_debug = (uint32_t)ctx.params.get_int(GeometryDebug::param, 0);
     const bool diag_geometry = diag_enabled() && ctx.pass_name == Names::pass_geometry_base;
     if (diag_geometry)
         backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
-    for (auto& item : items)
-    {
-        const RenderPrimitive& prim = *item.primitive;
-    
-        const RenderPrimitivePassInfo* prim_info = prim.get_pass_info(ctx.pass_name);
-        
-        if (!prim_info)
-            continue;
-    
-        PipelineObject* pipeline = prim_info->pipeline;
-    
-        if (ctx.bind_pipeline(pipeline))
-        {
-            ctx.bind(camera_resource, mesh_table_resource,
-                     shadow_resource, light_resource, reflection_resource, pbr_material_table_resource, textures_resource,
-                     primitive_table_resource);
-            if (ctx.pass_name == Names::pass_geometry_translucent)
-            {
-                ctx.bind(hdr_color_output_resource);
-            }
-        }       
-        
-        ModelPushConstants pc;
-        pc.mesh_id = prim.mesh_index;
-        pc.primitive_id = prim.id;
-        pc.material_id = prim_info->material_index;
-        pc.debug_id = geometry_debug;
-        
-        ctx.push_constants(pc);
 
-        ctx.draw(prim.mesh.get().indices.size());
-    }
+    // translucent draws blend: they keep their order across pipelines
+    draw_items(ctx, primitives, geometry_debug, translucent, [&] (const RenderPrimitivePassInfo&)
+    {
+        ctx.bind(camera_resource, mesh_table_resource,
+                 shadow_resource, light_resource, reflection_resource, pbr_material_table_resource, textures_resource,
+                 primitive_table_resource);
+        if (translucent)
+            ctx.bind(hdr_color_output_resource);
+    });
+
     if (diag_geometry)
         backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
 
+}
+
+void GenericRenderGraph::draw_items(RenderGraphContext& ctx, const std::vector<const RenderPrimitive*>& items,
+    uint32_t debug_id, bool in_order, const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources)
+{
+    PROFILE("GenericRenderGraph::draw_items");
+
+    auto bind = [&] (const RenderPrimitivePassInfo& info)
+    {
+        if (ctx.bind_pipeline(info.pipeline))
+        {
+            bind_resources(info);
+            draw_list.bind(ctx);
+            ctx.push_constants(ModelPushConstants{ .debug_id = debug_id });
+        }
+    };
+    auto record_of = [] (const RenderPrimitive& prim, const RenderPrimitivePassInfo& info)
+    {
+        return GPUDrawRecord{
+            .mesh_id = (uint32_t)prim.mesh_index,
+            .primitive_id = prim.id,
+            .material_id = info.material_index,
+        };
+    };
+
+    if (in_order)
+    {
+        for (const RenderPrimitive* prim : items)
+        {
+            const RenderPrimitivePassInfo* info = prim->get_pass_info(ctx.pass_name);
+            if (!info)
+                continue;
+            bind(*info);
+            ctx.draw((uint32_t)prim->mesh.get().indices.size(), 0, draw_list.add_record(record_of(*prim, *info)));
+        }
+        return;
+    }
+
+    // group by pipeline (a handful per pass), the order of the items is kept inside a group
+    struct Group
+    {
+        const RenderPrimitivePassInfo* info;
+        std::vector<std::pair<const RenderPrimitive*, const RenderPrimitivePassInfo*>> draws;
+    };
+    std::vector<Group> groups;
+    for (const RenderPrimitive* prim : items)
+    {
+        const RenderPrimitivePassInfo* info = prim->get_pass_info(ctx.pass_name);
+        if (!info)
+            continue;
+        auto group = std::ranges::find_if(groups, [&] (const Group& g) { return g.info->pipeline == info->pipeline; });
+        if (group == groups.end())
+        {
+            groups.push_back({ info, {} });
+            group = std::prev(groups.end());
+        }
+        group->draws.push_back({ prim, info });
+    }
+
+    for (const Group& group : groups)
+    {
+        const uint32_t first_command = draw_list.command_count();
+        for (const auto& [prim, info] : group.draws)
+            draw_list.add_draw(record_of(*prim, *info), (uint32_t)prim->mesh.get().indices.size());
+
+        bind(*group.info);
+        draw_list.draw_indirect(ctx, first_command, draw_list.command_count() - first_command);
+    }
 }
 
 void GenericRenderGraph::read_diag_queries(RenderGraphContext& ctx)
@@ -1474,6 +1573,11 @@ void GenericRenderGraph::read_diag_queries(RenderGraphContext& ctx)
     const Extent extent = backend->get_swapchain_extent();
     const double pixels = double(extent.width) * double(extent.height);
 
+    // the frame recorded now is inside a RenderDoc capture: its watch result arrives MAX_FRAMES_IN_FLIGHT frames later
+    if (platform::renderdoc::is_frame_capturing())
+        LogGenericRG.Log("Emissive watch: RenderDoc is capturing frame %llu (its result is reported at frame %llu)",
+            (unsigned long long)diag_frame_counter, (unsigned long long)diag_frame_counter + kRenderMaxFramesInFlight);
+
     // emissive watch: the lighting pass discarded every legacy-model pixel with a non-zero emissive
     // (these frames were recorded MAX_FRAMES_IN_FLIGHT frames ago)
     if (has_lighting && pixels > 0.0)
@@ -1481,25 +1585,54 @@ void GenericRenderGraph::read_diag_queries(RenderGraphContext& ctx)
         const double bad = std::max(0.0, pixels - double(lighting));
         const double now = RhGlobals::engine->world->get_time_seconds();
         // the checked periphery (see lighting.frag) is 58% of the screen
-        if (bad > pixels * 0.01)
+        const bool flagged = bad > pixels * 0.01;
+        ++emissive_watch_frames;
+        emissive_watch_flagged += flagged ? 1 : 0;
+        emissive_watch_bursts += flagged && !emissive_watch_prev_flagged ? 1 : 0;
+        emissive_watch_prev_flagged = flagged;
+        if (emissive_watch_last_summary_time < 0.0)
+            emissive_watch_last_summary_time = now;
+        if (now - emissive_watch_last_summary_time >= 30.0)
+        {
+            LogGenericRG.Log("Emissive watch summary (t=%.0f s, %ux%u): %llu frames, %llu flagged, %llu bursts",
+                now, extent.width, extent.height,
+                (unsigned long long)emissive_watch_frames, (unsigned long long)emissive_watch_flagged,
+                (unsigned long long)emissive_watch_bursts);
+            emissive_watch_last_summary_time = now;
+        }
+        if (flagged)
         {
             ++emissive_watch_frames_since_log;
             if (now - emissive_watch_last_log_time > 0.5)
             {
-                LogGenericRG.Log("Emissive watch (frame %llu, t=%.2f s): %.0f corrupted pixels (%.1f%% of the screen), %u flagged frames since the last message",
-                    (unsigned long long)diag_frame_counter, now, bad, 100.0 * bad / pixels, emissive_watch_frames_since_log);
+                // wall clock: to line up with external logs (nvidia-smi clocks / power states)
+                const long long wall_ms = (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+                LogGenericRG.Log("Emissive watch (frame %llu, t=%.2f s, unix_ms %lld): %.0f corrupted pixels (%.1f%% of the screen), %u flagged frames since the last message",
+                    (unsigned long long)diag_frame_counter, now, wall_ms, bad, 100.0 * bad / pixels, emissive_watch_frames_since_log);
                 emissive_watch_last_log_time = now;
                 emissive_watch_frames_since_log = 0;
             }
+            // RenderDoc (RHEA_RENDERDOC=1): capture the next frames of the flash, to replay them later
+            // (a clean replay of a frame that was corrupted live = the commands are right)
+            if (platform::renderdoc::available() && renderdoc_captures_requested < 3 &&
+                now - renderdoc_last_request_time > 2.0)
+            {
+                ++renderdoc_captures_requested;
+                renderdoc_last_request_time = now;
+                platform::renderdoc::trigger_capture(3);
+                LogGenericRG.Log("Emissive watch: RenderDoc capture of the next 3 frames requested at frame %llu (request %u/3, captures so far %u)",
+                    (unsigned long long)diag_frame_counter, renderdoc_captures_requested, platform::renderdoc::get_num_captures());
+            }
             // the flash usually lasts several frames: this frame is likely still corrupted
-            constexpr uint32_t max_dumps = 5;
+            const uint32_t max_dumps = (uint32_t)std::max(0, ctx.params.get_int("emissive_watch_dumps", 5));
             if (emissive_watch_dumps < max_dumps && now - emissive_watch_last_dump_time > 1.0)
             {
                 ++emissive_watch_dumps;
                 emissive_watch_last_dump_time = now;
                 set_flag("debug_dump_frame", true, false, true);
-                LogGenericRG.Log("Emissive watch: dumping g-buffer of frame %llu to cache/debug_dump (%u/%u)",
-                    (unsigned long long)diag_frame_counter, emissive_watch_dumps, max_dumps);
+                LogGenericRG.Log("Emissive watch: dumping g-buffer of frame %llu to cache/debug_dump (%u/%u), the corrupted frame is g_emissive_ring layer %u",
+                    (unsigned long long)diag_frame_counter, emissive_watch_dumps, max_dumps, emissive_ring_layer_of_slot[ctx.frame]);
             }
         }
     }
@@ -1528,36 +1661,21 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
 
     ctx.backend.update_viewport(ctx.cmd, Constants::shadowmap_extent);
 
-    for (auto& prim : mesh_processor.primitives)
+    std::vector<const RenderPrimitive*> primitives;
+    primitives.reserve(mesh_processor.primitives.size());
+    for (const RenderPrimitive& prim : mesh_processor.primitives)
+        primitives.push_back(&prim);
+
+    draw_items(ctx, primitives, 0, false, [&] (const RenderPrimitivePassInfo& info)
     {
-        const RenderPrimitivePassInfo* info = prim.get_pass_info(ctx.pass_name);  // todo: temp crutch (provide shadow pass instead)
-        
-        if (!info)
-            continue;
-        
-        auto pipeline = info->pipeline;
-        
-        if (ctx.bind_pipeline(pipeline))
-        {
-            bind_shadow_globals(ctx);
-            
-            // alpha tested shadow pipelines sample material textures
-            if (info->pipeline_family->uses_resource("pbr_material_table"))
-                ctx.bind(pbr_material_table_resource);
-            if (info->pipeline_family->uses_resource("textures"))
-                ctx.bind(textures_resource);
-        }
-        
-        
-        ModelPushConstants pc;
-        pc.mesh_id = prim.mesh_index;
-        pc.primitive_id = prim.id;
-        pc.material_id = info->material_index;
-        pc.debug_id = 0;
-        ctx.push_constants(pc);
-        
-        ctx.draw(prim.mesh.get().indices.size());
-    }
+        bind_shadow_globals(ctx);
+
+        // alpha tested shadow pipelines sample material textures
+        if (info.pipeline_family->uses_resource("pbr_material_table"))
+            ctx.bind(pbr_material_table_resource);
+        if (info.pipeline_family->uses_resource("textures"))
+            ctx.bind(textures_resource);
+    });
 }
 
 void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture)
@@ -1723,27 +1841,25 @@ void GenericRenderGraph::draw_mesh_wireframe(RenderGraphContext& ctx)
 {
     auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
 
-    if (ctx.bind_pipeline(wireframe_mesh_pipeline))
-    {
-        ctx.bind(camera_resource, mesh_table_resource, primitive_table_resource);
-    }
-
+    const uint32_t first_command = draw_list.command_count();
     for (const RenderPrimitive& prim : mesh_processor.primitives)
     {
         // only primitives drawn by the scene passes (skips released slots)
         if (!prim.get_pass_info(Names::pass_geometry_base) && !prim.get_pass_info(Names::pass_geometry_translucent))
             continue;
 
-        ModelPushConstants pc;
-        pc.mesh_id = prim.mesh_index;
-        pc.primitive_id = prim.id;
-        pc.material_id = 0;
-        pc.debug_id = 0;
-        ctx.push_constants(pc);
-
         // wireframe_mesh.vert: 3 edges (6 line vertices) per triangle
-        ctx.draw((uint32_t)prim.mesh.get().indices.size() * 2);
+        draw_list.add_draw({ .mesh_id = (uint32_t)prim.mesh_index, .primitive_id = prim.id, .material_id = 0 },
+            (uint32_t)prim.mesh.get().indices.size() * 2);
     }
+
+    if (ctx.bind_pipeline(wireframe_mesh_pipeline))
+    {
+        ctx.bind(camera_resource, mesh_table_resource, primitive_table_resource);
+        draw_list.bind(ctx);
+    }
+    ctx.push_constants(ModelPushConstants{ .debug_id = 0 });
+    draw_list.draw_indirect(ctx, first_command, draw_list.command_count() - first_command);
 }
 
 void GenericRenderGraph::add_skeleton_lines(std::vector<LineVertex>& vertices)
@@ -1905,7 +2021,7 @@ void GenericRenderGraph::draw_ssr_composite(RenderGraphContext& ctx)
 
     if (ctx.bind_pipeline(ssr_composite_pipeline))
     {
-        ctx.bind(gbuffer_resource, hdr_color_output_resource, ssr_resource);
+        ctx.bind(camera_resource, gbuffer_resource, hdr_color_output_resource, ssr_resource, reflection_resource);
     }
     ctx.backend.draw_fullscreen(ctx.cmd);
 }

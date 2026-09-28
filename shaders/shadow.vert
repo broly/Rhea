@@ -9,10 +9,14 @@
 #include "resources/light.glsl"
 #include "resources/mesh_table.glsl"
 #include "resources/primitive_table.glsl"
+// shadow.frag does not read the draw record
+#define DRAW_RECORD_NO_VARYING
 #include "push_constants/model_push_constants.glsl"
 
 void main()
 {
+    forward_draw_record();
+
     Vertex vertex = fetch_vertex(get_mesh_index(), gl_VertexIndex);
 
     uint prim_id = get_primitive_index();

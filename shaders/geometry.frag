@@ -62,6 +62,8 @@ void main()
     float ao        = orm.r;
     float roughness = orm.g;
     float metallic  = orm.b;
+    if ((get_debug_index() & GEOMETRY_DEBUG_GLOSSY) != 0u)
+        roughness *= 0.25;
 
     // ---- normals ----
     vec3 Ng = normalize(v_world_normal);
@@ -81,7 +83,8 @@ void main()
     vec3 N_view = normalize((camera_ubo.view * vec4(N, 0.0)).xyz);
 
     out_g_normal = vec4(N_view * 0.5 + 0.5, roughness);
-    out_g_world_normal = vec4(N * 0.5 + 0.5, 1.0);
+    // legacy model: a = ao (lighting.frag, same slot as the character models)
+    out_g_world_normal = vec4(N * 0.5 + 0.5, ao);
 
     vec2 curr_ndc = v_curr_clip.xy / v_curr_clip.w;
     vec2 prev_ndc = v_prev_clip.xy / v_prev_clip.w;
@@ -99,6 +102,7 @@ void main()
 
     out_g_geometry_normal = vec4(Ng * 0.5 + 0.5, 1.0);
 
-    out_g_emissive = vec4(emissive, 0.0);
+    // a = metallic (lighting.frag, same slot as the character default lit model)
+    out_g_emissive = vec4(emissive, metallic);
 #endif
 }

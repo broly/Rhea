@@ -3,6 +3,8 @@
 import std;
 import ecs;
 
+#include "ecs/ecs_macros.h"
+
 using namespace ecs;
 
 struct Position { float x = 0, y = 0; };
@@ -194,12 +196,106 @@ void external_resources()
     EXPECT(x == 4.0f);
 }   // the registry must not delete the external objects
 
+struct AutoLog { std::vector<std::string> calls; };
+struct EarlySet {};
+struct LaterSet {};
+
+namespace
+{
+    [[=ecs::system<Phase::Update>, =ecs::in_set<LaterSet>, =ecs::after<EarlySet>]]
+    void auto_b(ResMut<AutoLog> log) { log->calls.push_back("b"); }
+
+    [[=ecs::system<Phase::Update>, =ecs::in_set<EarlySet>]]
+    void auto_z(ResMut<AutoLog> log) { log->calls.push_back("z"); }
+
+    [[=ecs::system<Phase::Update>, =ecs::system<Phase::Late>, =ecs::before<EarlySet>]]
+    void auto_y(ResMut<AutoLog> log) { log->calls.push_back("y"); }
+}
+
+namespace   // reopened: members_of lists this block first
+{
+    [[=ecs::system<Phase::Update>, =ecs::after<LaterSet>]]
+    void auto_a(ResMut<AutoLog> log) { log->calls.push_back("a"); }
+
+    void not_a_system(ResMut<AutoLog> log) { log->calls.push_back("not_a_system"); }
+
+    [[=ecs::on_add]]
+    void velocity_added(Registry& r, Entity, Velocity& v) { r.resource<AutoLog>().calls.push_back(std::format("add {}", v.x)); }
+
+    [[=ecs::on_remove]]
+    void velocity_removed(Registry& r, Entity, Velocity& v) { r.resource<AutoLog>().calls.push_back(std::format("remove {}", v.x)); }
+
+    ECS_REGISTER()
+}
+
+void auto_systems()
+{
+    Registry r;
+    Schedule s;
+    r.set_resource<AutoLog>();
+    s.add_auto_systems();
+    EXPECT(s.get_systems().size() == 5);
+    EXPECT(set_name<EarlySet>() == "EarlySet");
+    EXPECT(s.get_systems()[0].name == "auto_a");   // registered by name, ordered by before / after
+    EXPECT(s.get_phase_systems(Phase::Late).size() == 1 && s.get_phase_systems(Phase::Late)[0]->name == "auto_y");
+    s.run_frame(r, 0.0);
+    EXPECT((r.resource<AutoLog>().calls == std::vector<std::string>{ "y", "z", "b", "a", "y" }));
+    // all of them write AutoLog, but every pair is ordered (transitively)
+    EXPECT(s.find_ambiguities().empty());
+
+    add_auto_hooks(r);
+    r.resource<AutoLog>().calls.clear();
+    const Entity e = r.create();
+    r.add<Velocity>(e, 2.f, 0.f);
+    r.destroy(e);
+    EXPECT((r.resource<AutoLog>().calls == std::vector<std::string>{ "add 2", "remove 2" }));
+    (void)&not_a_system;
+}
+
+void ambiguities()
+{
+    Schedule s;
+    s.add(Phase::Update, "w1", [](Query<Position>) {}).sets = { set_name<EarlySet>() };
+    System& w2 = s.add(Phase::Update, "w2", [](Query<Position, const Velocity>) {});
+    w2.sets = { set_name<LaterSet>() };
+    w2.after = { set_name<EarlySet>() };
+    System& r1 = s.add(Phase::Update, "r1", [](Query<const Position>) {});
+    r1.after = { set_name<EarlySet>() };
+    r1.ambiguous_with = { set_name<LaterSet>() };       // w2 / r1: intended
+    s.add(Phase::Update, "v", [](Query<Velocity>) {});   // v / w2: Velocity
+    s.add(Phase::Update, "reads", [](Query<const Position>, Query<const Velocity>) {});   // reads what w1, w2, v write
+    s.add(Phase::Late, "log1", [](ResMut<AutoLog>) {});
+    s.add(Phase::Late, "log2", [](Res<AutoLog>) {});
+    s.add(Phase::Late, "exclusive", [](Registry&) {});
+
+    std::vector<std::string> found;
+    for (const Ambiguity& a : s.find_ambiguities())
+        found.push_back(std::format("{}/{}: {}", a.first->name, a.second->name, a.conflict));
+    std::ranges::sort(found);
+    const std::vector<std::string> expected = {
+        "log1/exclusive: Registry& (exclusive)",
+        "log1/log2: AutoLog",
+        "log2/exclusive: Registry& (exclusive)",
+        "v/reads: Velocity",
+        "w1/reads: Position",
+        "w2/reads: Position",
+        "w2/v: Velocity",
+    };
+    EXPECT(found == expected);
+    if (found != expected)
+        for (const std::string& f : found)
+            std::println("  {}", f);
+}
+
 int main()
+
 {
     external_resources();
     basic();
     commands_and_hooks();
     schedule();
+    auto_systems();
+    ambiguities();
     stress();
     if (failures)
         std::println("FAILED ({})", failures);

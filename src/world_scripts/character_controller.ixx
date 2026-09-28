@@ -31,7 +31,7 @@ import reflect;
 //                        interpolated between the last two ticks at the same time
 export
 {
-    struct CharacterInput
+    struct [[=scene::runtime_only]] CharacterInput
     {
         glm::vec2 move_axis{0.0f};   // x: right, y: forward, relative to camera_yaw
         [[=rh::edit, =rh::read_only, =rh::degrees]] float camera_yaw = 0.0f;
@@ -46,7 +46,7 @@ export
         [[=rh::edit, =rh::degrees]] float camera_yaw = 0.0f;
     };
 
-    struct CharacterMovement
+    struct [[=scene::runtime_only]] CharacterMovement
     {
         glm::vec3 position{0.0f};   // feet
         glm::vec3 move_direction{0, 0, 1};
@@ -78,7 +78,7 @@ export
         static constexpr float capsule_radius = 0.3f;
     };
 
-    struct CharacterAnimator
+    struct [[=scene::runtime_only]] CharacterAnimator
     {
         struct Clip
         {
@@ -153,7 +153,4 @@ export
 
     // Orbit camera around the character, pulled in front of walls
     Transform make_character_camera(World& world, ecs::Entity character, float camera_yaw, float camera_pitch);
-
-    // Component types, systems; `input` (the keyboard of PlayerControlled characters) becomes a resource
-    void install_character_controller(World& world, const Input& input);
 }

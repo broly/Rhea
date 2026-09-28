@@ -3,63 +3,64 @@ module rhcomponents;
 import :scene_view_proxy.reflection_capture;
 
 import std.compat;
-import globals;
+import glm;
 
 RenderId SceneViewProcessor_ReflectionCapture::register_proxy()
 {
-    if (!vacated_cubemap_ids.empty())
+    RenderId render_id(0, 0);
+    if (!vacated_capture_ids.empty())
     {
-        RenderId reuse_id = vacated_cubemap_ids.back();
-        reuse_id.generation++;
-        vacated_cubemap_ids.pop_back();
-        return reuse_id;
+        render_id = vacated_capture_ids.back();
+        render_id.generation++;
+        vacated_capture_ids.pop_back();
     }
-    uint32_t identifier = cubemaps.size();
-    cubemaps.push_back({});
-    const RenderId render_id(identifier, 0);
+    else
+    {
+        render_id = RenderId(uint32_t(captures.size()), 0);
+        captures.push_back({});
+    }
     
+    RenderObject_ReflectionCapture& capture = captures[render_id.identifier];
+    const uint32_t version = capture.capture_version;
+    capture = {};
+    capture.registered = true;
+    // a reused slot holds the previous owner's capture
+    capture.capture_version = version + 1;
     return render_id;
 }
 
 void SceneViewProcessor_ReflectionCapture::unregister_proxy(RenderId render_id)
 {
-    cubemaps[render_id.identifier] = {}; 
-    vacated_cubemap_ids.push_back(render_id);
+    RenderObject_ReflectionCapture& capture = captures[render_id.identifier];
+    const uint32_t version = capture.capture_version;
+    capture = {};
+    capture.capture_version = version + 1;
+    vacated_capture_ids.push_back(render_id);
 }
-
-
 
 void SceneViewProcessor_ReflectionCapture::process()
 {
     for (const auto& submitted : read_submission_buffer<SceneViewProxy_ReflectionCapture>())
     {
-        auto& cubemap_ro = cubemaps[submitted.render_id.identifier];
+        RenderObject_ReflectionCapture& capture = captures[submitted.render_id.identifier];
+        if (!capture.registered)
+            continue;
         
-        auto renderer = RhGlobals::engine->renderer;  // crutch
+        const glm::vec3 position = submitted.transform.position.glm();
+        if (position != capture.position || submitted.active != capture.active)
+            capture.capture_version++;
         
-        const CubemapHandle irradiance = submitted.irradiance;
-        const CubemapHandle prefiltered_env = submitted.prefiltered_env;
-        irradiance.get();
-        prefiltered_env.get();
+        const glm::vec3 center = position + submitted.box_offset.glm();
+        const glm::vec3 extent = glm::max(glm::abs(submitted.box_extent.glm()), glm::vec3(0.01f));
         
-        cubemap_ro.debug_name = submitted.debug_name;
-        cubemap_ro.irradiance = irradiance;
-        cubemap_ro.prefiltered_env = prefiltered_env;
+        capture.active = submitted.active;
+        capture.position = position;
+        capture.box_min = center - extent;
+        capture.box_max = center + extent;
+        capture.blend_distance = std::max(submitted.blend_distance, 0.001f);
+        capture.intensity = std::max(submitted.intensity, 0.0f);
+        capture.update_interval = std::max(submitted.update_interval, 0.0f);
+        capture.rebake_on_enter = submitted.rebake_on_enter;
+        capture.debug_name = submitted.debug_name;
     }
-}
-
-std::optional<RenderObject_ReflectionCapture> SceneViewProcessor_ReflectionCapture::query_nearest(glm::vec3 origin) const
-{
-    std::vector<RenderObject_ReflectionCapture> all = cubemaps;
-        
-    std::sort(all.begin(), all.end(),
-        [origin](const RenderObject_ReflectionCapture& a, const RenderObject_ReflectionCapture& b) {
-                
-            return glm::distance(a.position, origin) <
-                   glm::distance(b.position, origin);
-        });
-    
-    if (all.empty())
-        return std::nullopt;
-    return all[0];
 }

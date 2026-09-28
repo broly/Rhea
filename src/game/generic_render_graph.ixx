@@ -21,6 +21,9 @@ import rhmath;
 import debug_draw;
 import :nn_denoiser_passes;
 import :debug_view;
+import :reflection_probes;
+import :draw_list;
+import rhcomponents;
 #include "object/object_reflection_macro.h"
 
 
@@ -50,7 +53,7 @@ enum class COLOR_OUTPUT_HDR : uint8_t
     RTXGI = 1,
     SSR = 2,
     INTERMEDIATE = 3,
-    RESERVED_0 = 4,
+    SPECULAR_WEIGHT = 4,     // lighting -> SSRComposite: env BRDF x specular occlusion
     RTXGI_REPROJECTED = 5,
     RTXGI_ACCUM = 6,
     RTXGI_MOMENTS = 7,
@@ -111,7 +114,7 @@ namespace LightingDebug
 {
     inline constexpr const char* param = "lighting_debug";
     inline constexpr uint32_t no_diffuse_gi = 1;    // irradiance / GI buffer
-    inline constexpr uint32_t no_specular_ibl = 2;  // prefiltered environment (character shading models)
+    inline constexpr uint32_t no_specular_ibl = 2;  // image based specular: reflection probes and SSR (specular weight 0)
     inline constexpr uint32_t no_emissive = 4;      // g-buffer emissive (and character default lit emissive)
     inline constexpr uint32_t no_shadows = 8;       // directional shadow map
     inline constexpr uint32_t no_decals = 16;       // decal albedo
@@ -119,6 +122,9 @@ namespace LightingDebug
     // g-buffer emissive (discarded, so they show black), logs frames where they appear and auto-dumps
     // g-buffer EXRs (see read_diag_queries)
     inline constexpr uint32_t emissive_watch = 32;
+    // every surface is a mirror of the reflection probes (roughness 0, parallax corrected): shows what the
+    // probes captured and how their boxes line up with the geometry
+    inline constexpr uint32_t probe_mirror = 64;
 }
 
 // Renderer int param "geometry_debug" (bit mask, ModelPushConstants.debug_id of the base pass draws)
@@ -128,6 +134,7 @@ namespace GeometryDebug
     inline constexpr uint32_t zero_emissive = 1;         // g-buffer emissive written as 0 (pbr and character)
     inline constexpr uint32_t emissive_index_check = 2;  // pbr: emissive = red where the material has an emissive texture
     inline constexpr uint32_t solid_emissive = 4;        // emissive target = solid red (checks the switch reaches the shaders)
+    inline constexpr uint32_t glossy = 8;                // pbr roughness x 0.25: polished level to check SSR / probe reflections
 }
 
 struct ColorOutputConstants
@@ -224,6 +231,22 @@ public:
     double emissive_watch_last_dump_time = -1.0e9;
     double emissive_watch_last_log_time = -1.0e9;
     uint32_t emissive_watch_frames_since_log = 0;
+    // totals, logged every 30 s while the watch is on
+    uint64_t emissive_watch_frames = 0;
+    uint64_t emissive_watch_flagged = 0;
+    uint64_t emissive_watch_bursts = 0;
+    bool emissive_watch_prev_flagged = false;
+    double emissive_watch_last_summary_time = -1.0;
+    // Emissive watch ring: g_emissive copied into one layer after the base pass every frame while the watch is on.
+    // A corrupted frame is only reported MAX_FRAMES_IN_FLIGHT frames later (and often lasts one frame), its copy
+    // is still intact then and the auto-dump saves every ring layer (the log names the corrupted frame's layer)
+    static constexpr uint32_t EMISSIVE_RING_SIZE = kRenderMaxFramesInFlight + 1;
+    RGTextureHandle emissive_ring;
+    uint32_t emissive_ring_next = 0;
+    std::array<uint32_t, kRenderMaxFramesInFlight> emissive_ring_layer_of_slot = {};
+    bool emissive_watch_active = false;
+    uint32_t renderdoc_captures_requested = 0;
+    double renderdoc_last_request_time = -1.0e9;
     bool diag_enabled() const { return num_pass_instances == 1 && diag_queries.handle != 0; }
     void read_diag_queries(RenderGraphContext& ctx);
 
@@ -318,5 +341,15 @@ public:
     
     NNDenoiserState nn_denoiser_state;
     
+    // runtime baked reflection probes, main graph only (pass "ReflectionProbes")
+    std::unique_ptr<ReflectionProbeSystem> reflection_probes;
+
+    // mesh draws of the frame: records + indirect commands
+    DrawList draw_list;
+
+    // Draws `items` of the pass: grouped by pipeline, one indirect draw per group (in_order: one draw per item
+    // in the given order, for passes which blend). bind_resources binds the pass resources after a pipeline.
+    void draw_items(RenderGraphContext& ctx, const std::vector<const RenderPrimitive*>& items, uint32_t debug_id,
+        bool in_order, const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources);
 };
 RH_OBJECT(GenericRenderGraph)

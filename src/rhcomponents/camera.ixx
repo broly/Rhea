@@ -19,9 +19,16 @@ export
     // Perspective camera at the entity's WorldTransform; the active one renders the view
     struct Camera
     {
-        [[=rh::edit, =rh::degrees, =rh::range<10.f, 120.f>]] float fov = 1.0f;
-        [[=rh::edit, =rh::speed<0.001f>]] float near_plane = 0.1f;
-        [[=rh::edit, =rh::speed<1.f>]] float far_plane = 1000.0f;
-        [[=rh::edit]] bool active = false;
+        [[=rh::edit, =rh::degrees, =rh::range<10.f, 120.f>]] 
+        float fov = 1.0f;
+        
+        [[=rh::edit, =rh::speed<0.001f>]] 
+        float near_plane = 0.1f;
+        
+        [[=rh::edit, =rh::speed<1.f>]] 
+        float far_plane = 1000.0f;
+        
+        [[=rh::edit]] 
+        bool active = false;
     };
 }

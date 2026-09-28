@@ -2,7 +2,7 @@
 #define CHARACTER_LIGHTING
 
 // Deferred shading for the character shading models (see character/shading_models.glsl).
-// Requires pbr_helpers.glsl (GGX helpers, PI) and resources/reflection.glsl.
+// Requires pbr_helpers.glsl (GGX helpers, PI) and resources/reflection.glsl (env_brdf_approx).
 
 #include "character/shading_models.glsl"
 
@@ -133,20 +133,10 @@ vec3 character_eval_light(in CharacterGBuffer g, vec3 V, vec3 L, vec3 Li)
     return (diffuse + specular) * Li;
 }
 
-// Karis, mobile env BRDF approximation
-vec3 character_env_brdf_approx(vec3 F0, float roughness, float NdotV)
-{
-    const vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
-    const vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
-    vec4 r = roughness * c0 + c1;
-    float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
-    vec2 AB = vec2(-1.04, 1.04) * a004 + r.zw;
-    return F0 * AB.x + AB.y;
-}
-
-// gi: irradiance-like signal (RT GI or IBL irradiance, same term as legacy: gi * albedo)
-// Specular comes from the prefiltered environment of the nearest reflection capture.
-vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi, vec3 pos, bool specular_ibl)
+// gi: irradiance-like signal (RT GI or probe irradiance, same term as legacy: gi * albedo).
+// Returns the diffuse part; specular_weight is what the reflected radiance along reflect(-V, N) is multiplied
+// by (SSR / reflection probes, added in ssr_composite.frag)
+vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi, out vec3 specular_weight)
 {
     float NdotV = max(dot(g.N, V), 1e-4);
 
@@ -154,13 +144,9 @@ vec3 character_eval_indirect(in CharacterGBuffer g, vec3 V, vec3 gi, vec3 pos, b
 
     vec3 F0 = g.shading_model == SHADING_MODEL_ID_HAIR ? vec3(0.04) : character_f0(g);
 
-    vec3 R = reflect(-V, g.N);
-    float max_lod = float(textureQueryLevels(u_prefilter_map) - 1);
-    vec3 prefiltered = specular_ibl ? textureLod(u_prefilter_map, R, g.roughness * max_lod).rgb : vec3(0.0);
+    specular_weight = env_brdf_approx(F0, g.roughness, NdotV) * g.ao;
 
-    vec3 specular = prefiltered * character_env_brdf_approx(F0, g.roughness, NdotV);
-
-    return (diffuse + specular) * g.ao;
+    return diffuse * g.ao;
 }
 
 #endif // CHARACTER_LIGHTING

@@ -4,17 +4,25 @@
 		"usage": "frame",
 		"allowed_stages": ["fragment"],
 		"parameters": {
-			"irradiance": {
-				"variable": "u_irradiance",
+			"probe_irradiance": {
+				"variable": "u_probe_irradiance",
 				"type": "sampler",
 				"sampler": "default",
-				"binding": "BINDING_SAMPLER_IRRADIANCE"
+				"binding": "BINDING_SAMPLER_PROBE_IRRADIANCE",
+				"initial_array_size": 16
 			},
-			"prefilter": {
-				"variable": "u_prefilter_map",
+			"probe_specular": {
+				"variable": "u_probe_specular",
 				"type": "sampler",
 				"sampler": "default",
-				"binding": "BINDING_SAMPLER_PREFILTERED_ENV"
+				"binding": "BINDING_SAMPLER_PROBE_SPECULAR",
+				"initial_array_size": 16
+			},
+			"probes": {
+				"variable": "reflection_probes_ubo",
+				"type": "uniform",
+				"ubo": "ReflectionProbesUBO",
+				"binding": "BINDING_UBO_REFLECTION_PROBES"
 			},
 			"brdf_lut": {
 				"variable": "u_brdf_lut",

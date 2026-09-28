@@ -27,6 +27,3 @@ export struct GltfScene
     // static triangle mesh collision for every mesh of the scene
     [[=rh::edit, =rh::read_only]] bool collision = false;
 };
-
-// Component type and its import on spawn
-export void install_gltf_scene(World& world);

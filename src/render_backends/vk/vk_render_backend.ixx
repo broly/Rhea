@@ -90,7 +90,8 @@ public:   /// API Section
     virtual void begin_render_pass(RBCommandList cmd_list, RBFramebufferId framebuffer_index) override;
     virtual void end_render_pass(RBCommandList cmd_list) override;
     virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) override;
-    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0) override;
+    virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0, uint32_t first_instance = 0) override;
+    virtual void draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset, uint32_t draw_count) override;
     virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) override;
     virtual bool acquire_next_image(RBFrameHandle frame_handle) override;
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
@@ -104,6 +105,7 @@ public:   /// API Section
     virtual RBPipelineLayout create_pipeline_layout(const PipelineLayoutDesc& desc) override;
     virtual Extent get_swapchain_extent() const override;
     virtual void transition_image(RBCommandList cmd, const ImageBarrierParams& params) override;
+    virtual void generate_mips(RBCommandList cmd, RBImageHandle image) override;
     virtual void update_sampled_image(
         RBDescriptorSet set,
         uint32_t binding,

@@ -118,11 +118,14 @@ void platform::window::set_input(Input* input)
     g_input = input;
 }
 
-bool platform::window::window_create(Window& window, int width, int height, const char* title) {
+bool platform::window::window_create(Window& window, int width, int height, const char* title, const WindowCreateOptions& options) {
     if (!glfwInit())
         return false;
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_MAXIMIZED, options.maximized ? GLFW_TRUE : GLFW_FALSE);
+    glfwWindowHint(GLFW_FOCUSED, options.focus_on_show ? GLFW_TRUE : GLFW_FALSE);
+    glfwWindowHint(GLFW_FOCUS_ON_SHOW, options.focus_on_show ? GLFW_TRUE : GLFW_FALSE);
 
     window.handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
     assert(window.handle);
@@ -142,6 +145,10 @@ bool platform::window::window_create(Window& window, int width, int height, cons
 
 void platform::window::window_poll_events() {
     glfwPollEvents();
+}
+
+void platform::window::window_request_close(Window& window) {
+    glfwSetWindowShouldClose(window.handle, GLFW_TRUE);
 }
 
 bool platform::window::window_should_close(const Window& window) {

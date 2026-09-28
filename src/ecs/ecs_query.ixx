@@ -13,8 +13,13 @@ export namespace ecs
     {
         std::vector<ComponentId> reads;
         std::vector<ComponentId> writes;
-        std::vector<const void*> resource_reads;
-        std::vector<const void*> resource_writes;
+        struct Resource
+        {
+            const void* key;
+            std::string_view name;
+        };
+        std::vector<Resource> resource_reads;
+        std::vector<Resource> resource_writes;
         bool exclusive = false;  // takes Registry& - conflicts with everything
     };
 
@@ -75,6 +80,18 @@ export namespace ecs
         }
 
         bool empty() const { return count() == 0; }
+
+        // Component of any entity, not only the iterated one (nullptr if it has none): T is one of Ts,
+        // the result is const if the query reads it. With one component type T can be omitted.
+        template<typename T = std::remove_const_t<std::tuple_element_t<0, std::tuple<Ts...>>>>
+            requires (std::is_same_v<T, std::remove_const_t<Ts>> || ...)
+        auto* get(Entity e) const
+        {
+            if constexpr ((std::is_same_v<T, Ts> || ...))
+                return registry->get<T>(e);
+            else
+                return static_cast<const T*>(registry->get<T>(e));
+        }
 
         static void describe_access(Access& access)
         {

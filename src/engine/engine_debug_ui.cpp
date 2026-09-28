@@ -708,6 +708,10 @@ void EngineDebugUI::draw_gpu_profiler_window(Engine& engine)
     if (ImGui::Button("Dump json"))
         gpuprof::dump_json();
 
+    // CPU frame rate (ImGui's running average) next to the GPU pass times
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::Text("%.1f FPS (%.2f ms/frame)", io.Framerate, io.Framerate > 0.0f ? 1000.0f / io.Framerate : 0.0f);
+
     std::vector<const gpuprof::PassResult*> results;
     double total_last_ms = 0.0;
     for (const auto& [name, result] : gpuprof::ctx().results)
@@ -913,10 +917,9 @@ void EngineDebugUI::draw_ecs_window(Engine& engine)
             ImGui::TableHeadersRow();
             for (int phase = 0; phase < int(ecs::Phase::Count); ++phase)
             {
-                for (const ecs::System& system : schedule.get_systems())
+                for (const ecs::System* system_ptr : schedule.get_phase_systems(ecs::Phase(phase)))
                 {
-                    if (int(system.phase) != phase)
-                        continue;
+                    const ecs::System& system = *system_ptr;
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     ImGui::TextUnformatted(ecs::phase_name(system.phase).data());
@@ -934,6 +937,10 @@ void EngineDebugUI::draw_ecs_window(Engine& engine)
             }
             ImGui::EndTable();
         }
+
+        for (const ecs::Ambiguity& a : schedule.find_ambiguities())
+            ImGui::TextColored(ImVec4(1.f, 0.7f, 0.2f, 1.f), "unordered: %s / %s (%s): %s", a.first->name.c_str(),
+                a.second->name.c_str(), ecs::phase_name(a.first->phase).data(), a.conflict.c_str());
     }
 
     if (ImGui::CollapsingHeader("Archetypes", ImGuiTreeNodeFlags_DefaultOpen))

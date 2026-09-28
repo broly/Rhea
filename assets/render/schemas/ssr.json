@@ -51,7 +51,7 @@
 				},
 				"fragment": {
 					"shader": "ssr_composite.frag",
-					"resources": ["hdr_color_output", "gbuffer", "ssr"]
+					"resources": ["camera", "hdr_color_output", "gbuffer", "ssr", "reflection"]
 				}
 			},
 			"color_attachments": [

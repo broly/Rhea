@@ -22,6 +22,10 @@ public:
     
     void update_ssbo_element(Name buffer_name, size_t element_size, size_t index, const void* data, std::optional<RBFrameHandle> frame) override;
 
+    RBBufferHandle get_ssbo_handle(Name buffer_name, std::optional<RBFrameHandle> frame) override;
+
+    std::span<std::byte> map_ssbo(Name buffer_name, std::optional<RBFrameHandle> frame) override;
+
     void bind(RBCommandList command_list, RBFrameHandle frame) override;
 
     vk::BufferManager& buffer_manager;

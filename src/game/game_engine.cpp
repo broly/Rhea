@@ -10,12 +10,15 @@ import std.compat;
 
 import :renderer;
 import :debug_view;
+import :reflection_probes;
+import :generic_render_graph;
 import ecs;
 import name;
 import framework;
 import rhcomponents;
 import rhmath;
 import glm;
+import cvar;
 
 void GameEngine::engine_init()
 {
@@ -25,13 +28,9 @@ void GameEngine::engine_init()
     Engine::engine_init();
 }
 
-void GameEngine::capture_reflection_probes()
+void GameEngine::rebake_reflection_probes()
 {
-    auto game_renderer = std::static_pointer_cast<GameRenderer>(renderer);
-    ecs::Registry& registry = world->registry;
-    ecs::Query<const ReflectionCapture, const Name>(registry).each([&] (ecs::Entity e, const ReflectionCapture&, const Name& name) {
-        game_renderer->capture_ibl(scene::get_world_transform(registry, e).position.glm(), name);
-    });
+    std::static_pointer_cast<GameRenderer>(renderer)->rebake_reflection_probes();
 }
 
 void GameEngine::on_debug_ui_menu()
@@ -80,7 +79,129 @@ void GameEngine::on_debug_ui_render_panel()
     if (ImGui::Checkbox("Skeletons", &show_skeleton))
         cv_debug_show_skeleton.set(show_skeleton);
 
-    if (ImGui::Button("Capture reflection probes"))
-        capture_reflection_probes();
-    ImGui::SetItemTooltip("Bakes IBL cubemaps of every reflection capture into cache/hdr (G)");
+    auto checkbox = [] (const char* label, cvar::Var<bool>& var, const char* tooltip)
+    {
+        bool value = var.get();
+        if (ImGui::Checkbox(label, &value))
+            var.set(value);
+        ImGui::SetItemTooltip("%s", tooltip);
+    };
+    auto slider = [] (const char* label, cvar::Var<float>& var, float min, float max, const char* tooltip)
+    {
+        float value = var.get();
+        if (ImGui::SliderFloat(label, &value, min, max))
+            var.set(value);
+        ImGui::SetItemTooltip("%s", tooltip);
+    };
+    // one bit of a renderer int param (debug switches read by the render graph every frame)
+    auto int_param_bit = [this] (const char* label, const char* param, uint32_t bit, const char* tooltip)
+    {
+        const auto& params = renderer->get_int_params();
+        const auto it = params.find(param);
+        const uint32_t value = it != params.end() ? (uint32_t)it->second : 0u;
+        bool on = (value & bit) != 0;
+        if (ImGui::Checkbox(label, &on))
+            renderer->set_int_param(param, (int)(on ? value | bit : value & ~bit));
+        ImGui::SetItemTooltip("%s", tooltip);
+    };
+
+    // ---- image based specular: SSR where the screen space ray hits, probe cubemaps elsewhere ----
+    ImGui::SeparatorText("Reflections");
+
+    ImGui::PushID("ssr");
+    checkbox("SSR", cv_ssr_enabled, "Screen space reflections: replace the probe reflections where the ray hits something on screen");
+    ImGui::SameLine(160.0f);
+    ImGui::BeginDisabled(!cv_ssr_enabled.get());
+    slider("Intensity", cv_ssr_intensity, 0.0f, 8.0f, "Scale of the screen space reflections (1: physically based)");
+    ImGui::EndDisabled();
+    ImGui::PopID();
+
+    ImGui::PushID("probe_specular");
+    checkbox("Probe cubemaps", cv_probes_specular, "Specular reflections from the reflection probe cubemaps (parallax corrected, blended by the boxes)");
+    ImGui::SameLine(160.0f);
+    ImGui::BeginDisabled(!cv_probes_specular.get());
+    slider("Intensity", cv_probes_specular_intensity, 0.0f, 8.0f, "Scale of the probe reflections (1: physically based)");
+    ImGui::EndDisabled();
+    ImGui::PopID();
+
+    ImGui::PushID("probe_diffuse");
+    checkbox("Probe diffuse", cv_probes_diffuse, "Indirect diffuse light from the probes' irradiance cubemaps");
+    ImGui::SameLine(160.0f);
+    ImGui::BeginDisabled(!cv_probes_diffuse.get());
+    slider("Intensity", cv_probes_diffuse_intensity, 0.0f, 4.0f, "Scale of the probe irradiance");
+    ImGui::EndDisabled();
+    ImGui::PopID();
+
+    int_param_bit("Glossy level", GeometryDebug::param, GeometryDebug::glossy,
+        "Debug: roughness x 0.25 on every pbr material. The level (New Sponza) is rough stone (roughness ~0.7): physically it barely reflects");
+    ImGui::SameLine();
+    int_param_bit("Probe mirror", LightingDebug::param, LightingDebug::probe_mirror,
+        "Debug: every surface shows the probes' mirror reflection (roughness 0, parallax corrected) - what the probes captured and how their boxes line up");
+
+    ImGui::SeparatorText("Reflection probes");
+
+    ReflectionProbeSystem* probes = std::static_pointer_cast<GameRenderer>(renderer)->get_reflection_probes();
+    if (!probes)
+    {
+        ImGui::TextDisabled("The render graph has no reflection probes");
+        return;
+    }
+
+    if (ImGui::Button("Rebake all"))
+        rebake_reflection_probes();
+    ImGui::SetItemTooltip("Every probe is captured again, nearest to the camera first (G)");
+
+    ImGui::SameLine();
+    checkbox("Show volumes", cv_probes_show_volumes, "Boxes (outer box: end of the influence fade) and capture points. Green: baked, yellow: waiting for a rebake, red: capturing");
+    checkbox("Enabled", cv_probes_enabled, "Off: no probes, the lighting uses the sky ambient only");
+    ImGui::SameLine();
+    checkbox("Parallax", cv_probes_parallax, "Box projected reflections");
+    ImGui::SameLine();
+    checkbox("Rebake on sun change", cv_probes_auto_rebake, "A sun direction / color change makes every probe dirty");
+
+    int faces = cv_probes_faces_per_frame.get();
+    if (ImGui::SliderInt("Faces per frame", &faces, 1, 6))
+        cv_probes_faces_per_frame.set(faces);
+    ImGui::SetItemTooltip("Cube faces a rebaking probe renders per frame: 1 spreads a rebake over 6 frames");
+    int blend_frames = cv_probes_blend_frames.get();
+    if (ImGui::SliderInt("Blend frames", &blend_frames, 1, 120))
+        cv_probes_blend_frames.set(blend_frames);
+    ImGui::SetItemTooltip("Frames a rebaked probe crossfades from its old capture to the new one (1: switch at once)");
+
+    const auto status = probes->get_status();
+    if (status.empty())
+    {
+        ImGui::TextDisabled("No active ReflectionCapture entities");
+        return;
+    }
+    if (ImGui::BeginTable("reflection_probes", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp))
+    {
+        ImGui::TableSetupColumn("Probe");
+        ImGui::TableSetupColumn("State");
+        ImGui::TableSetupColumn("Bakes");
+        ImGui::TableSetupColumn("Age");
+        ImGui::TableHeadersRow();
+        for (const auto& probe : status)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(probe.name.to_string().c_str());
+            ImGui::TableNextColumn();
+            if (probe.baking)
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "capturing");
+            else if (!probe.baked)
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "not baked");
+            else if (probe.dirty)
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f), "dirty");
+            else
+                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "baked");
+            ImGui::TableNextColumn();
+            ImGui::Text("%u", probe.bake_count);
+            ImGui::TableNextColumn();
+            if (probe.baked)
+                ImGui::Text("%.1f s", probe.age_seconds);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::Text("Faces rendered: %llu", (unsigned long long)probes->get_faces_rendered());
 }

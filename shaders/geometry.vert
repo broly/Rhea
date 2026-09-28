@@ -24,6 +24,8 @@ layout(location = 6) out vec4 v_prev_clip;
 void main()
 {
     
+    forward_draw_record();
+
     uint prim_id = get_primitive_index();
     GPUPrimitiveInfo primitive_info = get_primitive_info(prim_id);
     

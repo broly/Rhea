@@ -14,6 +14,8 @@ import name;
 
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
+#include "ecs/ecs_macros.h"
+#include "framework/scene_macros.h"
 
 DEFINE_LOGGER(LogCharacterController, Log);
 
@@ -79,6 +81,7 @@ namespace
 
     // ------------------------------------------------------------------ systems
 
+    [[=ecs::system<ecs::Phase::FixedPre>]]
     void read_player_input(ecs::Query<CharacterInput, const PlayerControlled> characters, ecs::Res<Input> input)
     {
         characters.each([&] (CharacterInput& command, const PlayerControlled& player) {
@@ -317,6 +320,7 @@ namespace
         mesh.set_morph_weights(a.expression_weights);
     }
 
+    [[=ecs::system<ecs::Phase::Fixed>]]
     void move_characters(ecs::Query<CharacterMovement, const CharacterInput> characters,
         ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
     {
@@ -326,25 +330,30 @@ namespace
     }
 
     // the probe shape is made once the physics scene exists (after the level is loaded)
+    // independent of the colliders, but both take the Registry
+    [[=ecs::system<ecs::Phase::PostLoad>, =ecs::ambiguous_with<MeshColliderSync>]]
     void create_camera_probe(ecs::Registry& registry, ecs::ResMut<phys::PhysicsScene> physics)
     {
         if (!registry.find_resource<CharacterCameraProbe>())
             registry.set_resource<CharacterCameraProbe>(physics->create_shape(phys::SphereShape{ camera_probe_radius }));
     }
 
-    void animate_characters(ecs::Registry& registry)
+    [[=ecs::system<ecs::Phase::Update>]]
+    void animate_characters(ecs::Query<CharacterAnimator, SkinnedMesh, const CharacterMovement> characters,
+        ecs::Query<const CharacterInput> inputs, ecs::Res<ecs::FrameTime> time)
     {
-        const float dt = std::min((float)registry.resource<ecs::FrameTime>().dt, 0.1f);   // hitches (shader compilation, loading)
-        ecs::Query<CharacterAnimator, SkinnedMesh, const CharacterMovement>(registry).each(
+        const float dt = std::min((float)time->dt, 0.1f);   // hitches (shader compilation, loading)
+        characters.each(
             [&] (ecs::Entity e, CharacterAnimator& animator, SkinnedMesh& mesh, const CharacterMovement& movement)
             {
-                update_pose(animator, movement, registry.get<CharacterInput>(e), dt);
+                update_pose(animator, movement, inputs.get(e), dt);
                 mesh.set_local_pose(pose_to_local_matrices(animator.pose_final));
                 update_expression(animator, mesh, dt);
             });
     }
 
     // Render transform between the last two simulated ticks
+    [[=ecs::system<ecs::Phase::Update>]]
     void interpolate_characters(ecs::Query<Transform, const CharacterMovement> characters, ecs::Res<ecs::FrameTime> time)
     {
         const float alpha = (float)time->alpha;
@@ -354,6 +363,16 @@ namespace
             transform.rotation = glm::angleAxis(heading, glm::vec3(0, 1, 0));
         });
     }
+
+    [[=ecs::on_remove]]
+    void destroy_character_capsule(ecs::Registry& registry, ecs::Entity, CharacterMovement& movement)
+    {
+        if (phys::PhysicsScene* physics = registry.find_resource<phys::PhysicsScene>())
+            physics->destroy_character(movement.capsule);
+    }
+
+    ECS_REGISTER()
+    SCENE_REGISTER_COMPONENTS(PlayerControlled, CharacterInput, CharacterMovement, CharacterAnimator)
 }
 
 
@@ -556,24 +575,4 @@ Transform make_character_camera(World& world, ecs::Entity character, float camer
     t.position = pivot + back * distance;
     t.rotation = math::from_euler_rotation(glm::vec3(camera_pitch, camera_yaw, 0.0f));
     return t;
-}
-
-void install_character_controller(World& world, const Input& input)
-{
-    scene::register_component_type<PlayerControlled>();
-    scene::register_component_type<CharacterInput, false>();
-    scene::register_component_type<CharacterMovement, false>();
-    scene::register_component_type<CharacterAnimator, false>();
-
-    world.registry.set_resource_ref(input);
-    world.registry.on_remove<CharacterMovement>([] (ecs::Registry& registry, ecs::Entity, CharacterMovement& movement) {
-        if (phys::PhysicsScene* physics = registry.find_resource<phys::PhysicsScene>())
-            physics->destroy_character(movement.capsule);
-    });
-
-    world.schedule.add<&read_player_input>(ecs::Phase::FixedPre);
-    world.schedule.add<&move_characters>(ecs::Phase::Fixed);
-    world.schedule.add<&animate_characters>(ecs::Phase::Update);
-    world.schedule.add<&interpolate_characters>(ecs::Phase::Update);
-    world.schedule.add<&create_camera_probe>(ecs::Phase::PostLoad);
 }

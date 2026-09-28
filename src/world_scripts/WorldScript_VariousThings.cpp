@@ -19,6 +19,7 @@ import ecs;
 import name;
 import framework;
 import character_controller;
+import cvar;
 
 constexpr bool DO_NN_SAMPLES = false;
 constexpr bool DO_ANIMATE_LIGHT = true;
@@ -124,6 +125,22 @@ void WorldScript_VariousThings::tick_debug_views()
 void WorldScript_VariousThings::tick(double dt)
 {
     tick_debug_views();
+
+    // RHEA_SOAK_SECONDS (Engine::run): free camera held on the face close-up, emissive watch on, no auto-dumps
+    static const bool soak_test = std::getenv("RHEA_SOAK_SECONDS") != nullptr;
+    if (soak_test)
+    {
+        character_mode = false;
+        RhGlobals::engine->renderer->set_int_param("lighting_debug", 32);
+        // EXR dumps stall for seconds: none while RenderDoc captures the flash (RHEA_RENDERDOC=1)
+        static const bool renderdoc_run = std::getenv("RHEA_RENDERDOC") != nullptr;
+        RhGlobals::engine->renderer->set_int_param("emissive_watch_dumps", renderdoc_run ? 0 : 3);
+        // RHEA_SOAK_PROBES=0: runtime reflection probes off (not saved, Engine::run skips cvar::save in soak runs)
+        static const char* probes_env = std::getenv("RHEA_SOAK_PROBES");
+        if (probes_env && probes_env[0] == '0')
+            if (cvar::Entry* probes = cvar::find("render.probes.enabled"))
+                probes->from_string("false");
+    }
 
     ecs::Registry& registry = world->registry;
 
@@ -496,10 +513,8 @@ void WorldScript_VariousThings::tick(double dt)
 
     if (input->is_key_down(Key::G))
     {
-        auto gr = dynamic_cast<GameRenderer*>(RhGlobals::engine->renderer.get());
-        ecs::Query<const ReflectionCapture, const Name>(registry).each([&] (ecs::Entity e, const ReflectionCapture&, const Name& name) {
-            gr->capture_ibl(scene::get_world_transform(registry, e).position.glm(), name);
-        });
+        if (auto gr = dynamic_cast<GameRenderer*>(RhGlobals::engine->renderer.get()))
+            gr->rebake_reflection_probes();
         handled = true;
     }
 
@@ -520,6 +535,9 @@ void WorldScript_VariousThings::tick(double dt)
         if (Camera* camera_component = registry.get<Camera>(camera))
             camera_component->fov = glm::clamp(camera_component->fov * powf(0.9f, (float)scroll), glm::radians(10.0f), glm::radians(120.0f));
     }
+
+    if (soak_test && frame_character(t, true))
+        handled = true;
 
     if (handled && free_camera)
         set_camera_transform(t);

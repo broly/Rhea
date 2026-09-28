@@ -21,6 +21,7 @@ import paths;
 import :cubemap_capture_render_graph;
 import :brdf_lut_capture_render_graph;
 import :debug_view;
+import :reflection_probes;
 
 import log;
 #include "render_layout.h"
@@ -68,86 +69,19 @@ void GameRenderer::init(RBWindowHandle in_window)
     {
         set_int_param(DebugViewParams::show_skeleton, show ? 1 : 0);
     });
-    
-    // auto aux_graph1 = reflect::get_object_type_name<CubemapCaptureRenderGraph>();
-    // create_render_graph(aux_graph1, {{"capture_ibl", true}}, "ibl");
 }
-void GameRenderer::capture_ibl(glm::vec3 pos, Name actor_name)
+
+ReflectionProbeSystem* GameRenderer::get_reflection_probes() const
 {
-    LogGameRenderer.Log("Starting IBL capture for %s",
-        actor_name.to_string().c_str());
-    
-    for (Name image_type : {"irradiance", "prefiltered_env"})
-        current_cubemaps.insert({ actor_name.to_string() + "_" + image_type.to_string(), Cubemap{} });
+    auto graph = std::dynamic_pointer_cast<GenericRenderGraph>(get_main_render_graph());
+    return graph ? graph->reflection_probes.get() : nullptr;
+}
 
-    RenderGraphParameters params;
-    params.bool_params["capture_ibl"] = true;
-    params.vec3_params["capture_pos"] = pos;
-
-    for (Name image_type : {"irradiance", "prefiltered_env"})
+void GameRenderer::rebake_reflection_probes()
+{
+    if (ReflectionProbeSystem* probes = get_reflection_probes())
     {
-        trigger_aux_rg_once("ibl", params,
-            [=](RenderGraphContext& ctx)
-            {
-                auto image_opt =
-                    ctx.render_graph.get_image_by_name(image_type);
-
-                checkf(image_opt.has_value(),
-                       "Unable to get IBL cubemap image");
-
-                // --------------------------------------------------
-                // Readback
-                // --------------------------------------------------
-
-                ImageReadback readback =
-                    ctx.backend.readback_image(*image_opt);
-                
-                const std::string image_name = actor_name.to_string() + "_" + image_type.to_string();
-
-                checkf(readback.layers == 6, "should be 6 layers (cubemap)");
-                Cubemap& cubemap = current_cubemaps[image_name];
-
-                cubemap.format    = readback.format;
-                cubemap.face_size = readback.extent.width;
-
-                // --------------------------------------------------
-                // Copy faces + mips
-                // --------------------------------------------------
-
-                for (uint32_t face = 0; face < 6; ++face)
-                {
-                    auto& dst_face = cubemap.faces[face];
-                    dst_face.clear();
-                    dst_face.resize(readback.mips);
-
-                    for (uint32_t mip = 0; mip < readback.mips; ++mip)
-                    {
-                        // move is fine: ImageReadback is temporary
-                        dst_face[mip] =
-                            std::move(readback.data[face][mip]);
-                    }
-                }
-
-                finish_capturing_ibl(image_name);
-            });
+        probes->request_rebake_all();
+        LogGameRenderer.Log("Rebaking reflection probes");
     }
 }
-
-void GameRenderer::finish_capturing_ibl(const std::string& filename)
-{
-    Cubemap& cubemap = current_cubemaps[filename];
-
-    checkf(cubemap.face_size > 0,
-           "Cubemap not initialized");
-
-    auto name =
-        std::string("hdr/ibl_") +
-        filename +
-        ".exr";
-
-    std::filesystem::path path = paths::get_cache_path() / name;
-    cubemap.save(path);
-
-    current_cubemaps.erase(filename);
-}
-

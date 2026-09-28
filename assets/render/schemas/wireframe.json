@@ -159,7 +159,7 @@
 			"stages": {
 				"vertex": {
 					"shader": "wireframe_mesh.vert",
-					"resources": ["camera", "mesh_table", "primitive_table"]
+					"resources": ["camera", "mesh_table", "primitive_table", "draw_list"]
 				},
 				"fragment": {
 					"shader": "wireframe.frag",

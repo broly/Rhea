@@ -20,11 +20,12 @@ export
     struct LightProxy { SceneViewProxy_Light proxy; };
     struct ReflectionCaptureProxy { SceneViewProxy_ReflectionCapture proxy; };
 
-    // Registers the render component types (JSON / inspector), `scene_view` as a resource (ResMut<SceneView>)
-    // and the systems of the world:
-    //   Late:      sync_render_proxies (after propagate_transforms), mesh colliders created at runtime
+    // System sets of render_sync.cpp (component types, hooks and systems register themselves there;
+    // the systems need the SceneView resource, ResMut<SceneView>):
+    //   Late:      sync_render_proxies (after scene::TransformPropagation), mesh colliders created at runtime
     //   PostLoad:  mesh colliders of a loaded level
-    void install_render_components(World& world, SceneView& scene_view);
+    struct RenderSync {};
+    struct MeshColliderSync {};
 
     // Union of the world bounds of all registered meshes (zero box when there are none)
     AABB compute_world_bounds(ecs::Registry& registry);

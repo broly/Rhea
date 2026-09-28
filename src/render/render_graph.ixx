@@ -173,13 +173,18 @@ public:
         instance->bind(cmd, frame);
     }
     
+    // Binds unless the pipeline is already bound. RenderGraph::execute resets current_pipeline before every
+    // pass execution (layer / mip instances included): every render pass needs its pipeline bound again (the
+    // backend forgets the pipeline layout at end_render_pass, and another VkRenderPass needs another pipeline
+    // variant) and per layer resources. Code that begins its own render passes inside a pass must reset
+    // current_pipeline after each begin_render_pass. Returns true when it bound: resources must be (re)bound.
     bool bind_pipeline(PipelineObject* pipeline) const
     {
-        const bool pipeline_changed = current_pipeline != pipeline;
+        if (current_pipeline == pipeline)
+            return false;
         current_pipeline = pipeline;
         backend.bind_pipeline(cmd, pipeline);
-        
-        return pipeline_changed;
+        return true;
     }
     
     template<typename T>
@@ -208,9 +213,9 @@ public:
         backend.draw_fullscreen(cmd);
     }
     
-    void draw(uint32_t vertex_count = 0, uint32_t first_vertex = 0) const
+    void draw(uint32_t vertex_count = 0, uint32_t first_vertex = 0, uint32_t first_instance = 0) const
     {
-        backend.draw(cmd, vertex_count, first_vertex);
+        backend.draw(cmd, vertex_count, first_vertex, first_instance);
     }
     
     

@@ -3,6 +3,9 @@ module rail;
 import std.compat;
 import ecs;
 
+#include "ecs/ecs_macros.h"
+#include "framework/scene_macros.h"
+
 void Rail::start()
 {
     active = true;
@@ -80,14 +83,12 @@ void Rail::tick(double dt)
 
 namespace
 {
+    [[=ecs::system<ecs::Phase::Update>]]
     void tick_rails(ecs::Query<Rail> rails, ecs::Res<ecs::FrameTime> time)
     {
         rails.each([&] (Rail& rail) { rail.tick(time->dt); });
     }
-}
 
-void install_rail(World& world)
-{
-    scene::register_component_type<Rail>();
-    world.schedule.add<&tick_rails>(ecs::Phase::Update);
+    ECS_REGISTER()
+    SCENE_REGISTER_COMPONENTS(Rail)
 }

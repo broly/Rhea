@@ -23,7 +23,7 @@ public:
     void on_debug_ui_menu() override;
     void on_debug_ui_render_panel() override;
     
-    // bakes IBL cubemaps of every RhComp_ReflectionCapture (G)
-    void capture_reflection_probes();
+    // rebakes every reflection probe (G)
+    void rebake_reflection_probes();
 };
 RH_OBJECT(GameEngine)

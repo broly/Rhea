@@ -12,13 +12,11 @@ import render;
 import vk;
 import WorldScript_RotateAroundObject;
 import rhcomponents;
-import gltf_scene;
-import rail;
-import character_controller;
 import profile;
 import gpu_profile;
 import ui;
 import cvar;
+import paths;
 
 
 void Engine::engine_init()
@@ -33,7 +31,31 @@ void Engine::run()
     // saved settings (cache/cvars.json), before anything reads them
     cvar::load();
     
-    window_create(window, 1280, 720, "Rhea");
+    // RHEA_SOAK_SECONDS=<n>: unattended soak test for the blocky g-buffer emissive garbage (see
+    // WorldScript_VariousThings / GenericRenderGraph::read_diag_queries): maximized window without stealing
+    // the focus, face close-up, emissive watch summaries in the log, quits after n seconds of world time
+    const char* soak_env = std::getenv("RHEA_SOAK_SECONDS");
+    const double soak_seconds = soak_env ? std::atof(soak_env) : 0.0;
+    window_create(window, 1280, 720, "Rhea", {
+        .maximized = soak_seconds > 0.0,
+        .focus_on_show = soak_seconds <= 0.0,
+    });
+
+    // RHEA_RENDERDOC=1: RenderDoc in-app API (before the Vulkan instance exists), captures go to cache/renderdoc.
+    // The emissive watch triggers captures of the corrupted frames (GenericRenderGraph::read_diag_queries)
+    if (const char* renderdoc_env = std::getenv("RHEA_RENDERDOC"); renderdoc_env && renderdoc_env[0] == '1')
+    {
+        std::string renderdoc_error;
+        if (platform::renderdoc::load(&renderdoc_error))
+        {
+            const auto capture_dir = paths::get_cache_path() / "renderdoc";
+            std::filesystem::create_directories(capture_dir);
+            platform::renderdoc::set_capture_path_template((capture_dir / "rhea").string());
+            std::printf("RenderDoc loaded, captures: %s\n", capture_dir.string().c_str());
+        }
+        else
+            std::printf("RenderDoc requested (RHEA_RENDERDOC=1) but not loaded: %s\n", renderdoc_error.c_str());
+    }
     
     window_handle = {window.handle};
     input = std::make_shared<Input>();
@@ -65,11 +87,9 @@ void Engine::run()
     
     world->set_clock(clock);
 
-    // component types and systems of the world, before the level is loaded
-    install_render_components(*world, *scene_view);
-    install_gltf_scene(*world);
-    install_rail(*world);
-    install_character_controller(*world, *input);
+    // engine services for systems and hooks (component types and systems register themselves)
+    world->registry.set_resource_ref(*scene_view);          // ResMut<SceneView>
+    world->registry.set_resource_ref(std::as_const(*input)); // Res<Input>
 
     world->add_script<WorldScript_VariousThings>(); // TODO hardcoded
     
@@ -92,6 +112,16 @@ void Engine::run()
         clock->tick();
         
         world->tick();
+        // RHEA_SOAK_CAP_UNTIL=<s>: soak runs hold ~30 FPS until then, to move the full-load step in time
+        static const char* soak_cap_env = std::getenv("RHEA_SOAK_CAP_UNTIL");
+        static const double soak_cap_until = soak_cap_env ? std::atof(soak_cap_env) : 0.0;
+        if (soak_seconds > 0.0 && world->get_time_seconds() < soak_cap_until)
+            std::this_thread::sleep_for(std::chrono::milliseconds(33));
+        if (soak_seconds > 0.0 && world->get_time_seconds() > soak_seconds)
+        {
+            std::printf("Soak test finished after %.0f s\n", world->get_time_seconds());
+            platform::window::window_request_close(window);
+        }
         debug_ui.draw_world_debug(*this);
         
         if (ui::is_visible())
@@ -125,7 +155,9 @@ void Engine::run()
     }
     renderer->get_backend()->shutdown_ui_overlay();
     ui::shutdown();
-    cvar::save();
+    // soak runs override settings (RHEA_SOAK_PROBES...): they must not end up in the user's cvars.json
+    if (soak_seconds <= 0.0)
+        cvar::save();
     
     gpuprof::shutdown();
     window_destroy(window);

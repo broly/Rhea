@@ -54,5 +54,10 @@ public:
     virtual void update_ssbo(Name buffer_name, size_t size, void* data, std::optional<RBFrameHandle> frame = std::nullopt) = 0;
     
     virtual void update_ssbo_element(Name buffer_name, size_t element_size, size_t index, const void* data, std::optional<RBFrameHandle> frame) = 0;
+
+    // The storage buffer of `frame` (host visible): its handle (RenderBackend::draw_indirect) and its mapped
+    // memory, written directly (coherent memory, the frame's fence was waited before prepare)
+    virtual RBBufferHandle get_ssbo_handle(Name buffer_name, std::optional<RBFrameHandle> frame) = 0;
+    virtual std::span<std::byte> map_ssbo(Name buffer_name, std::optional<RBFrameHandle> frame) = 0;
     
 };

@@ -888,6 +888,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
                     PROFILE("RenderGraph Pass");
                     gpuprof::pass_begin(cmd, pass.name.to_string());
                     ctx.pass_name = pass.name;
+                    ctx.current_pipeline = nullptr;
                     ctx.level = layer_id;
                     ctx.mip = mip_map_id;
                     pass.execute(ctx);

@@ -11,6 +11,10 @@
 #include "character/character_lighting.glsl"
 
 layout(location = 0) out vec4 out_color;
+// hdr_color_present[SPECULAR_WEIGHT]: rgb = what the reflected radiance is multiplied by (env BRDF x
+// specular occlusion). The specular itself is added by SSRComposite: SSR where the ray hit, the reflection
+// probes elsewhere (ssr_composite.frag)
+layout(location = 1) out vec4 out_specular_weight;
 layout(location = 0) in vec2 v_uv;
 
 layout(push_constant)
@@ -26,6 +30,7 @@ const uint LIGHTING_DEBUG_NO_EMISSIVE = 4u;
 const uint LIGHTING_DEBUG_NO_SHADOWS = 8u;
 const uint LIGHTING_DEBUG_NO_DECALS = 16u;
 const uint LIGHTING_DEBUG_EMISSIVE_WATCH = 32u;
+const uint LIGHTING_DEBUG_PROBE_MIRROR = 64u;
 
 bool lighting_debug(uint flag)
 {
@@ -35,6 +40,7 @@ bool lighting_debug(uint flag)
 void main()
 {
     vec2 uv = v_uv;
+    out_specular_weight = vec4(0.0);
     
     vec4 albedo_roughness = get_gbuffer_ALBEDO_ROUGHNESS(uv);
     
@@ -64,18 +70,30 @@ void main()
 
     vec3 V = normalize(camera_ubo.camera_pos.xyz - pos);
     
-    // buffer_index == LIGHTING_GI_FROM_IBL (ray tracing disabled): ambient from the reflection capture
+    // ---- character shading models (see character/shading_models.glsl) ----
+    uint shading_model = decode_shading_model(get_gbuffer_GEOMETRY_NORMAL(uv).a);
+    const bool legacy_model = shading_model == SHADING_MODEL_ID_CLEAR || shading_model == SHADING_MODEL_ID_LEGACY;
+    
+    if (lighting_debug(LIGHTING_DEBUG_PROBE_MIRROR))
+    {
+        out_color = vec4(sample_reflection_probes_specular(pos, reflect(-V, N), 0.0), 1.0);
+        return;
+    }
+    
+    // Same roughness clamp as character_decode_gbuffer
+    const float roughness = clamp(albedo_roughness.a, 0.04, 1.0);
+    const float NdotV = max(dot(N, V), 1e-4);
+    
+    // buffer_index == LIGHTING_GI_FROM_IBL (ray tracing disabled): ambient from the reflection probes
+    // (blended by their boxes, resources/reflection.glsl)
     const bool gi_from_ibl = pc.buffer_index == 0xFFFFFFFFu;
     vec3 gi = gi_from_ibl
-        ? texture(u_irradiance, N).rgb
+        ? sample_reflection_probes_irradiance(pos, N)
         : texture(u_hdr_color_present[pc.buffer_index], uv).rgb;
     if (lighting_debug(LIGHTING_DEBUG_NO_DIFFUSE_GI))
         gi = vec3(0.0);
     
-    // ---- character shading models (see character/shading_models.glsl) ----
-    uint shading_model = decode_shading_model(get_gbuffer_GEOMETRY_NORMAL(uv).a);
-    
-    if (shading_model != SHADING_MODEL_ID_CLEAR && shading_model != SHADING_MODEL_ID_LEGACY)
+    if (!legacy_model)
     {
         CharacterGBuffer g = character_decode_gbuffer(
             shading_model,
@@ -102,15 +120,22 @@ void main()
             radiance += character_eval_light(g, V, L, light_ubo.dir_light.color.rgb * shadow);
         }
         
-        radiance += character_eval_indirect(g, V, gi, pos, !lighting_debug(LIGHTING_DEBUG_NO_SPECULAR_IBL));
+        vec3 character_specular_weight;
+        radiance += character_eval_indirect(g, V, gi, character_specular_weight);
         if (!lighting_debug(LIGHTING_DEBUG_NO_EMISSIVE))
             radiance += g.emissive;
         
         out_color = vec4(radiance, 1.0);
+        if (!lighting_debug(LIGHTING_DEBUG_NO_SPECULAR_IBL))
+            out_specular_weight = vec4(character_specular_weight, 1.0);
         return;
     }
 
     // ---- legacy PBR model ----
+    const float metallic = clamp(get_gbuffer_EMISSIVE(uv).a, 0.0, 1.0);
+    const float ao = get_gbuffer_WORLD_NORMAL(uv).a;
+    vec3 diffuse_albedo = albedo * (1.0 - metallic);
+    
     vec3 direct = vec3(0.0);
 
     for (int i = 0; i < light_ubo.light_count; ++i)
@@ -127,7 +152,7 @@ void main()
         float dist = length(Lpos - pos);
         float attenuation = 1.0 / (dist * dist + 1.0);
 
-        direct += albedo / 3.14159265 * Lcol * attenuation * NdotL;
+        direct += diffuse_albedo / 3.14159265 * Lcol * attenuation * NdotL;
     }
     
     if (light_ubo.has_dir_light == 1)
@@ -140,13 +165,19 @@ void main()
             float shadow = lighting_debug(LIGHTING_DEBUG_NO_SHADOWS) ? 1.0 : shadow_factor(pos, Ng);
             vec3 radiance = light_ubo.dir_light.color.rgb * shadow;
 
-            direct += albedo / 3.14159265 * radiance * NdotL;
+            direct += diffuse_albedo / 3.14159265 * radiance * NdotL;
         }
     }
 
-    vec3 indirect = gi * albedo;
+    vec3 indirect = gi * diffuse_albedo * ao;
 
     vec3 color = direct + indirect + emissive;
 
     out_color = vec4(color, 1.0);
+    
+    // image based specular (split sum with the analytic env BRDF, occluded by the material AO), applied in
+    // SSRComposite to SSR / reflection probe radiance
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    if (!lighting_debug(LIGHTING_DEBUG_NO_SPECULAR_IBL))
+        out_specular_weight = vec4(env_brdf_approx(F0, roughness, NdotV) * specular_occlusion(NdotV, ao, roughness), 1.0);
 }

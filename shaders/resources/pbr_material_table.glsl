@@ -120,12 +120,15 @@ vec4 get_emissive(in GPUMaterial mat, vec2 uv)
 }
 
 
+// (ao, roughness, metallic). The texture is ORM packed (glTF metallicRoughness: G roughness, B metallic).
+// params1 = (roughness, metallic, occlusion) factors: roughness / metallic scale their channels, occlusion is
+// the AO strength (glTF occlusion strength: 0 = no AO, glTF materials without an occlusion texture leave it 0)
 vec3 get_orm(in GPUMaterial mat, vec2 uv)
 {
     uint orm_tex_index = mat.textures0.z;
     vec3 orm_color = read_texture_or(orm_tex_index, uv, vec4(1.0)).rgb;
-    vec3 orm_factor = mat.params1.xyz;
-    return orm_color * orm_factor;
+    float ao = mix(1.0, orm_color.r, clamp(mat.params1.z, 0.0, 1.0));
+    return vec3(ao, orm_color.g * mat.params1.x, orm_color.b * mat.params1.y);
 }
     
     

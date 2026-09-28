@@ -88,11 +88,11 @@
 			"stages": {
 				"vertex": {
 					"shader": "geometry.vert",
-					"resources": ["camera", "mesh_table", "primitive_table"]
+					"resources": ["camera", "mesh_table", "primitive_table", "draw_list"]
 				},
 				"fragment": {
 					"shader": "geometry.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures"]
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "draw_list"]
 				}
 			},
 			"depth_write": true,
@@ -172,6 +172,10 @@
 				{
 					"write_mask": ["R", "G", "B", "A"],
 					"translucent": false
+				},
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
 				}
 			],
 
@@ -200,11 +204,11 @@
 			"stages": {
 				"vertex": {
 					"shader": "geometry.vert",
-					"resources": ["camera", "mesh_table", "primitive_table"]
+					"resources": ["camera", "mesh_table", "primitive_table", "draw_list"]
 				},
 				"fragment": {
 					"shader": "forward.frag",
-					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "hdr_color_output"]
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "hdr_color_output", "draw_list"]
 				}
 			},
 			"depth_write": false,
@@ -241,7 +245,7 @@
 			"stages": {
 				"vertex": {
 					"shader": "shadow.vert",
-					"resources": ["camera", "light", "primitive_table", "mesh_table"]
+					"resources": ["camera", "light", "primitive_table", "mesh_table", "draw_list"]
 				},
 				"fragment": {
 					"shader": "shadow.frag",

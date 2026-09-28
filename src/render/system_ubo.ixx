@@ -74,3 +74,39 @@ export struct CloudsUBO
     glm::vec4 horizon_color;
 };
 RH_REGISTER_TYPE(CloudsUBO)
+
+// ---- reflection probes (game: ReflectionProbeSystem, shaders/resources/reflection.glsl) ----
+
+export constexpr uint32_t kMaxReflectionProbes = 16;
+
+export struct GPUReflectionProbe
+{
+    glm::vec4 capture_position;  // xyz: capture point, w: 1 once the probe holds a filtered capture
+    glm::vec4 box_min;           // xyz: influence / parallax box, w: blend distance (fade inside the box)
+    glm::vec4 box_max;           // xyz, w: intensity
+};
+
+export struct ReflectionProbesUBO
+{
+    GPUReflectionProbe probes[kMaxReflectionProbes];
+    glm::uvec4 info;         // x: slots to scan, y: unused, z: specular mips, w: parallax on
+    glm::vec4 sky_ambient;   // rgb: radiance used while no probe is baked
+    glm::vec4 intensity;     // x: diffuse, y: specular (0: off)
+    glm::vec4 ssr_params;    // x: SSR intensity (0: off) - ssr_composite.frag
+};
+RH_REGISTER_TYPE(ReflectionProbesUBO)
+
+export struct ProbeCaptureUBO
+{
+    glm::mat4 face_view_proj[6];  // cube face order +X -X +Y -Y +Z -Z (Vulkan cubemap layers)
+    glm::vec4 capture_position;   // xyz, w: unused
+    glm::vec4 sky_color;          // rgb: sky radiance behind the clouds, a: cloud density scale
+    glm::vec4 sky_ambient;        // rgb: ambient radiance of surfaces no probe covers yet
+    glm::vec4 filter_params;      // x: source face size, y: source mip count
+    // lights baked into the probe (Light::visible_in_reflection_probes): nearest point lights to the capture
+    // point, the sun (light_ubo.dir_light, with the shadow map) only if it is visible to probes
+    glm::vec4 light_position[8];  // xyz
+    glm::vec4 light_color[8];     // rgb
+    glm::uvec4 light_info;        // x: point light count, y: sun visible
+};
+RH_REGISTER_TYPE(ProbeCaptureUBO)

@@ -8,6 +8,7 @@ import glm;
 import assets;
 import texture_format;
 import assets;
+import :reflection_probes;
 
 export class GameRenderer : public Renderer
 {
@@ -18,8 +19,9 @@ public:
 
     std::shared_ptr<Engine> engine;
     
-    void capture_ibl(glm::vec3 pos, Name actor_name);
-    void finish_capturing_ibl(const std::string& filename);
+    // runtime reflection probes of the main render graph (null if it has none)
+    ReflectionProbeSystem* get_reflection_probes() const;
     
-    std::map<std::string, Cubemap> current_cubemaps;
+    // every reflection probe is rebaked (a probe per few frames, nearest first)
+    void rebake_reflection_probes();
 };

@@ -76,6 +76,27 @@ ComponentType& scene::detail::add_component_type(ComponentType type)
     return stored;
 }
 
+namespace
+{
+    // filled by static initializers of SCENE_REGISTER_COMPONENTS, before main
+    std::vector<void (*)()>& auto_components()
+    {
+        static std::vector<void (*)()> list;
+        return list;
+    }
+}
+
+void scene::detail::register_auto_component(void (*registration)())
+{
+    auto_components().push_back(registration);
+}
+
+void scene::register_auto_components()
+{
+    for (void (*registration)() : auto_components())
+        registration();
+}
+
 const ComponentType* scene::find_component_type(std::string_view name)
 {
     const ComponentTypeTable& table = component_types();

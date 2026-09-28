@@ -335,7 +335,8 @@ RBBufferHandle vk::BufferManager::create_uniform_buffer(size_t buffer_size, Reso
 
 RBBufferHandle vk::BufferManager::create_storage_buffer(size_t buffer_size, ResourceUsage usage_type, bool host_visible)
 {
-    VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    // indirect: resource SSBOs double as vkCmdDrawIndirect argument buffers (resource "draw_list")
+    VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
     VkMemoryPropertyFlags mem_flags = host_visible ?
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT :
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;

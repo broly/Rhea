@@ -136,6 +136,25 @@ void VkRenderResourceInstance::update_ssbo_element(Name buffer_name, size_t elem
     buffer_manager.update_buffer_element(buffer, element_size, index, data, frame_index);
 }
 
+RBBufferHandle VkRenderResourceInstance::get_ssbo_handle(Name buffer_name, std::optional<RBFrameHandle> frame)
+{
+    auto& inst_info = resource->backend.pipeline_manager.resource_instance_data.at(this);
+    auto& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
+
+    auto [binding_index, binding] = pipe_info.descritor_set_layout_desc.get_binding(buffer_name);
+    checkf(binding.parameter.type == MaterialParamType::ssbo, "Type mismatch");
+
+    return inst_info.buffers[binding_index][usage.frame_index(frame)];
+}
+
+std::span<std::byte> VkRenderResourceInstance::map_ssbo(Name buffer_name, std::optional<RBFrameHandle> frame)
+{
+    const RBBufferHandle handle = get_ssbo_handle(buffer_name, frame);
+    vk::BufferInfo& buf = buffer_manager.get_buffer(handle, usage.frame_index(frame));
+    checkf(buf.mapped_ptr, "Storage buffer '%s' is not host visible", buffer_name.to_string().c_str());
+    return { static_cast<std::byte*>(buf.mapped_ptr), (size_t)buf.size };
+}
+
 void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle frame)
 {
     PROFILE("VkRenderResourceInstance::bind");

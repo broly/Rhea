@@ -16,6 +16,8 @@ layout(location = 1) out vec3 v_world_normal;
 
 void main()
 {
+    forward_draw_record();
+
     Vertex vertex = fetch_vertex(get_mesh_index(), gl_VertexIndex);
 
     GPUPrimitiveInfo primitive_info = get_primitive_info(get_primitive_index());

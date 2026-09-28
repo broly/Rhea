@@ -408,14 +408,199 @@ namespace ecs
         return "?";
     }
 
+    namespace
+    {
+        // filled by static initializers of ECS_REGISTER, before main
+        std::vector<detail::AutoSystem>& auto_systems()
+        {
+            static std::vector<detail::AutoSystem> list;
+            return list;
+        }
+    }
+
+    void detail::register_auto_system(const AutoSystem& system)
+    {
+        auto_systems().push_back(system);
+    }
+
+    void Schedule::add_auto_systems()
+    {
+        std::vector<detail::AutoSystem> list = auto_systems();
+        // static initialization order across files is unspecified: sort for a stable schedule
+        std::ranges::sort(list, {}, [] (const detail::AutoSystem& s) { return std::tuple(s.file, s.name, s.index); });
+        for (const detail::AutoSystem& s : list)
+            if (s.add_system)
+                s.add_system(*this);
+    }
+
+    void add_auto_hooks(Registry& registry)
+    {
+        std::vector<detail::AutoSystem> list = auto_systems();
+        std::ranges::sort(list, {}, [] (const detail::AutoSystem& s) { return std::tuple(s.file, s.name, s.index); });
+        for (const detail::AutoSystem& s : list)
+            if (s.add_hook)
+                s.add_hook(registry);
+    }
+
+    namespace
+    {
+        bool in_any_set(const System& system, std::span<const std::string_view> sets)
+        {
+            return std::ranges::any_of(sets, [&] (std::string_view set) { return system.in_set(set); });
+        }
+
+        // successors[i]: systems of `list` that must run after list[i]
+        std::vector<std::vector<uint32_t>> order_successors(std::span<System* const> list)
+        {
+            std::vector<std::vector<uint32_t>> successors(list.size());
+            for (uint32_t i = 0; i < list.size(); ++i)
+            {
+                for (uint32_t j = 0; j < list.size(); ++j)
+                {
+                    if (i != j && (in_any_set(*list[j], list[i]->before) || in_any_set(*list[i], list[j]->after)))
+                        successors[i].push_back(j);
+                }
+            }
+            return successors;
+        }
+
+        // Empty if the systems may run in any order
+        std::string access_conflict(const Access& a, const Access& b)
+        {
+            if (a.exclusive || b.exclusive)
+                return "Registry& (exclusive)";
+
+            std::string result;
+            const auto add = [&] (std::string_view name)
+            {
+                if (!result.empty())
+                    result += ", ";
+                result += name;
+            };
+            for (ComponentId id : a.writes)
+                if (std::ranges::contains(b.writes, id) || std::ranges::contains(b.reads, id))
+                    add(component_info(id).name);
+            for (ComponentId id : b.writes)
+                if (std::ranges::contains(a.reads, id))
+                    add(component_info(id).name);
+
+            const auto key = &Access::Resource::key;
+            for (const Access::Resource& r : a.resource_writes)
+                if (std::ranges::contains(b.resource_writes, r.key, key) || std::ranges::contains(b.resource_reads, r.key, key))
+                    add(r.name);
+            for (const Access::Resource& r : b.resource_writes)
+                if (std::ranges::contains(a.resource_reads, r.key, key))
+                    add(r.name);
+            return result;
+        }
+    }
+
+    void Schedule::build_order() const
+    {
+        for (int phase = 0; phase < int(Phase::Count); ++phase)
+        {
+            // registration order: the tie-break where before / after leave a choice
+            std::vector<System*> list;
+            for (const System& system : systems)
+                if (int(system.phase) == phase)
+                    list.push_back(const_cast<System*>(&system));   // the schedule owns them
+
+            const std::vector<std::vector<uint32_t>> successors = order_successors(list);
+            std::vector<uint32_t> predecessor_count(list.size(), 0);
+            for (const auto& next : successors)
+                for (uint32_t j : next)
+                    ++predecessor_count[j];
+
+            // Kahn's algorithm, always taking the earliest registered ready system
+            std::priority_queue<uint32_t, std::vector<uint32_t>, std::greater<>> ready;
+            for (uint32_t i = 0; i < list.size(); ++i)
+                if (predecessor_count[i] == 0)
+                    ready.push(i);
+
+            std::vector<System*>& order = phase_order[phase];
+            order.clear();
+            while (!ready.empty())
+            {
+                const uint32_t i = ready.top();
+                ready.pop();
+                order.push_back(list[i]);
+                for (uint32_t j : successors[i])
+                    if (--predecessor_count[j] == 0)
+                        ready.push(j);
+            }
+
+            if (order.size() != list.size())
+            {
+                std::string cycle;
+                for (uint32_t i = 0; i < list.size(); ++i)
+                {
+                    if (predecessor_count[i] == 0)
+                        continue;
+                    cycle += cycle.empty() ? "" : ", ";
+                    cycle += list[i]->name;
+                    order.push_back(list[i]);   // still run them, in registration order
+                }
+                checkf(false, "ecs: before / after cycle in phase %s between: %s",
+                    std::string(phase_name(Phase(phase))).c_str(), cycle.c_str());
+            }
+        }
+        order_dirty = false;
+    }
+
+    std::span<System* const> Schedule::get_phase_systems(Phase phase) const
+    {
+        if (order_dirty)
+            build_order();
+        return phase_order[size_t(phase)];
+    }
+
+    std::vector<Ambiguity> Schedule::find_ambiguities() const
+    {
+        std::vector<Ambiguity> result;
+        for (int phase = 0; phase < int(Phase::Count); ++phase)
+        {
+            const std::span<System* const> list = get_phase_systems(Phase(phase));
+            const std::vector<std::vector<uint32_t>> successors = order_successors(list);
+
+            // reachable[i][j]: list[i] runs before list[j] through before / after (list is topologically sorted)
+            std::vector<std::vector<bool>> reachable(list.size(), std::vector<bool>(list.size(), false));
+            for (size_t i = list.size(); i-- > 0;)
+            {
+                for (uint32_t j : successors[i])
+                {
+                    reachable[i][j] = true;
+                    if (j > i)
+                        for (size_t k = 0; k < list.size(); ++k)
+                            if (reachable[j][k])
+                                reachable[i][k] = true;
+                }
+            }
+
+            for (size_t i = 0; i < list.size(); ++i)
+            {
+                for (size_t j = i + 1; j < list.size(); ++j)
+                {
+                    const System& a = *list[i];
+                    const System& b = *list[j];
+                    if (reachable[i][j] || reachable[j][i])
+                        continue;
+                    if (in_any_set(b, a.ambiguous_with) || in_any_set(a, b.ambiguous_with))
+                        continue;
+                    std::string conflict = access_conflict(a.access, b.access);
+                    if (!conflict.empty())
+                        result.push_back({ &a, &b, std::move(conflict) });
+                }
+            }
+        }
+        return result;
+    }
+
     void Schedule::run_phase(Registry& registry, Phase phase)
     {
         std::deque<Commands> buffers;
-        for (System& system : systems)
+        for (System* system_ptr : get_phase_systems(phase))
         {
-            if (system.phase != phase)
-                continue;
-
+            System& system = *system_ptr;
             SystemContext context{ registry, buffers.emplace_back(registry) };
             const auto start = std::chrono::steady_clock::now();
             system.run(context);

@@ -6,10 +6,16 @@
 
 
 layout(location = 0) in vec2 v_uv;
+// rgb: radiance seen along the reflection ray, a: confidence of the hit. No BRDF here: ssr_composite.frag
+// weights it like the reflection probes it replaces (env BRDF from the lighting pass)
 layout(location = 0) out vec4 out_ssr;
 
-const int   MAX_STEPS   = 200;
+// coarse march + bisection of the first crossing (was up to 200 fine steps: 6+ ms at 2560x1600)
+const int   LINEAR_STEPS = 48;
+const int   REFINE_STEPS = 6;
 const float MAX_DIST    = 100.0;
+// below this the reflection hardly shows (specular weight x roughness fade): left to the probes
+const float MIN_CONTRIBUTION = 0.015;
 const float THICKNESS   = 0.002;
 const float SELF_BIAS   = 0.05;
 
@@ -37,7 +43,15 @@ void main()
     vec4 normal_data = get_gbuffer_NORMAL(v_uv);
     vec3 normal = normalize(normal_data.xyz * 2.0 - 1.0);
     float roughness = normal_data.w;
-    if (roughness > 0.8)
+    // glossy only: rough lobes are left to the prefiltered probes (smooth hand over, no seam)
+    const float roughness_fade = 1.0 - smoothstep(0.45, 0.75, roughness);
+    if (roughness_fade <= 0.0)
+        return;
+
+    // what the lighting pass will multiply the reflection by (env BRDF x specular occlusion): rough
+    // dielectrics reflect a few percent, not worth a ray
+    vec3 specular_weight = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_SPECULAR_WEIGHT], v_uv).rgb;
+    if (max(specular_weight.r, max(specular_weight.g, specular_weight.b)) * roughness_fade < MIN_CONTRIBUTION)
         return;
 
     vec3 view_pos = reconstruct_view_pos(v_uv, depth);
@@ -73,31 +87,65 @@ void main()
     if (!(max_comp > 1e-5))
         return;
 
-    int steps = int(clamp(max_comp * 1024.0, 1.0, float(MAX_STEPS)));
+    // only the on screen part of the segment is marched (t_screen: where it leaves the screen)
+    vec2 t_bounds = max((vec2(1.0) - start_uv) / delta_uv, -start_uv / delta_uv);   // per axis exit
+    float t_screen = clamp(min(abs(delta_uv.x) > 1e-6 ? t_bounds.x : 1.0, abs(delta_uv.y) > 1e-6 ? t_bounds.y : 1.0), 0.0, 1.0);
+    if (!(t_screen > 0.0))
+        return;
 
+    // about one step per 8 pixels of a 1024 wide screen, at most LINEAR_STEPS
+    int steps = int(clamp(max_comp * t_screen * 128.0, 4.0, float(LINEAR_STEPS)));
+
+    float prev_t = 0.0;
     for (int i = 1; i <= steps; i++)
     {
         // NDC z is affine in screen space along the segment: linear interpolation is exact
-        float t = float(i) / float(steps);
+        float t = t_screen * float(i) / float(steps);
         vec2 uv = start_uv + delta_uv * t;
-
-        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)
-            break;
 
         float scene_depth = get_gbuffer_DEPTH(uv).r;
         float ray_depth = mix(start_ndc.z, end_ndc.z, t);
 
-        if (ray_depth > scene_depth && ray_depth - scene_depth < THICKNESS)
+        if (ray_depth <= scene_depth)
+        {
+            prev_t = t;
+            continue;
+        }
+
+        // the ray went behind the depth buffer between prev_t and t: find the crossing
+        float lo = prev_t;
+        float hi = t;
+        for (int j = 0; j < REFINE_STEPS; j++)
+        {
+            float mid = 0.5 * (lo + hi);
+            vec2 mid_uv = start_uv + delta_uv * mid;
+            if (mix(start_ndc.z, end_ndc.z, mid) > get_gbuffer_DEPTH(mid_uv).r)
+                hi = mid;
+            else
+                lo = mid;
+        }
+        t = hi;
+        uv = start_uv + delta_uv * t;
+        scene_depth = get_gbuffer_DEPTH(uv).r;
+        ray_depth = mix(start_ndc.z, end_ndc.z, t);
+
+        // passed behind an object thicker than THICKNESS: no hit, the probes reflect it
+        if (ray_depth - scene_depth >= THICKNESS)
+            return;
+
         {
             vec3 hit_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], uv).rgb;
             if (!is_finite(hit_color))
                 return;
 
-            float NdotV = max(dot(normal, -incident), 0.0);
-            float fresnel = pow(1.0 - NdotV, 5.0);
-            float strength = (1.0 - roughness) * fresnel;
+            // unreliable hits fade out towards the probes: near the screen border (the ray may continue
+            // off screen), at the end of the ray, and for rays back towards the camera
+            vec2 border = min(uv, 1.0 - uv);
+            float edge_fade = smoothstep(0.0, 0.08, min(border.x, border.y));
+            float distance_fade = 1.0 - smoothstep(0.75, 1.0, t);
+            float facing_fade = 1.0 - smoothstep(0.25, 0.75, refl_dir.z);
 
-            out_ssr = vec4(hit_color * strength, 1.0);
+            out_ssr = vec4(hit_color, roughness_fade * edge_fade * distance_fade * facing_fade);
             return;
         }
     }

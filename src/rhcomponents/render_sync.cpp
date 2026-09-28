@@ -29,6 +29,8 @@ import profile;
 import glm;
 
 #include "profiling/profile.h"
+#include "ecs/ecs_macros.h"
+#include "framework/scene_macros.h"
 
 namespace
 {
@@ -90,13 +92,15 @@ namespace
         proxy.color = light.color;
         proxy.intensity = light.intensity;
         proxy.falloff = light.falloff;
+        proxy.visible_in_reflection_probes = light.visible_in_reflection_probes;
         return proxy;
     }
 
     bool same_proxy(const SceneViewProxy_Light& a, const SceneViewProxy_Light& b)
     {
         return same(a.transform, b.transform) && a.light_type == b.light_type && same(a.color, b.color)
-            && a.intensity == b.intensity && a.falloff == b.falloff;
+            && a.intensity == b.intensity && a.falloff == b.falloff
+            && a.visible_in_reflection_probes == b.visible_in_reflection_probes;
     }
 
     SceneViewProxy_ReflectionCapture make_proxy(const ecs::Registry&, ecs::Entity, const ReflectionCapture& capture, const Transform& world)
@@ -104,15 +108,21 @@ namespace
         SceneViewProxy_ReflectionCapture proxy;
         proxy.transform = world;
         proxy.active = capture.active;
-        proxy.irradiance = capture.irradiance;
-        proxy.prefiltered_env = capture.prefiltered_env;
+        proxy.box_extent = capture.box_extent;
+        proxy.box_offset = capture.box_offset;
+        proxy.blend_distance = capture.blend_distance;
+        proxy.intensity = capture.intensity;
+        proxy.update_interval = capture.update_interval;
+        proxy.rebake_on_enter = capture.rebake_on_enter;
         return proxy;
     }
 
     bool same_proxy(const SceneViewProxy_ReflectionCapture& a, const SceneViewProxy_ReflectionCapture& b)
     {
         return same(a.transform, b.transform) && a.active == b.active
-            && a.irradiance == b.irradiance && a.prefiltered_env == b.prefiltered_env;
+            && same(a.box_extent, b.box_extent) && same(a.box_offset, b.box_offset)
+            && a.blend_distance == b.blend_distance && a.intensity == b.intensity
+            && a.update_interval == b.update_interval && a.rebake_on_enter == b.rebake_on_enter;
     }
 
     template<typename Data>
@@ -158,27 +168,55 @@ namespace
         });
     }
 
-    template<typename State, typename ProcessorT>
-    void unregister_on_remove(ecs::Registry& registry)
+    template<typename ProcessorT, typename State>
+    void unregister_proxy(ecs::Registry& registry, State& state)
     {
-        registry.on_remove<State>([] (ecs::Registry& r, ecs::Entity, State& state) {
-            if (SceneView* scene_view = r.find_resource<SceneView>())
-                scene_view->unregister_scene_view_proxy(state.proxy, processor_id<ProcessorT>());
-        });
+        if (SceneView* scene_view = registry.find_resource<SceneView>())
+            scene_view->unregister_scene_view_proxy(state.proxy, processor_id<ProcessorT>());
     }
 
-    void load_reflection_captures(ecs::Registry& registry)
+    [[=ecs::on_remove]]
+    void unregister_mesh_proxy(ecs::Registry& registry, ecs::Entity, MeshProxy& state)
     {
-        ecs::Query<ReflectionCapture>(registry).each([&] (ecs::Entity e, ReflectionCapture& capture) {
-            if (capture.irradiance.is_valid())
-                return;
-            const std::string name = scene::get_name(registry, e);
-            capture.irradiance = AssetManager::get().load_cubemap("hdr/ibl_" + name + "_irradiance.exr");
-            capture.prefiltered_env = AssetManager::get().load_cubemap("hdr/ibl_" + name + "_prefiltered_env.exr");
-        });
+        unregister_proxy<SceneViewProcessor_Mesh>(registry, state);
+    }
+
+    [[=ecs::on_remove]]
+    void unregister_camera_proxy(ecs::Registry& registry, ecs::Entity, CameraProxy& state)
+    {
+        unregister_proxy<SceneViewProcessor_Camera>(registry, state);
+    }
+
+    [[=ecs::on_remove]]
+    void unregister_light_proxy(ecs::Registry& registry, ecs::Entity, LightProxy& state)
+    {
+        unregister_proxy<SceneViewProcessor_Light>(registry, state);
+    }
+
+    [[=ecs::on_remove]]
+    void unregister_reflection_capture_proxy(ecs::Registry& registry, ecs::Entity, ReflectionCaptureProxy& state)
+    {
+        unregister_proxy<SceneViewProcessor_ReflectionCapture>(registry, state);
+    }
+
+    [[=ecs::on_remove]]
+    void destroy_mesh_collider_body(ecs::Registry& registry, ecs::Entity, MeshCollider& collider)
+    {
+        phys::PhysicsScene* physics = registry.find_resource<phys::PhysicsScene>();
+        if (collider.body.is_valid() && physics)
+            physics->destroy_body(collider.body);
+    }
+
+    [[=scene::on_spawned<SkinnedMesh>]]
+    void init_spawned_skinned_mesh(World& world, ecs::Entity e, const SerializationContext&)
+    {
+        init_skinned_mesh(world.registry, e);
     }
 
     // Static bodies of MeshColliders: shapes cooked on loading threads (pending) or now
+    // independent of the render proxies, but both take the Registry
+    [[=ecs::system<ecs::Phase::PostLoad>, =ecs::system<ecs::Phase::Late>, =ecs::in_set<MeshColliderSync>,
+      =ecs::after<scene::TransformPropagation>, =ecs::ambiguous_with<RenderSync>]]
     void create_mesh_colliders(ecs::Registry& registry, ecs::ResMut<phys::PhysicsScene> physics)
     {
         ecs::Query<MeshCollider, const MeshRenderer>(registry).each([&] (ecs::Entity e, MeshCollider& collider, const MeshRenderer& renderer) {
@@ -210,46 +248,19 @@ namespace
 
 namespace
 {
+    [[=ecs::system<ecs::Phase::Late>, =ecs::in_set<RenderSync>, =ecs::after<scene::TransformPropagation>]]
     void sync_render_proxies(ecs::Registry& registry, ecs::ResMut<SceneView> scene_view)
     {
         PROFILE("sync_render_proxies");
-        load_reflection_captures(registry);
         sync_proxies<MeshRenderer, MeshProxy>(registry, *scene_view, processor_id<SceneViewProcessor_Mesh>());
         sync_proxies<Camera, CameraProxy>(registry, *scene_view, processor_id<SceneViewProcessor_Camera>());
         sync_proxies<Light, LightProxy>(registry, *scene_view, processor_id<SceneViewProcessor_Light>());
         sync_proxies<ReflectionCapture, ReflectionCaptureProxy>(registry, *scene_view, processor_id<SceneViewProcessor_ReflectionCapture>());
         scene_view->world_aabb = compute_world_bounds(registry);
     }
-}
 
-void install_render_components(World& world, SceneView& scene_view)
-{
-    scene::register_component_type<MeshRenderer>();
-    scene::register_component_type<MeshCollider>();
-    scene::register_component_type<SkinnedMesh>([] (World& w, ecs::Entity e, const SerializationContext&) {
-        init_skinned_mesh(w.registry, e);
-    });
-    scene::register_component_type<Camera>();
-    scene::register_component_type<Light>();
-    scene::register_component_type<ReflectionCapture>();
-
-    ecs::Registry& registry = world.registry;
-    registry.set_resource_ref(scene_view);
-
-    unregister_on_remove<MeshProxy, SceneViewProcessor_Mesh>(registry);
-    unregister_on_remove<CameraProxy, SceneViewProcessor_Camera>(registry);
-    unregister_on_remove<LightProxy, SceneViewProcessor_Light>(registry);
-    unregister_on_remove<ReflectionCaptureProxy, SceneViewProcessor_ReflectionCapture>(registry);
-
-    registry.on_remove<MeshCollider>([] (ecs::Registry& r, ecs::Entity, MeshCollider& collider) {
-        phys::PhysicsScene* physics = r.find_resource<phys::PhysicsScene>();
-        if (collider.body.is_valid() && physics)
-            physics->destroy_body(collider.body);
-    });
-
-    world.schedule.add<&create_mesh_colliders>(ecs::Phase::PostLoad);
-    world.schedule.add<&create_mesh_colliders>(ecs::Phase::Late);
-    world.schedule.add<&sync_render_proxies>(ecs::Phase::Late);
+    ECS_REGISTER()
+    SCENE_REGISTER_COMPONENTS(MeshRenderer, MeshCollider, SkinnedMesh, Camera, Light, ReflectionCapture)
 }
 
 AABB compute_world_bounds(ecs::Registry& registry)

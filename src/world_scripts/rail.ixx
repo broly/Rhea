@@ -60,6 +60,3 @@ export struct Rail
     void start();
     void tick(double dt);
 };
-
-// Component type and the playback system (Update phase)
-export void install_rail(World& world);

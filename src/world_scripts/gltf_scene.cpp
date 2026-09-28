@@ -16,11 +16,13 @@ import assets;
 import physics;
 
 #include "logging/log_macro.h"
+#include "framework/scene_macros.h"
 
 DEFINE_LOGGER(LogImportGltf, Log);
 
 namespace
 {
+    [[=scene::on_spawned<GltfScene>]]
     void import_scene(World& world, ecs::Entity root, const SerializationContext& context)
     {
         ecs::Registry& registry = world.registry;
@@ -72,9 +74,6 @@ namespace
 
         LogImportGltf.Log("Scene '%s': %zu meshes", scene_desc.asset_path.c_str(), scene.objects.size());
     }
-}
 
-void install_gltf_scene(World& world)
-{
-    scene::register_component_type<GltfScene>(import_scene);
+    SCENE_REGISTER_COMPONENTS(GltfScene)
 }

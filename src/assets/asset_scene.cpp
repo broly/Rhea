@@ -117,16 +117,17 @@ AssetSceneInfo AssetSceneHandle::load(const std::filesystem::path& path, const s
             std::string texture_name = asset.textures[texture_info.textureIndex].name.c_str();
             auto full_texture_path = rel_textures_path + "/" + texture_name;
             mat->parameters["orm"] = TextureHandle::make_pending(full_texture_path);
+        }
+        else
+        {
+            mat->parameters["orm"] = TextureHandle::invalid();
+        }
+        // glTF factors apply with and without the texture (without one the shader reads 1: the factor itself)
+        {
             const float rv = scene_mat.pbrData.roughnessFactor;
             const float mv = scene_mat.pbrData.metallicFactor;
             mat->parameters["roughness_factor"] = LinearColor(rv, rv, rv, 1.0);
             mat->parameters["metallic_factor"] = LinearColor(mv, mv, mv, 1.0);
-        }
-        else
-        {
-            mat->parameters["roughness_factor"] = LinearColor(1.0, 1.0, 1.0, 1.0);
-            mat->parameters["metallic_factor"] = LinearColor(1.0, 1.0, 1.0, 1.0);
-            mat->parameters["orm"] = TextureHandle::invalid();
         }
         if (scene_mat.normalTexture.has_value())
         {

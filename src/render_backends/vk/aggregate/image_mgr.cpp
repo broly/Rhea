@@ -1353,6 +1353,56 @@ void vk::ImageManager::copy_image_to_buffer(
 
 
 
+void vk::ImageManager::cmd_generate_mips(RBCommandList cmd, RBImageHandle image)
+{
+    const ImageResource& res = get_image_resource(image);
+    const uint32_t num_layers = res.num_layers;
+    const uint32_t mip_levels = res.mip_levels;
+    
+    auto transition = [&] (uint32_t mip, RBImageUsageType usage)
+    {
+        ImageBarrierParams params{};
+        params.debug_pass_name = Name("GenerateMips");
+        params.image = image;
+        params.dst_usage = usage;
+        params.pass_type = RenderPassType::transfer;
+        params.base_layer = 0;
+        params.base_mip = mip;
+        params.layer_count = num_layers;
+        params.mip_count = 1;
+        transition_image(cmd, params);
+    };
+    
+    int32_t width = static_cast<int32_t>(res.extent.width);
+    int32_t height = static_cast<int32_t>(res.extent.height);
+    
+    for (uint32_t mip = 1; mip < mip_levels; ++mip)
+    {
+        transition(mip - 1, RBImageUsageType::TransferSrc);
+        transition(mip, RBImageUsageType::TransferDst);
+        
+        const int32_t dst_width = std::max(width / 2, 1);
+        const int32_t dst_height = std::max(height / 2, 1);
+        
+        VkImageBlit blit{};
+        blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, mip - 1, 0, num_layers };
+        blit.srcOffsets[1] = { width, height, 1 };
+        blit.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, mip, 0, num_layers };
+        blit.dstOffsets[1] = { dst_width, dst_height, 1 };
+        
+        vkCmdBlitImage(cmd.as<VkCommandBuffer>(),
+            res.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            res.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1, &blit, VK_FILTER_LINEAR);
+        
+        width = dst_width;
+        height = dst_height;
+    }
+    
+    // uniform state: the caller transitions the whole image at once
+    transition(mip_levels - 1, RBImageUsageType::TransferSrc);
+}
+
 void vk::ImageManager::generate_mipmaps(VkCommandBuffer cmd, RBImageHandle image,
                                         uint32_t width, uint32_t height, uint32_t mip_levels)
 {

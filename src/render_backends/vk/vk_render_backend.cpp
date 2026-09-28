@@ -65,6 +65,11 @@ void VkRenderBackend::transition_image(RBCommandList cmd, const ImageBarrierPara
     image_manager.transition_image(cmd, params);
 }
 
+void VkRenderBackend::generate_mips(RBCommandList cmd, RBImageHandle image)
+{
+    image_manager.cmd_generate_mips(cmd, image);
+}
+
 
 void VkRenderBackend::update_sampled_image(RBDescriptorSet set, uint32_t binding, RBImageHandle image,
                                            ResourceUsage usage, std::optional<RBSampler> sampler,
@@ -819,12 +824,20 @@ void VkRenderBackend::bind_pipeline(RBCommandList cmd_list, PipelineObject* pipe
     
 }
 
-void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex)
+void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex, uint32_t first_instance)
 {
     LogRB.Log("draw");
-    
+
     VkCommandBuffer cmd = cmd_list.as<VkCommandBuffer>();
-    vkCmdDraw(cmd, vertex_count, 1, first_vertex, 0);
+    vkCmdDraw(cmd, vertex_count, 1, first_vertex, first_instance);
+}
+
+void VkRenderBackend::draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset, uint32_t draw_count)
+{
+    if (draw_count == 0)
+        return;
+    const vk::BufferInfo& info = buffer_manager.get_buffer(buffer, frame);
+    vkCmdDrawIndirect(cmd_list.as<VkCommandBuffer>(), info.buffer, offset, draw_count, sizeof(VkDrawIndirectCommand));
 }
 
 void VkRenderBackend::trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth)

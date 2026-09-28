@@ -103,6 +103,10 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { .texture = gbuffer[GBUFFER_SLOTS::MOTION_VECTORS], .subdir = "g_motion_vectors", .out_channels = 3 },
             { .texture = gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL], .subdir = "g_geometry_normal" },
             { .texture = gbuffer[GBUFFER_SLOTS::EMISSIVE], .subdir = "g_emissive" },
+            // emissive watch ring (GenericRenderGraph::EMISSIVE_RING_SIZE layers, the log names the corrupted one)
+            { .texture = emissive_ring, .subdir = "g_emissive_ring_0", .layer = 0 },
+            { .texture = emissive_ring, .subdir = "g_emissive_ring_1", .layer = 1 },
+            { .texture = emissive_ring, .subdir = "g_emissive_ring_2", .layer = 2 },
             { .texture = decal_albedo, .subdir = "decal_albedo" },
             { .texture = hdr_color_present[COLOR_OUTPUT_HDR::BASE], .subdir = "hdr_base" },
             { .texture = hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE], .subdir = "hdr_intermediate" },
