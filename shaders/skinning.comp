@@ -1,0 +1,155 @@
+#version 460
+
+// Morph targets + linear blend skinning (up to 8 influences per vertex).
+// Reads bind-pose vertices, adds weighted morph deltas, skins and writes vertices
+// which are then consumed by every pass through the mesh table (raster + RT).
+
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#define SKINNING_GROUP_SIZE 64
+
+layout(local_size_x = SKINNING_GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+// must match Vertex (rhmath) / resources/mesh_table.glsl
+struct Vertex
+{
+    vec3 position;
+    float _pad0;
+
+    vec3 normal;
+    float _pad1;
+
+    vec2 uv;
+    vec2 _pad2;
+
+    vec4 tangent;
+};
+
+// must match SkinVertex (assets:skeletal_mesh)
+struct SkinVertex
+{
+    uvec4 joints;   // 8 x uint16: lo | hi << 16
+    vec4 weights0;
+    vec4 weights1;
+};
+
+// must match MorphDelta (assets:skeletal_mesh)
+struct MorphDelta
+{
+    vec3 position;
+    uint target;
+    vec3 normal;
+    float _pad;
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 16)
+readonly buffer SrcVertices { Vertex v[]; };
+
+layout(buffer_reference, std430, buffer_reference_align = 16)
+writeonly buffer DstVertices { Vertex v[]; };
+
+layout(buffer_reference, std430, buffer_reference_align = 16)
+readonly buffer SkinBuffer { SkinVertex s[]; };
+
+layout(buffer_reference, std430, buffer_reference_align = 16)
+readonly buffer BoneMatrices { mat4 m[]; };
+
+// CSR by vertex: deltas of vertex i are [o[i], o[i + 1])
+layout(buffer_reference, std430, buffer_reference_align = 4)
+readonly buffer MorphOffsets { uint o[]; };
+
+layout(buffer_reference, std430, buffer_reference_align = 16)
+readonly buffer MorphDeltas { MorphDelta d[]; };
+
+layout(buffer_reference, std430, buffer_reference_align = 4)
+readonly buffer MorphWeights { float w[]; };
+
+layout(push_constant) uniform SkinningPushConstants
+{
+    uint64_t src_vertices;
+    uint64_t skin;
+    uint64_t bones;
+    uint64_t dst_vertices;
+    uint vertex_count;
+    uint bone_count;
+    uint64_t morph_offsets;
+    uint64_t morph_deltas;
+    uint64_t morph_weights;
+    uint morph_count;
+    uint _pad;
+} pc;
+
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.vertex_count)
+        return;
+
+    SrcVertices src = SrcVertices(pc.src_vertices);
+    DstVertices dst = DstVertices(pc.dst_vertices);
+    SkinBuffer skin = SkinBuffer(pc.skin);
+    BoneMatrices bones = BoneMatrices(pc.bones);
+
+    Vertex v = src.v[index];
+    SkinVertex s = skin.s[index];
+
+    if (pc.morph_count > 0)
+    {
+        MorphOffsets offsets = MorphOffsets(pc.morph_offsets);
+        MorphDeltas deltas = MorphDeltas(pc.morph_deltas);
+        MorphWeights morph_weights = MorphWeights(pc.morph_weights);
+
+        const uint first = offsets.o[index];
+        const uint last = offsets.o[index + 1];
+
+        vec3 normal = v.normal;
+        for (uint k = first; k < last; ++k)
+        {
+            MorphDelta d = deltas.d[k];
+            float w = morph_weights.w[min(d.target, pc.morph_count - 1)];
+            if (w != 0.0)
+            {
+                v.position += w * d.position;
+                normal += w * d.normal;
+            }
+        }
+
+        if (last > first)
+        {
+            v.normal = normalize(normal);
+            // keep the tangent frame orthogonal to the morphed normal
+            vec3 t = v.tangent.xyz - v.normal * dot(v.normal, v.tangent.xyz);
+            if (dot(t, t) > 1e-12)
+                v.tangent.xyz = normalize(t);
+        }
+    }
+
+    uint joints[8] = uint[8](
+        s.joints.x & 0xFFFFu, s.joints.x >> 16,
+        s.joints.y & 0xFFFFu, s.joints.y >> 16,
+        s.joints.z & 0xFFFFu, s.joints.z >> 16,
+        s.joints.w & 0xFFFFu, s.joints.w >> 16);
+
+    float weights[8] = float[8](
+        s.weights0.x, s.weights0.y, s.weights0.z, s.weights0.w,
+        s.weights1.x, s.weights1.y, s.weights1.z, s.weights1.w);
+
+    mat4 skin_matrix = mat4(0.0);
+    for (int i = 0; i < 8; ++i)
+    {
+        if (weights[i] > 0.0)
+            skin_matrix += weights[i] * bones.m[min(joints[i], pc.bone_count - 1)];
+    }
+
+    // bones carry rigid transforms (+ uniform scale), mat3 is fine for directions
+    mat3 skin_rot = mat3(skin_matrix);
+
+    Vertex o = v;
+    o.position = (skin_matrix * vec4(v.position, 1.0)).xyz;
+    o.normal = normalize(skin_rot * v.normal);
+    o.tangent = vec4(normalize(skin_rot * v.tangent.xyz), v.tangent.w);
+
+    dst.v[index] = o;
+}
