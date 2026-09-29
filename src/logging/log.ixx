@@ -15,13 +15,25 @@ export enum ELogOutputDetailsMask
     function = 0x4,
 };
 
+// Receives every logger message in addition to stdout / stderr (the debug console). Any thread
+export using LogListener = void(*)(const char* message, bool error);
+export inline LogListener& log_listener()
+{
+    static LogListener listener = nullptr;
+    return listener;
+}
+
 export inline void print_error(const char* message)
 {
     std::cerr << message << std::endl;
+    if (LogListener listener = log_listener())
+        listener(message, true);
 }
 export inline void print_text(const char* message)
 {
     std::cout << message << std::endl;
+    if (LogListener listener = log_listener())
+        listener(message, false);
 }
 
 export using LogPrinter = void(*)(const char*);

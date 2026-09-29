@@ -26,7 +26,7 @@ namespace
         return state;
     }
 
-    cvar::Var<bool> cv_visible("ui.visible", true, "Debug UI is shown (toggle: `)");
+    cvar::Var<bool> cv_visible("ui.visible", true, "Debug UI is shown (toggle: Shift+`)");
     cvar::Var<float> cv_scale("ui.scale", 1.0f, "Debug UI scale",
         {.has_range = true, .min = 0.5f, .max = 3.0f});
 
@@ -82,6 +82,8 @@ void ui::init(GLFWwindow* window)
     // chains the engine's GLFW callbacks (installed by platform::window_create)
     ImGui_ImplGlfw_InitForVulkan(window, true);
 
+    detail::init_console();
+
     state.window = window;
     state.initialized = true;
 }
@@ -92,6 +94,7 @@ void ui::shutdown()
     if (!state.initialized)
         return;
 
+    detail::shutdown_console();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     state = {};
@@ -107,9 +110,15 @@ void ui::begin_frame()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGuiIO& io = ImGui::GetIO();
-    if (ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && !io.WantTextInput)
-        toggle_visible();
+    // ` also works while typing in the console (the console filters the character out)
+    const ImGuiIO& io = ImGui::GetIO();
+    if (ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && (!io.WantTextInput || detail::console_has_input_focus()))
+    {
+        if (io.KeyShift)
+            toggle_visible();
+        else
+            toggle_console();
+    }
 
     ImGui::GetStyle().FontScaleMain = cv_scale.get();
 
@@ -119,6 +128,8 @@ void ui::begin_frame()
 
 void ui::end_frame()
 {
+    if (is_console_open())
+        detail::draw_console();
     ImGui::Render();
 }
 
@@ -139,12 +150,13 @@ void ui::toggle_visible()
 
 bool ui::wants_mouse()
 {
-    return is_initialized() && is_visible() && ImGui::GetIO().WantCaptureMouse;
+    return is_initialized() && (is_visible() || is_console_open()) && ImGui::GetIO().WantCaptureMouse;
 }
 
 bool ui::wants_keyboard()
 {
-    return is_initialized() && is_visible() && ImGui::GetIO().WantCaptureKeyboard;
+    // the open console keeps the keyboard even when its input line lost focus
+    return is_initialized() && (is_console_open() || (is_visible() && ImGui::GetIO().WantCaptureKeyboard));
 }
 
 void ui::help_marker(const char* text)

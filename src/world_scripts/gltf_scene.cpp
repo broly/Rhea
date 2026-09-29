@@ -20,6 +20,21 @@ import physics;
 
 DEFINE_LOGGER(LogImportGltf, Log);
 
+MeshCollisionSettings GltfScene::get_collision_settings(std::string_view mesh_name) const
+{
+    MeshCollisionSettings settings{ .type = collision_type, .simplify_error = simplify_error };
+    size_t matched_length = 0;
+    for (const auto& [prefix, type] : collision_overrides)
+    {
+        if (mesh_name.starts_with(prefix) && prefix.size() >= matched_length)
+        {
+            settings.type = type;
+            matched_length = prefix.size();
+        }
+    }
+    return settings;
+}
+
 namespace
 {
     [[=scene::on_spawned<GltfScene>]]
@@ -50,19 +65,20 @@ namespace
             registry.add<Transform>(child, object.transform);
             registry.add<ChildOf>(child, root);
 
-            if (scene_desc.collision)
+            const MeshCollisionSettings collision = scene_desc.get_collision_settings(mesh_name);
+            if (scene_desc.collision && collision.type != MeshCollision::none)
             {
                 // cooked in parallel with the texture loads (or loaded from the cache); the body is created in PostLoad
-                MeshCollider collider;
+                MeshCollider collider{ .type = collision.type, .simplify_error = collision.simplify_error };
                 collider.pending = std::make_shared<phys::Shape>();
                 phys::PhysicsScene& physics = world.get_physics();
                 const StaticMesh* mesh_data = &renderer.mesh.get();
                 const glm::vec3 scale = object.transform.scale.glm();
                 std::string cache_key = std::format("{}__{}_{}", scene_desc.asset_path, index, mesh_name);
                 context.dc->push(std::async(std::launch::async,
-                    [shape = collider.pending, mesh_data, scale, &physics, cache_key = std::move(cache_key)]
+                    [shape = collider.pending, mesh_data, scale, collision, &physics, cache_key = std::move(cache_key)]
                     {
-                        *shape = cook_mesh_collision(physics, *mesh_data, scale, cache_key);
+                        *shape = cook_mesh_collision(physics, *mesh_data, scale, collision, cache_key);
                     }).share());
                 registry.add<MeshCollider>(child, std::move(collider));
             }

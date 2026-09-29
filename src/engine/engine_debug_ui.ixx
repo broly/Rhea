@@ -6,6 +6,7 @@ import rhmath;
 import framework;
 import physics;
 import ecs;
+import cvar;
 
 
 export class Engine;
@@ -23,6 +24,9 @@ public:
 
     // World space debug drawing (physics shapes, probes), every frame, also while the UI is hidden
     void draw_world_debug(Engine& engine);
+
+    // Engine commands of the console (`): quit, render.*, gpuprof.*, select
+    void register_console_commands(Engine& engine);
 
     void select(ecs::Entity e);
     // null if nothing is selected or the entity was destroyed
@@ -61,6 +65,7 @@ private:
     ecs::Entity selected;
     bool scroll_outliner_to_selection = false;
     std::string outliner_filter;
+    std::vector<std::unique_ptr<cvar::Command>> console_commands;
     std::string cvar_filter;
 
     // physics window: probe from the camera and test bodies

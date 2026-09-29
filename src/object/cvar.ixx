@@ -16,6 +16,14 @@ import name;
 //
 // Values are edited through their reflect::PropertyDesc, so any type the property editor
 // supports works (bool, numbers, enums, strings, vectors, ...).
+//
+// Console commands are named actions with text arguments, run from the debug console (`) or
+// cvar::execute, next to the variables:
+//
+//     cvar::Command cmd_reload("render.reload_shaders", "Rebuild all pipelines",
+//                              [] (cvar::Args args) { ... });
+//
+// In a console line "name" prints a variable, "name value" sets it, "a; b" runs both.
 export namespace cvar
 {
     enum Flags : uint32_t
@@ -45,6 +53,7 @@ export namespace cvar
 
         // persistence, empty / false for types without a text form
         virtual std::string to_string() const = 0;
+        virtual std::string default_to_string() const = 0;
         virtual bool from_string(std::string_view text) = 0;
 
     protected:
@@ -64,6 +73,73 @@ export namespace cvar
     // cache/cvars.json by default
     bool save(const std::filesystem::path& path = {});
     bool load(const std::filesystem::path& path = {});
+
+    /************************************************************************
+     * COMMANDS / CONSOLE
+     ***********************************************************************/
+
+    using Args = std::span<const std::string>;
+
+    class Command
+    {
+    public:
+        using Handler = std::function<void(Args args)>;
+        // values offered by the console for argument arg_index (0 = first argument)
+        using Completer = std::function<std::vector<std::string>(size_t arg_index)>;
+
+        // usage: the arguments, "<name> [0|1]"
+        Command(std::string_view name, std::string_view description, Handler handler,
+            std::string_view usage = {}, Completer completer = {});
+        ~Command();
+
+        Command(const Command&) = delete;
+        Command& operator=(const Command&) = delete;
+
+        const std::string& get_name() const { return name; }
+        const std::string& get_description() const { return description; }
+        const std::string& get_usage() const { return usage; }
+
+        void run(Args args) const { handler(args); }
+        std::vector<std::string> complete(size_t arg_index) const
+        {
+            return completer ? completer(arg_index) : std::vector<std::string>{};
+        }
+
+    private:
+        std::string name;
+        std::string description;
+        std::string usage;
+        Handler handler;
+        Completer completer;
+    };
+
+    // sorted by name
+    std::vector<Command*> get_commands();
+    Command* find_command(std::string_view name);
+
+    // Runs a console line: commands and variables, ';' separated. Output goes to print()
+    void execute(std::string_view line);
+
+    // Splits one command on whitespace, "double quotes" keep spaces
+    std::vector<std::string> tokenize(std::string_view command);
+    // Splits a line on ';' outside quotes
+    std::vector<std::string_view> split_commands(std::string_view line);
+    // Argument text that tokenizes back to value (quoted when it has spaces)
+    std::string quote_argument(std::string_view value);
+
+    enum class Output : uint8_t
+    {
+        info,
+        error,
+    };
+
+    // Console output of commands. Goes to the handler (the debug console), stdout without one
+    void print(std::string_view text, Output kind = Output::info);
+    using PrintHandler = void (*)(std::string_view text, Output kind);
+    void set_print_handler(PrintHandler handler);
+
+    // variable values offered by the console: enumerators, true / false
+    std::vector<std::string> get_value_suggestions(const Entry& entry);
 
     namespace detail
     {
@@ -89,7 +165,12 @@ export namespace cvar
         {
             if constexpr (std::is_same_v<T, bool>)
             {
-                value = text == "true" || text == "1";
+                if (text == "true" || text == "1" || text == "on" || text == "yes")
+                    value = true;
+                else if (text == "false" || text == "0" || text == "off" || text == "no")
+                    value = false;
+                else
+                    return false;
                 return true;
             }
             else if constexpr (std::is_enum_v<T>)
@@ -194,6 +275,11 @@ export namespace cvar
         std::string to_string() const override
         {
             return detail::value_to_string(value);
+        }
+
+        std::string default_to_string() const override
+        {
+            return detail::value_to_string(default_value);
         }
 
         bool from_string(std::string_view text) override

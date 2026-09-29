@@ -120,6 +120,7 @@ target_link_libraries(rhea
 		unofficial::tinyexr::tinyexr
 		imgui
 		Jolt
+		meshoptimizer
 )
 
 target_compile_definitions(rhea

@@ -75,9 +75,10 @@ void Engine::run()
     // Toggle at runtime with P (start) / O (dump+stop) — see the loop below.
     gpuprof::init(renderer->get_backend().get());
     
-    // debug UI: ` shows / hides it
+    // debug UI: Shift+` shows / hides it, ` opens the console
     ui::init(window.handle);
     renderer->get_backend()->init_ui_overlay();
+    debug_ui.register_console_commands(*this);
     
     std::shared_ptr<EngineClock> clock = std::make_shared<EngineClock>();
     

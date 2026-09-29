@@ -49,8 +49,11 @@ namespace
         "Also draw fixed bodies (level geometry, many lines)");
     cvar::Var<bool> cv_physics_draw_bounds("physics.debug.draw_bounds", false, "Draw body bounding boxes");
     cvar::Var<bool> cv_physics_draw_velocity("physics.debug.draw_velocity", false, "Draw body velocities");
+    cvar::Var<bool> cv_physics_draw_character("physics.debug.draw_character", false,
+        "Draw the character controller's stair steps (white: sweeps, red: rejected, cyan: forward test), "
+        "floor snapping (orange) and corner probes (green: free, red: blocked)");
     cvar::Var<float> cv_physics_draw_distance("physics.debug.draw_distance", 25.0f,
-        "Bodies farther from the camera are not drawn, m", {.has_range = true, .min = 1.0f, .max = 500.0f});
+        "Level geometry farther from the camera is not drawn (moving bodies always are), m", {.has_range = true, .min = 1.0f, .max = 500.0f});
     cvar::Var<bool> cv_physics_probe("physics.debug.probe", false,
         "Trace from the camera along its view direction every frame");
 
@@ -297,6 +300,159 @@ void EngineDebugUI::select(ecs::Entity e)
     scroll_outliner_to_selection = !e.is_null();
 }
 
+void EngineDebugUI::register_console_commands(Engine& engine)
+{
+    auto add = [this] (std::string_view name, std::string_view description, cvar::Command::Handler handler,
+        std::string_view usage = {}, cvar::Command::Completer completer = {}) {
+        console_commands.push_back(std::make_unique<cvar::Command>(name, description, std::move(handler), usage,
+            std::move(completer)));
+    };
+    auto bool_values = [] { return std::vector<std::string>{"true", "false"}; };
+
+    add("quit", "Closes the engine", [&engine] (cvar::Args) {
+        glfwSetWindowShouldClose(engine.window.handle, GLFW_TRUE);
+    });
+
+    add("render.reload_shaders", "Rebuilds all pipelines from the shader sources (R)", [&engine] (cvar::Args) {
+        engine.render_hot_reload();
+    });
+
+    add("render.reset_accumulation", "Resets temporal accumulation for one frame (B)", [&engine] (cvar::Args) {
+        engine.renderer->set_flag("reset_temporal_accum", true, false, true);
+    });
+
+    auto flag_names = [&engine] {
+        std::vector<std::string> names;
+        if (const auto graph = engine.renderer->get_main_render_graph())
+            for (const auto& [name, value] : graph->get_render_flags())
+                names.push_back(name.to_string());
+        return names;
+    };
+    add("render.flag", "Prints / sets a render graph flag, toggles it without a value",
+        [&engine] (cvar::Args args) {
+            const auto graph = engine.renderer->get_main_render_graph();
+            if (args.empty() || !graph)
+            {
+                cvar::print("render.flag <name> [true|false]", cvar::Output::error);
+                return;
+            }
+            const Name name(args[0]);
+            const auto flags = graph->get_render_flags();
+            const auto it = flags.find(name);
+            const bool current = it != flags.end() && it->second;
+            bool value = !current;
+            if (args.size() > 1)
+            {
+                if (args[1] == "true" || args[1] == "1" || args[1] == "on")
+                    value = true;
+                else if (args[1] == "false" || args[1] == "0" || args[1] == "off")
+                    value = false;
+                else
+                {
+                    cvar::print(std::format("'{}' is not true / false", args[1]), cvar::Output::error);
+                    return;
+                }
+            }
+            if (it == flags.end())
+                engine.renderer->set_flag(name, value, true);
+            else if (value != current)
+                engine.renderer->toggle_flag(name, true);
+            cvar::print(std::format("{} = {}", args[0], value));
+        },
+        "<name> [true|false]",
+        [flag_names, bool_values] (size_t arg_index) { return arg_index == 0 ? flag_names() : bool_values(); });
+
+    add("render.param", "Prints / sets a render graph int parameter",
+        [&engine] (cvar::Args args) {
+            if (args.empty())
+            {
+                for (const auto& [name, value] : engine.renderer->get_int_params())
+                    cvar::print(std::format("{} = {}", name.to_string(), value));
+                return;
+            }
+            const Name name(args[0]);
+            if (args.size() > 1)
+            {
+                int value = 0;
+                if (std::from_chars(args[1].data(), args[1].data() + args[1].size(), value).ec != std::errc{})
+                {
+                    cvar::print(std::format("'{}' is not an integer", args[1]), cvar::Output::error);
+                    return;
+                }
+                engine.renderer->set_int_param(name, value);
+            }
+            const auto& params = engine.renderer->get_int_params();
+            const auto it = params.find(name);
+            if (it == params.end())
+                cvar::print(std::format("{} is not set", args[0]), cvar::Output::error);
+            else
+                cvar::print(std::format("{} = {}", args[0], it->second));
+        },
+        "[name] [value]",
+        [&engine] (size_t arg_index) {
+            std::vector<std::string> names;
+            if (arg_index == 0)
+                for (const auto& [name, value] : engine.renderer->get_int_params())
+                    names.push_back(name.to_string());
+            return names;
+        });
+
+    add("gpuprof.start", "Starts the GPU pass profiler (P)", [] (cvar::Args) {
+        gpuprof::clear_results();
+        gpuprof::set_enabled(true);
+        cv_window_gpu_profiler.set(true);
+    });
+    add("gpuprof.stop", "Dumps the GPU profile and stops the profiler (O)", [] (cvar::Args) {
+        gpuprof::dump_json();
+        gpuprof::set_enabled(false);
+    });
+    add("gpuprof.dump", "Dumps the GPU profile to JSON", [] (cvar::Args) {
+        gpuprof::dump_json();
+    });
+
+    auto entity_labels = [&engine] {
+        std::vector<std::string> labels;
+        const ecs::Registry& registry = engine.world->registry;
+        for (const auto& archetype : registry.get_archetypes())
+            for (ecs::Entity e : archetype->get_entities())
+                labels.push_back(get_entity_label(registry, e));
+        return labels;
+    };
+    add("select", "Selects an entity by name (exact, else the first containing the text) and shows the inspector",
+        [this, &engine] (cvar::Args args) {
+            if (args.empty())
+            {
+                cvar::print("select <entity name>", cvar::Output::error);
+                return;
+            }
+            const ecs::Registry& registry = engine.world->registry;
+            ecs::Entity exact;
+            ecs::Entity partial;
+            for (const auto& archetype : registry.get_archetypes())
+                for (ecs::Entity e : archetype->get_entities())
+                {
+                    const std::string label = get_entity_label(registry, e);
+                    if (!exact && label == args[0])
+                        exact = e;
+                    if (!partial && contains_case_insensitive(label, args[0]))
+                        partial = e;
+                }
+            const ecs::Entity found = exact ? exact : partial;
+            if (!found)
+            {
+                cvar::print(std::format("No entity '{}'", args[0]), cvar::Output::error);
+                return;
+            }
+            select(found);
+            cv_window_inspector.set(true);
+            cvar::print(std::format("Selected {}{}", get_entity_label(registry, found),
+                ui::is_visible() ? "" : "   (Shift+` shows the UI)"));
+        },
+        "<entity name>", [entity_labels] (size_t arg_index) {
+            return arg_index == 0 ? entity_labels() : std::vector<std::string>{};
+        });
+}
+
 ecs::Entity EngineDebugUI::get_selected(Engine& engine)
 {
     if (selected && !engine.world->registry.alive(selected))
@@ -346,7 +502,9 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
 
     if (ImGui::BeginMenu("Rhea"))
     {
-        if (ImGui::MenuItem("Hide UI", "`"))
+        if (ImGui::MenuItem("Console", "`", ui::is_console_open()))
+            ui::toggle_console();
+        if (ImGui::MenuItem("Hide UI", "Shift+`"))
             ui::set_visible(false);
         ImGui::Separator();
         if (ImGui::MenuItem("Save settings"))
@@ -973,7 +1131,8 @@ void EngineDebugUI::draw_help_window()
         return;
 
     static constexpr std::pair<const char*, const char*> hotkeys[] = {
-        {"`", "Show / hide the debug UI"},
+        {"`", "Console: commands and variables, completes names while typing"},
+        {"Shift+`", "Show / hide the debug UI"},
         {"Click", "Select the entity under the cursor"},
         {"LMB drag", "Rotate the camera"},
         {"WASD / Q E", "Move (free camera) or walk (character)"},
@@ -1178,6 +1337,7 @@ void EngineDebugUI::draw_world_debug(Engine& engine)
     const glm::vec3 camera_position = camera->first.position.glm();
     const glm::vec3 camera_forward = camera->first.forward();
 
+    physics.set_character_debug(cv_physics_draw.get() && cv_physics_draw_character.get());
     if (cv_physics_draw.get())
     {
         std::vector<debug_draw::Line> lines;
@@ -1244,7 +1404,8 @@ void EngineDebugUI::draw_physics_window(Engine& engine)
 
     ImGui::Text("Bodies: %u (%u active)", stats.bodies, stats.active_bodies);
     ImGui::Text("Step: %.2f ms, %u substeps", stats.step_ms, stats.steps_last_frame);
-    ImGui::Text("Mesh shapes: %u cooked, %u from cache", stats.shapes_cooked, stats.shapes_from_cache);
+    ImGui::Text("Characters: %.2f ms, %u contacts", stats.character_ms, stats.character_contacts);
+    ImGui::Text("Cooked shapes: %u built, %u from cache", stats.shapes_cooked, stats.shapes_from_cache);
 
     auto checkbox = [] (const char* label, cvar::Var<bool>& value) {
         bool v = value.get();
@@ -1259,6 +1420,7 @@ void EngineDebugUI::draw_physics_window(Engine& engine)
         checkbox("Level geometry", cv_physics_draw_fixed);
         checkbox("Bounding boxes", cv_physics_draw_bounds);
         checkbox("Velocities", cv_physics_draw_velocity);
+        checkbox("Character steps / probes", cv_physics_draw_character);
         float distance = cv_physics_draw_distance.get();
         if (ImGui::SliderFloat("Distance", &distance, 1.0f, 500.0f, "%.0f m", ImGuiSliderFlags_Logarithmic))
             cv_physics_draw_distance.set(distance);

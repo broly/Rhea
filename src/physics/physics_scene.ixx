@@ -23,7 +23,7 @@ export namespace phys
         // 0: hardware threads - 1
         uint32_t worker_threads = 0;
 
-        // cooked triangle meshes (create_mesh_shape with a cache key), empty: no cache
+        // cooked shapes (create_mesh_shape with a cache key, store_cached_shape), empty: no cache
         std::filesystem::path shape_cache_dir;
     };
 
@@ -64,6 +64,10 @@ export namespace phys
         float mass = 70.0f;                             // kg, for pushing bodies
         float max_push_force = 500.0f;                  // N
 
+        // Blocked by something taller than a step on one side only (a door jamb, the edge of a column):
+        // steers around it when shifting sideways by corner_slide * radius frees the way (0: off)
+        float corner_slide = 1.0f;
+
         Category category = Category::character;
         std::optional<CategoryMask> blocked_by;         // default_collision_mask(category) when unset
 
@@ -96,12 +100,13 @@ export namespace phys
         glm::vec3 ground_normal{ 0.0f, 1.0f, 0.0f };
         glm::vec3 ground_velocity{ 0.0f };              // moving platforms
         BodyId ground_body;
+        uint32_t contacts = 0;                          // touching / predicted, cost of the move grows with them
     };
 
     struct DebugDrawSettings
     {
         glm::vec3 camera_position{ 0.0f };
-        float max_distance = 40.0f;                     // bodies whose bounds are farther are skipped
+        float max_distance = 40.0f;                     // fixed bodies whose bounds are farther are skipped
 
         bool fixed_bodies = false;                      // level geometry, can be a lot of lines
         bool moving_bodies = true;
@@ -113,10 +118,12 @@ export namespace phys
     {
         uint32_t bodies = 0;
         uint32_t active_bodies = 0;
-        uint32_t shapes_cooked = 0;                     // triangle meshes built this session
-        uint32_t shapes_from_cache = 0;                 // triangle meshes loaded from shape_cache_dir
+        uint32_t shapes_cooked = 0;                     // cached shapes built this session
+        uint32_t shapes_from_cache = 0;                 // shapes loaded from shape_cache_dir
         uint32_t steps_last_frame = 0;
         float step_ms = 0.0f;                           // CPU time of the last step() call
+        float character_ms = 0.0f;                      // CPU time of move_character calls before the last step()
+        uint32_t character_contacts = 0;                // most contacts of a character in those calls
     };
 
     class PhysicsBackend;
@@ -143,6 +150,12 @@ export namespace phys
         // Triangle mesh (BVH build is slow for big meshes). With a cache key the cooked result is
         // stored in PhysicsSettings::shape_cache_dir; it is rebuilt when the geometry changes.
         Shape create_mesh_shape(const TriangleMeshShape& mesh, std::string_view cache_key = {});
+
+        // Cooked shape cache in PhysicsSettings::shape_cache_dir, for shapes that are slow to build.
+        // `hash` covers the source data and the cooking parameters (hash_mesh, hash_value): a load
+        // with another hash misses. Thread safe; no-ops without a cache dir or key.
+        Shape load_cached_shape(std::string_view cache_key, uint64_t hash) const;
+        void store_cached_shape(std::string_view cache_key, uint64_t hash, const Shape& shape) const;
 
         // ---- bodies ----
 
@@ -210,6 +223,10 @@ export namespace phys
         PhysicsStats get_stats() const;
 
         // ---- debug ----
+
+        // Records what move_character tries (stair steps, floor snapping, corner probes); debug_draw draws
+        // the last step's recording
+        void set_character_debug(bool enabled);
 
         void debug_draw(const DebugDrawSettings& settings,
                         const std::function<void(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color)>& line) const;

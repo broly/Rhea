@@ -12,11 +12,13 @@ import framework;
 import render;
 import name;
 import assets;
+import rhcomponents;
 
 // Imports a glTF scene into the world: every mesh object of the file becomes a child entity
 // (Name, Transform, MeshRenderer and, with `collision`, MeshCollider) of the entity with this component.
 //
-//     "GltfScene": { "asset_path": "gltf/sponza/Sponza.gltf", "textures_dir": "textures/sponza", "collision": true }
+//     "GltfScene": { "asset_path": "gltf/sponza/Sponza.gltf", "textures_dir": "textures/sponza", "collision": true,
+//                    "collision_overrides": { "wood_door": "box", "lamps_": "convex_hull", "decals_": "none" } }
 export struct GltfScene
 {
     [[=rh::edit, =rh::read_only]] std::string asset_path;
@@ -24,6 +26,13 @@ export struct GltfScene
     std::shared_ptr<Material> material;
     std::map<Name, std::string> test;
 
-    // static triangle mesh collision for every mesh of the scene
+    // static collision for every mesh of the scene
     [[=rh::edit, =rh::read_only]] bool collision = false;
+    // of the meshes without an override
+    [[=rh::edit, =rh::read_only]] MeshCollision collision_type = MeshCollision::simplified;
+    [[=rh::edit, =rh::read_only]] float simplify_error = 0.02f;
+    // mesh name prefix -> collision type, the longest matching prefix wins
+    std::map<std::string, MeshCollision> collision_overrides;
+
+    MeshCollisionSettings get_collision_settings(std::string_view mesh_name) const;
 };

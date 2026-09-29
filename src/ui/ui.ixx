@@ -22,15 +22,21 @@ export namespace ui
     void shutdown();
     bool is_initialized();
 
-    // starts the ImGui frame: platform input, visibility hotkey (`), dock space
+    // starts the ImGui frame: platform input, hotkeys (` console, Shift+` UI), dock space
     void begin_frame();
-    // finishes the frame, ImGui::GetDrawData() is valid after it
+    // draws the console, finishes the frame, ImGui::GetDrawData() is valid after it
     void end_frame();
 
-    // hidden UI draws nothing and never captures input
+    // hidden UI draws only the console and captures input only while the console is open
     bool is_visible();
     void set_visible(bool visible);
     void toggle_visible();
+
+    // Drop-down console (`): runs cvar commands / variables, completes their names while typing
+    // (fuzzy, also by description) and shows the log. Independent of is_visible()
+    bool is_console_open();
+    void set_console_open(bool open);
+    void toggle_console();
 
     // ImGui uses the mouse / keyboard this frame (hovered window, active text field)
     bool wants_mouse();
@@ -66,4 +72,14 @@ export namespace ui
 
     // "(?)" with a tooltip
     void help_marker(const char* text);
+}
+
+// console.cpp, driven by ui.cpp
+namespace ui::detail
+{
+    void init_console();
+    void shutdown_console();
+    void draw_console();
+    // the console input line is being edited (last frame)
+    bool console_has_input_focus();
 }

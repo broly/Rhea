@@ -76,6 +76,8 @@ set(OVERRIDE_CXX_FLAGS OFF CACHE BOOL "" FORCE)          # keep the engine's Deb
 set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
 set(ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 set(DEBUG_RENDERER_IN_DEBUG_AND_RELEASE ON CACHE BOOL "" FORCE)
+# every configuration: the other option only covers Debug / Release, the release preset is RelWithDebInfo
+set(DEBUG_RENDERER_IN_DISTRIBUTION ON CACHE BOOL "" FORCE)
 set(PROFILER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(JPH_USE_DX12 OFF CACHE BOOL "" FORCE)                # GPU compute (hair) is not used
 set(JPH_USE_VK OFF CACHE BOOL "" FORCE)
@@ -104,3 +106,18 @@ FetchContent_MakeAvailable(JoltPhysics)
 set_property(TARGET Jolt PROPERTY INTERFACE_COMPILE_OPTIONS "")
 # Jolt asks for C++17; the MSVC STL overlay (std_module.cmake) needs the engine's standard.
 set_property(TARGET Jolt PROPERTY CXX_STANDARD 26)
+
+
+
+# meshoptimizer: mesh simplification for collision cooking (rhcomponents). Plain C++ library,
+# included only in global module fragments.
+FetchContent_Declare(
+  meshoptimizer
+  GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
+  GIT_TAG        v1.3
+  GIT_SHALLOW    TRUE
+  EXCLUDE_FROM_ALL
+)
+set(MESHOPT_INSTALL OFF CACHE BOOL "" FORCE)
+set(MESHOPT_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(meshoptimizer)

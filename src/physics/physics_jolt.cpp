@@ -26,6 +26,7 @@ module;
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #ifdef JPH_DEBUG_RENDERER
 #include <Jolt/Renderer/DebugRendererSimple.h>
@@ -95,31 +96,6 @@ namespace
             return {};
         }
         return make_shape(result.Get());
-    }
-
-    // content hash of a triangle mesh, invalidates cooked shapes when the geometry changes
-    uint64_t hash_bytes(uint64_t h, const void* data, size_t size)
-    {
-        const auto* bytes = static_cast<const uint8_t*>(data);
-        size_t i = 0;
-        for (; i + 8 <= size; i += 8)
-        {
-            uint64_t word;
-            std::memcpy(&word, bytes + i, 8);
-            h = (h ^ word) * 0x9e3779b97f4a7c15ull;
-            h ^= h >> 29;
-        }
-        for (; i < size; ++i)
-            h = (h ^ bytes[i]) * 0x100000001b3ull;
-        return h;
-    }
-
-    uint64_t hash_mesh(const TriangleMeshShape& mesh)
-    {
-        uint64_t h = 0xcbf29ce484222325ull;
-        h = hash_bytes(h, mesh.vertices.data(), mesh.vertices.size() * sizeof(glm::vec3));
-        h = hash_bytes(h, mesh.indices.data(), mesh.indices.size() * sizeof(uint32_t));
-        return h;
     }
 
     std::string sanitize_file_name(std::string_view key)
@@ -230,18 +206,30 @@ namespace
         QueryBodyFilter body;
     };
 
+    struct DebugLine
+    {
+        glm::vec3 from;
+        glm::vec3 to;
+        glm::vec4 color;
+    };
+
 #ifdef JPH_DEBUG_RENDERER
+    // Jolt's debug renderer (a singleton): lines go to `line` while debug_draw runs, otherwise to
+    // `recording` (character moves)
     class LineDebugRenderer final : public JPH::DebugRendererSimple
     {
     public:
         using LineFn = std::function<void(const glm::vec3&, const glm::vec3&, const glm::vec4&)>;
 
         const LineFn* line = nullptr;
+        std::vector<DebugLine>* recording = nullptr;
 
         void DrawLine(JPH::RVec3Arg from, JPH::RVec3Arg to, JPH::ColorArg color) override
         {
             if (line)
                 (*line)(to_glm(from), to_glm(to), to_glm(color));
+            else if (recording)
+                recording->push_back({ to_glm(from), to_glm(to), to_glm(color) });
         }
 
         void DrawText3D(JPH::RVec3Arg, const std::string_view&, JPH::ColorArg, float) override {}
@@ -256,6 +244,8 @@ namespace
         {
             if (body.IsStatic() ? !settings.fixed_bodies : !settings.moving_bodies)
                 return false;
+            if (!body.IsStatic())
+                return true;        // few, and the character is often farther than max_distance (third person camera)
             const float max_distance_sq = settings.max_distance * settings.max_distance;
             return body.GetWorldSpaceBounds().GetSqDistanceTo(to_jolt(settings.camera_position)) <= max_distance_sq;
         }
@@ -384,15 +374,39 @@ namespace phys
             JPH::CharacterVirtual::ExtendedUpdateSettings update_settings;
             CategoryMask blocked_by;
             uint32_t generation = 0;
+
+            float radius = 0.0f;
+            float step_height = 0.0f;
+            float corner_slide = 0.0f;
+            bool blocked = false;       // the last move got less than half of the way
         };
         std::vector<CharacterSlot> characters;
         std::vector<uint32_t> free_characters;
+
+        // move_character cost, accumulated until the next step()
+        float character_ms = 0.0f;
+        uint32_t character_contacts = 0;
+        float character_ms_last_frame = 0.0f;
+        uint32_t character_contacts_last_frame = 0;
 
         CharacterSlot* find_character(CharacterId id);
 
 #ifdef JPH_DEBUG_RENDERER
         mutable std::unique_ptr<LineDebugRenderer> debug_renderer;
+
+        LineDebugRenderer& get_debug_renderer() const
+        {
+            if (!debug_renderer)
+                debug_renderer = std::make_unique<LineDebugRenderer>();
+            return *debug_renderer;
+        }
 #endif
+
+        // set_character_debug: lines of the move_character calls since the last step(), and of the
+        // calls before it (what debug_draw shows)
+        bool character_debug = false;
+        std::vector<DebugLine> character_lines;
+        std::vector<DebugLine> character_lines_shown;
     };
 
 
@@ -424,7 +438,10 @@ namespace phys
             {
                 const float min_half_extent = std::min({ d.half_extents.x, d.half_extents.y, d.half_extents.z });
                 const float convex_radius = std::min(JPH::cDefaultConvexRadius, 0.5f * min_half_extent);
-                return make_shape(new JPH::BoxShape(to_jolt(d.half_extents), convex_radius));
+                JPH::RefConst<JPH::Shape> box = new JPH::BoxShape(to_jolt(d.half_extents), convex_radius);
+                if (d.center == glm::vec3(0.0f))
+                    return make_shape(box);
+                return make_shape(JPH::RotatedTranslatedShapeSettings(to_jolt(d.center), JPH::Quat::sIdentity(), box).Create(), "offset box");
             }
             else if constexpr (std::is_same_v<T, ConvexHullShape>)
             {
@@ -446,35 +463,9 @@ namespace phys
         if (mesh.indices.size() < 3 || mesh.vertices.empty())
             return {};
 
-        std::filesystem::path cache_file;
-        uint64_t content_hash = 0;
-        if (!cache_key.empty() && !backend->settings.shape_cache_dir.empty())
-        {
-            cache_file = backend->settings.shape_cache_dir / (sanitize_file_name(cache_key) + ".jshape");
-            content_hash = hash_mesh(mesh);
-
-            std::ifstream in(cache_file, std::ios::binary);
-            if (in)
-            {
-                uint32_t magic = 0, version = 0;
-                uint64_t stored_hash = 0;
-                in.read(reinterpret_cast<char*>(&magic), sizeof(magic));
-                in.read(reinterpret_cast<char*>(&version), sizeof(version));
-                in.read(reinterpret_cast<char*>(&stored_hash), sizeof(stored_hash));
-                if (in && magic == cooked_shape_magic && version == cooked_shape_version && stored_hash == content_hash)
-                {
-                    JPH::StreamInWrapper stream(in);
-                    JPH::Shape::IDToShapeMap shape_map;
-                    JPH::Shape::IDToMaterialMap material_map;
-                    JPH::Shape::ShapeResult result = JPH::Shape::sRestoreWithChildren(stream, shape_map, material_map);
-                    if (result.IsValid())
-                    {
-                        backend->shapes_from_cache++;
-                        return make_shape(result.Get());
-                    }
-                }
-            }
-        }
+        const uint64_t content_hash = cache_key.empty() ? 0 : hash_mesh(shape_hash_seed, mesh);
+        if (Shape cached = load_cached_shape(cache_key, content_hash))
+            return cached;
 
         JPH::VertexList vertices;
         vertices.reserve(mesh.vertices.size());
@@ -488,36 +479,69 @@ namespace phys
 
         JPH::MeshShapeSettings mesh_settings(std::move(vertices), std::move(triangles));
         Shape shape = make_shape(mesh_settings.Create(), "triangle mesh");
-        if (!shape)
-            return shape;
-        backend->shapes_cooked++;
-
-        if (!cache_file.empty())
-        {
-            std::error_code ec;
-            std::filesystem::create_directories(cache_file.parent_path(), ec);
-
-            // write next to the target and rename: a concurrent reader never sees a partial file
-            std::filesystem::path temp_file = cache_file;
-            temp_file += std::format(".{}.tmp", std::hash<std::thread::id>{}(std::this_thread::get_id()));
-            {
-                std::ofstream out(temp_file, std::ios::binary | std::ios::trunc);
-                out.write(reinterpret_cast<const char*>(&cooked_shape_magic), sizeof(cooked_shape_magic));
-                out.write(reinterpret_cast<const char*>(&cooked_shape_version), sizeof(cooked_shape_version));
-                out.write(reinterpret_cast<const char*>(&content_hash), sizeof(content_hash));
-                JPH::StreamOutWrapper stream(out);
-                JPH::Shape::ShapeToIDMap shape_map;
-                JPH::Shape::MaterialToIDMap material_map;
-                get_jolt_shape(shape)->SaveWithChildren(stream, shape_map, material_map);
-            }
-            std::filesystem::rename(temp_file, cache_file, ec);
-            if (ec)
-            {
-                LogPhysics.Log<Warning>("Can't write cooked shape '%s': %s", cache_file.string().c_str(), ec.message().c_str());
-                std::filesystem::remove(temp_file, ec);
-            }
-        }
+        if (shape && !cache_key.empty())
+            store_cached_shape(cache_key, content_hash, shape);
         return shape;
+    }
+
+    Shape PhysicsScene::load_cached_shape(std::string_view cache_key, uint64_t hash) const
+    {
+        if (cache_key.empty() || backend->settings.shape_cache_dir.empty())
+            return {};
+
+        const std::filesystem::path cache_file = backend->settings.shape_cache_dir / (sanitize_file_name(cache_key) + ".jshape");
+        std::ifstream in(cache_file, std::ios::binary);
+        if (!in)
+            return {};
+
+        uint32_t magic = 0, version = 0;
+        uint64_t stored_hash = 0;
+        in.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+        in.read(reinterpret_cast<char*>(&version), sizeof(version));
+        in.read(reinterpret_cast<char*>(&stored_hash), sizeof(stored_hash));
+        if (!in || magic != cooked_shape_magic || version != cooked_shape_version || stored_hash != hash)
+            return {};
+
+        JPH::StreamInWrapper stream(in);
+        JPH::Shape::IDToShapeMap shape_map;
+        JPH::Shape::IDToMaterialMap material_map;
+        JPH::Shape::ShapeResult result = JPH::Shape::sRestoreWithChildren(stream, shape_map, material_map);
+        if (!result.IsValid())
+            return {};
+
+        backend->shapes_from_cache++;
+        return make_shape(result.Get());
+    }
+
+    void PhysicsScene::store_cached_shape(std::string_view cache_key, uint64_t hash, const Shape& shape) const
+    {
+        backend->shapes_cooked++;
+        if (cache_key.empty() || backend->settings.shape_cache_dir.empty() || !shape)
+            return;
+
+        const std::filesystem::path cache_file = backend->settings.shape_cache_dir / (sanitize_file_name(cache_key) + ".jshape");
+        std::error_code ec;
+        std::filesystem::create_directories(cache_file.parent_path(), ec);
+
+        // write next to the target and rename: a concurrent reader never sees a partial file
+        std::filesystem::path temp_file = cache_file;
+        temp_file += std::format(".{}.tmp", std::hash<std::thread::id>{}(std::this_thread::get_id()));
+        {
+            std::ofstream out(temp_file, std::ios::binary | std::ios::trunc);
+            out.write(reinterpret_cast<const char*>(&cooked_shape_magic), sizeof(cooked_shape_magic));
+            out.write(reinterpret_cast<const char*>(&cooked_shape_version), sizeof(cooked_shape_version));
+            out.write(reinterpret_cast<const char*>(&hash), sizeof(hash));
+            JPH::StreamOutWrapper stream(out);
+            JPH::Shape::ShapeToIDMap shape_map;
+            JPH::Shape::MaterialToIDMap material_map;
+            get_jolt_shape(shape)->SaveWithChildren(stream, shape_map, material_map);
+        }
+        std::filesystem::rename(temp_file, cache_file, ec);
+        if (ec)
+        {
+            LogPhysics.Log<Warning>("Can't write cooked shape '%s': %s", cache_file.string().c_str(), ec.message().c_str());
+            std::filesystem::remove(temp_file, ec);
+        }
     }
 
 
@@ -676,7 +700,58 @@ namespace phys
             state.ground_normal = to_glm(character.GetGroundNormal());
             state.ground_velocity = to_glm(character.GetGroundVelocity());
             state.ground_body = to_phys(character.GetGroundBodyID());
+            state.contacts = (uint32_t)character.GetActiveContacts().size();
             return state;
+        }
+
+        // The last move was blocked by something taller than a step on one side only (a door jamb, the edge
+        // of a column) whose face is square to the movement, so collide-and-slide has nothing to slide along:
+        // turns the horizontal velocity 45 degrees to the free side. Probes: the capsule raised by the step
+        // height (steps don't count) swept forward by its radius, from its position and shifted sideways.
+        glm::vec3 steer_around_corners(const PhysicsBackend& b, const PhysicsBackend::CharacterSlot& slot, const glm::vec3& velocity)
+        {
+            const JPH::CharacterVirtual& c = *slot.character;
+            const JPH::Vec3 up = c.GetUp();
+            const JPH::Vec3 desired = to_jolt(velocity);
+            const JPH::Vec3 horizontal = desired - desired.Dot(up) * up;
+            const float speed = horizontal.Length();
+            if (speed < 1.0e-3f)
+                return velocity;
+            const JPH::Vec3 forward = horizontal / speed;
+            const JPH::Vec3 side = up.Cross(forward).Normalized();
+
+            const QueryBroadPhaseLayerFilter broadphase_filter(slot.blocked_by);
+            const QueryObjectLayerFilter object_layer_filter(slot.blocked_by);
+            const JPH::IgnoreSingleBodyFilter body_filter(c.GetInnerBodyID());
+            const JPH::RMat44 raised = c.GetCenterOfMassTransform().PostTranslated(up * slot.step_height);
+
+            auto is_free = [&] (float shift)
+            {
+                const JPH::RMat44 from = raised.PostTranslated(side * shift);
+                const JPH::RShapeCast cast(c.GetShape(), JPH::Vec3::sOne(), from, forward * slot.radius);
+                JPH::ShapeCastSettings settings;
+                settings.mBackFaceModeTriangles = JPH::EBackFaceMode::CollideWithBackFaces;
+                JPH::AnyHitCollisionCollector<JPH::CastShapeCollector> collector;
+                b.narrow_phase().CastShape(cast, settings, JPH::RVec3::sZero(), collector,
+                                           broadphase_filter, object_layer_filter, body_filter);
+                const bool free = !collector.HadHit();
+#ifdef JPH_DEBUG_RENDERER
+                if (b.character_debug)
+                    b.get_debug_renderer().DrawArrow(from.GetTranslation(), from.GetTranslation() + forward * slot.radius,
+                                                     free ? JPH::Color::sGreen : JPH::Color::sRed, 0.03f);
+#endif
+                return free;
+            };
+
+            if (is_free(0.0f))
+                return velocity;        // nothing or a step ahead
+            const float shift = slot.corner_slide * slot.radius;
+            const bool free_positive = is_free(shift);
+            const bool free_negative = is_free(-shift);
+            if (free_positive == free_negative)
+                return velocity;        // a wall across the way, or an inside corner
+            const JPH::Vec3 steered = (forward + (free_positive ? side : -side)).Normalized() * speed;
+            return to_glm(steered + desired.Dot(up) * up);
         }
     }
 
@@ -721,6 +796,9 @@ namespace phys
         slot.character = new JPH::CharacterVirtual(&settings, to_jolt(desc.position), to_jolt(desc.rotation),
                                                    desc.user_data, &backend->system);
         slot.blocked_by = blocked_by;
+        slot.radius = radius;
+        slot.step_height = desc.step_height;
+        slot.corner_slide = desc.corner_slide;
         slot.update_settings.mWalkStairsStepUp = JPH::Vec3(0.0f, desc.step_height, 0.0f);
         slot.update_settings.mStickToFloorStepDown = JPH::Vec3(0.0f, -desc.stick_to_floor, 0.0f);
 
@@ -760,20 +838,51 @@ namespace phys
         if (!slot)
             return {};
 
+        const auto start_time = std::chrono::steady_clock::now();
         JPH::CharacterVirtual& c = *slot->character;
         if (dt > 0.0f)
         {
-            c.SetLinearVelocity(to_jolt(velocity));
+#ifdef JPH_DEBUG_RENDERER
+            // Jolt draws its stair walking / floor sticking sweeps through the debug renderer
+            if (backend->character_debug)
+                backend->get_debug_renderer().recording = &backend->character_lines;
+            JPH::CharacterVirtual::sDrawWalkStairs = backend->character_debug;
+            JPH::CharacterVirtual::sDrawStickToFloor = backend->character_debug;
+#endif
 
+            const glm::vec3 steered = slot->blocked && slot->corner_slide > 0.0f
+                ? steer_around_corners(*backend, *slot, velocity) : velocity;
+            c.SetLinearVelocity(to_jolt(steered));
+
+            const JPH::RVec3 old_position = c.GetPosition();
             const QueryBroadPhaseLayerFilter broadphase_filter(slot->blocked_by);
             const QueryObjectLayerFilter object_layer_filter(slot->blocked_by);
             c.ExtendedUpdate(dt, backend->system.GetGravity(), slot->update_settings,
                              broadphase_filter, object_layer_filter, {}, {}, *backend->temp_allocator);
+
+            // blocked: moved less than half of the way (along the horizontal movement)
+            const JPH::Vec3 up = c.GetUp();
+            JPH::Vec3 desired = to_jolt(steered) * dt;
+            desired -= desired.Dot(up) * up;
+            const float desired_length = desired.Length();
+            const float achieved = JPH::Vec3(c.GetPosition() - old_position).Dot(desired) / std::max(desired_length, 1.0e-6f);
+            slot->blocked = desired_length > 1.0e-4f && achieved < 0.5f * desired_length;
+
+#ifdef JPH_DEBUG_RENDERER
+            JPH::CharacterVirtual::sDrawWalkStairs = false;
+            JPH::CharacterVirtual::sDrawStickToFloor = false;
+            if (backend->debug_renderer)
+                backend->debug_renderer->recording = nullptr;
+#endif
         }
 
         // ground velocity for the next frame's velocity (moving platforms)
         c.UpdateGroundVelocity();
-        return make_character_state(c);
+        const CharacterState state = make_character_state(c);
+
+        backend->character_ms += std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start_time).count();
+        backend->character_contacts = std::max(backend->character_contacts, state.contacts);
+        return state;
     }
 
     CharacterState PhysicsScene::get_character_state(CharacterId character) const
@@ -969,6 +1078,14 @@ namespace phys
         const auto start_time = std::chrono::steady_clock::now();
         PhysicsBackend& b = *backend;
 
+        b.character_ms_last_frame = std::exchange(b.character_ms, 0.0f);
+        b.character_contacts_last_frame = std::exchange(b.character_contacts, 0u);
+        if (!b.character_lines.empty())
+        {
+            b.character_lines_shown.swap(b.character_lines);
+            b.character_lines.clear();
+        }
+
         const float fixed_dt = b.settings.fixed_timestep;
         b.accumulator = std::min(b.accumulator + dt, fixed_dt * (float)b.settings.max_steps_per_frame);
 
@@ -1043,6 +1160,8 @@ namespace phys
         stats.shapes_from_cache = backend->shapes_from_cache.load();
         stats.steps_last_frame = backend->steps_last_frame;
         stats.step_ms = backend->step_ms;
+        stats.character_ms = backend->character_ms_last_frame;
+        stats.character_contacts = backend->character_contacts_last_frame;
         return stats;
     }
 
@@ -1055,10 +1174,7 @@ namespace phys
 #ifdef JPH_DEBUG_RENDERER
         backend->check_not_stepping();
 
-        if (!backend->debug_renderer)
-            backend->debug_renderer = std::make_unique<LineDebugRenderer>();
-
-        LineDebugRenderer& renderer = *backend->debug_renderer;
+        LineDebugRenderer& renderer = backend->get_debug_renderer();
         renderer.line = &line;
         renderer.SetCameraPos(to_jolt(settings.camera_position));
 
@@ -1074,5 +1190,18 @@ namespace phys
         renderer.NextFrame();
         renderer.line = nullptr;
 #endif
+
+        for (const DebugLine& recorded : backend->character_lines_shown)
+            line(recorded.from, recorded.to, recorded.color);
+    }
+
+    void PhysicsScene::set_character_debug(bool enabled)
+    {
+        backend->character_debug = enabled;
+        if (!enabled)
+        {
+            backend->character_lines.clear();
+            backend->character_lines_shown.clear();
+        }
     }
 }

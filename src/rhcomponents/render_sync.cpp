@@ -220,7 +220,7 @@ namespace
     void create_mesh_colliders(ecs::Registry& registry, ecs::ResMut<phys::PhysicsScene> physics)
     {
         ecs::Query<MeshCollider, const MeshRenderer>(registry).each([&] (ecs::Entity e, MeshCollider& collider, const MeshRenderer& renderer) {
-            if (collider.body.is_valid())
+            if (collider.body.is_valid() || collider.type == MeshCollision::none)
                 return;
 
             const Transform world = scene::get_world_transform(registry, e);
@@ -229,10 +229,19 @@ namespace
                 collider.shape = std::move(*collider.pending);
                 collider.pending.reset();
             }
-            if (!collider.shape && renderer.mesh.is_valid())
-                collider.shape = cook_mesh_collision(*physics, renderer.mesh.get(), world.scale.glm(), scene::get_name(registry, e));
+            else if (!collider.shape)
+            {
+                if (!renderer.mesh.is_valid())
+                    return;
+                collider.shape = cook_mesh_collision(*physics, renderer.mesh.get(), world.scale.glm(), collider.get_settings(),
+                                                     scene::get_name(registry, e));
+            }
             if (!collider.shape)
+            {
+                // nothing to collide with (empty mesh, or simplified away): don't cook again every frame
+                collider.type = MeshCollision::none;
                 return;
+            }
 
             collider.body = physics->create_body({
                 .shape = collider.shape,
