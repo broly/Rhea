@@ -473,6 +473,9 @@ void RenderGraph::compile()
 
         if (tex.should_create_image())
         {
+            if (tex.desc.extent_divisor > 0)
+                tex.desc.extent = backend->get_swapchain_extent().divided(tex.desc.extent_divisor);
+
             RBImageDesc desc{
                 .name = std::string("RG_") + tex.desc.name.to_string(),
                 .extent  = tex.desc.extent,
@@ -769,6 +772,16 @@ void RenderGraph::flush_pending_exr_saves()
     pending_exr_saves.clear();
 }
 
+// Name of a pass for the CPU profiler, which keeps the pointer
+static const char* pass_scope_name(Name pass)
+{
+    static std::unordered_map<Name, std::string> names;
+    auto it = names.find(pass);
+    if (it == names.end())
+        it = names.emplace(pass, "pass " + pass.to_string()).first;
+    return it->second.c_str();
+}
+
 void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback)
 {
     PROFILE("RenderGraph::execute");
@@ -776,7 +789,10 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
     // GPU pass profiler: open this frame's timestamp pool (drains the results
     // recorded MAX_FRAMES_IN_FLIGHT frames ago, then resets for fresh recording).
-    gpuprof::frame_begin(frame, cmd);
+    {
+        PROFILE("gpuprof::frame_begin");
+        gpuprof::frame_begin(frame, cmd);
+    }
 
     RenderGraphContext ctx(*backend, cmd, {}, *this, params);
     ctx.frame = frame;
@@ -790,7 +806,10 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         tex.reset_layout();  // for swapchain: transfer_present
     
     ctx.is_preparing = true;
-    prepare_resources(ctx);
+    {
+        PROFILE("RenderGraph::prepare_resources");
+        prepare_resources(ctx);
+    }
     ctx.is_preparing = false;
 
     for (uint32_t pass_index : execution_order)
@@ -799,6 +818,9 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
         
         if (pass.condition && !pass.condition())
             continue;
+
+        // CPU profile: everything the pass records, barriers and render pass included
+        PROFILE(pass_scope_name(pass.name));
 
         if (sync_debug >= SyncDebug::pass_barriers)
             backend->debug_full_barrier(cmd);
@@ -941,6 +963,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
 
     if (params.draw_ui_overlay && get_swapchain_texture())
     {
+        PROFILE("UIOverlay");
         gpuprof::pass_begin(cmd, "UIOverlay");
         backend->render_ui_overlay(cmd, frame);
         gpuprof::pass_end(cmd);
@@ -961,6 +984,7 @@ void RenderGraph::execute(RBCommandList cmd, RBFrameHandle frame, const RenderGr
     // Fix: keep render-pass finalLayout aligned with the attachment usage
     // (e.g. ColorAttachment), and emit an explicit transition to Present
     // here. This keeps state and reality in sync.
+    PROFILE("end of frame");
     for (auto& tex : textures)
     {
         if (!tex.is_swapchain())
@@ -1018,7 +1042,10 @@ void RenderGraph::rebuild_resources()
             backend->destroy_image(*tex.image, true);
             tex.image.reset();
         }
-        
+
+        if (tex.desc.extent_divisor > 0)
+            tex.desc.extent = extent.divided(tex.desc.extent_divisor);
+
         RBImageDesc desc = {
             .name = std::string("RG_") + tex.desc.name.to_string(),
             .extent  = tex.desc.extent,
@@ -1033,6 +1060,29 @@ void RenderGraph::rebuild_resources()
 }
 
 
+
+void RenderGraph::resize_texture(RGTextureHandle handle, uint32_t extent_divisor)
+{
+    RGTexture& tex = textures[handle.id];
+    checkf(tex.should_create_image(), "resize_texture: '%s' is not an image of the graph", tex.desc.name.to_string().c_str());
+
+    tex.desc.extent_divisor = extent_divisor;
+    tex.desc.extent = backend->get_swapchain_extent().divided(std::max(extent_divisor, 1u));
+    if (tex.image.has_value())
+    {
+        backend->destroy_image(*tex.image, true);
+        tex.image.reset();
+    }
+    tex.image = backend->create_image({
+        .name = std::string("RG_") + tex.desc.name.to_string(),
+        .extent = tex.desc.extent,
+        .format = tex.desc.format,
+        .usage = tex.desc.usage,
+        .mip_levels = tex.get_mip_levels_count(),
+        .num_layers = tex.get_layers_count(),
+        .is_cubemap = tex.desc.dimension == TextureDimension::Cube,
+    });
+}
 
 void RenderGraph::recompile()
 {

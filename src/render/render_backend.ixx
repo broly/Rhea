@@ -188,6 +188,9 @@ public:
     virtual Extent get_swapchain_extent() const = 0;
 
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) = 0;
+    // Volume texture (sampler3D) from an RGBA8 texture holding `depth` slices stacked along its height:
+    // slice z is rows [z * slice_height, (z + 1) * slice_height). Mips are box filtered on the GPU.
+    virtual RBImageHandle create_texture_3d(const Texture& data, uint32_t depth, bool generate_mips) = 0;
     virtual RBImageHandle create_texture_cubemap(const Cubemap& data, const TextureCreationInfo& texture_creation_info) = 0;
 
     // Editing tools (terrain painting and sculpting). Both wait until the GPU is idle first: the frames in

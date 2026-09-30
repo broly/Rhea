@@ -12,6 +12,7 @@ import json_utils;
 import log;
 import name;
 import cvar;
+import sky_controller;
 
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -385,7 +386,8 @@ namespace
     }
 
     // Render transform between the last two simulated ticks
-    [[=ecs::system<ecs::Phase::Update>]]
+    // (the sky controller writes Transform too: of the sun, never of a character)
+    [[=ecs::system<ecs::Phase::Update>, =ecs::ambiguous_with<SkyControl>]]
     void interpolate_characters(ecs::Query<Transform, const CharacterMovement> characters, ecs::Res<ecs::FrameTime> time)
     {
         const float alpha = (float)time->alpha;

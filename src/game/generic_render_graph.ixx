@@ -22,6 +22,7 @@ import debug_draw;
 import :nn_denoiser_passes;
 import :debug_view;
 import :reflection_probes;
+import :sky_renderer;
 import :draw_list;
 import rhcomponents;
 import cvar;
@@ -175,6 +176,7 @@ public:
     void build_passes(const std::map<Name, bool>& parameters) override;
     void prepare_resources(RenderGraphContext& ctx) override;
     void prepare_raytracing(RenderGraphContext& ctx);
+    void begin_frame() override;
     void end_frame() override;
     
     void rebuild_camera_ubo(RenderGraphContext& ctx);
@@ -183,7 +185,6 @@ public:
 
     void prepare_geometry_resources(RenderGraphContext& ctx);
     void prepare_shadow_pass(RenderGraphContext& ctx);
-    void prepare_clouds_pass(RenderGraphContext& ctx);
     void prepare_wireframe_pass(RenderGraphContext& ctx);
     void prepare_ssr(RenderGraphContext& ctx);
     
@@ -193,7 +194,6 @@ public:
     void dispatch_skinning(RenderGraphContext& ctx);
     void draw_scene(RenderGraphContext& ctx);
     void draw_scene_shadow(RenderGraphContext& ctx);
-    void draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture);
     void draw_wireframe(RenderGraphContext& ctx);
     void draw_ssr(RenderGraphContext& ctx);
     void draw_ssr_composite(RenderGraphContext& ctx);
@@ -234,7 +234,12 @@ public:
         RenderGraphContext& ctx);
     
     RGTextureHandle shadow_map;
-    RGTextureHandle noise_texture;
+    // sky of the frame at 1 / sky_downscale of the screen (SkyRenderer): atmosphere, clouds, and the clouds
+    // of the two previous frames (layer history_index is written, the other one read)
+    RGTextureHandle atmosphere_buffer;
+    RGTextureHandle clouds_buffer;
+    RGTextureHandle clouds_history;
+    uint32_t sky_downscale = 1;     // render.sky.downscale the buffers were created with
     RGTextureHandle swapchain_color;
     
     HDROutputTextureArray hdr_color_present;
@@ -248,7 +253,7 @@ public:
     uint32_t history_index = 0;
 
     // Full-screen "sky flash" diagnostics: occlusion queries per frame in flight, [frame * DIAG_COUNT + DIAG_*]:
-    // samples drawn by the clouds pass (sky where depth is empty) and by the base geometry pass.
+    // samples drawn by the sky pass (where depth is empty) and by the base geometry pass.
     // Read back when the frame slot comes around again, logged when the sky covers most of the screen.
     // DIAG_LIGHTING: samples the lighting pass kept with LightingDebug::emissive_watch.
     static constexpr uint32_t DIAG_CLOUDS = 0;
@@ -299,7 +304,6 @@ public:
     RenderResource* hdr_color_storage_resource = nullptr;
     RenderResource* tlas_resource = nullptr;
     RenderResource* mesh_table_resource = nullptr;
-    RenderResource* clouds_resource = nullptr;
     RenderResource* base_color_resource = nullptr;
     RenderResource* pbr_material_table_resource = nullptr;
     RenderResource* textures_resource = nullptr;
@@ -320,7 +324,6 @@ public:
 
     
     PipelineObject* shadow_debug_pipeline;
-    PipelineObject* clouds_pipeline;
     PipelineObject* tonemap_pipeline;
     PipelineObject* wireframe_pipeline;
     PipelineObject* ssr_pipeline;
@@ -381,6 +384,9 @@ public:
     
     // runtime baked reflection probes, main graph only (pass "ReflectionProbes")
     std::unique_ptr<ReflectionProbeSystem> reflection_probes;
+
+    // sky and clouds, main graph only (passes "SkyMarch", "Sky")
+    std::unique_ptr<SkyRenderer> sky;
 
     // mesh draws of the frame: records + indirect commands
     DrawList draw_list;

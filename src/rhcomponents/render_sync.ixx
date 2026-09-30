@@ -10,6 +10,7 @@ import :mesh;
 import :camera;
 import :light;
 import :reflection_capture;
+import :sky;
 
 export
 {
@@ -19,13 +20,17 @@ export
     struct CameraProxy { SceneViewProxy_Camera proxy; };
     struct LightProxy { SceneViewProxy_Light proxy; };
     struct ReflectionCaptureProxy { SceneViewProxy_ReflectionCapture proxy; };
+    struct SkyProxy { SceneViewProxy_Sky proxy; };
 
     // System sets of render_sync.cpp (component types, hooks and systems register themselves there;
     // the systems need the SceneView resource, ResMut<SceneView>):
+    //   Update:    advance_clouds (the wind moves the VolumetricClouds)
     //   Late:      sync_render_proxies (after scene::TransformPropagation), mesh colliders created at runtime
     //   PostLoad:  mesh colliders of a loaded level
     struct RenderSync {};
     struct MeshColliderSync {};
+    // advance_clouds: systems which set the wind of VolumetricClouds run before it
+    struct CloudWind {};
 
     // Union of the world bounds of all registered meshes (zero box when there are none)
     AABB compute_world_bounds(ecs::Registry& registry);

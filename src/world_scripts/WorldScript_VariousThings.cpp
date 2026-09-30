@@ -15,6 +15,7 @@ import rhmath;
 import rhcomponents;
 import game;
 import rail;
+import sky_controller;
 import ecs;
 import name;
 import framework;
@@ -22,7 +23,6 @@ import character_controller;
 import cvar;
 
 constexpr bool DO_NN_SAMPLES = false;
-constexpr bool DO_ANIMATE_LIGHT = true;
 
 Transform WorldScript_VariousThings::get_camera_transform() const
 {
@@ -149,11 +149,6 @@ void WorldScript_VariousThings::tick(double dt)
     if (!camera)
         return;
 
-    if (!registry.alive(sun))
-        sun = world->find_entity("dir_light0");
-    if (!sun)
-        return;
-
     if (!registry.alive(rail))
         rail = world->find_entity("rail");
     Rail* rail_track = registry.get<Rail>(rail);
@@ -204,26 +199,8 @@ void WorldScript_VariousThings::tick(double dt)
                 set_camera_transform(Transform(d.position, d.rotation));
         };
 
-        rail_track->on_tick["light"] = [this] (const RailSampleData& d)
-        {
-            ecs::Registry& registry = world->registry;
-            scene::set_world_transform(registry, sun, Transform(d.position, d.rotation));
-            glm::vec4 sun_color = d.color;
-            // lighting presets tint the animated sun
-            if (light_rig)
-                sun_color = glm::vec4(glm::vec3(sun_color) * light_rig->get_sun_tint(), sun_color.w);
-            if (Light* light = registry.get<Light>(sun))
-                light->color = sun_color;
-        };
         if (DO_NN_SAMPLES)
         {
-            rail_track->start();
-        }
-        if (DO_ANIMATE_LIGHT)
-        {
-            rail_track->loop = true;
-            rail_track->fixed_timestep = false;
-            rail_track->time_dilation = 0.3;
             rail_track->start();
         }
         do_once = true;
@@ -329,7 +306,7 @@ void WorldScript_VariousThings::tick(double dt)
 
     const bool free_camera = !character || !character_mode;
 
-    // light rig: L next preset (LeftShift + L previous), M freezes / resumes the sun animation
+    // light rig: L next preset (LeftShift + L previous), M freezes / resumes the time of day
     if (character && !light_rig_init_attempted)
     {
         light_rig_init_attempted = true;
@@ -351,10 +328,14 @@ void WorldScript_VariousThings::tick(double dt)
 
         const bool m_down = input->is_key_down(Key::M);
         if (m_down && !sun_freeze_key_was_down)
-            set_sun_frozen(!sun_frozen);
+            set_sun_frozen(!is_sun_frozen());
         sun_freeze_key_was_down = m_down;
 
         light_rig->tick(registry);
+
+        // lighting presets tint the sun (the sky controller owns its color)
+        if (SkyController* sky_controller = sky::find_controller(registry))
+            sky_controller->light_tint = light_rig->get_sun_tint();
     }
 
     // T: next pose, Shift+T: previous (locomotion is part of the cycle), 0: back to locomotion
@@ -584,18 +565,14 @@ void WorldScript_VariousThings::tick(double dt)
 
 void WorldScript_VariousThings::set_sun_frozen(bool frozen)
 {
-    Rail* rail_track = world->registry.get<Rail>(rail);
-    if (!rail_track || frozen == sun_frozen)
-        return;
+    if (SkyController* sky_controller = sky::find_controller(world->registry))
+        sky_controller->paused = frozen;
+}
 
-    sun_frozen = frozen;
-    if (sun_frozen)
-    {
-        sun_time_dilation = rail_track->time_dilation;
-        rail_track->time_dilation = 0.0f;
-    }
-    else
-        rail_track->time_dilation = sun_time_dilation;
+bool WorldScript_VariousThings::is_sun_frozen() const
+{
+    const SkyController* sky_controller = sky::find_controller(world->registry);
+    return sky_controller && sky_controller->paused;
 }
 
 void WorldScript_VariousThings::draw_debug_ui()
@@ -660,7 +637,7 @@ void WorldScript_VariousThings::draw_debug_ui()
             ImGui::EndCombo();
         }
 
-        bool frozen = sun_frozen;
+        bool frozen = is_sun_frozen();
         if (ImGui::Checkbox("Freeze sun (M)", &frozen))
             set_sun_frozen(frozen);
     }

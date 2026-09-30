@@ -107,12 +107,21 @@ void Renderer::execute_graph(
     RBFrameHandle frame = backend.get_current_frame();
 
     backend.wait_for_frame(frame);
+    rg->begin_frame();
 
     rg->flush_pending_exr_saves();
 
-    backend.flush_frame_garbage(frame);
+    {
+        PROFILE("flush_frame_garbage");
+        backend.flush_frame_garbage(frame);
+    }
 
-    if (!backend.acquire_next_image(frame))
+    bool acquired = false;
+    {
+        PROFILE("acquire_next_image");
+        acquired = backend.acquire_next_image(frame);
+    }
+    if (!acquired)
     {
         rg->rebuild_resources();
         return;
@@ -127,7 +136,12 @@ void Renderer::execute_graph(
 
     backend.end_commands(cmd);
 
-    if (!backend.submit_frame(frame, cmd))
+    bool submitted = false;
+    {
+        PROFILE("submit_frame");
+        submitted = backend.submit_frame(frame, cmd);
+    }
+    if (!submitted)
     {
         rg->rebuild_resources();
         return;

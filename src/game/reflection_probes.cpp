@@ -24,14 +24,12 @@ DEFINE_LOGGER(LogReflectionProbes, Display);
 
 namespace
 {
-    // sky behind the clouds as clouds.frag draws it
-    constexpr glm::vec3 sky_color = { 0.1f, 0.5f, 1.0f };
-    // what surfaces receive before any probe is baked / what lies below the horizon
-    constexpr glm::vec3 ground_radiance = { 0.03f, 0.03f, 0.035f };
-
     // sun change that makes the probes dirty (auto_rebake)
     constexpr float sun_direction_threshold_cos = 0.99985f;   // ~1 degree
     constexpr float sun_color_threshold = 0.02f;              // relative
+    // sky change that makes them dirty: its average radiance (relative), the cloud coverage
+    constexpr float sky_ambient_threshold = 0.05f;
+    constexpr float cloud_coverage_threshold = 0.05f;
 
     float distance_to_box(glm::vec3 point, glm::vec3 box_min, glm::vec3 box_max)
     {
@@ -53,6 +51,13 @@ namespace
         const float scale = std::max(glm::length(baked_color), 1e-3f);
         return glm::length(color - baked_color) / scale > sun_color_threshold;
     }
+
+    bool sky_changed(const glm::vec4& baked, const glm::vec4& sky)
+    {
+        const float scale = std::max(glm::length(glm::vec3(baked)), 1e-3f);
+        return glm::length(glm::vec3(sky) - glm::vec3(baked)) / scale > sky_ambient_threshold
+            || std::abs(sky.w - baked.w) > cloud_coverage_threshold;
+    }
 }
 
 void ReflectionProbeSystem::init(Renderer& in_renderer, RenderBackend& in_backend)
@@ -62,13 +67,14 @@ void ReflectionProbeSystem::init(Renderer& in_renderer, RenderBackend& in_backen
 
     reflection_resource = renderer->find_resource("reflection");
     probe_capture_resource = renderer->find_resource("probe_capture");
+    sky_resource = renderer->find_resource("sky");
     light_resource = renderer->find_resource("light");
     shadow_resource = renderer->find_resource("shadow");
     mesh_table_resource = renderer->find_resource("mesh_table");
     primitive_table_resource = renderer->find_resource("primitive_table");
     pbr_material_table_resource = renderer->find_resource("pbr_material_table");
     textures_resource = renderer->find_resource("textures");
-    checkf(reflection_resource && probe_capture_resource, "reflection probe resources are missing (assets/render/resources)");
+    checkf(reflection_resource && probe_capture_resource && sky_resource, "reflection probe resources are missing (assets/render/resources)");
 
     auto probe_model = renderer->find_model("reflection_probe");
     checkf(probe_model, "material model 'reflection_probe' is missing (assets/render/schemas/reflection_probe.json)");
@@ -296,13 +302,15 @@ void ReflectionProbeSystem::update_slots(SceneView& scene_view, const FrameInput
         const bool sun_differs = auto_rebake &&
             sun_changed(state.baked_sun_direction, state.baked_sun_color, probe_lights.sun_direction, probe_lights.sun_color);
         const bool lights_differ = auto_rebake && state.baked_lights_hash != probe_lights.points_hash;
+        const bool sky_differs = auto_rebake && sky_changed(state.baked_sky, glm::vec4(inputs.sky_ambient, inputs.cloud_coverage));
 
-        state.dirty = !state.valid || moved || state.force || interval_elapsed || sun_differs || lights_differ;
+        state.dirty = !state.valid || moved || state.force || interval_elapsed || sun_differs || lights_differ || sky_differs;
         state.dirty_reason = !state.valid ? "first bake"
             : moved ? "moved"
             : state.force ? "requested"
             : sun_differs ? "sun changed"
             : lights_differ ? "lights changed"
+            : sky_differs ? "sky changed"
             : interval_elapsed ? "update interval"
             : "";
     }
@@ -336,6 +344,7 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
         state.baked_position = job->position;
         state.baked_sun_direction = job->sun_direction;
         state.baked_sun_color = job->sun_color;
+        state.baked_sky = job->sky;
         state.baked_lights_hash = job->lights_hash;
         state.bake_time = current_time;
         state.bake_count++;
@@ -410,6 +419,7 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
             .position = capture.position,
             .sun_direction = probe_lights.sun_direction,
             .sun_color = probe_lights.sun_color,
+            .sky = glm::vec4(inputs.sky_ambient, inputs.cloud_coverage),
             .lights_hash = probe_lights.points_hash,
             // not the cube a pending filter still reads
             .capture_index = fade ? 1u - fade->capture_index : 0u,
@@ -466,7 +476,7 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
     }
 
     probes_ubo.info = glm::uvec4(count, 0u, specular_mips, cv_probes_parallax.get() ? 1u : 0u);
-    probes_ubo.sky_ambient = glm::vec4(sky_color * 0.5f, 0.0f);
+    probes_ubo.sky_ambient = glm::vec4(inputs.sky_ambient, 0.0f);
     probes_ubo.intensity = glm::vec4(
         cv_probes_diffuse.get() ? cv_probes_diffuse_intensity.get() : 0.0f,
         cv_probes_specular.get() ? cv_probes_specular_intensity.get() : 0.0f,
@@ -489,8 +499,6 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
     for (uint32_t face = 0; face < 6; ++face)
         capture_ubo.face_view_proj[face] = face_view_proj(face, capture_position);
     capture_ubo.capture_position = glm::vec4(capture_position, 1.0f);
-    capture_ubo.sky_color = glm::vec4(sky_color, 1.0f);
-    capture_ubo.sky_ambient = glm::vec4(ground_radiance, 0.0f);
     capture_ubo.filter_params = glm::vec4(float(capture_size), float(specular_mips), 0.0f, 0.0f);
 
     // static point lights nearest to the capture point
@@ -513,7 +521,6 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
     probe_capture_resource->update_image("u_probe_source", capture_colors[frame_work.filter_capture_index], { .frame = ctx.frame, .cubemap = true });
     probe_capture_resource->update_image("u_probe_scratch_specular", scratch_specular, { .frame = ctx.frame, .cubemap = true });
     probe_capture_resource->update_image("u_probe_scratch_irradiance", scratch_irradiance, { .frame = ctx.frame, .cubemap = true });
-    probe_capture_resource->update_image("u_probe_sky_noise", inputs.sky_noise, { .frame = ctx.frame });
 }
 
 void ReflectionProbeSystem::draw_debug_volumes(SceneView& scene_view) const
@@ -658,9 +665,9 @@ void ReflectionProbeSystem::render_face(RenderGraphContext& ctx, SceneView& scen
     // a new render pass: the pipeline must be bound again (RenderGraphContext::bind_pipeline)
     ctx.current_pipeline = nullptr;
 
-    // ---- sky ----
+    // ---- sky (the SkyRenderer wrote the "sky" resource of the frame) ----
     ctx.bind_pipeline(sky_pipeline);
-    ctx.bind(probe_capture_resource, light_resource);
+    ctx.bind(probe_capture_resource, sky_resource);
     ctx.push_constants(ProbeFacePushConstants{ face, 0, 0.0f, 0, 1.0f });
     ctx.draw_fullscreen();
 

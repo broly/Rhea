@@ -18,6 +18,8 @@ import ui;
 import cvar;
 import paths;
 
+#include "profiling/profile.h"
+
 
 void Engine::engine_init()
 {
@@ -36,9 +38,12 @@ void Engine::run()
     // the focus, face close-up, emissive watch summaries in the log, quits after n seconds of world time
     const char* soak_env = std::getenv("RHEA_SOAK_SECONDS");
     const double soak_seconds = soak_env ? std::atof(soak_env) : 0.0;
+    // RHEA_BACKGROUND=1: the window opens without taking the keyboard focus (automation: RHEA_EXEC + screenshots)
+    const char* background_env = std::getenv("RHEA_BACKGROUND");
+    const bool background = background_env && background_env[0] == '1';
     window_create(window, 1280, 720, "Rhea", {
         .maximized = soak_seconds > 0.0,
-        .focus_on_show = soak_seconds <= 0.0,
+        .focus_on_show = soak_seconds <= 0.0 && !background,
     });
 
     // RHEA_RENDERDOC=1: RenderDoc in-app API (before the Vulkan instance exists), captures go to cache/renderdoc.
@@ -103,7 +108,10 @@ void Engine::run()
     while (!window_should_close(window)) {
         prof::frame_start();
         
-        platform::window::window_poll_events();
+        {
+            PROFILE("poll_events");
+            platform::window::window_poll_events();
+        }
         
         renderer->get_backend()->ui_overlay_new_frame();
         ui::begin_frame();
@@ -112,7 +120,10 @@ void Engine::run()
         
         clock->tick();
         
-        world->tick();
+        {
+            PROFILE("World::tick");
+            world->tick();
+        }
         // RHEA_SOAK_CAP_UNTIL=<s>: soak runs hold ~30 FPS until then, to move the full-load step in time
         static const char* soak_cap_env = std::getenv("RHEA_SOAK_CAP_UNTIL");
         static const double soak_cap_until = soak_cap_env ? std::atof(soak_cap_env) : 0.0;
@@ -125,11 +136,17 @@ void Engine::run()
         }
         debug_ui.draw_world_debug(*this);
         
-        if (ui::is_visible())
-            debug_ui.draw(*this);
-        ui::end_frame();
+        {
+            PROFILE("debug_ui");
+            if (ui::is_visible())
+                debug_ui.draw(*this);
+            ui::end_frame();
+        }
         
-        scene_view->perform_extraction();
+        {
+            PROFILE("SceneView::perform_extraction");
+            scene_view->perform_extraction();
+        }
 
         // GPU profiler runtime control (edge-detected):
         //   P -> start timing (clears previous results)
@@ -151,7 +168,10 @@ void Engine::run()
             gpu_prof_prev_o = o_down;
         }
 
-        renderer->execute();
+        {
+            PROFILE("Renderer::execute");
+            renderer->execute();
+        }
         prof::frame_end();
     }
     renderer->get_backend()->shutdown_ui_overlay();

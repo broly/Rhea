@@ -23,7 +23,10 @@ export
     struct RGTextureDesc
     {
         Name name;
+        // zero: the swapchain extent
         Extent extent;
+        // > 0: extent = swapchain extent / extent_divisor (rounded up), kept through resizes
+        uint32_t extent_divisor = 0;
 
         TextureFormat format = TextureFormat::Undefined;
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;

@@ -41,7 +41,6 @@ public:
     void pass_shadow_map(RenderGraphContext& ctx);
     void pass_shadow_debug(RenderGraphContext& ctx);
     void pass_translucent(RenderGraphContext& ctx);
-    void pass_clouds(RenderGraphContext& ctx);
     void pass_tonemapping(RenderGraphContext& ctx);
     void pass_readback(RenderGraphContext& ctx);
 

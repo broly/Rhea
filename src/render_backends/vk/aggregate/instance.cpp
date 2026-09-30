@@ -45,8 +45,13 @@ void vk::Instance::init(GLFWwindow* in_window)
 
     VkInstanceCreateInfo ici{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     ici.pApplicationInfo = &appInfo;
-    ici.enabledLayerCount = 1;
+    // RHEA_VALIDATION=0: no validation layer. It checks every Vulkan call on the CPU (with the synchronization
+    // validation: most of the render thread's frame), so measure performance without it.
+    const char* validation_env = std::getenv("RHEA_VALIDATION");
+    const bool validation = !(validation_env && validation_env[0] == '0');
+    ici.enabledLayerCount = validation ? 1 : 0;
     ici.ppEnabledLayerNames = VALIDATION_LAYERS;
+    LogVkInstance.Log("Vulkan validation layer: %s", validation ? "on (RHEA_VALIDATION=0 turns it off)" : "off (RHEA_VALIDATION=0)");
     
     // RHEA_GPU_AV=1: GPU-assisted validation (slow). It instruments shaders and reports what the CPU side
     // can't see: unwritten / out of range bindless descriptors, out of bounds buffer device address accesses.
@@ -96,11 +101,11 @@ void vk::Instance::init(GLFWwindow* in_window)
 
     debug_create_info.pfnUserCallback = &vk::Instance::debug_callback;
     debug_create_info.pUserData = this;
-    debug_create_info.pNext = &validationFeatures;
+    debug_create_info.pNext = validation ? &validationFeatures : nullptr;
     
     ici.pNext = &debug_create_info;
 #else 
-    ici.pNext = &validationFeatures;
+    ici.pNext = validation ? &validationFeatures : nullptr;
 #endif
 
     VK_CHECK(

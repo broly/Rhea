@@ -10,10 +10,12 @@ import :skinned_mesh;
 import :camera;
 import :light;
 import :reflection_capture;
+import :sky;
 import :scene_view_proxy.mesh;
 import :scene_view_proxy.camera;
 import :scene_view_proxy.light;
 import :scene_view_proxy.reflection_capture;
+import :scene_view_proxy.sky;
 
 import std.compat;
 import ecs;
@@ -125,6 +127,25 @@ namespace
             && a.update_interval == b.update_interval && a.rebake_on_enter == b.rebake_on_enter;
     }
 
+    SceneViewProxy_Sky make_proxy(const ecs::Registry& registry, ecs::Entity e, const SkyAtmosphere& atmosphere, const Transform& world)
+    {
+        SceneViewProxy_Sky proxy;
+        proxy.transform = world;
+        proxy.atmosphere = atmosphere;
+        if (const VolumetricClouds* clouds = registry.get<VolumetricClouds>(e))
+            proxy.clouds = *clouds;
+        else
+            proxy.clouds.enabled = false;
+        return proxy;
+    }
+
+    // plain data: floats, vectors, flags
+    bool same_proxy(const SceneViewProxy_Sky& a, const SceneViewProxy_Sky& b)
+    {
+        return std::memcmp(&a.atmosphere, &b.atmosphere, sizeof(SkyAtmosphere)) == 0
+            && std::memcmp(&a.clouds, &b.clouds, sizeof(VolumetricClouds)) == 0;
+    }
+
     template<typename Data>
     bool wants_proxy(const Data&) { return true; }
     bool wants_proxy(const MeshRenderer& renderer) { return renderer.visible && renderer.mesh.is_valid(); }
@@ -200,6 +221,12 @@ namespace
     }
 
     [[=ecs::on_remove]]
+    void unregister_sky_proxy(ecs::Registry& registry, ecs::Entity, SkyProxy& state)
+    {
+        unregister_proxy<SceneViewProcessor_Sky>(registry, state);
+    }
+
+    [[=ecs::on_remove]]
     void destroy_mesh_collider_body(ecs::Registry& registry, ecs::Entity, MeshCollider& collider)
     {
         phys::PhysicsScene* physics = registry.find_resource<phys::PhysicsScene>();
@@ -257,6 +284,22 @@ namespace
 
 namespace
 {
+    // The clouds drift with the wind: the offsets of their noise accumulate, so the wind may change at any time
+    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<CloudWind>]]
+    void advance_clouds(ecs::Query<VolumetricClouds> clouds, ecs::Res<ecs::FrameTime> time)
+    {
+        clouds.each([&] (VolumetricClouds& layer) {
+            const float heading = glm::radians(layer.wind_direction);
+            const glm::vec3 wind = glm::vec3(std::sin(heading), 0.0f, -std::cos(heading)) * layer.wind_speed;
+            // the noise is sampled at position + offset: moving the clouds downwind moves the offset upwind
+            const glm::vec3 step = -wind * float(time->dt);
+            layer.offset = layer.offset.glm() + step;
+            // the detail also sinks through the shapes: their edges keep changing
+            layer.detail_offset = layer.detail_offset.glm() + step * (1.0f + layer.turbulence)
+                + glm::vec3(0.0f, layer.turbulence * layer.wind_speed * float(time->dt), 0.0f);
+        });
+    }
+
     [[=ecs::system<ecs::Phase::Late>, =ecs::in_set<RenderSync>, =ecs::after<scene::TransformPropagation>]]
     void sync_render_proxies(ecs::Registry& registry, ecs::ResMut<SceneView> scene_view)
     {
@@ -265,11 +308,13 @@ namespace
         sync_proxies<Camera, CameraProxy>(registry, *scene_view, processor_id<SceneViewProcessor_Camera>());
         sync_proxies<Light, LightProxy>(registry, *scene_view, processor_id<SceneViewProcessor_Light>());
         sync_proxies<ReflectionCapture, ReflectionCaptureProxy>(registry, *scene_view, processor_id<SceneViewProcessor_ReflectionCapture>());
+        sync_proxies<SkyAtmosphere, SkyProxy>(registry, *scene_view, processor_id<SceneViewProcessor_Sky>());
         scene_view->world_aabb = compute_world_bounds(registry);
     }
 
     ECS_REGISTER()
-    SCENE_REGISTER_COMPONENTS(MeshRenderer, MeshCollider, SkinnedMesh, Camera, Light, ReflectionCapture)
+    SCENE_REGISTER_COMPONENTS(MeshRenderer, MeshCollider, SkinnedMesh, Camera, Light, ReflectionCapture, SkyAtmosphere,
+        VolumetricClouds)
 }
 
 AABB compute_world_bounds(ecs::Registry& registry)

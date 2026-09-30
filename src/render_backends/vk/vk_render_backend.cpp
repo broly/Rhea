@@ -616,6 +616,11 @@ RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, const Textu
     return image_manager.create_texture_2d(tex, texture_creation_info);
 }
 
+RBImageHandle VkRenderBackend::create_texture_3d(const Texture& tex, uint32_t depth, bool generate_mips)
+{
+    return image_manager.create_texture_3d(tex, depth, generate_mips);
+}
+
 void VkRenderBackend::update_texture_2d(RBImageHandle image, const Texture& data, const TextureRegion& region)
 {
     PROFILE(__FUNCTION__);

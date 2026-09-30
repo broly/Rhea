@@ -172,6 +172,7 @@ public:   /// API Section
     virtual RBSampler create_sampler(const ::SamplerDesc& desc) override;
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) override;
+    virtual RBImageHandle create_texture_3d(const Texture& data, uint32_t depth, bool generate_mips) override;
     virtual RBImageHandle create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info) override;
     virtual void update_texture_2d(RBImageHandle image, const Texture& data, const TextureRegion& region) override;
     virtual void update_mesh_vertices(MeshPrimHandle mesh, std::span<const Vertex> vertices) override;

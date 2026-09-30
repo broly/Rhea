@@ -212,8 +212,9 @@ namespace vk
         Extent extent = {};
         VkFormat format = VK_FORMAT_UNDEFINED;
         
-        uint32_t mip_levels = 1; 
+        uint32_t mip_levels = 1;
         uint32_t num_layers = 1;
+        uint32_t depth = 1;     // > 1: 3D image, its view (layer 0) is a 3D view of all mips
         Mask<RenderTextureUsage::Type> usage = RenderTextureUsage::None;
         
         VkImageView array_view = VK_NULL_HANDLE;

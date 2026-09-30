@@ -187,11 +187,6 @@ void GameRenderGraph::pass_translucent(RenderGraphContext& ctx)
     draw_scene(ctx);
 }
 
-void GameRenderGraph::pass_clouds(RenderGraphContext& ctx)
-{
-    draw_clouds(ctx, gbuffer[GBUFFER_SLOTS::DEPTH], noise_texture);
-}
-
 void GameRenderGraph::pass_tonemapping(RenderGraphContext& ctx)
 {
             

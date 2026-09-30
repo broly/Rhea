@@ -90,6 +90,9 @@ export namespace glm
     using glm::orthoRH;
     using glm::ortho;
     using glm::dot;
+    using glm::dvec3;
+    using glm::exp;
+    using glm::smoothstep;
     using glm::abs;
     using glm::value_ptr;
     using glm::lerp;

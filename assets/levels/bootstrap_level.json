@@ -13,6 +13,18 @@
 			}
 		},
 		{
+			"name": "sky",
+			"prefab": "prefabs/sky.json",
+			"components": {
+				"SkyController": {
+					"time_of_day": 10.5,
+					"day_length": 600,
+					"sun": "dir_light0",
+					"weather": "overcast"
+				}
+			}
+		},
+		{
 			"name": "RAIL",
 			"components": {
 				"Rail": {
@@ -430,74 +442,6 @@
 								"timestamp_seconds": 249.815,
 								"position": { "x": -9.75329, "y": 7.70576, "z": -4.3934 },
 								"rotation": { "x": 0.00614289, "y": 0.993509, "z": 0.066031, "w": -0.0924265 }
-							}
-						],
-						"light": [
-							{
-								"timestamp_seconds": 0.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -75.9915, "yaw": 51.2847, "roll": 0 },
-								"color": { "x": 8, "y": 8, "z": 5, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 20.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -25.2584, "yaw": 52.834, "roll": 0 },
-								"color": { "x": 10, "y": 2, "z": 0, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 20.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -75.9915, "yaw": 51.2847, "roll": 0 },
-								"color": { "x": 18, "y": 18, "z": 10, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 40.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -25.2584, "yaw": 52.834, "roll": 0 },
-								"color": { "x": 10, "y": 2, "z": 0, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 40.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -75.9915, "yaw": 51.2847, "roll": 0 },
-								"color": { "x": 18, "y": 18, "z": 10, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 60.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -25.2584, "yaw": 52.834, "roll": 0 },
-								"color": { "x": 10, "y": 2, "z": 0, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 60.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -75.9915, "yaw": 51.2847, "roll": 0 },
-								"color": { "x": 18, "y": 18, "z": 10, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 80.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -25.2584, "yaw": 52.834, "roll": 0 },
-								"color": { "x": 15, "y": 2, "z": 0, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 80.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -75.9915, "yaw": 51.2847, "roll": 0 },
-								"color": { "x": 18, "y": 18, "z": 10, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 100.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -25.2584, "yaw": 52.834, "roll": 0 },
-								"color": { "x": 15, "y": 2, "z": 0, "w": 1 }
-							},
-							{
-								"timestamp_seconds": 0.0,
-								"position": { "x": 0, "y": 0, "z": 0 },
-								"rotation": { "__kind__": "euler_deg", "pitch": -60.9915, "yaw": 51.2847, "roll": 0 },
-								"color": { "x": 12, "y": 12, "z": 8, "w": 1 }
 							}
 						]
 					}

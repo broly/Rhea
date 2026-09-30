@@ -13,7 +13,7 @@ export class Engine;
 
 // Engine windows of the debug UI (ui module, Dear ImGui): main menu, world outliner (entities), inspector of
 // the selected entity, renderer settings, stats, GPU profiler, cvar catalog, world scripts, physics, ECS,
-// terrain editor.
+// terrain editor, sky (time of day, weather).
 //
 // Game code extends it with Engine::on_debug_ui_menu / on_debug_ui_render_panel and
 // WorldScript::draw_debug_ui.
@@ -26,9 +26,10 @@ public:
     // World space debug drawing (physics shapes, probes), every frame, also while the UI is hidden
     void draw_world_debug(Engine& engine);
 
-    // Engine commands of the console (`): quit, render.*, gpuprof.*, select, after, terrain.*
+    // Engine commands of the console (`): quit, render.*, gpuprof.*, select, after, terrain.*, sky.*
     void register_console_commands(Engine& engine);
     void register_terrain_commands(Engine& engine);
+    void register_sky_commands(Engine& engine);
 
     void select(ecs::Entity e);
     // null if nothing is selected or the entity was destroyed
@@ -62,6 +63,8 @@ private:
     // Terrain editor: brush in the viewport (paint layers, sculpt), save, teleport
     void draw_terrain_window(Engine& engine);
     void update_terrain_brush(Engine& engine, const ViewData& view);
+    // Sky controller of the level: time of day, weather presets
+    void draw_sky_window(Engine& engine);
     void draw_ecs_window(Engine& engine);
 
     void draw_viewport_overlay(Engine& engine, const ViewData& view);

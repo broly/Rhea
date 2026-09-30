@@ -11,6 +11,7 @@ import std.compat;
 import :renderer;
 import :debug_view;
 import :reflection_probes;
+import :sky_renderer;
 import :generic_render_graph;
 import ecs;
 import name;
@@ -158,6 +159,21 @@ void GameEngine::on_debug_ui_render_panel()
         ImGui::TextDisabled("%s", rendered.c_str());
         ImGui::SetItemTooltip("Radius of each cascade; * rendered this frame (the others keep their tile)");
     }
+
+    // ---- sky: its cost is the texels of its buffers (downscale), for the clouds x steps per ray x samples
+    // towards the light ----
+    ImGui::SeparatorText("Sky");
+    checkbox("Volumetric clouds", cv_clouds_enabled, "Clouds of the VolumetricClouds of the level (their look: the sky entity, Windows > Sky)");
+    for (auto [label, var, min, max] : { std::tuple{ "Downscale", &cv_sky_downscale, 1, 8 },
+                                         std::tuple{ "Cloud steps", &cv_clouds_steps, 8, 256 },
+                                         std::tuple{ "Cloud light steps", &cv_clouds_light_steps, 1, 16 } })
+    {
+        int value = var->get();
+        if (ImGui::SliderInt(label, &value, min, max))
+            var->set(value);
+        ImGui::SetItemTooltip("%s", var->get_description().c_str());
+    }
+    slider("Cloud history", cv_clouds_history, 0.0f, 0.98f, cv_clouds_history.get_description().c_str());
 
     ImGui::SeparatorText("Reflection probes");
 

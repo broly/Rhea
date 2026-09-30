@@ -41,6 +41,12 @@ export struct Extent
         return Extent{width / d, height / d};
     }
     
+    // rounded up, never zero (downscaled render targets)
+    constexpr Extent divided(const uint32_t d) const
+    {
+        return Extent{std::max((width + d - 1) / d, 1u), std::max((height + d - 1) / d, 1u)};
+    }
+
     constexpr Extent operator/(const float d) const
     {
         return Extent{(uint32_t)(width / d), (uint32_t)(height / d)};

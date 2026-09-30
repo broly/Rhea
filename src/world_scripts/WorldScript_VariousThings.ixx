@@ -25,8 +25,9 @@ public:
     // F4: skeleton overlay
     void tick_debug_views();
 
-    // M: freezes / resumes the animated sun
+    // M: freezes / resumes the time of day (SkyController::paused)
     void set_sun_frozen(bool frozen);
+    bool is_sun_frozen() const;
 
     std::string_view get_debug_name() const override { return "Various Things"; }
     reflect::PropertyObject get_properties() override { return reflect::make_property_object(*this); }
@@ -44,7 +45,6 @@ public:
     [[=rh::edit, =rh::range<0.0005f, 0.01f>]] float mouse_sensitivity = 0.0025f;
     [[=rh::edit, =rh::range<0.1f, 50.f>]] float move_speed = 6.0f;
     ecs::Entity camera;
-    ecs::Entity sun;
     ecs::Entity rail;
     double last_rg_switch_time = 0.f;
     double last_cam_key_time = 0.f;
@@ -62,8 +62,6 @@ public:
     bool light_rig_init_attempted = false;
     bool light_preset_key_was_down = false;
     bool sun_freeze_key_was_down = false;
-    bool sun_frozen = false;
-    float sun_time_dilation = 1.0f;
 
     // DebugViewMode (game module)
     uint32_t last_gbuffer_view_mode = 0;

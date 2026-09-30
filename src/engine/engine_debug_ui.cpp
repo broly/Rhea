@@ -21,6 +21,7 @@ import render;
 import render_scene;
 import rhcomponents;
 import gpu_profile;
+import profile;
 import input;
 import ui;
 import cvar;
@@ -28,6 +29,7 @@ import physics;
 import debug_draw;
 import ecs;
 import terrain;
+import sky_controller;
 
 
 namespace
@@ -45,6 +47,7 @@ namespace
     cvar::Var<bool> cv_window_physics("ui.windows.physics", false, "Physics stats, debug drawing and probes");
     cvar::Var<bool> cv_window_ecs("ui.windows.ecs", false, "ECS: simulation tick, systems, archetypes");
     cvar::Var<bool> cv_window_terrain("ui.windows.terrain", false, "Terrain editor: paint layers, sculpt, save");
+    cvar::Var<bool> cv_window_sky("ui.windows.sky", false, "Sky: time of day, weather");
     cvar::Var<bool> cv_terrain_brush("terrain.brush", false,
         "Terrain window: the left mouse button paints / sculpts in the viewport (the camera turns with the right one)");
 
@@ -415,6 +418,14 @@ void EngineDebugUI::register_console_commands(Engine& engine)
             return names;
         });
 
+    add("prof.start", "Starts the CPU profiler (PROFILE scopes, accumulated until prof.stop)", [] (cvar::Args) {
+        prof::set_is_profiling(true);
+    });
+    add("prof.stop", "Stops the CPU profiler and writes profiling_dump.txt", [] (cvar::Args) {
+        prof::set_is_profiling(false);
+        prof::dump();
+    });
+
     add("gpuprof.start", "Starts the GPU pass profiler (P)", [] (cvar::Args) {
         gpuprof::clear_results();
         gpuprof::set_enabled(true);
@@ -471,6 +482,7 @@ void EngineDebugUI::register_console_commands(Engine& engine)
         });
 
     register_terrain_commands(engine);
+    register_sky_commands(engine);
 }
 
 ecs::Entity EngineDebugUI::get_selected(Engine& engine)
@@ -498,6 +510,7 @@ void EngineDebugUI::draw(Engine& engine)
     draw_help_window();
     draw_physics_window(engine);
     draw_terrain_window(engine);
+    draw_sky_window(engine);
     draw_ecs_window(engine);
     if (cv_window_imgui_demo.get())
     {
@@ -555,6 +568,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         item("Console Variables", cv_window_cvars);
         item("Physics", cv_window_physics);
         item("Terrain", cv_window_terrain);
+        item("Sky", cv_window_sky);
         item("ECS", cv_window_ecs);
         ImGui::Separator();
         item("Hotkeys", cv_window_help);
@@ -1876,6 +1890,149 @@ void EngineDebugUI::draw_terrain_window(Engine& engine)
         ImGui::SameLine();
         ImGui::TextDisabled("middle click: to the cursor");
     }
+
+    ImGui::End();
+}
+
+
+/************************************************************************
+ * SKY
+ ***********************************************************************/
+
+void EngineDebugUI::register_sky_commands(Engine& engine)
+{
+    auto add = [this] (std::string_view name, std::string_view description, cvar::Command::Handler handler,
+        std::string_view usage = {}, cvar::Command::Completer completer = {}) {
+        console_commands.push_back(std::make_unique<cvar::Command>(name, description, std::move(handler), usage,
+            std::move(completer)));
+    };
+    auto controller_of = [&engine] () -> SkyController* {
+        SkyController* controller = sky::find_controller(engine.world->registry);
+        if (!controller)
+            cvar::print("No SkyController in the level", cvar::Output::error);
+        return controller;
+    };
+    auto parse = [] (const std::string& text, float& value) {
+        return std::from_chars(text.data(), text.data() + text.size(), value).ec == std::errc{};
+    };
+
+    add("sky.time", "Prints / sets the time of day, hours (12 = noon)",
+        [controller_of, parse] (cvar::Args args) {
+            SkyController* controller = controller_of();
+            if (!controller)
+                return;
+            float hours = 0.0f;
+            if (!args.empty() && !parse(args[0], hours))
+            {
+                cvar::print("sky.time [hours]", cvar::Output::error);
+                return;
+            }
+            if (!args.empty())
+                controller->time_of_day = hours;
+            cvar::print(std::format("time of day {} (sun {:.1f} degrees above the horizon)",
+                sky::format_time(controller->time_of_day), controller->sun_elevation));
+        }, "[hours]");
+
+    add("sky.day_length", "Prints / sets the seconds a full day takes (0: the time stands still)",
+        [controller_of, parse] (cvar::Args args) {
+            SkyController* controller = controller_of();
+            if (!controller)
+                return;
+            float seconds = 0.0f;
+            if (!args.empty() && !parse(args[0], seconds))
+            {
+                cvar::print("sky.day_length [seconds]", cvar::Output::error);
+                return;
+            }
+            if (!args.empty())
+                controller->day_length = std::max(seconds, 0.0f);
+            cvar::print(std::format("day length {} s", controller->day_length));
+        }, "[seconds]");
+
+    add("sky.pause", "Freezes / resumes the time of day, toggles without a value",
+        [controller_of] (cvar::Args args) {
+            SkyController* controller = controller_of();
+            if (!controller)
+                return;
+            controller->paused = args.empty() ? !controller->paused : (args[0] == "true" || args[0] == "1" || args[0] == "on");
+            cvar::print(std::format("time of day {}", controller->paused ? "paused" : "running"));
+        }, "[true|false]", [] (size_t) { return std::vector<std::string>{ "true", "false" }; });
+
+    add("sky.weather", "Prints / sets the weather preset of the sky controller",
+        [controller_of] (cvar::Args args) {
+            SkyController* controller = controller_of();
+            if (!controller)
+                return;
+            if (!args.empty())
+            {
+                if (!controller->weather_presets.contains(args[0]))
+                {
+                    std::string names;
+                    for (const auto& [name, preset] : controller->weather_presets)
+                        names += (names.empty() ? "" : ", ") + name;
+                    cvar::print(std::format("No weather preset '{}' (presets: {})", args[0], names), cvar::Output::error);
+                    return;
+                }
+                controller->weather = args[0];
+            }
+            cvar::print(std::format("weather {}", controller->weather));
+        }, "[preset]", [&engine] (size_t arg_index) {
+            std::vector<std::string> names;
+            if (const SkyController* controller = arg_index == 0 ? sky::find_controller(engine.world->registry) : nullptr)
+                for (const auto& [name, preset] : controller->weather_presets)
+                    names.push_back(name);
+            return names;
+        });
+}
+
+void EngineDebugUI::draw_sky_window(Engine& engine)
+{
+    if (!begin_window("Sky", cv_window_sky, viewport_point(0.70f, 0.08f), viewport_size(0.24f, 0.5f)))
+        return;
+
+    ecs::Entity entity;
+    SkyController* controller = sky::find_controller(engine.world->registry, &entity);
+    if (!controller)
+    {
+        ImGui::TextDisabled("No SkyController in the level");
+        ImGui::End();
+        return;
+    }
+
+    ImGui::SeparatorText("Time of day");
+    ImGui::SliderFloat("##time", &controller->time_of_day, 0.0f, 24.0f, sky::format_time(controller->time_of_day).c_str());
+    ImGui::SameLine();
+    ImGui::Checkbox("Paused", &controller->paused);
+    ImGui::DragFloat("Day length, s", &controller->day_length, 1.0f, 0.0f, 86400.0f, "%.0f");
+    ImGui::SetItemTooltip("Seconds a full day takes (0: the time stands still). The day rail scales it by the hour");
+    ImGui::TextDisabled("Sun %.1f degrees above the horizon, time x%.1f", controller->sun_elevation,
+        sky::evaluate_rail(*controller, controller->time_of_day).time_scale);
+
+    ImGui::SeparatorText("Weather");
+    if (ImGui::BeginCombo("Preset", controller->weather.c_str()))
+    {
+        for (const auto& [name, preset] : controller->weather_presets)
+            if (ImGui::Selectable(name.c_str(), name == controller->weather))
+                controller->weather = name;
+        ImGui::EndCombo();
+    }
+    ImGui::DragFloat("Transition, s", &controller->weather_transition, 0.1f, 0.0f, 600.0f, "%.1f");
+    if (controller->weather_blend < 1.0f)
+        ImGui::ProgressBar(controller->weather_blend, ImVec2(-1.0f, 0.0f), "changing");
+
+    // the preset itself: the sky follows its edits
+    if (const auto preset = controller->weather_presets.find(controller->weather); preset != controller->weather_presets.end())
+        ui::edit_properties(reflect::make_property_object(preset->second), nullptr, "##weather_preset");
+    else
+        ImGui::TextDisabled("No preset '%s': the sky keeps its authored look", controller->weather.c_str());
+
+    ImGui::Separator();
+    if (ImGui::Button("Select the sky entity"))
+    {
+        select(entity);
+        cv_window_inspector.set(true);
+    }
+    ImGui::SetItemTooltip("Atmosphere and cloud settings the controller does not drive are in the inspector");
 
     ImGui::End();
 }

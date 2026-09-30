@@ -338,6 +338,8 @@ export
         Mask<RenderTextureUsage::Type> usage;
         uint32_t mip_levels = 1;
         uint32_t num_layers = 1;
+        // > 1: a 3D image of extent x depth (one layer), bound as sampler3D
+        uint32_t depth = 1;
         bool is_cubemap = false;
         std::optional<RBImageHandle> old_image_handle;
         bool use_mip_levels_for_image_view = false;

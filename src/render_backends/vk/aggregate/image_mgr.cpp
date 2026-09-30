@@ -177,6 +177,8 @@ RBImageView vk::ImageManager::fetch_image_view_generic(RBImageHandle image_handl
         view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
     else if (as_array_2d)
         view_info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    else if (image_resource.depth > 1)
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_3D;
     else
         view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
@@ -462,8 +464,10 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     res.format = vk::to_vk_format(desc.format);
     res.mip_levels = desc.mip_levels;
     res.num_layers = desc.get_num_layers();
+    res.depth = std::max(desc.depth, 1u);
     res.usage = desc.usage;
     res.init_states();
+    checkf(res.depth == 1 || (res.num_layers == 1 && !desc.is_cubemap), "a 3D image has one layer");
 
 
     VkImageUsageFlags vk_usage = 0;
@@ -488,8 +492,8 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
     
 
     VkImageCreateInfo image_info{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.extent = { extent.width, extent.height, 1 };
+    image_info.imageType = res.depth > 1 ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
+    image_info.extent = { extent.width, extent.height, res.depth };
     if (desc.is_cubemap)
     {
         image_info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
@@ -703,6 +707,113 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
 
     LogVkImageManager.Log<Verbose>("Allocated GPU texture: %s (layers=%u)",
         tex.name.c_str(), array_layers);
+
+    return image;
+}
+
+RBImageHandle vk::ImageManager::create_texture_3d(const Texture& tex, uint32_t depth, bool generate_mips)
+{
+    checkf(tex.format == TextureFormat::RGBA8, "create_texture_3d: '%s' is not RGBA8", tex.name.c_str());
+    checkf(depth > 1 && tex.extent.height % depth == 0, "create_texture_3d: '%s' is not %u slices stacked along its height",
+        tex.name.c_str(), depth);
+
+    const Extent extent = { tex.extent.width, tex.extent.height / depth };
+    const uint32_t largest = std::max({ extent.width, extent.height, depth });
+    const uint32_t mip_levels = generate_mips ? static_cast<uint32_t>(std::floor(std::log2(largest))) + 1 : 1;
+
+    RBImageDesc desc;
+    desc.name = std::string("TEX3D_") + tex.name;
+    desc.mip_levels = mip_levels;
+    desc.extent = extent;
+    desc.depth = depth;
+    desc.format = TextureFormat::RGBA8_UNORM;
+    desc.usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst | RenderTextureUsage::TransferSrc;
+    desc.use_mip_levels_for_image_view = true;
+
+    RBImageHandle image = create_image(desc);
+    auto& res = get_image_resource(image);
+
+    const size_t upload_size = size_t(extent.width) * extent.height * depth * 4;
+    checkf(tex.bulk.size() >= upload_size, "create_texture_3d: '%s' has too little data", tex.name.c_str());
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+    vk::create_buffer(
+        instance.device, instance.physical_device,
+        upload_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buffer, staging_memory);
+    vk::update_buffer(instance.device, staging_memory, tex.bulk.data(), upload_size);
+
+    immediate_command_pool.submit([&](VkCommandBuffer cmd)
+    {
+        VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+        barrier.image = res.image;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, mip_levels, 0, 1 };
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        VkBufferImageCopy copy{};
+        copy.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        copy.imageExtent = { extent.width, extent.height, depth };
+        vkCmdCopyBufferToImage(cmd, staging_buffer, res.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+        // mips by linear blits of the whole volume (2:1: the average of 8 texels)
+        VkOffset3D size = { int32_t(extent.width), int32_t(extent.height), int32_t(depth) };
+        for (uint32_t mip = 1; mip < mip_levels; ++mip)
+        {
+            barrier.subresourceRange.baseMipLevel = mip - 1;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            const VkOffset3D next = { std::max(size.x / 2, 1), std::max(size.y / 2, 1), std::max(size.z / 2, 1) };
+            VkImageBlit blit{};
+            blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, mip - 1, 0, 1 };
+            blit.srcOffsets[1] = size;
+            blit.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, mip, 0, 1 };
+            blit.dstOffsets[1] = next;
+            vkCmdBlitImage(cmd, res.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                res.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+            size = next;
+        }
+
+        for (uint32_t mip = 0; mip < mip_levels; ++mip)
+        {
+            const bool last = mip == mip_levels - 1;
+            barrier.subresourceRange.baseMipLevel = mip;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.oldLayout = last ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = last ? VK_ACCESS_TRANSFER_WRITE_BIT : VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            ImageSubresourceState state;
+            state.usage = RBImageUsageType::SampledFragment;
+            state.layout = barrier.newLayout;
+            state.stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            state.access = barrier.dstAccessMask;
+            res.set_state(state, 0, 1, mip, 1);
+        }
+    });
+
+    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
+
+    LogVkImageManager.Log<Verbose>("Allocated GPU 3D texture: %s (%ux%ux%u, %u mips)",
+        tex.name.c_str(), extent.width, extent.height, depth, mip_levels);
 
     return image;
 }

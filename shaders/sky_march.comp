@@ -1,0 +1,101 @@
+#version 450
+
+// Sky of the frame at a fraction of the screen resolution (SkyRenderer, pass "SkyMarch"), one texel per
+// group of screen pixels that shows any sky:
+//   atmosphere  the scattering of the sun light along the view ray: smooth, so the low resolution is enough
+//   clouds      one march per texel, its samples dithered and blended with the reprojected result of the
+//               previous frames
+// sky.frag upsamples both and adds what needs the full resolution (sun, moon, stars).
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "resources/camera.glsl"
+#include "resources/gbuffer.glsl"
+#include "resources/sky.glsl"
+#include "resources/sky_buffers.glsl"
+#include "resources/sky_targets.glsl"
+#include "sky/view_ray.glsl"
+#include "sky/atmosphere.glsl"
+#include "sky/clouds.glsl"
+
+layout(push_constant) uniform SkyMarchPushConstants
+{
+    uint steps;             // long steps of the cloud march per ray
+    uint light_steps;       // samples towards the light per cloud sample
+    float history_weight;   // share of the reprojected history in the clouds, 0: none
+    uint frame;             // dither pattern of the frame
+    uint downscale;         // screen pixels per texel, per axis
+} pc;
+
+// Interleaved gradient noise (J. Jimenez): well distributed over neighbors and, shifted per frame, over time
+float dither(vec2 pixel, uint frame)
+{
+    pixel += 5.588238 * float(frame % 64u);
+    return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+}
+
+// Any sky among the screen pixels the texel covers?
+bool sees_sky(ivec2 texel)
+{
+    ivec2 screen = textureSize(u_gbuffer[GBUFFER_SLOT_DEPTH], 0);
+    int scale = int(pc.downscale);
+    for (int y = 0; y < scale; ++y)
+    {
+        for (int x = 0; x < scale; ++x)
+        {
+            ivec2 pixel = min(texel * scale + ivec2(x, y), screen - 1);
+            if (texelFetch(u_gbuffer[GBUFFER_SLOT_DEPTH], pixel, 0).r >= 1.0)
+                return true;
+        }
+    }
+    return false;
+}
+
+vec4 march_clouds(ivec2 texel, vec3 origin, vec3 dir)
+{
+    float cloud_distance;
+    vec4 clouds = cloud_march(origin, dir, dither(vec2(texel), pc.frame), int(pc.steps), int(pc.light_steps),
+        cloud_distance);
+
+    // where the clouds of this texel were on the screen a frame ago (they are far: the turn of the camera matters)
+    if (pc.history_weight > 0.0)
+    {
+        vec4 clip = camera_ubo.prev_proj * camera_ubo.prev_view * vec4(origin + dir * cloud_distance, 1.0);
+        vec2 previous_uv = clip.xy / clip.w * 0.5 + 0.5;
+        vec4 history;
+        if (clip.w > 0.0 && all(greaterThanEqual(previous_uv, vec2(0.0))) && all(lessThanEqual(previous_uv, vec2(1.0)))
+            && sky_buffer_sample(u_clouds_history, previous_uv, history)
+            && !any(isnan(history)) && !any(isinf(history)))
+        {
+            clouds = mix(clouds, history, pc.history_weight);
+        }
+    }
+    return clouds;
+}
+
+void main()
+{
+    ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(u_clouds_target);
+    if (any(greaterThanEqual(texel, size)))
+        return;
+
+    if (!sees_sky(texel))
+    {
+        imageStore(u_atmosphere_target, texel, vec4(0.0, 0.0, 0.0, -1.0));
+        imageStore(u_clouds_target, texel, vec4(0.0, 0.0, 0.0, -1.0));
+        return;
+    }
+
+    vec2 uv = (vec2(texel) + 0.5) / vec2(size);
+    vec3 origin = camera_ubo.camera_pos.xyz;
+    vec3 dir = sky_view_ray(uv);
+
+    vec3 transmittance;
+    vec3 atmosphere = sky_atmosphere(origin.y, dir, transmittance);
+    imageStore(u_atmosphere_target, texel, vec4(atmosphere, sky_luminance(transmittance)));
+
+    // no cloud layer: nothing in front of the sky
+    vec4 clouds = sky_ubo.cloud_detail_offset.w < 0.5 ? vec4(0.0, 0.0, 0.0, 1.0) : march_clouds(texel, origin, dir);
+    imageStore(u_clouds_target, texel, clouds);
+}

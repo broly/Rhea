@@ -256,6 +256,9 @@ public:
     
     virtual void init_resources(const std::map<Name, bool>& parameters) = 0;
     virtual void build_passes(const std::map<Name, bool>& parameters) = 0;
+    // Before the commands of the frame are recorded (the previous work of its slot is complete): the place
+    // to recreate resources
+    virtual void begin_frame() {};
     virtual void end_frame() {};
     virtual void prepare_resources(RenderGraphContext& ctx) {};
     virtual void on_pso_built() {};
@@ -306,6 +309,10 @@ public:
     }
     
     void rebuild_resources();
+
+    // Recreates the image of a texture at 1 / extent_divisor of the swapchain extent (waits for the GPU).
+    // Not while commands are being recorded: from begin_frame. Its content is lost.
+    void resize_texture(RGTextureHandle texture, uint32_t extent_divisor);
     
     void recompile();
     

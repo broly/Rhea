@@ -66,7 +66,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     hdr_color_storage_resource = renderer->find_resource("hdr_color_storage");
     tlas_resource = renderer->find_resource("tlas");
     mesh_table_resource = renderer->find_resource("mesh_table");
-    clouds_resource = renderer->find_resource("clouds");
     base_color_resource = renderer->find_resource("base_color");
     pbr_material_table_resource = renderer->find_resource("pbr_material_table");
     textures_resource = renderer->find_resource("textures");
@@ -76,8 +75,6 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     
     auto& asset_manager = AssetManager::get();
-    auto noise_tex = asset_manager.load_texture("textures/noise/noise_512.png");
-    noise_texture = create_texture_from_asset(noise_tex, false);
     
     auto brdf_lut_tex = asset_manager.load_texture("textures/brdf_lut.png");
     brdf_lut = create_texture_from_asset(brdf_lut_tex, false);
@@ -382,8 +379,32 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     {
         reflection_probes = std::make_unique<ReflectionProbeSystem>();
         reflection_probes->init(*renderer, *backend);
+
+        sky = std::make_unique<SkyRenderer>();
+        sky->init(*renderer, *backend);
+
+        sky_downscale = uint32_t(std::clamp(cv_sky_downscale.get(), 1, 8));
+        atmosphere_buffer = create_texture({
+            .name = NAME(atmosphere_buffer),
+            .extent_divisor = sky_downscale,
+            .format = TextureFormat::RGBA16F,
+            .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+        });
+        clouds_buffer = create_texture({
+            .name = NAME(clouds_buffer),
+            .extent_divisor = sky_downscale,
+            .format = TextureFormat::RGBA16F,
+            .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        });
+        clouds_history = create_texture({
+            .name = NAME(clouds_history),
+            .extent_divisor = sky_downscale,
+            .format = TextureFormat::RGBA16F,
+            .usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .num_layers = 2
+        });
     }
-    
+
     if constexpr (render_settings::enable_nn_denoiser)
     {
         // nn_denoiser::add_nn_denoiser_passes(nn_denoiser_state, *this, *renderer);
@@ -756,28 +777,52 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = num_pass_instances
     });
     
-    add_pass({
-        .name = "Clouds",
-        .reads = {
-            { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
-            { noise_texture, RBImageUsageType::SampledFragment }
-        },
-        .writes = {
-            { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Load },
-        },
-        .execute = [this] (RenderGraphContext& ctx)
-        {
-            PROFILE("Clouds");
-            
-            draw_clouds(ctx, gbuffer[GBUFFER_SLOTS::DEPTH], noise_texture);
-        },
-        .num_layers = num_pass_instances
-        
-    });
-    
+    // ---- sky behind the scene: clouds marched at a fraction of the resolution, then the sky over them ----
+    if (sky)
+    {
+        add_pass({
+            .name = "SkyMarch",
+            .reads = {
+                { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::Sampled },
+                { clouds_history, RBImageUsageType::Sampled }
+            },
+            .writes = {
+                { atmosphere_buffer, RBImageUsageType::StorageImage },
+                { clouds_buffer, RBImageUsageType::StorageImage }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("SkyMarch");
+                sky->dispatch_march(ctx, camera_resource, gbuffer_resource, textures[clouds_buffer.id].desc.extent);
+            },
+            .type = RenderPassType::compute
+        });
 
-    
-    
+        add_copy_pass("COPY_clouds_to_history", clouds_buffer, clouds_history);
+
+        add_pass({
+            .name = "Sky",
+            .reads = {
+                { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
+                { atmosphere_buffer, RBImageUsageType::SampledFragment },
+                { clouds_buffer, RBImageUsageType::SampledFragment }
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Load },
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Sky");
+                if (diag_enabled())
+                    backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_CLOUDS);
+                sky->draw_sky(ctx, camera_resource, gbuffer_resource);
+                if (diag_enabled())
+                    backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_CLOUDS);
+            },
+        });
+    }
+
+
     add_pass({
         .name = "SSR",
         .condition = [] () { return cv_ssr_enabled.get(); },
@@ -916,31 +961,57 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     
     prepared_batches.clear();
 
-    draw_list.begin_frame(ctx.frame);
+    {
+        PROFILE("DrawList::begin_frame");
+        draw_list.begin_frame(ctx.frame);
+    }
 
     emissive_watch_active = (ctx.params.get_int(LightingDebug::param, 0) & LightingDebug::emissive_watch) != 0;
-    read_diag_queries(ctx);
+    {
+        PROFILE("read_diag_queries");
+        read_diag_queries(ctx);
+    }
 
     // -------- resources --------
     // this frame's copy of the primitive table (the previous frame may still be reading its own on the GPU)
-    engine->scene_view->get_processor<SceneViewProcessor_Mesh>().upload_primitive_table(*primitive_table_resource, ctx.frame);
+    {
+        PROFILE("upload_primitive_table");
+        engine->scene_view->get_processor<SceneViewProcessor_Mesh>().upload_primitive_table(*primitive_table_resource, ctx.frame);
+    }
     
     prepare_geometry_resources(ctx);
     
+    // the sky first: the probes capture it and take their fallback ambient from it
+    if (sky)
+    {
+        sky->prepare(ctx, *engine->scene_view, {
+            .camera_position = current_camera_ubo.camera_pos,
+            .time = RhGlobals::engine->world->get_time_seconds(),
+            .atmosphere = get_image(atmosphere_buffer),
+            .clouds = get_image(clouds_buffer),
+            .clouds_history = get_image(clouds_history),
+            .history_layer = history_index ^ 1,
+            .downscale = sky_downscale,
+        });
+    }
+
     if (reflection_probes)
     {
         reflection_probes->prepare(ctx, *engine->scene_view, {
             .camera_position = current_camera_ubo.camera_pos,
             .time = RhGlobals::engine->world->get_time_seconds(),
-            .sky_noise = get_image(noise_texture),
             .brdf_lut = get_image(brdf_lut),
+            .sky_ambient = sky ? sky->get_sky_ambient() : glm::vec3(0.0f),
+            .cloud_coverage = sky ? sky->get_cloud_coverage() : 0.0f,
         });
     }
     
-    prepare_wireframe_pass(ctx);
-    prepare_ssr(ctx);
-    prepare_raytracing(ctx);
-    prepare_clouds_pass(ctx);
+    {
+        PROFILE("prepare_wireframe / ssr / raytracing");
+        prepare_wireframe_pass(ctx);
+        prepare_ssr(ctx);
+        prepare_raytracing(ctx);
+    }
     
     if constexpr (render_settings::enable_nn_denoiser)
     {
@@ -991,6 +1062,20 @@ void GenericRenderGraph::prepare_raytracing(RenderGraphContext& ctx)
         );
     
         mesh_processor.set_dirty(false);
+    }
+}
+
+void GenericRenderGraph::begin_frame()
+{
+    RenderGraph::begin_frame();
+
+    // render.sky.downscale changed: the sky buffers get their new size
+    const uint32_t downscale = uint32_t(std::clamp(cv_sky_downscale.get(), 1, 8));
+    if (sky && downscale != sky_downscale)
+    {
+        sky_downscale = downscale;
+        for (RGTextureHandle texture : { atmosphere_buffer, clouds_buffer, clouds_history })
+            resize_texture(texture, downscale);
     }
 }
 
@@ -1188,72 +1273,6 @@ void GenericRenderGraph::prepare_geometry_resources(
 
 void GenericRenderGraph::prepare_shadow_pass(RenderGraphContext& ctx)
 {
-}
-
-void GenericRenderGraph::prepare_clouds_pass(RenderGraphContext& ctx)
-{
-    PROFILE("prepare_clouds_pass");
-    auto frame = ctx.frame;
-
-    auto cloud_model =
-        renderer->find_model("clouds");
-
-    auto pipeline_family =
-        renderer->query_pipeline_family(
-            "clouds",
-            cloud_model
-        );
-
-    clouds_pipeline = pipeline_family->request_pipeline({});
-
-    // ---------- Camera ----------
-    camera_resource->update_uniform_buffer(
-        "camera_ubo",
-        current_camera_ubo,
-        frame
-    );
-
-    // ---------- Clouds UBO ----------
-    CloudsUBO clouds_ubo{};
-    
-    clouds_ubo.planet_center = { 0, 0, 0, 0 };        // flat world
-    clouds_ubo.cloud_base    = { 150.0f, 400.0f, 0.3f, 1.0f };
-
-    
-    clouds_ubo.sun_direction = glm::vec4{ normalize(glm::vec3(-0.4f, 0.8f, -0.3f)), 0.0f };
-    clouds_ubo.sun_color     = { 2.0f, 1.98f, 0.7f, 15.0f };
-
-    clouds_ubo.cloud_color   = { 1.5f, 1.5f, 1.0f, 1.0f };
-
-    clouds_ubo.scattering = { 1.0f, 0.4f, 0.25f, 0.0f };
-
-    clouds_ubo.wind          = { 0.02f, 0.0f, 0.01f, 0.0 };
-    
-    clouds_ubo.sky_ambient = { 0.45f, 1.65f, 2.7f, 0.0f };
-    clouds_ubo.horizon_color = { 0.8f, 0.9f, 1.0f, 0.0f };
-    
-    clouds_resource->update_uniform_buffer(
-        "clouds_ubo",
-        clouds_ubo,
-        frame
-    );
-
-    clouds_resource->update_image(
-        "u_depth",
-        get_image(gbuffer[GBUFFER_SLOTS::DEPTH]),
-        {
-            .frame = ctx.frame
-          }
-    );
-
-    clouds_resource->update_image(
-        "u_noise",
-        get_image(noise_texture),
-        {
-            .frame = ctx.frame
-        }
-    );
-
 }
 
 void GenericRenderGraph::prepare_wireframe_pass(RenderGraphContext& ctx)
@@ -1750,12 +1769,12 @@ void GenericRenderGraph::read_diag_queries(RenderGraphContext& ctx)
     if (!has_clouds)
         return;
     if (diag_frame_counter == 300)
-        LogGenericRG.Log("Sky flash diagnostics active: frame 300 clouds %.1f%% of the screen, base pass samples %s",
+        LogGenericRG.Log("Sky flash diagnostics active: frame 300 sky %.1f%% of the screen, base pass samples %s",
             pixels > 0.0 ? 100.0 * double(clouds) / pixels : 0.0,
             has_geometry ? std::to_string(geometry).c_str() : "n/a");
     if (pixels > 0.0 && double(clouds) > pixels * 0.9)
     {
-        LogGenericRG.Log("Sky flash (frame %llu, t=%.2f s): clouds covered %.0f%% of the screen, base pass samples: %s",
+        LogGenericRG.Log("Sky flash (frame %llu, t=%.2f s): the sky covered %.0f%% of the screen, base pass samples: %s",
             (unsigned long long)diag_frame_counter, RhGlobals::engine->world->get_time_seconds(),
             100.0 * double(clouds) / pixels,
             has_geometry ? std::to_string(geometry).c_str() : "n/a");
@@ -1813,23 +1832,6 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
     }
     ctx.backend.set_viewport(ctx.cmd, 0, 0, Constants::shadowmap_extent.width, Constants::shadowmap_extent.height);
 }
-
-void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture)
-{
-    PROFILE("Clouds");
-    
-    if (ctx.bind_pipeline(clouds_pipeline))
-    {
-        ctx.bind(camera_resource, clouds_resource, gbuffer_resource);
-    }
-    if (diag_enabled())
-        backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_CLOUDS);
-    ctx.draw_fullscreen();
-    if (diag_enabled())
-        backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_CLOUDS);
-
-}
-
 
 void add_aabb_lines(
     const AABB& box,

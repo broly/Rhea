@@ -70,6 +70,7 @@ set(RHEA_MODULE_DIRS
     src/render
     src/world_scripts
     src/terrain
+    src/sky
     src/engine
     src/render_backends/vk
     src/render_backends/vk/aggregate

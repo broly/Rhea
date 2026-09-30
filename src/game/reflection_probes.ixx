@@ -36,7 +36,7 @@ export cvar::Var<bool> cv_probes_enabled(
 export cvar::Var<int> cv_probes_faces_per_frame(
     "render.probes.faces_per_frame", 1, "Cube faces a rebaking probe renders per frame (1-6). A probe without any bake yet always renders all 6");
 export cvar::Var<bool> cv_probes_auto_rebake(
-    "render.probes.auto_rebake", true, "Rebake probes when the lights visible to them change (sun, static lights)");
+    "render.probes.auto_rebake", true, "Rebake probes when the lights visible to them or the sky change (sun, static lights, weather)");
 export cvar::Var<int> cv_probes_blend_frames(
     "render.probes.blend_frames", 30, "Frames a rebaked probe crossfades from its old capture to the new one (1: switch at once)");
 export cvar::Var<bool> cv_probes_parallax(
@@ -73,7 +73,7 @@ export cvar::Var<bool> cv_probes_show_volumes(
 // are). The next probe is captured meanwhile, it is filtered once the fade is over.
 //
 // Priority: probes without a bake, then the dirty probes by staleness over distance to the camera. Dirty:
-// moved / (re)activated, the lights visible to probes changed, update_interval elapsed, camera entered the box
+// moved / (re)activated, the lights visible to probes or the sky changed, update_interval elapsed, camera entered the box
 // (rebake_on_enter), request_rebake_all.
 //
 // Shading side (resources/reflection.glsl): every slot is bound as samplerCube arrays, the UBO carries the
@@ -95,8 +95,11 @@ public:
     {
         glm::vec3 camera_position;
         double time = 0.0;
-        RBImageHandle sky_noise;
         RBImageHandle brdf_lut;
+        // from the SkyRenderer: average radiance of the sky (the ambient of what no probe covers), and the
+        // cloud coverage - the probes capture the sky, a change of either makes them dirty
+        glm::vec3 sky_ambient = glm::vec3(0.0f);
+        float cloud_coverage = 0.0f;
     };
 
     struct ProbeStatus
@@ -134,6 +137,7 @@ private:
         glm::vec3 baked_position = glm::vec3(0.0f);
         glm::vec3 baked_sun_direction = glm::vec3(0.0f);
         glm::vec3 baked_sun_color = glm::vec3(0.0f);
+        glm::vec4 baked_sky = glm::vec4(0.0f);   // FrameInputs: sky_ambient, cloud_coverage
         uint64_t baked_lights_hash = 0;    // static point lights visible to probes
         double bake_time = 0.0;
         uint32_t bake_count = 0;
@@ -153,6 +157,7 @@ private:
         glm::vec3 position = glm::vec3(0.0f);
         glm::vec3 sun_direction = glm::vec3(0.0f);
         glm::vec3 sun_color = glm::vec3(0.0f);
+        glm::vec4 sky = glm::vec4(0.0f);
         uint64_t lights_hash = 0;
         uint32_t capture_index = 0;   // capture cube the faces go to
     };
@@ -222,6 +227,7 @@ private:
 
     RenderResource* reflection_resource = nullptr;
     RenderResource* probe_capture_resource = nullptr;
+    RenderResource* sky_resource = nullptr;
     RenderResource* light_resource = nullptr;
     RenderResource* shadow_resource = nullptr;
     RenderResource* mesh_table_resource = nullptr;

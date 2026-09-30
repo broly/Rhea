@@ -66,6 +66,8 @@ namespace vk
         bool is_swapchain_image(RBImageHandle image);
         
         RBImageHandle create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info);
+        // RGBA8 volume of `depth` slices stacked along the height of tex (the memory layout of the 3D image)
+        RBImageHandle create_texture_3d(const Texture& tex, uint32_t depth, bool generate_mips);
         // region of mip 0 from tex (same extent, RGBA8), then the mips; the caller makes sure the GPU is idle
         void update_texture_2d(RBImageHandle image, const Texture& tex, const TextureRegion& region);
         RBImageHandle create_fallback_texture(const Texture& tex, const TextureCreationInfo& texture_creation_info);

@@ -51,36 +51,35 @@ export struct alignas(16) LightUBO
 RH_REGISTER_TYPE(LightUBO)
 
 
-export struct CloudsUBO
+// Sky of the frame: atmosphere, celestial bodies, cloud layer (game: SkyRenderer, shaders/resources/sky.glsl).
+// Distances in meters, coefficients in 1 / m.
+export struct SkyUBO
 {
-    glm::vec4 planet_center; // xyz = center, w = radius
-
-    // x = base height
-    // y = thickness
-    // z = coverage
-    // w = density
-    glm::vec4 cloud_base;
-
-    glm::vec4 sun_direction; // xyz normalized
-    glm::vec4 sun_color;     // rgb * intensity
-
-    // rgb = albedo
-    // a   = extinction
-    glm::vec4 cloud_color;
-
-    // x = forward scattering (g ~ 0.6–0.8)
-    // y = backward scattering
-    // z = ambient scattering
-    glm::vec4 scattering;
-
-    // xyz = wind direction * speed
-    // w   = time
-    glm::vec4 wind;
-    
-    glm::vec4 sky_ambient;
-    glm::vec4 horizon_color;
+    glm::vec4 sun_direction;         // xyz: towards the sun (atmosphere, sun disc), w: cos of the disc's angular radius
+    glm::vec4 sun_illuminance;       // rgb: sun light above the atmosphere, w: disc radiance per unit of it
+    glm::vec4 moon_direction;        // xyz: towards the moon (zero: none), w: cos of the disc's angular radius
+    glm::vec4 moon_radiance;         // rgb: radiance of the moon disc
+    glm::vec4 light_direction;       // xyz: towards the body which lights the clouds (sun or moon)
+    glm::vec4 light_color;           // rgb: its light above them
+    glm::vec4 rayleigh_scattering;   // rgb: at the ground, w: scale height
+    glm::vec4 mie_scattering;        // rgb: at the ground, w: scale height
+    glm::vec4 mie_extinction;        // rgb: at the ground, w: anisotropy g
+    glm::vec4 ozone_absorption;      // rgb: at the center of the ozone layer, w: multiple scattering factor
+    glm::vec4 planet;                // x: ground radius, y: atmosphere radius, z: altitude of world y = 0, w: sky intensity
+    glm::vec4 ground_albedo;         // rgb
+    glm::vec4 night_radiance;        // rgb: night sky, w: stars intensity
+    glm::vec4 stars_rotation;        // xyz: axis, w: angle (rad)
+    glm::vec4 ambient_top;           // rgb: sky light on the clouds (average sky radiance)
+    glm::vec4 ambient_bottom;        // rgb: light from the ground below them
+    glm::vec4 cloud_layer;           // x: bottom (m above world y = 0), y: thickness, z: coverage threshold, w: extinction at full density
+    glm::vec4 cloud_scale;           // x: 1 / shape noise size, y: 1 / detail noise size, z: 1 / weather cell size, w: detail strength
+    glm::vec4 cloud_offset;          // xyz: wind offset of the shapes (m), w: weather amplitude (threshold units)
+    glm::vec4 cloud_detail_offset;   // xyz: offset of the detail noise (m), w: 1 when the level has clouds
+    glm::vec4 cloud_albedo;          // rgb, w: ambient strength
+    glm::vec4 cloud_phase;           // x: forward anisotropy, y: backward anisotropy, z: weight of the backward lobe, w: powder
+    glm::vec4 cloud_march;           // x: max distance, y: time (s)
 };
-RH_REGISTER_TYPE(CloudsUBO)
+RH_REGISTER_TYPE(SkyUBO)
 
 // ---- reflection probes (game: ReflectionProbeSystem, shaders/resources/reflection.glsl) ----
 
@@ -107,8 +106,6 @@ export struct ProbeCaptureUBO
 {
     glm::mat4 face_view_proj[6];  // cube face order +X -X +Y -Y +Z -Z (Vulkan cubemap layers)
     glm::vec4 capture_position;   // xyz, w: unused
-    glm::vec4 sky_color;          // rgb: sky radiance behind the clouds, a: cloud density scale
-    glm::vec4 sky_ambient;        // rgb: ambient radiance of surfaces no probe covers yet
     glm::vec4 filter_params;      // x: source face size, y: source mip count
     // lights baked into the probe (Light::visible_in_reflection_probes): nearest point lights to the capture
     // point, the sun (light_ubo.dir_light, with the shadow map) only if it is visible to probes
