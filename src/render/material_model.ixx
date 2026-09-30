@@ -348,10 +348,23 @@ export enum class MatModel_WriteMaskEnum
 };
 
 
+// How a translucent color attachment combines the fragment color with what it holds
+export enum class MatModel_Blend
+{
+    alpha,          // rgb * a + dst * (1 - a)
+    // rgb + dst * (1 - a): rgb is already scaled by the coverage. With a = 0 the fragment only adds light,
+    // so one pipeline draws covering and glowing fragments in one sorted pass (particles)
+    premultiplied,
+    additive,       // rgb * a + dst
+};
+
+
 export struct MatModel_ColorAttachmentInfo
 {
     std::set<MatModel_WriteMaskEnum> write_mask;
     bool translucent;
+    // of a translucent attachment; alpha when not given
+    std::optional<MatModel_Blend> blend;
 };
 
 

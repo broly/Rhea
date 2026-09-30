@@ -59,6 +59,16 @@ export
         [[=rh::transient]] std::shared_ptr<TerrainData> data;
     };
 
+    // Puts the entity on the terrain under it when it is spawned: the height of its position becomes the
+    // terrain's there plus `offset`. For what a level places on the ground by hand (a prefab), so it stays on
+    // it when the terrain is sculpted. After the Terrain entity in the level.
+    //
+    //     "SnapToTerrain": { "offset": 0.0 }
+    struct SnapToTerrain
+    {
+        [[=rh::edit, =rh::read_only]] float offset = 0.0f;     // m above the terrain
+    };
+
     struct TerrainChunk
     {
         ecs::Entity entity;

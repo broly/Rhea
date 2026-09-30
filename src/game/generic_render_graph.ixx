@@ -23,6 +23,7 @@ import :nn_denoiser_passes;
 import :debug_view;
 import :reflection_probes;
 import :sky_renderer;
+import :particle_renderer;
 import :draw_list;
 import rhcomponents;
 import cvar;
@@ -424,6 +425,9 @@ public:
 
     // sky, clouds and fog, main graph only (passes "CloudShadow", "SkyMarch", "Sky", "FogMarch", "Fog")
     std::unique_ptr<SkyRenderer> sky;
+
+    // sprites of the particle systems, main graph only (pass "Particles")
+    std::unique_ptr<ParticleRenderer> particles;
 
     // mesh draws of the frame: records + indirect commands
     DrawList draw_list;

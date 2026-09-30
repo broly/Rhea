@@ -438,6 +438,28 @@ namespace
         registry.get<Terrain>(root)->data = std::move(data);
     }
 
+    [[=scene::on_spawned<SnapToTerrain>]]
+    void snap_to_terrain(World& world, ecs::Entity e, const SerializationContext&)
+    {
+        ecs::Registry& registry = world.registry;
+        const float offset = registry.get<SnapToTerrain>(e)->offset;
+        Transform transform = scene::get_world_transform(registry, e);
+
+        std::optional<float> height;
+        ecs::Query<const Terrain>(registry).each([&] (const Terrain& terrain) {
+            if (terrain.data && !height)
+                height = terrain::height_at(*terrain.data, glm::vec2(transform.position.x, transform.position.z));
+        });
+        if (!height)
+        {
+            LogTerrain.Log<Warning>("SnapToTerrain of '%s': no terrain under it (the Terrain entity must be spawned first)",
+                scene::get_name(registry, e).c_str());
+            return;
+        }
+        transform.position.y = *height + offset;
+        scene::set_world_transform(registry, e, transform);
+    }
+
     [[=ecs::on_remove]]
     void destroy_terrain_body(ecs::Registry& registry, ecs::Entity, Terrain& terrain)
     {
@@ -447,7 +469,7 @@ namespace
     }
 
     ECS_REGISTER()
-    SCENE_REGISTER_COMPONENTS(Terrain)
+    SCENE_REGISTER_COMPONENTS(Terrain, SnapToTerrain)
 }
 
 namespace terrain

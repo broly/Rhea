@@ -193,6 +193,17 @@ void GameEngine::on_debug_ui_render_panel()
     slider("History", cv_fog_history, 0.0f, 0.98f, cv_fog_history.get_description().c_str());
     ImGui::PopID();
 
+    // ---- particles: sprites of the ParticleSystems of the level ----
+    ImGui::SeparatorText("Particles");
+    checkbox("Particles", cv_particles_enabled, cv_particles_enabled.get_description().c_str());
+    if (const auto graph = std::dynamic_pointer_cast<GenericRenderGraph>(renderer->get_main_render_graph());
+        graph && graph->particles)
+    {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%u sprites", graph->particles->get_count());
+        ImGui::SetItemTooltip("Drawn this frame. Effects (assets/particles) reload when their file is saved");
+    }
+
     ImGui::SeparatorText("Reflection probes");
 
     ReflectionProbeSystem* probes = std::static_pointer_cast<GameRenderer>(renderer)->get_reflection_probes();

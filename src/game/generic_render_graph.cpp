@@ -375,6 +375,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         sky = std::make_unique<SkyRenderer>();
         sky->init(*renderer, *backend);
 
+        particles = std::make_unique<ParticleRenderer>();
+        particles->init(*renderer, *backend);
+
         sky_downscale = uint32_t(std::clamp(cv_sky_downscale.get(), 1, 8));
         atmosphere_buffer = create_texture({
             .name = NAME(atmosphere_buffer),
@@ -957,6 +960,28 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         });
     }
 
+    // ---- particles over the lit frame and its fog: sprites tested against the depth of the scene ----
+    if (particles)
+    {
+        add_pass({
+            .name = "Particles",
+            .condition = [this] () { return particles->has_particles(); },
+            .reads = {
+                { gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::SampledFragment },
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Load },
+                { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::DepthStencilAttachment, RBLoadOp::Load },
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Particles");
+                ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+                particles->draw(ctx, camera_resource, light_resource, gbuffer_resource);
+            },
+        });
+    }
+
     if (readback_nn && render_settings::enable_raytracing)
     {
         add_exr_dump_pass({
@@ -1072,6 +1097,14 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     }
 
     prepare_geometry_resources(ctx);
+
+    if (particles)
+    {
+        particles->prepare(ctx, *engine->scene_view, {
+            .camera_position = current_camera_ubo.camera_pos,
+            .ambient = sky ? sky->get_sky_ambient() : glm::vec3(0.0f),
+        });
+    }
 
     if (reflection_probes)
     {

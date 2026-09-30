@@ -183,12 +183,13 @@ VkPipeline VkPipelineObject_Graphics::create_pipeline(VkRenderPass render_pass)
         
         if (attachment_info.translucent)
         {
+            const MatModel_Blend blend_mode = attachment_info.blend.value_or(MatModel_Blend::alpha);
             color.blendEnable = VK_TRUE; 
-            color.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; 
-            color.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
+            color.srcColorBlendFactor = blend_mode == MatModel_Blend::premultiplied ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_SRC_ALPHA; 
+            color.dstColorBlendFactor = blend_mode == MatModel_Blend::additive ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
             color.colorBlendOp = VK_BLEND_OP_ADD; 
             color.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; 
-            color.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
+            color.dstAlphaBlendFactor = blend_mode == MatModel_Blend::additive ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; 
             color.alphaBlendOp = VK_BLEND_OP_ADD;
         }
         blend_attachments.push_back(color);

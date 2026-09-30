@@ -692,6 +692,34 @@
 				"Props": { "placement": "levels/sponza_props.json" }
 			}
 		},
+		// campfires (assets/prefabs/campfire.json: the ring of stones, the fire, its lights). After the terrain:
+		// they are put on it.
+		{
+			// by the door: right of the road when leaving, where the path around the building passes
+			"name": "campfire_gate",
+			"prefab": "prefabs/campfire.json",
+			"components": {
+				"Transform": {
+					"position": { "x": 28.5, "y": -1.12, "z": 6.2 },
+					"rotation": { "x": 0, "y": 0.2164, "z": 0, "w": 0.9763 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
+				},
+				"SnapToTerrain": {}
+			}
+		},
+		{
+			// a camp off the road: by the mossy rock, between the cypress and the island tree
+			"name": "campfire_rock",
+			"prefab": "prefabs/campfire.json",
+			"components": {
+				"Transform": {
+					"position": { "x": 37.8, "y": -1.15, "z": -7.2 },
+					"rotation": { "x": 0, "y": 0.9397, "z": 0, "w": 0.342 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
+				},
+				"SnapToTerrain": {}
+			}
+		},
 		{
 			"name": "cosmo_bunny",
 			"prefab": "prefabs/cosmo_bunny.json",
