@@ -44,7 +44,8 @@ export
         [[=rh::edit, =rh::speed<0.1f>]] float wind_speed = 12.0f;            // m/s
         // SkyAtmosphere::mie: 1 clear air, more for mist
         [[=rh::edit, =rh::range<0.f, 10.f>]] float haze = 1.0f;
-        // share of the sun (moon) light which reaches the ground through these clouds
+        // share of the sun (moon) light the weather leaves at the ground, apart from the shadows of its clouds
+        // (those are cast by the renderer, VolumetricClouds::shadow): rain, mist, a veil above the layer
         [[=rh::edit, =rh::range<0.f, 1.f>]] float sun_light = 1.0f;
     };
 

@@ -41,7 +41,6 @@ void main()
 {
     vec2 uv = v_uv;
     out_specular_weight = vec4(0.0);
-    { out_color = vec4(vec3(cloud_shadow(get_gbuffer_POSITION(uv).rgb)), 1.0); return; } // TEMP DEBUG
     
     vec4 albedo_roughness = get_gbuffer_ALBEDO_ROUGHNESS(uv);
     
