@@ -111,7 +111,38 @@ namespace vk
         }
 
         std::unordered_map<MeshPrimHandle, MeshGPUData> mesh_map;
-        
+
+        // Vertices and indices of the meshes are sub-allocated from big blocks (one allocation per mesh ran into
+        // the allocation count limit). Indexed mesh draws (RenderBackend::get_mesh_index_range) bind an index
+        // block once for many meshes; the indices are reordered for the post transform vertex cache.
+        struct BufferBlock
+        {
+            VkBuffer buffer = VK_NULL_HANDLE;
+            VkDeviceMemory memory = VK_NULL_HANDLE;
+            VkDeviceAddress address = 0;
+            VkDeviceSize capacity = 0;
+            VkDeviceSize used = 0;
+        };
+        static constexpr VkDeviceSize vertex_block_size = 256ull << 20;   // bigger meshes get a block of their own
+        static constexpr VkDeviceSize index_block_size = 64ull << 20;
+        std::vector<BufferBlock> vertex_blocks;
+        std::vector<BufferBlock> index_blocks;
+        std::vector<MeshIndexRange> index_ranges;   // by mesh table index
+
+        // block index, byte offset
+        std::pair<uint32_t, VkDeviceSize> suballocate(std::vector<BufferBlock>& blocks, VkDeviceSize size,
+            VkDeviceSize alignment, VkDeviceSize block_size);
+        // one staging buffer, one submit (waits)
+        void upload(VkBuffer vertex_buffer, VkDeviceSize vertex_offset, const void* vertices, VkDeviceSize vertex_size,
+            VkBuffer index_buffer, VkDeviceSize index_offset, const void* indices, VkDeviceSize index_size);
+
+        MeshIndexRange get_index_range(uint32_t mesh_index) const
+        {
+            checkf(mesh_index < index_ranges.size(), "No index range for mesh %u", mesh_index);
+            return index_ranges[mesh_index];
+        }
+        void bind_index_block(VkCommandBuffer cmd, uint32_t block) const;
+
         std::vector<GPUMesh> gpu_mesh_table;
         RBBufferHandle mesh_table_buffer;
         bool mesh_table_dirty = false;

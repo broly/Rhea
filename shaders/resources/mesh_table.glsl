@@ -51,6 +51,16 @@ readonly buffer MeshTable
     GPUMesh meshes[];
 } u_mesh_table;
 
+// Vertex of an indexed mesh draw (every mesh pass, DrawList): gl_VertexIndex is the index of the vertex, the
+// input assembler read it from the shared mesh index block
+Vertex fetch_indexed_vertex(uint mesh_index, int vertex)
+{
+    GPUMesh mesh = u_mesh_table.meshes[nonuniformEXT(mesh_index)];
+    return VertexBuffer(mesh.vertex_address).vertices[vertex];
+}
+
+// Vertex of the index at `vertex_index` of the mesh's own index buffer (non-indexed draws expanding
+// triangles, ray tracing hits)
 Vertex fetch_vertex(uint mesh_index, int vertex_index)
 {
     GPUMesh mesh = u_mesh_table.meshes[nonuniformEXT(mesh_index)];

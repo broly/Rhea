@@ -59,6 +59,7 @@ void SceneViewProcessor_Mesh::retire_primitives(RenderObject_Mesh& ro)
         rp.passes.clear();
         rp.info_by_pass.clear();
         rp.skinning.reset();
+        rp.shadow_proxies.clear();
     }
     ro.primitives.clear();
 }
@@ -83,7 +84,8 @@ void SceneViewProcessor_Mesh::process()
         dirty = true;
 
         bool is_new = ro.primitives.empty();
-        bool mesh_changed = ro.mesh != submitted.mesh || ro.lods != submitted.lods;
+        bool mesh_changed = ro.mesh != submitted.mesh || ro.lods != submitted.lods
+            || ro.shadow_proxies != submitted.shadow_proxies;
 
         glm::mat4 new_world = submitted.transform.matrix();
         bool transform_changed = ro.world != new_world;
@@ -94,6 +96,7 @@ void SceneViewProcessor_Mesh::process()
 
             ro.mesh   = submitted.mesh;
             ro.lods   = submitted.lods;
+            ro.shadow_proxies = submitted.shadow_proxies;
             ro.world  = new_world;
             ro.bounds = submitted.bounds;
 
@@ -206,6 +209,27 @@ void SceneViewProcessor_Mesh::process()
                         {
                             auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, rt_build_mode);
                             rp.mesh_index = result.mesh_index;
+                        }
+                        rp.indices = renderer.get_backend()->get_mesh_index_range((uint32_t)rp.mesh_index);
+
+                        // simplified stand-ins in the shadow maps; kept only when they save triangles
+                        if (level == 0 && !submitted.skinning && rp.passes.contains("ShadowMap"))
+                        {
+                            for (const ShadowProxy& proxy : submitted.shadow_proxies)
+                            {
+                                const MeshPrimHandle proxy_prim{ proxy.mesh, geom, prim_index };
+                                const Primitive& simplified = proxy_prim.get();
+                                RenderPrimitive::ShadowProxyDraw draw{ .error = proxy.error };
+                                if (!simplified.indices.empty())
+                                {
+                                    if (simplified.indices.size() * 5 > rp.indices.index_count * 4)
+                                        continue;
+                                    draw.mesh_index = (uint32_t)renderer.get_backend()->get_or_create_mesh_buffers(
+                                        proxy_prim, RTBuildMode::none).mesh_index;
+                                    draw.indices = renderer.get_backend()->get_mesh_index_range(draw.mesh_index);
+                                }
+                                rp.shadow_proxies.push_back(draw);
+                            }
                         }
                         
                         // todo: temp. exact pass is bad idea

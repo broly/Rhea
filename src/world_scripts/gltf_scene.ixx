@@ -37,5 +37,10 @@ export struct GltfScene
     // mesh name prefixes not imported at all (authoring leftovers: material swatches, ...)
     std::vector<std::string> hidden_meshes;
 
+    // simplified shadow casters (MeshRenderer::shadow_proxies) of the meshes with at least
+    // shadow_proxy_min_triangles, one per error (m): the shadow cascades take the coarsest within a texel
+    std::vector<float> shadow_proxy_errors{ 0.01f, 0.03f, 0.1f };
+    [[=rh::edit, =rh::read_only]] uint32_t shadow_proxy_min_triangles = 2000;
+
     MeshCollisionSettings get_collision_settings(std::string_view mesh_name) const;
 };

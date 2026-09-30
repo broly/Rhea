@@ -32,6 +32,7 @@ export struct RenderObject_Mesh
 {
     MeshHandle mesh;
     std::vector<MeshLod> lods;
+    std::vector<ShadowProxy> shadow_proxies;
     glm::mat4 world;
     AABB bounds;
 
@@ -67,6 +68,8 @@ export struct RenderPrimitive
     AABB bounds;
     
     uint64_t mesh_index;
+    // its indices in the shared index blocks (indexed draws)
+    MeshIndexRange indices;
     // material written into the primitive table
     uint32_t primitive_material_id = 0;
     uint32_t debug_texture_id;
@@ -92,15 +95,40 @@ export struct RenderPrimitive
     float shadow_lod_min = 0.0f;
     float shadow_lod_max = std::numeric_limits<float>::max();
 
-    bool in_lod_range(const glm::vec3& viewer) const { return in_range(viewer, lod_min, lod_max); }
-    bool in_shadow_lod_range(const glm::vec3& viewer) const { return in_range(viewer, shadow_lod_min, shadow_lod_max); }
+    // ---- shadow proxies (MeshRenderer::shadow_proxies, the mesh itself only, not its LODs) ----
+    struct ShadowProxyDraw
+    {
+        uint32_t mesh_index = 0;
+        MeshIndexRange indices;    // index_count 0: nothing left at this error (the part is smaller)
+        float error = 0.0f;        // m
+    };
+    // by ascending error
+    std::vector<ShadowProxyDraw> shadow_proxies;
 
-    bool in_range(const glm::vec3& viewer, float min, float max) const
+    bool in_lod_range(const glm::vec3& viewer) const { return in_range(viewer, lod_min, lod_max); }
+    // min_distance: the level of at least that distance (shadow cascades far from the viewer)
+    bool in_shadow_lod_range(const glm::vec3& viewer, float min_distance = 0.0f) const
+    {
+        return in_range(viewer, shadow_lod_min, shadow_lod_max, min_distance);
+    }
+
+    bool in_range(const glm::vec3& viewer, float min, float max, float min_distance = 0.0f) const
     {
         if (min <= 0.0f && max == std::numeric_limits<float>::max())
             return true;
-        const float distance = glm::length(glm::max(glm::max(bounds.min - viewer, viewer - bounds.max), glm::vec3(0.0f)));
+        // the scale moves the switches of every mesh (render.lod_scale): the distances are compared scaled back
+        const float distance = std::max(
+            glm::length(glm::max(glm::max(bounds.min - viewer, viewer - bounds.max), glm::vec3(0.0f))), min_distance)
+            / lod_distance_scale();
         return distance >= min && distance < max;
+    }
+
+    // Multiplies the LOD distances of every mesh (render.lod_scale, set by the renderer every frame): below 1 the
+    // coarser levels take over closer
+    static float& lod_distance_scale()
+    {
+        static float scale = 1.0f;
+        return scale;
     }
 
     

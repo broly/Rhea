@@ -92,11 +92,9 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     // F9: intermediate buffers of one frame -> cache/debug_dump/<buffer>/frame_<N>.exr.
     // Last pass on purpose, and skipped (with its barriers) unless requested: the frame is unchanged otherwise.
     std::vector<ExrDumpEntry> dump_entries = {
-        { .texture = gbuffer[GBUFFER_SLOTS::NORMAL], .subdir = "g_normal" },
         { .texture = gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], .subdir = "g_world_normal" },
         { .texture = gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], .subdir = "g_linear_depth" },
         { .texture = gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], .subdir = "g_albedo_roughness" },
-        { .texture = gbuffer[GBUFFER_SLOTS::POSITION], .subdir = "g_position" },
         { .texture = gbuffer[GBUFFER_SLOTS::MOTION_VECTORS], .subdir = "g_motion_vectors", .out_channels = 3 },
         { .texture = gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL], .subdir = "g_geometry_normal" },
         { .texture = gbuffer[GBUFFER_SLOTS::EMISSIVE], .subdir = "g_emissive" },

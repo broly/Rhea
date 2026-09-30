@@ -340,6 +340,7 @@ RBBufferHandle vk::BufferManager::create_storage_buffer(size_t buffer_size, Reso
     VkMemoryPropertyFlags mem_flags = host_visible ?
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT :
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    LogVkBufferManager.Log("create_storage_buffer: %zu bytes, %s", buffer_size, host_visible ? "host visible" : "device local");
 
     if (usage_type.is_frame_based())
     {

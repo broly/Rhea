@@ -12,6 +12,7 @@
 #include "resources/gbuffer.glsl"
 #include "resources/ssr.glsl"
 #include "resources/reflection.glsl"
+#include "utils/gbuffer_position.glsl"
 
 layout(location = 0) out vec4 out_color;
 
@@ -29,7 +30,7 @@ void main()
         return;
     }
 
-    vec3 pos = get_gbuffer_POSITION(uv).rgb;
+    vec3 pos = gbuffer_world_position(ivec2(gl_FragCoord.xy));
     vec3 N = normalize(get_gbuffer_WORLD_NORMAL(uv).rgb * 2.0 - 1.0);
     vec3 V = normalize(camera_ubo.camera_pos.xyz - pos);
     vec3 R = reflect(-V, N);

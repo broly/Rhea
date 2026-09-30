@@ -21,7 +21,7 @@ void main()
     forward_draw_record();
     // record.user: cube face
     GPUDrawRecord record = get_draw_record();
-    Vertex v = fetch_vertex(record.mesh_id, gl_VertexIndex);
+    Vertex v = fetch_indexed_vertex(record.mesh_id, gl_VertexIndex);
     GPUPrimitiveInfo primitive_info = get_primitive_info(record.primitive_id);
 
     mat4 world = primitive_info.current_transform;

@@ -757,7 +757,8 @@ void ReflectionProbeSystem::render_face(RenderGraphContext& ctx, SceneView& scen
     const glm::mat4 view_proj = face_view_proj(face, frame_work.position);
     const Frustum frustum = Frustum::from_view_projection(view_proj);
 
-    const uint32_t first_command = draw_list.command_count();
+    // one indirect draw per index block of the meshes
+    std::map<uint32_t, std::vector<const RenderPrimitive*>> by_block;
     for (const RenderPrimitive& prim : scene_view.get_processor<SceneViewProcessor_Mesh>().primitives)
     {
         // skinned meshes move: a probe keeps only what stays
@@ -768,20 +769,27 @@ void ReflectionProbeSystem::render_face(RenderGraphContext& ctx, SceneView& scen
             continue;
         if (!frustum.test_aabb_world(prim.bounds))
             continue;
-
-        draw_list.add_draw({
-            .mesh_id = (uint32_t)prim.mesh_index,
-            .primitive_id = prim.id,
-            .material_id = info->material_index,
-            .user = face,
-        }, (uint32_t)prim.mesh.get().indices.size());
+        by_block[prim.indices.block].push_back(&prim);
     }
 
     ctx.bind_pipeline(capture_pipeline);
     ctx.bind(probe_capture_resource, mesh_table_resource, primitive_table_resource, light_resource,
         shadow_resource, reflection_resource, pbr_material_table_resource, textures_resource);
     draw_list.bind(ctx);
-    draw_list.draw_indirect(ctx, first_command, draw_list.command_count() - first_command);
+    for (const auto& [block, primitives] : by_block)
+    {
+        const uint32_t first_command = draw_list.command_count();
+        for (const RenderPrimitive* prim : primitives)
+        {
+            draw_list.add_draw({
+                .mesh_id = (uint32_t)prim->mesh_index,
+                .primitive_id = prim->id,
+                .material_id = prim->get_pass_info(Names::pass_geometry_base)->material_index,
+                .user = face,
+            }, prim->indices);
+        }
+        draw_list.draw_indirect(ctx, block, first_command, draw_list.command_count() - first_command);
+    }
 
     backend->end_render_pass(ctx.cmd);
 

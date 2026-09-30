@@ -101,6 +101,16 @@ export struct MeshTableInfo
     size_t size;
 };
 
+// Where the indices of a mesh (mesh table entry) are in the shared index blocks: mesh draws are indexed draws
+// of many meshes at once, with the block bound (RenderBackend::bind_mesh_index_block). The indices are local
+// to the mesh's vertices, which the vertex shaders fetch from the mesh table with gl_VertexIndex.
+export struct MeshIndexRange
+{
+    uint32_t block = 0;
+    uint32_t first_index = 0;
+    uint32_t index_count = 0;
+};
+
 export 
 {
     template<typename... Ts>

@@ -18,7 +18,7 @@ void main()
 {
     forward_draw_record();
 
-    Vertex vertex = fetch_vertex(get_mesh_index(), gl_VertexIndex);
+    Vertex vertex = fetch_indexed_vertex(get_mesh_index(), gl_VertexIndex);
 
     GPUPrimitiveInfo primitive_info = get_primitive_info(get_primitive_index());
     mat4 transform_curr = primitive_info.current_transform;

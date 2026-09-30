@@ -154,6 +154,64 @@ phys::Shape cook_mesh_collision(phys::PhysicsScene& physics, const StaticMesh& m
     return shape;
 }
 
+StaticMesh build_shadow_proxy(const StaticMesh& mesh, float max_error)
+{
+    StaticMesh proxy;
+    proxy.name = mesh.name + "_shadow";
+    proxy.bounds = mesh.bounds;
+    proxy.material_names = mesh.material_names;
+
+    for (const Geometry& geometry : mesh.mesh_geometry)
+    {
+        Geometry& proxy_geometry = proxy.mesh_geometry.emplace_back();
+        for (const Primitive& primitive : geometry.primitives)
+        {
+            Primitive& simplified = proxy_geometry.primitives.emplace_back();
+            simplified.material_index = primitive.material_index;
+            if (primitive.indices.size() < 3)
+                continue;
+
+            // merged by position: the simplifier collapses across uv / normal seams, the depth only needs positions
+            std::vector<glm::vec3> positions(primitive.vertices.size());
+            for (size_t i = 0; i < positions.size(); ++i)
+                positions[i] = primitive.vertices[i].position;
+            std::vector<uint32_t> remap(positions.size());
+            const size_t unique = meshopt_generateVertexRemap(remap.data(), primitive.indices.data(), primitive.indices.size(),
+                                                              positions.data(), positions.size(), sizeof(glm::vec3));
+            std::vector<glm::vec3> welded(unique);
+            meshopt_remapVertexBuffer(welded.data(), positions.data(), positions.size(), sizeof(glm::vec3), remap.data());
+            std::vector<uint32_t> indices(primitive.indices.size());
+            meshopt_remapIndexBuffer(indices.data(), primitive.indices.data(), primitive.indices.size(), remap.data());
+
+            std::vector<uint32_t> kept(indices.size());
+            kept.resize(meshopt_simplify(kept.data(), indices.data(), indices.size(), &welded[0].x, welded.size(),
+                                         sizeof(glm::vec3), 0, max_error,
+                                         meshopt_SimplifyErrorAbsolute | meshopt_SimplifyPrune, nullptr));
+            if (kept.empty())
+                continue;
+
+            // the vertices the triangles still use, compacted: position from the welded set, the rest of the
+            // vertex (normal, uv: alpha tested shadows) from one of the merged render vertices
+            std::vector<uint32_t> source_of(unique, 0);
+            for (size_t i = 0; i < remap.size(); ++i)
+                if (remap[i] != ~0u)   // vertices no triangle uses
+                    source_of[remap[i]] = uint32_t(i);
+            std::vector<uint32_t> compact(unique, std::numeric_limits<uint32_t>::max());
+            simplified.indices.reserve(kept.size());
+            for (uint32_t index : kept)
+            {
+                if (compact[index] == std::numeric_limits<uint32_t>::max())
+                {
+                    compact[index] = uint32_t(simplified.vertices.size());
+                    simplified.vertices.push_back(primitive.vertices[source_of[index]]);
+                }
+                simplified.indices.push_back(compact[index]);
+            }
+        }
+    }
+    return proxy;
+}
+
 AABB get_mesh_bounds(const MeshRenderer& renderer, const Transform& world)
 {
     if (!renderer.mesh.is_valid())

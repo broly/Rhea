@@ -23,12 +23,24 @@ export
         bool operator==(const MeshLod&) const = default;
     };
 
+    // A simplified copy of a MeshRenderer's mesh drawn into the shadow maps instead of it: same geometries and
+    // primitives (material slots), the surface moved at most `error` (m, world). The shadow pass takes the
+    // coarsest one whose error is below a texel of the cascade (GenericRenderGraph::draw_scene_shadow).
+    struct ShadowProxy
+    {
+        MeshHandle mesh;
+        float error = 0.0f;
+
+        bool operator==(const ShadowProxy&) const = default;
+    };
+
     // What the mesh scene view processor gets for one mesh entity
     struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
     {
         MeshHandle mesh;
         AABB bounds;
         std::vector<MeshLod> lods;
+        std::vector<ShadowProxy> shadow_proxies;
         std::vector<std::shared_ptr<Material>> materials;
 
         // set for skinned meshes (SkinnedMesh)
@@ -43,7 +55,17 @@ export
         std::vector<MeshLod> lods;
         std::vector<std::shared_ptr<Material>> materials;
         [[=rh::edit]] bool visible = true;
+
+        // by ascending error (level geometry: GltfScene::shadow_proxy_errors)
+        [[=rh::transient]] std::vector<ShadowProxy> shadow_proxies;
+        // built on a loading thread: stored as shadow_proxies (with their errors) in PostLoad
+        [[=rh::transient]] std::shared_ptr<std::vector<std::pair<StaticMesh, float>>> pending_shadow_proxies;
     };
+
+    // Simplified copy of `mesh` for the shadow maps (ShadowProxy): every primitive simplified until its surface
+    // moved max_error (mesh units), parts smaller than that removed (a primitive may lose all its triangles).
+    // Only positions matter: vertices split at uv / normal seams are merged first. Thread safe.
+    StaticMesh build_shadow_proxy(const StaticMesh& mesh, float max_error);
 
     // How a MeshCollider approximates its mesh. Characters, simulated bodies, sweeps and queries all
     // collide with it, and their cost grows with the triangles they touch: as simple as gameplay allows.

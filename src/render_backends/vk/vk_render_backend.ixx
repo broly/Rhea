@@ -91,7 +91,12 @@ public:   /// API Section
     virtual void end_render_pass(RBCommandList cmd_list) override;
     virtual void bind_pipeline(RBCommandList cmd_list, PipelineObject* pipeline_object) override;
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0, uint32_t first_instance = 0) override;
-    virtual void draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset, uint32_t draw_count) override;
+    virtual void draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset,
+        uint32_t draw_count, uint32_t stride) override;
+    virtual void draw_indexed_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset,
+        uint32_t draw_count, uint32_t stride) override;
+    virtual MeshIndexRange get_mesh_index_range(uint32_t mesh_index) const override;
+    virtual void bind_mesh_index_block(RBCommandList cmd_list, uint32_t block) override;
     virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) override;
     virtual bool acquire_next_image(RBFrameHandle frame_handle) override;
     virtual bool submit_frame(RBFrameHandle frame_handle, RBCommandList cmd_list) override;
@@ -140,6 +145,7 @@ public:   /// API Section
     virtual bool read_timestamps(RBQueryPool pool, uint32_t first_query, uint32_t query_count, uint64_t* out_values) override;
     virtual void wait_idle() override;
     virtual void debug_full_barrier(RBCommandList cmd) override;
+    virtual void cmd_buffer_barrier(RBCommandList cmd, BufferBarrier barrier) override;
     virtual RBQueryPool create_occlusion_pool(uint32_t query_count) override;
     virtual void cmd_begin_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index) override;
     virtual void cmd_end_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index) override;

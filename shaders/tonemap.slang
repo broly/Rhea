@@ -43,12 +43,10 @@ static const uint VIEW_LIT_WIREFRAME   = 2;
 static const uint VIEW_BASE_COLOR      = 3;
 static const uint VIEW_ROUGHNESS       = 4;
 static const uint VIEW_WORLD_NORMAL    = 5;
-static const uint VIEW_VIEW_NORMAL     = 6;
-static const uint VIEW_GEOMETRY_NORMAL = 7;
-static const uint VIEW_LINEAR_DEPTH    = 8;
-static const uint VIEW_WORLD_POSITION  = 9;
-static const uint VIEW_MOTION_VECTORS  = 10;
-static const uint VIEW_EMISSIVE        = 11;
+static const uint VIEW_GEOMETRY_NORMAL = 6;
+static const uint VIEW_LINEAR_DEPTH    = 7;
+static const uint VIEW_MOTION_VECTORS  = 8;
+static const uint VIEW_EMISSIVE        = 9;
 
 static const float3 DEBUG_VIEW_BACKGROUND = float3(0.03, 0.03, 0.035);
 
@@ -91,9 +89,6 @@ bool get_debug_view_color(uint view_mode, float2 uv, out float3 color)
         case VIEW_WORLD_NORMAL:
             color = world_normal.rgb;
             break;
-        case VIEW_VIEW_NORMAL:
-            color = GBuffer::get<GBuffer::Slot::NORMAL>(uv).rgb;
-            break;
         case VIEW_GEOMETRY_NORMAL:
             color = GBuffer::get<GBuffer::Slot::GEOMETRY_NORMAL>(uv).rgb;
             break;
@@ -102,16 +97,6 @@ bool get_debug_view_color(uint view_mode, float2 uv, out float3 color)
             // log scale: near is white, ~500 m fades to black
             const float t = saturate(log2(1.0 + linear_depth) / log2(1.0 + 500.0));
             color = float3(1.0 - t);
-            break;
-        }
-        case VIEW_WORLD_POSITION:
-        {
-            // 1 m cells + thin grid lines on the cell borders
-            const float3 p = GBuffer::get<GBuffer::Slot::POSITION>(uv).xyz;
-            const float3 cell = frac(p);
-            const float3 border = min(cell, 1.0 - cell);
-            const float grid = step(min(border.x, min(border.y, border.z)), 0.02);
-            color = lerp(cell, float3(1.0), grid * 0.6);
             break;
         }
         case VIEW_MOTION_VECTORS:

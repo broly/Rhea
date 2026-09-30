@@ -26,14 +26,13 @@ layout(location = 5) in vec4 v_curr_clip;
 layout(location = 6) in vec4 v_prev_clip;
 
 // ================== OUTPUT ==================
-layout(location = 0) out vec4 out_g_normal;
-layout(location = 1) out vec4 out_g_world_normal;
-layout(location = 2) out vec2 out_g_motion_vectors;
-layout(location = 3) out vec4 out_g_albedo_roughness;
-layout(location = 4) out vec4 out_g_position;
-layout(location = 5) out float out_g_linear_depth;
-layout(location = 6) out vec4 out_g_geometry_normal;
-layout(location = 7) out vec4 out_g_emissive;
+// view normals and positions are not stored: from the world normal and the linear depth (gbuffer.glsl)
+layout(location = 0) out vec4 out_g_world_normal;
+layout(location = 1) out vec2 out_g_motion_vectors;
+layout(location = 2) out vec4 out_g_albedo_roughness;
+layout(location = 3) out float out_g_linear_depth;
+layout(location = 4) out vec4 out_g_geometry_normal;
+layout(location = 5) out vec4 out_g_emissive;
 
 
 void main()
@@ -65,9 +64,7 @@ void main()
     float metallic = clamp(orm.b, 0.0, 1.0);
 
     // ---- outputs ----
-    vec3 N_view = normalize((camera_ubo.view * vec4(N, 0.0)).xyz);
 
-    out_g_normal = vec4(N_view * 0.5 + 0.5, roughness);
     out_g_world_normal = vec4(N * 0.5 + 0.5, ao);
 
     vec2 curr_ndc = v_curr_clip.xy / v_curr_clip.w;
@@ -75,7 +72,6 @@ void main()
     out_g_motion_vectors = (curr_ndc * 0.5 + 0.5) - (prev_ndc * 0.5 + 0.5);
 
     out_g_albedo_roughness = vec4(albedo, roughness);
-    out_g_position = vec4(v_world_pos, 1.0);
 
     vec4 view_pos = camera_ubo.view * vec4(v_world_pos, 1.0);
     out_g_linear_depth = -view_pos.z;

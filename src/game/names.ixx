@@ -4,6 +4,8 @@ import name;
 export namespace Names
 {
     Name pass_geometry_base = "GeometryBase";
+    // the draws the occlusion culling found visible after the depth of GeometryBase (OcclusionCulling)
+    Name pass_geometry_base_late = "GeometryBaseLate";
     Name pass_lighting = "Lighting";
     Name pass_geometry_translucent = "GeometryTranslucent";
     

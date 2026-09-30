@@ -31,7 +31,7 @@ void main()
     
     uint mesh_index = primitive_info.mesh_id;
 
-    Vertex v = fetch_vertex(mesh_index, gl_VertexIndex);
+    Vertex v = fetch_indexed_vertex(mesh_index, gl_VertexIndex);
     
     mat4 transform_curr = primitive_info.current_transform;
     mat4 transform_prev = primitive_info.prev_transform;

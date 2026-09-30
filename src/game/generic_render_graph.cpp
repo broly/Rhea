@@ -123,8 +123,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
     
     gbuffer = create_textures({
         {
+            // not written any more (view normals come from the world normal): 1 texel keeps the slot numbering
             .name = "g_normal",
-            .extent = resolution,
+            .extent = { 1, 1 },
             .format = TextureFormat::RGBA8_UNORM,
             .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
             .external = false,
@@ -161,10 +162,10 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .dimension = capture_dimension
         },
         {
+            // not written any more: shaders take the position from the linear depth (utils/gbuffer_position.glsl,
+            // float: sub-millimeter, what the shadow normal offset needs, Rhea-xfu). 1 texel keeps the slot numbering
             .name = "g_position",
-            .extent = resolution,
-            // absolute world position: half floats step 6 cm at 64 m from the origin, far more than the
-            // shadow normal offset (acne away from the origin, Rhea-xfu); float keeps it sub-millimeter
+            .extent = { 1, 1 },
             .format = TextureFormat::RGBA32F,
             .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
             .external = false,
@@ -296,9 +297,12 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .num_layers = EMISSIVE_RING_SIZE
     });
     
+    // screen space reflections at 1 / ssr_downscale of the screen (main graph): SSRComposite upsamples them
+    ssr_downscale = resolution.is_zero() ? uint32_t(std::clamp(cv_ssr_downscale.get(), 1, 4)) : 1;
     ssr_texture = create_texture({
         .name = NAME(ssr_texture),
         .extent = resolution,
+        .extent_divisor = resolution.is_zero() ? ssr_downscale : 0,
         .format = TextureFormat::RGBA16F,
         .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
         .dimension = capture_dimension
@@ -377,6 +381,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
 
         particles = std::make_unique<ParticleRenderer>();
         particles->init(*renderer, *backend);
+
+        occlusion = std::make_unique<OcclusionCulling>();
+        occlusion->init(*renderer, *backend);
 
         sky_downscale = uint32_t(std::clamp(cv_sky_downscale.get(), 1, 8));
         atmosphere_buffer = create_texture({
@@ -524,21 +531,39 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_frames = (uint8_t)backend->get_num_images_in_flight()
     });
     
+    // the g-buffer targets of the base pass: cleared by GeometryBase, loaded by GeometryBaseLate
+    auto base_pass_targets = [this] (RBLoadOp load)
+    {
+        std::vector<RBImageUsage> targets;
+        targets.push_back({ gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::DepthStencilAttachment, load });
+        // attachment order = fragment output locations of the base pass shaders (geometry.frag, ...)
+        for (GBUFFER_SLOTS slot : { GBUFFER_SLOTS::WORLD_NORMAL, GBUFFER_SLOTS::MOTION_VECTORS,
+                                    GBUFFER_SLOTS::ALBEDO_ROUGHNESS, GBUFFER_SLOTS::LINEAR_DEPTH,
+                                    GBUFFER_SLOTS::GEOMETRY_NORMAL, GBUFFER_SLOTS::EMISSIVE })
+            targets.push_back({ gbuffer[slot], RBImageUsageType::ColorAttachment, load });
+        return targets;
+    };
+    const auto culling = [this] () { return occlusion && cv_occlusion_culling.get(); };
+
+    // occlusion culling, early phase: the draws visible at the end of the last frame
+    if (occlusion)
+    {
+        add_pass({
+            .name = "OcclusionCullEarly",
+            .condition = culling,
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                occlusion->cull(ctx, camera_resource, draw_list.get_resource(), false, base_first_command, base_command_count);
+            },
+            .type = RenderPassType::compute
+        });
+    }
+
     add_pass({
         .name = Names::pass_geometry_base,
         .reads = {
         },
-        .writes = { 
-            { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::DepthStencilAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::NORMAL], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::MOTION_VECTORS], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::POSITION], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
-            { gbuffer[GBUFFER_SLOTS::EMISSIVE], RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
-        },
+        .writes = base_pass_targets(RBLoadOp::Clear),
         .execute = [this] (RenderGraphContext& ctx)
         {
             PROFILE("Geometry");
@@ -547,6 +572,44 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .num_layers = num_pass_instances
     });
+
+    // occlusion culling, late phase: what the depth of the early draws does not hide, and was not drawn early
+    if (occlusion)
+    {
+        add_pass({
+            .name = "HZB",
+            .condition = culling,
+            .reads = {
+                { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::Sampled }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                occlusion->build_hzb(ctx);
+            },
+            .type = RenderPassType::compute
+        });
+
+        add_pass({
+            .name = "OcclusionCullLate",
+            .condition = culling,
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                occlusion->cull(ctx, camera_resource, draw_list.get_resource(), true, base_first_command, base_command_count);
+            },
+            .type = RenderPassType::compute
+        });
+
+        add_pass({
+            .name = Names::pass_geometry_base_late,
+            .condition = culling,
+            .writes = base_pass_targets(RBLoadOp::Load),
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("GeometryLate");
+                draw_scene(ctx);
+            },
+        });
+    }
     
     // emissive watch ring (see EMISSIVE_RING_SIZE): g_emissive as the base pass left it
     if (emissive_diagnostics_enabled())
@@ -864,7 +927,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },
             { hdr_color_present[COLOR_OUTPUT_HDR::SPECULAR_WEIGHT], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
-            { gbuffer[GBUFFER_SLOTS::NORMAL], RBImageUsageType::SampledFragment },
+            { gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment },
         },
         .writes = {
@@ -885,7 +948,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { hdr_color_present[COLOR_OUTPUT_HDR::SPECULAR_WEIGHT], RBImageUsageType::SampledFragment },
             { ssr_texture, RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
-            { gbuffer[GBUFFER_SLOTS::POSITION], RBImageUsageType::SampledFragment },
+            { gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::ALBEDO_ROUGHNESS], RBImageUsageType::SampledFragment }
         },
@@ -1113,6 +1176,17 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
 
     prepare_geometry_resources(ctx);
 
+    RenderPrimitive::lod_distance_scale() = std::clamp(cv_lod_scale.get(), 0.1f, 4.0f);
+
+    // the base pass draws, before the passes: the occlusion culling passes run over them
+    prepare_base_draws(ctx);
+    if (occlusion)
+    {
+        // screen sized targets keep a zero extent in their description
+        const Extent depth_extent = resolution.is_zero() ? backend->get_swapchain_extent() : resolution;
+        occlusion->prepare(ctx, get_image(gbuffer[GBUFFER_SLOTS::DEPTH]), depth_extent);
+    }
+
     if (particles)
     {
         particles->prepare(ctx, *engine->scene_view, {
@@ -1202,6 +1276,14 @@ void GenericRenderGraph::begin_frame()
         sky_downscale = downscale;
         for (RGTextureHandle texture : { atmosphere_buffer, clouds_buffer, clouds_history })
             resize_texture(texture, downscale);
+    }
+
+    // the same for render.ssr.downscale
+    const uint32_t ssr_scale = uint32_t(std::clamp(cv_ssr_downscale.get(), 1, 4));
+    if (resolution.is_zero() && ssr_scale != ssr_downscale)
+    {
+        ssr_downscale = ssr_scale;
+        resize_texture(ssr_texture, ssr_scale);
     }
 
     // the same for render.fog.downscale
@@ -1563,6 +1645,7 @@ std::array<ShadowCascade, shadow_cascade_count> GenericRenderGraph::fit_shadow_c
             .radius = radius,
             .texel = texel,
             .depth_range = z_far - z_near,
+            .split_near = splits[cascade],
             .light_direction = light_direction,
             .valid = true,
         };
@@ -1725,41 +1808,52 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 {
     PROFILE("GenericRenderGraph::draw_scene");
 
-    auto& mesh_processor =
-        engine->scene_view
-            ->get_processor<SceneViewProcessor_Mesh>();
-
     ctx.backend.update_viewport(
         ctx.cmd,
         resolution,
         use_swapchain_extent);
-    
-    bool is_depth_prepass = (ctx.pass_name == Name("DepthPrepass"));
+
+    const bool translucent = ctx.pass_name == Names::pass_geometry_translucent;
+    const uint32_t geometry_debug = (uint32_t)ctx.params.get_int(GeometryDebug::param, 0);
+    const auto bind_resources = [&] (const RenderPrimitivePassInfo&)
+    {
+        ctx.bind(camera_resource, mesh_table_resource,
+                 shadow_resource, light_resource, reflection_resource, pbr_material_table_resource, textures_resource,
+                 primitive_table_resource);
+        if (translucent)
+            ctx.bind(hdr_color_output_resource);
+    };
+
+    // the base pass of the main graph was put into the draw list before the passes (prepare_base_draws): the
+    // occlusion culling decides which of its draws run in the early and in the late pass
+    const bool late = ctx.pass_name == Names::pass_geometry_base_late;
+    if (late || (ctx.pass_name == Names::pass_geometry_base && base_draws_prepared))
+    {
+        const bool culled = occlusion && cv_occlusion_culling.get();
+        if (late && !culled)
+            return;
+        const bool diag_geometry = diag_enabled() && !late;
+        if (diag_geometry)
+            backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
+        if (culled)
+            draw_groups(ctx, base_groups, geometry_debug, bind_resources, occlusion->get_commands_buffer(),
+                late ? occlusion->get_late_offset() : 0);
+        else
+            draw_groups(ctx, base_groups, geometry_debug, bind_resources);
+        if (diag_geometry)
+            backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
+        return;
+    }
 
     std::vector<ViewRenderItem> items;
-    
     auto view_info = build_view_info(ctx, false);
-
-    mesh_processor.gather_for_view(
+    engine->scene_view->get_processor<SceneViewProcessor_Mesh>().gather_for_view(
         view_info.view,
         view_info.frustum,
         ctx.pass_name,
         items);
 
-    if (ctx.pass_name == Name("DepthPrepass"))
-    {
-        PROFILE("draw_scene - sort");
-        std::sort(items.begin(), items.end(),
-            [](const ViewRenderItem& a,
-               const ViewRenderItem& b)
-            {
-                return a.get_sort_key() < b.get_sort_key();
-            });
-    }
-
-
     PROFILE("GenericRenderGraph::draw_scene - items");
-    const bool translucent = ctx.pass_name == Names::pass_geometry_translucent;
     const bool base_pass = ctx.pass_name == Names::pass_geometry_base;
 
     std::vector<const RenderPrimitive*> primitives;
@@ -1769,24 +1863,56 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
         if (!hidden.hides(*item.primitive))
             primitives.push_back(item.primitive);
 
-    const uint32_t geometry_debug = (uint32_t)ctx.params.get_int(GeometryDebug::param, 0);
-    const bool diag_geometry = diag_enabled() && ctx.pass_name == Names::pass_geometry_base;
+    const bool diag_geometry = diag_enabled() && base_pass;
     if (diag_geometry)
         backend->cmd_begin_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
 
     // translucent draws blend: they keep their order across pipelines
-    draw_items(ctx, primitives, geometry_debug, translucent, [&] (const RenderPrimitivePassInfo&)
-    {
-        ctx.bind(camera_resource, mesh_table_resource,
-                 shadow_resource, light_resource, reflection_resource, pbr_material_table_resource, textures_resource,
-                 primitive_table_resource);
-        if (translucent)
-            ctx.bind(hdr_color_output_resource);
-    });
+    draw_items(ctx, own_meshes(primitives), geometry_debug, translucent, bind_resources);
 
     if (diag_geometry)
         backend->cmd_end_query(ctx.cmd, diag_queries, ctx.frame * DIAG_COUNT + DIAG_GEOMETRY);
+}
 
+void GenericRenderGraph::prepare_base_draws(RenderGraphContext& ctx)
+{
+    PROFILE("GenericRenderGraph::prepare_base_draws");
+
+    base_groups.clear();
+    base_first_command = draw_list.command_count();
+    base_command_count = 0;
+    base_draws_prepared = false;
+    // the main graph only (one view, one pass instance)
+    if (num_pass_instances != 1)
+        return;
+
+    const glm::mat4 view = current_camera_ubo.view;
+    const Frustum frustum = Frustum::from_view_projection(current_camera_ubo.proj * view);
+    std::vector<ViewRenderItem> items;
+    engine->scene_view->get_processor<SceneViewProcessor_Mesh>().gather_for_view(view, frustum,
+        Names::pass_geometry_base, items);
+
+    std::vector<const RenderPrimitive*> primitives;
+    primitives.reserve(items.size());
+    const MeshNameFilter hidden(cv_debug_hide_base.get());
+    for (const ViewRenderItem& item : items)
+        if (!hidden.hides(*item.primitive))
+            primitives.push_back(item.primitive);
+
+    const std::vector<MeshDraw> draws = own_meshes(primitives);
+    if (draw_dump_frames > 0)
+        dump_draws(Names::pass_geometry_base, 0, draws);
+    base_groups = record_groups(Names::pass_geometry_base, draws, /* with_bounds = */ true);
+    base_command_count = draw_list.command_count() - base_first_command;
+    base_draws_prepared = true;
+
+    // the copies of the culling hold a limited number of commands: beyond them, no culling this frame
+    if (occlusion && base_first_command + base_command_count > occlusion->get_capacity())
+    {
+        LogGenericRG.Log("Occlusion culling: %u base pass draws exceed the %u of the culled command copies",
+            base_first_command + base_command_count, occlusion->get_capacity());
+        cv_occlusion_culling.set(false);
+    }
 }
 
 // Frame counters of a pass (prof::count, read by the benchmark): its draws and triangles
@@ -1800,7 +1926,7 @@ static void count_draws(Name pass, uint64_t draws, uint64_t indices)
     prof::count(it->second.second, indices / 3);
 }
 
-void GenericRenderGraph::dump_draws(Name pass, uint32_t debug_id, const std::vector<const RenderPrimitive*>& items) const
+void GenericRenderGraph::dump_draws(Name pass, uint32_t debug_id, std::span<const MeshDraw> draws) const
 {
     struct Row
     {
@@ -1809,13 +1935,13 @@ void GenericRenderGraph::dump_draws(Name pass, uint32_t debug_id, const std::vec
     };
     // mesh asset, LOD level
     std::map<std::pair<std::string, uint32_t>, Row> rows;
-    for (const RenderPrimitive* prim : items)
+    for (const MeshDraw& draw : draws)
     {
-        if (!prim->get_pass_info(pass))
+        if (!draw.primitive->get_pass_info(pass))
             continue;
-        Row& row = rows[{ prim->mesh.mesh.get().name, prim->lod_level }];
+        Row& row = rows[{ draw.primitive->mesh.mesh.get().name, draw.primitive->lod_level }];
         ++row.draws;
-        row.triangles += prim->mesh.get().indices.size() / 3;
+        row.triangles += draw.indices.index_count / 3;
     }
 
     std::ofstream file(paths::get_cache_path() / "bench" / "draws.csv", std::ios::app);
@@ -1825,87 +1951,114 @@ void GenericRenderGraph::dump_draws(Name pass, uint32_t debug_id, const std::vec
             key.first, key.second, row.draws, row.triangles);
 }
 
-void GenericRenderGraph::draw_items(RenderGraphContext& ctx, const std::vector<const RenderPrimitive*>& items,
+std::vector<GenericRenderGraph::MeshDraw> GenericRenderGraph::own_meshes(const std::vector<const RenderPrimitive*>& primitives)
+{
+    std::vector<MeshDraw> draws;
+    draws.reserve(primitives.size());
+    for (const RenderPrimitive* prim : primitives)
+        draws.push_back({ prim, (uint32_t)prim->mesh_index, prim->indices });
+    return draws;
+}
+
+std::vector<GenericRenderGraph::DrawGroup> GenericRenderGraph::record_groups(Name pass, std::span<const MeshDraw> items,
+    bool with_bounds)
+{
+    PROFILE("GenericRenderGraph::record_groups");
+
+    // group by pipeline and index block (a handful per pass), the order of the items is kept inside a group
+    std::vector<std::pair<DrawGroup, std::vector<std::pair<const MeshDraw*, const RenderPrimitivePassInfo*>>>> groups;
+    for (const MeshDraw& draw : items)
+    {
+        const RenderPrimitivePassInfo* info = draw.primitive->get_pass_info(pass);
+        if (!info)
+            continue;
+        auto group = std::ranges::find_if(groups, [&] (const auto& g)
+        {
+            return g.first.info->pipeline == info->pipeline && g.first.index_block == draw.indices.block;
+        });
+        if (group == groups.end())
+        {
+            groups.push_back({ DrawGroup{ .info = info, .index_block = draw.indices.block }, {} });
+            group = std::prev(groups.end());
+        }
+        group->second.push_back({ &draw, info });
+    }
+
+    uint64_t index_count = 0;
+    uint64_t draw_count = 0;
+    std::vector<DrawGroup> result;
+    result.reserve(groups.size());
+    for (auto& [group, draws] : groups)
+    {
+        group.first_command = draw_list.command_count();
+        for (const auto& [draw, info] : draws)
+        {
+            draw_list.add_draw({
+                .mesh_id = draw->mesh_index,
+                .primitive_id = draw->primitive->id,
+                .material_id = info->material_index,
+            }, draw->indices, with_bounds ? &draw->primitive->bounds : nullptr);
+            index_count += draw->indices.index_count;
+        }
+        group.command_count = draw_list.command_count() - group.first_command;
+        draw_count += group.command_count;
+        result.push_back(group);
+    }
+    count_draws(pass, draw_count, index_count);
+    return result;
+}
+
+void GenericRenderGraph::draw_groups(RenderGraphContext& ctx, std::span<const DrawGroup> groups, uint32_t debug_id,
+    const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources, std::optional<RBBufferHandle> commands,
+    uint32_t command_offset)
+{
+    for (const DrawGroup& group : groups)
+    {
+        if (ctx.bind_pipeline(group.info->pipeline))
+        {
+            bind_resources(*group.info);
+            draw_list.bind(ctx);
+            ctx.push_constants(ModelPushConstants{ .debug_id = debug_id });
+        }
+        draw_list.draw_indirect(ctx, group.index_block, group.first_command, group.command_count, commands, command_offset);
+    }
+}
+
+void GenericRenderGraph::draw_items(RenderGraphContext& ctx, std::span<const MeshDraw> items,
     uint32_t debug_id, bool in_order, const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources)
 {
     PROFILE("GenericRenderGraph::draw_items");
 
-    uint64_t draw_count = 0;
-    uint64_t index_count = 0;
     if (draw_dump_frames > 0)
         dump_draws(ctx.pass_name, debug_id, items);
 
-    auto bind = [&] (const RenderPrimitivePassInfo& info)
-    {
-        if (ctx.bind_pipeline(info.pipeline))
-        {
-            bind_resources(info);
-            draw_list.bind(ctx);
-            ctx.push_constants(ModelPushConstants{ .debug_id = debug_id });
-        }
-    };
-    auto record_of = [] (const RenderPrimitive& prim, const RenderPrimitivePassInfo& info)
-    {
-        return GPUDrawRecord{
-            .mesh_id = (uint32_t)prim.mesh_index,
-            .primitive_id = prim.id,
-            .material_id = info.material_index,
-        };
-    };
-
     if (in_order)
     {
-        for (const RenderPrimitive* prim : items)
+        uint64_t draw_count = 0;
+        uint64_t index_count = 0;
+        for (const MeshDraw& draw : items)
         {
-            const RenderPrimitivePassInfo* info = prim->get_pass_info(ctx.pass_name);
+            const RenderPrimitivePassInfo* info = draw.primitive->get_pass_info(ctx.pass_name);
             if (!info)
                 continue;
-            bind(*info);
-            const uint32_t indices = (uint32_t)prim->mesh.get().indices.size();
-            ctx.draw(indices, 0, draw_list.add_record(record_of(*prim, *info)));
+            if (ctx.bind_pipeline(info->pipeline))
+            {
+                bind_resources(*info);
+                draw_list.bind(ctx);
+                ctx.push_constants(ModelPushConstants{ .debug_id = debug_id });
+            }
+            const uint32_t first_command = draw_list.command_count();
+            draw_list.add_draw({ .mesh_id = draw.mesh_index, .primitive_id = draw.primitive->id,
+                .material_id = info->material_index }, draw.indices);
+            draw_list.draw_indirect(ctx, draw.indices.block, first_command, 1);
             ++draw_count;
-            index_count += indices;
+            index_count += draw.indices.index_count;
         }
         count_draws(ctx.pass_name, draw_count, index_count);
         return;
     }
 
-    // group by pipeline (a handful per pass), the order of the items is kept inside a group
-    struct Group
-    {
-        const RenderPrimitivePassInfo* info;
-        std::vector<std::pair<const RenderPrimitive*, const RenderPrimitivePassInfo*>> draws;
-    };
-    std::vector<Group> groups;
-    for (const RenderPrimitive* prim : items)
-    {
-        const RenderPrimitivePassInfo* info = prim->get_pass_info(ctx.pass_name);
-        if (!info)
-            continue;
-        auto group = std::ranges::find_if(groups, [&] (const Group& g) { return g.info->pipeline == info->pipeline; });
-        if (group == groups.end())
-        {
-            groups.push_back({ info, {} });
-            group = std::prev(groups.end());
-        }
-        group->draws.push_back({ prim, info });
-    }
-
-    for (const Group& group : groups)
-    {
-        const uint32_t first_command = draw_list.command_count();
-        for (const auto& [prim, info] : group.draws)
-        {
-            const uint32_t indices = (uint32_t)prim->mesh.get().indices.size();
-            draw_list.add_draw(record_of(*prim, *info), indices);
-            index_count += indices;
-        }
-        draw_count += group.draws.size();
-
-        bind(*group.info);
-        draw_list.draw_indirect(ctx, first_command, draw_list.command_count() - first_command);
-    }
-    count_draws(ctx.pass_name, draw_count, index_count);
+    draw_groups(ctx, record_groups(ctx.pass_name, items, false), debug_id, bind_resources);
 }
 
 bool GenericRenderGraph::emissive_diagnostics_enabled()
@@ -2040,8 +2193,8 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
 
     // one tile of the atlas per cascade, the cascade index goes to the shaders in the push constants
     const uint32_t tile = Constants::shadowmap_extent.width / Constants::shadow_atlas_tiles;
-    std::vector<const RenderPrimitive*> primitives;
-    primitives.reserve(mesh_processor.primitives.size());
+    std::vector<MeshDraw> draws;
+    draws.reserve(mesh_processor.primitives.size());
     const MeshNameFilter hidden(cv_debug_hide_shadow.get());
     for (uint32_t cascade = 0; cascade < shadow_cascade_count; ++cascade)
     {
@@ -2049,12 +2202,38 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
             continue;
 
         const Frustum frustum = Frustum::from_view_projection(shadow_cascades[cascade].vp);
-        primitives.clear();
+        const float texel = shadow_cascades[cascade].texel;
+        const float proxy_error = texel * cv_shadow_proxy_texels.get();
+        // casters smaller than this leave a speck of a texel or two: not drawn
+        const float min_caster_size = texel * cv_shadow_min_caster_texels.get();
+        const float lod_min_distance = cv_shadow_cascade_lods.get() ? shadow_cascades[cascade].split_near : 0.0f;
+
+        draws.clear();
         // the LOD follows the camera, not the light: the shadow of what the camera sees
         const glm::vec3 viewer = glm::vec3(current_camera_ubo.camera_pos);
         for (const RenderPrimitive& prim : mesh_processor.primitives)
-            if (prim.in_shadow_lod_range(viewer) && frustum.test_aabb_world(prim.bounds) && !hidden.hides(prim))
-                primitives.push_back(&prim);
+        {
+            // the cascade shades what is at least split_near away: casters in the LOD of that distance
+            if (!prim.in_shadow_lod_range(viewer, lod_min_distance) || !frustum.test_aabb_world(prim.bounds) || hidden.hides(prim))
+                continue;
+            if (glm::length(prim.bounds.max - prim.bounds.min) < min_caster_size)
+                continue;
+
+            MeshDraw draw{ &prim, (uint32_t)prim.mesh_index, prim.indices };
+            // the coarsest simplified caster within the error
+            const RenderPrimitive::ShadowProxyDraw* proxy = nullptr;
+            for (const RenderPrimitive::ShadowProxyDraw& candidate : prim.shadow_proxies)
+                if (candidate.error <= proxy_error)
+                    proxy = &candidate;
+            if (proxy)
+            {
+                if (proxy->indices.index_count == 0)
+                    continue;
+                draw.mesh_index = proxy->mesh_index;
+                draw.indices = proxy->indices;
+            }
+            draws.push_back(draw);
+        }
 
         const int32_t x = int32_t(cascade % Constants::shadow_atlas_tiles * tile);
         const int32_t y = int32_t(cascade / Constants::shadow_atlas_tiles * tile);
@@ -2062,7 +2241,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         ctx.backend.clear_depth(ctx.cmd, x, y, tile, tile);
         // rebind: draw_items pushes the cascade index when it binds a pipeline
         ctx.current_pipeline = nullptr;
-        draw_items(ctx, primitives, cascade, false, [&] (const RenderPrimitivePassInfo& info)
+        draw_items(ctx, draws, cascade, false, [&] (const RenderPrimitivePassInfo& info)
         {
             bind_shadow_globals(ctx);
 
@@ -2232,7 +2411,7 @@ void GenericRenderGraph::draw_mesh_wireframe(RenderGraphContext& ctx)
             continue;
 
         // wireframe_mesh.vert: 3 edges (6 line vertices) per triangle
-        draw_list.add_draw({ .mesh_id = (uint32_t)prim.mesh_index, .primitive_id = prim.id, .material_id = 0 },
+        draw_list.add_vertex_draw({ .mesh_id = (uint32_t)prim.mesh_index, .primitive_id = prim.id, .material_id = 0 },
             (uint32_t)prim.mesh.get().indices.size() * 2);
     }
 
@@ -2242,7 +2421,7 @@ void GenericRenderGraph::draw_mesh_wireframe(RenderGraphContext& ctx)
         draw_list.bind(ctx);
     }
     ctx.push_constants(ModelPushConstants{ .debug_id = 0 });
-    draw_list.draw_indirect(ctx, first_command, draw_list.command_count() - first_command);
+    draw_list.draw_vertex_indirect(ctx, first_command, draw_list.command_count() - first_command);
 }
 
 void GenericRenderGraph::add_skeleton_lines(std::vector<LineVertex>& vertices)
@@ -2380,10 +2559,12 @@ void GenericRenderGraph::draw_ssr(RenderGraphContext& ctx)
 {
     PROFILE("GenericRenderGraph::draw_ssr");
 
-    ctx.backend.update_viewport(
-        ctx.cmd,
-        resolution,
-        use_swapchain_extent);
+    // the SSR target may be smaller than the screen (render.ssr.downscale)
+    const Extent ssr_extent = textures[ssr_texture.id].desc.extent;
+    if (ssr_extent.is_zero())
+        ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+    else
+        ctx.backend.set_viewport(ctx.cmd, 0, 0, ssr_extent.width, ssr_extent.height);
     
     if (ctx.bind_pipeline(ssr_pipeline))
     {

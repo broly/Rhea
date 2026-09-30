@@ -1,6 +1,7 @@
 ﻿module;
 
 #include <vulkan/vulkan_core.h>
+#include <meshoptimizer.h>
 
 module vk;
 
@@ -52,68 +53,113 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
         }
 
     MeshGPUData data{};
-    
+
     uint32_t mesh_index = gpu_mesh_table.size();
     data.index_count =
         static_cast<uint32_t>(primitive.indices.size());
     data.vertex_count = primitive.vertices.size();
     data.mesh_table_index = mesh_index;
 
-    VkDeviceSize vertex_size =
-        primitive.vertices.size() * sizeof(Vertex);
+    // triangles in the order that reuses the most transformed vertices (indexed draws, post transform cache)
+    std::vector<uint32_t> indices(primitive.indices.size());
+    meshopt_optimizeVertexCache(indices.data(), primitive.indices.data(), indices.size(), primitive.vertices.size());
 
-    VkDeviceSize index_size =
-        primitive.indices.size() * sizeof(uint32_t);
-    
-    VkBufferUsageFlags usage =
-          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-        | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
-        | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-        | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    const VkDeviceSize vertex_size = primitive.vertices.size() * sizeof(Vertex);
+    const VkDeviceSize index_size = indices.size() * sizeof(uint32_t);
 
-    // ---- Vertex buffer ----
-    buffer_manager.create_device_local_buffer_with_data(
-        primitive.vertices.data(),
-        vertex_size,
-        usage,
-        data.vertex_buffer,
-        data.vertex_memory
-    );
+    // sub-allocated: one allocation per mesh ran into the allocation count limit (4096 on NVIDIA)
+    const auto [vertex_block, vertex_offset] = suballocate(vertex_blocks, vertex_size, sizeof(Vertex), vertex_block_size);
+    const auto [index_block, index_offset] = suballocate(index_blocks, index_size, sizeof(uint32_t), index_block_size);
+    data.vertex_buffer = vertex_blocks[vertex_block].buffer;
+    data.vertex_offset = vertex_offset;
+    data.vertex_address = vertex_blocks[vertex_block].address + vertex_offset;
+    data.index_buffer = index_blocks[index_block].buffer;
+    data.index_offset = index_offset;
+    data.index_address = index_blocks[index_block].address + index_offset;
 
-    // ---- Index buffer ----
-    buffer_manager.create_device_local_buffer_with_data(
-        primitive.indices.data(),
-        index_size,
-        usage,
-        data.index_buffer,
-        data.index_memory
-    );
+    upload(data.vertex_buffer, vertex_offset, primitive.vertices.data(), vertex_size,
+           data.index_buffer, index_offset, indices.data(), index_size);
 
     // ---- Optional BLAS ----
     if (rt_mode == RTBuildMode::build_blas)
-    {
-        VkDeviceAddress vertex_address =
-            buffer_manager.get_buffer_device_address(data.vertex_buffer);
+        build_blas(data, data.vertex_address, data.index_address);
 
-        VkDeviceAddress index_address =
-            buffer_manager.get_buffer_device_address(data.index_buffer);
+    mesh_map.emplace(handle, data);
 
-        build_blas(data, vertex_address, index_address);
-    }
+    checkf(index_ranges.size() == mesh_index, "Index ranges out of step with the mesh table");
+    index_ranges.push_back({
+        .block = index_block,
+        .first_index = uint32_t(index_offset / sizeof(uint32_t)),
+        .index_count = data.index_count,
+    });
 
-    mesh_map.emplace(handle, std::move(data));
-    
     GPUMesh gpu{};
-    gpu.vertex_address = buffer_manager.get_buffer_device_address(data.vertex_buffer);
-    gpu.index_address = buffer_manager.get_buffer_device_address(data.index_buffer);
+    gpu.vertex_address = data.vertex_address;
+    gpu.index_address = data.index_address;
     gpu.index_count = data.index_count;
     gpu.mesh_index = mesh_index;
 
     gpu_mesh_table.push_back(gpu);
 
     mesh_table_dirty = true;
-    
+
     return gpu;
+}
+
+std::pair<uint32_t, VkDeviceSize> vk::MeshManager::suballocate(std::vector<BufferBlock>& blocks, VkDeviceSize size,
+    VkDeviceSize alignment, VkDeviceSize block_size)
+{
+    for (uint32_t index = 0; index < blocks.size(); ++index)
+    {
+        BufferBlock& block = blocks[index];
+        const VkDeviceSize offset = (block.used + alignment - 1) / alignment * alignment;
+        if (offset + size <= block.capacity)
+        {
+            block.used = offset + size;
+            return { index, offset };
+        }
+    }
+
+    BufferBlock& block = blocks.emplace_back();
+    block.capacity = std::max(block_size, size);
+    create_buffer(instance.device, instance.physical_device, block.capacity,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, block.buffer, block.memory);
+    block.address = buffer_manager.get_buffer_device_address(block.buffer);
+    block.used = size;
+    return { uint32_t(blocks.size() - 1), 0 };
+}
+
+void vk::MeshManager::upload(VkBuffer vertex_buffer, VkDeviceSize vertex_offset, const void* vertices, VkDeviceSize vertex_size,
+    VkBuffer index_buffer, VkDeviceSize index_offset, const void* indices, VkDeviceSize index_size)
+{
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+    vk::create_buffer(instance.device, instance.physical_device, vertex_size + index_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging_buffer, staging_memory);
+    void* mapped = nullptr;
+    vkMapMemory(instance.device, staging_memory, 0, vertex_size + index_size, 0, &mapped);
+    std::memcpy(mapped, vertices, vertex_size);
+    std::memcpy(static_cast<std::byte*>(mapped) + vertex_size, indices, index_size);
+    vkUnmapMemory(instance.device, staging_memory);
+
+    command_pool.submit([&] (VkCommandBuffer cmd)
+    {
+        const VkBufferCopy vertex_copy{ .srcOffset = 0, .dstOffset = vertex_offset, .size = vertex_size };
+        vkCmdCopyBuffer(cmd, staging_buffer, vertex_buffer, 1, &vertex_copy);
+        const VkBufferCopy index_copy{ .srcOffset = vertex_size, .dstOffset = index_offset, .size = index_size };
+        vkCmdCopyBuffer(cmd, staging_buffer, index_buffer, 1, &index_copy);
+
+        // the blocks are read by the frames recorded after this (vertex pulling, index fetch, BLAS builds)
+        VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, 1, &barrier, 0, nullptr, 0, nullptr);
+    });
+    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
 }
 
 bool vk::MeshManager::update_vertices(MeshPrimHandle handle, std::span<const Vertex> vertices)
@@ -136,6 +182,7 @@ bool vk::MeshManager::update_vertices(MeshPrimHandle handle, std::span<const Ver
     command_pool.submit([&] (VkCommandBuffer cmd)
     {
         VkBufferCopy copy{};
+        copy.dstOffset = data.vertex_offset;
         copy.size = size;
         vkCmdCopyBuffer(cmd, staging_buffer, data.vertex_buffer, 1, &copy);
 
@@ -281,6 +328,12 @@ void vk::MeshManager::build_blas(MeshGPUData& data, VkDeviceAddress vertex_addre
     vkFreeMemory(instance.device, scratch_memory, nullptr);
 }
 
+void vk::MeshManager::bind_index_block(VkCommandBuffer cmd, uint32_t block) const
+{
+    checkf(block < index_blocks.size(), "No mesh index block %u", block);
+    vkCmdBindIndexBuffer(cmd, index_blocks[block].buffer, 0, VK_INDEX_TYPE_UINT32);
+}
+
 void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
 {
     auto it = mesh_map.find(mesh);
@@ -289,10 +342,10 @@ void vk::MeshManager::bind(const RBCommandList& cmd, MeshPrimHandle mesh)
     VkBuffer vb = it->second.vertex_buffer;
     VkBuffer ib = it->second.index_buffer;
 
-    VkDeviceSize offsets[] = { 0 };
+    VkDeviceSize offsets[] = { it->second.vertex_offset };
 
     vkCmdBindVertexBuffers(cmd, 0, 1, &vb, offsets);
-    vkCmdBindIndexBuffer(cmd, ib, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(cmd, ib, it->second.index_offset, VK_INDEX_TYPE_UINT32);
 }
 
 
@@ -398,7 +451,7 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     vkMapMemory(instance.device, data.bones_memory, 0, VK_WHOLE_SIZE, 0, &data.bones_mapped);
 
     const VkDeviceAddress vertex_address = buffer_manager.get_buffer_device_address(data.vertex_buffer);
-    const VkDeviceAddress index_address = buffer_manager.get_buffer_device_address(src.index_buffer);
+    const VkDeviceAddress index_address = src.index_address;
 
     // ---- BLAS (updatable) ----
     if (rt_build_mode == RTBuildMode::build_blas)
@@ -483,12 +536,14 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     gpu.index_count = data.index_count;
     gpu.mesh_index = data.mesh_table_index;
     gpu_mesh_table.push_back(gpu);
+    // the skinned copy has the vertices of its source, in the same order: same indices
+    index_ranges.push_back(index_ranges[src.mesh_table_index]);
     mesh_table_dirty = true;
 
     SkinnedMeshGPU& info = data.info;
     info.instance_id = (uint32_t)skinned_meshes.size();
     info.mesh_index = data.mesh_table_index;
-    info.src_vertex_address = buffer_manager.get_buffer_device_address(src.vertex_buffer);
+    info.src_vertex_address = src.vertex_address;
     info.skin_address = buffer_manager.get_buffer_device_address(data.skin_buffer);
     info.dst_vertex_address = vertex_address;
     info.vertex_count = data.vertex_count;
@@ -557,7 +612,7 @@ void vk::MeshManager::cmd_refit_skinned_blas(VkCommandBuffer cmd, const std::vec
 
         geometries.push_back(make_triangles_geometry(
             data.info.dst_vertex_address,
-            buffer_manager.get_buffer_device_address(src.index_buffer),
+            src.index_address,
             data.vertex_count));
 
         VkAccelerationStructureBuildGeometryInfoKHR build_info{

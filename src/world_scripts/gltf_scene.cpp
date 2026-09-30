@@ -84,6 +84,25 @@ namespace
                     }).share());
                 registry.add<MeshCollider>(child, std::move(collider));
             }
+
+            // simplified shadow casters, also on a loading thread (stored as meshes in PostLoad)
+            size_t triangles = 0;
+            for (const Geometry& geometry : renderer.mesh.get().mesh_geometry)
+                for (const Primitive& primitive : geometry.primitives)
+                    triangles += primitive.indices.size() / 3;
+            if (!scene_desc.shadow_proxy_errors.empty() && triangles >= scene_desc.shadow_proxy_min_triangles)
+            {
+                renderer.pending_shadow_proxies = std::make_shared<std::vector<std::pair<StaticMesh, float>>>();
+                const glm::vec3 scale = glm::abs(object.transform.scale.glm());
+                const float mesh_scale = std::max({ scale.x, scale.y, scale.z, 1e-6f });
+                context.dc->push(std::async(std::launch::async,
+                    [proxies = renderer.pending_shadow_proxies, mesh_data = &renderer.mesh.get(), mesh_scale,
+                     errors = scene_desc.shadow_proxy_errors]
+                    {
+                        for (float error : errors)
+                            proxies->emplace_back(build_shadow_proxy(*mesh_data, error / mesh_scale), error);
+                    }).share());
+            }
             registry.add<MeshRenderer>(child, std::move(renderer));
         }
 

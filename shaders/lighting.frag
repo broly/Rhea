@@ -9,6 +9,7 @@
 #include "resources/reflection.glsl"
 #include "pbr_helpers.glsl"
 #include "character/character_lighting.glsl"
+#include "utils/gbuffer_position.glsl"
 
 layout(location = 0) out vec4 out_color;
 // hdr_color_present[SPECULAR_WEIGHT]: rgb = what the reflected radiance is multiplied by (env BRDF x
@@ -51,7 +52,7 @@ void main()
     vec3 albedo = mix(albedo_roughness.rgb, decal.rgb, decal.a);
     vec3 N  = normalize(get_gbuffer_WORLD_NORMAL(uv).rgb * 2.0 - 1.0);
     vec3 Ng = normalize(get_gbuffer_GEOMETRY_NORMAL(uv).rgb * 2.0 - 1.0);
-    vec3 pos = get_gbuffer_POSITION(uv).rgb;
+    vec3 pos = gbuffer_world_position(ivec2(gl_FragCoord.xy));
     vec3 emissive = get_gbuffer_EMISSIVE(uv).rgb;
     
     // emissive watch: only the screen periphery is checked (the level, which has no emissive textures;

@@ -145,6 +145,13 @@ public:
     // submitted earlier to the queue, including the previous frames in flight
     virtual void debug_full_barrier(RBCommandList cmd) = 0;
 
+    // Buffer memory barriers of GPU generated draws (occlusion culling), outside render passes:
+    //   compute_to_draw     compute shader writes -> indirect arguments, vertex / fragment / compute shader reads
+    //   compute_to_compute  compute shader writes -> compute shader reads and writes (the next dispatch)
+    //   draw_to_compute     indirect / shader reads of earlier draws -> compute shader writes (reuse of the buffers)
+    enum class BufferBarrier : uint8_t { compute_to_draw, compute_to_compute, draw_to_compute };
+    virtual void cmd_buffer_barrier(RBCommandList cmd, BufferBarrier barrier) = 0;
+
     // --- occlusion queries (samples passing the per-fragment tests; diagnostics) ---
     virtual RBQueryPool create_occlusion_pool(uint32_t query_count) = 0;
     virtual void cmd_begin_query(RBCommandList cmd, RBQueryPool pool, uint32_t query_index) = 0;
@@ -233,9 +240,17 @@ public:
     // first_instance: gl_InstanceIndex of the (single) instance, mesh draws pass their draw record index
     virtual void draw(RBCommandList cmd_list, uint32_t vertex_count, uint32_t first_vertex = 0, uint32_t first_instance = 0) = 0;
 
-    // draw_count VkDrawIndirectCommands (16 bytes each, tightly packed) at byte `offset` of the storage buffer
+    // draw_count VkDrawIndirectCommands (`stride` bytes apart) at byte `offset` of the storage buffer
     // `buffer` (copy of `frame`)
-    virtual void draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset, uint32_t draw_count) = 0;
+    virtual void draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset,
+        uint32_t draw_count, uint32_t stride = 16) = 0;
+    // the same with VkDrawIndexedIndirectCommands, indices of the bound mesh index block
+    virtual void draw_indexed_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset,
+        uint32_t draw_count, uint32_t stride = 20) = 0;
+
+    // shared indices of the meshes (MeshIndexRange), for indexed draws
+    virtual MeshIndexRange get_mesh_index_range(uint32_t mesh_index) const = 0;
+    virtual void bind_mesh_index_block(RBCommandList cmd_list, uint32_t block) = 0;
     
     virtual void trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth) = 0;
     

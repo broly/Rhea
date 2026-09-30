@@ -36,13 +36,19 @@ void main()
 {
     out_ssr = vec4(0.0);
 
+    // SSR may run at a fraction of the screen (render.ssr.downscale): the surface of one screen pixel of the
+    // block, exactly (a filtered sample mixes depths and normals across edges)
+    const ivec2 screen = textureSize(u_gbuffer[GBUFFER_SLOT_DEPTH], 0);
+    const ivec2 pixel = min(ivec2(v_uv * vec2(screen)), screen - 1);
+    const vec2 v_uv = (vec2(pixel) + 0.5) / vec2(screen);
+
     float depth = get_gbuffer_DEPTH(v_uv).r;
     if (depth >= 1.0)
         return;
 
-    vec4 normal_data = get_gbuffer_NORMAL(v_uv);
-    vec3 normal = normalize(normal_data.xyz * 2.0 - 1.0);
-    float roughness = normal_data.w;
+    // view space normal (the g-buffer keeps the world one)
+    vec3 normal = normalize(mat3(camera_ubo.view) * (get_gbuffer_WORLD_NORMAL(v_uv).xyz * 2.0 - 1.0));
+    float roughness = get_gbuffer_ALBEDO_ROUGHNESS(v_uv).a;
     // glossy only: rough lobes are left to the prefiltered probes (smooth hand over, no seam)
     const float roughness_fade = 1.0 - smoothstep(0.45, 0.75, roughness);
     if (roughness_fade <= 0.0)

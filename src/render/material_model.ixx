@@ -246,6 +246,10 @@ export struct MatModel_Parameter
     
     // used in ssbo (initial buffer size)
     std::optional<size_t> initial_buffer_size;
+
+    // ssbo written and read by the GPU only (occlusion culling): device local memory, not mapped. Default: host
+    // visible, written by the CPU through map_ssbo / update_ssbo
+    std::optional<bool> device_local;
     
     std::optional<size_t> initial_array_size;
     

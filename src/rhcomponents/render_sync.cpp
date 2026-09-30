@@ -59,6 +59,7 @@ namespace
         proxy.mesh = renderer.mesh;
         proxy.bounds = get_mesh_bounds(renderer, world);
         proxy.lods = renderer.lods;
+        proxy.shadow_proxies = renderer.shadow_proxies;
         proxy.materials = renderer.materials;
         if (const SkinnedMesh* skinned = registry.get<SkinnedMesh>(e))
             proxy.skinning = skinned->pose;
@@ -67,7 +68,8 @@ namespace
 
     bool same_proxy(const SceneViewProxy_Mesh& a, const SceneViewProxy_Mesh& b)
     {
-        return same(a.transform, b.transform) && a.mesh == b.mesh && a.lods == b.lods && a.materials == b.materials
+        return same(a.transform, b.transform) && a.mesh == b.mesh && a.lods == b.lods
+            && a.shadow_proxies == b.shadow_proxies && a.materials == b.materials
             && a.skinning == b.skinning;
     }
 
@@ -245,6 +247,19 @@ namespace
     void init_spawned_skinned_mesh(World& world, ecs::Entity e, const SerializationContext&)
     {
         init_skinned_mesh(world.registry, e);
+    }
+
+    // Shadow proxies simplified on loading threads (GltfScene) become meshes, before the first render proxy
+    [[=ecs::system<ecs::Phase::PostLoad>, =ecs::ambiguous_with<MeshColliderSync>]]
+    void store_shadow_proxies(ecs::Query<MeshRenderer> renderers)
+    {
+        renderers.each([&] (MeshRenderer& renderer) {
+            if (!renderer.pending_shadow_proxies)
+                return;
+            for (auto& [mesh, error] : *renderer.pending_shadow_proxies)
+                renderer.shadow_proxies.push_back({ AssetManager::get().store_mesh(std::move(mesh)), error });
+            renderer.pending_shadow_proxies.reset();
+        });
     }
 
     // Static bodies of MeshColliders: shapes cooked on loading threads (pending) or now

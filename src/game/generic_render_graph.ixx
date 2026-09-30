@@ -24,6 +24,7 @@ import :debug_view;
 import :reflection_probes;
 import :sky_renderer;
 import :particle_renderer;
+import :occlusion_culling;
 import :draw_list;
 import rhcomponents;
 import cvar;
@@ -35,6 +36,33 @@ export cvar::Var<int> cv_shadow_interval_2(
     "render.shadows.interval_2", 2, "Frames between renders of shadow cascade 2 (1: every frame)");
 export cvar::Var<int> cv_shadow_interval_3(
     "render.shadows.interval_3", 4, "Frames between renders of shadow cascade 3 (1: every frame)");
+
+// Simplified shadow casters (MeshRenderer::shadow_proxies): a cascade draws the coarsest proxy whose error is at
+// most this many of its texels (0: the meshes themselves)
+export cvar::Var<float> cv_shadow_proxy_texels(
+    "render.shadows.proxy_texels", 1.0f, "Shadow proxies: allowed error in texels of the cascade (0: off)",
+    { .has_range = true, .min = 0.0f, .max = 8.0f });
+
+// LOD switch distances of every mesh are multiplied by it (MeshRenderer::lods): the imported distances keep
+// several triangles per pixel at 2560x1506, below 1 the coarser levels take over closer
+export cvar::Var<float> cv_lod_scale(
+    "render.lod_scale", 0.5f, "Multiplies the LOD distances of every mesh (below 1: coarser levels closer)",
+    { .has_range = true, .min = 0.1f, .max = 4.0f });
+
+// A cascade draws its casters in the LOD of the distance where it starts (the far cascades shade far receivers)
+export cvar::Var<bool> cv_shadow_cascade_lods(
+    "render.shadows.cascade_lods", true, "Shadow cascades draw casters at least in the LOD of their start distance");
+
+// Screen space reflections at a fraction of the resolution: the rays are traced for one pixel of every
+// downscale x downscale block, SSRComposite upsamples the result
+export cvar::Var<int> cv_ssr_downscale(
+    "render.ssr.downscale", 2, "Screen pixels per SSR texel, per axis (1: full resolution)",
+    { .has_range = true, .min = 1.0f, .max = 4.0f });
+
+// Casters whose bounds are smaller than this many texels of a cascade are left out of it
+export cvar::Var<float> cv_shadow_min_caster_texels(
+    "render.shadows.min_caster_texels", 2.0f, "Shadow casters smaller than this many texels of the cascade are skipped",
+    { .has_range = true, .min = 0.0f, .max = 16.0f });
 
 // Performance experiments (tools/bench/run_pose.py --a / --b): meshes left out of a pass by name, to see what
 // they cost. Comma separated parts of mesh names, '*' is every mesh, '-part' keeps the meshes with that part:
@@ -53,6 +81,7 @@ export struct ShadowCascade
     float radius = 0.0f;
     float texel = 0.0f;                 // world size of a shadow texel
     float depth_range = 1.0f;           // m between the near and far plane
+    float split_near = 0.0f;            // m from the camera where the cascade starts: LODs of its casters from there
     glm::vec3 light_direction{ 0.0f };
     bool valid = false;
     bool rendered_this_frame = false;
@@ -257,6 +286,7 @@ public:
     RGTextureHandle fog_buffer;
     RGTextureHandle fog_history;
     uint32_t fog_downscale = 1;     // render.fog.downscale the buffers were created with
+    uint32_t ssr_downscale = 1;     // render.ssr.downscale ssr_texture was created with
     RGTextureHandle swapchain_color;
     
     HDROutputTextureArray hdr_color_present;
@@ -437,18 +467,59 @@ public:
     // sprites of the particle systems, main graph only (pass "Particles")
     std::unique_ptr<ParticleRenderer> particles;
 
+    // GPU occlusion culling of the base pass, main graph only (passes OcclusionCullEarly, HZB, OcclusionCullLate,
+    // GeometryBaseLate)
+    std::unique_ptr<OcclusionCulling> occlusion;
+
     // mesh draws of the frame: records + indirect commands
     DrawList draw_list;
 
-    // Draws `items` of the pass: grouped by pipeline, one indirect draw per group (in_order: one draw per item
-    // in the given order, for passes which blend). bind_resources binds the pass resources after a pipeline.
-    void draw_items(RenderGraphContext& ctx, const std::vector<const RenderPrimitive*>& items, uint32_t debug_id,
+    // One mesh draw: the primitive (transform, material, passes) and the mesh it draws, its own or a stand-in
+    // (a simplified shadow caster)
+    struct MeshDraw
+    {
+        const RenderPrimitive* primitive = nullptr;
+        uint32_t mesh_index = 0;
+        MeshIndexRange indices;
+    };
+    // the primitives with their own meshes
+    static std::vector<MeshDraw> own_meshes(const std::vector<const RenderPrimitive*>& primitives);
+
+    // Draws `items` of the pass: grouped by pipeline and index block, one indirect draw per group (in_order: one
+    // draw per item in the given order, for passes which blend). bind_resources binds the pass resources after a
+    // pipeline.
+    // Draws of one pipeline and index block, commands [first_command, first_command + command_count) of the
+    // draw list
+    struct DrawGroup
+    {
+        const RenderPrimitivePassInfo* info = nullptr;
+        uint32_t index_block = 0;
+        uint32_t first_command = 0;
+        uint32_t command_count = 0;
+    };
+    // Puts the draws of the pass into the draw list, grouped by pipeline and index block (the order of the items is
+    // kept inside a group). with_bounds: their world bounds too (for the GPU culling)
+    std::vector<DrawGroup> record_groups(Name pass, std::span<const MeshDraw> items, bool with_bounds);
+    // One indirect draw per group; `commands` / command_offset: a GPU made copy of the commands (culling)
+    void draw_groups(RenderGraphContext& ctx, std::span<const DrawGroup> groups, uint32_t debug_id,
+        const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources,
+        std::optional<RBBufferHandle> commands = std::nullopt, uint32_t command_offset = 0);
+
+    // The base pass of the main graph, put into the draw list before the passes: the occlusion culling runs over
+    // its commands before GeometryBase draws them
+    void prepare_base_draws(RenderGraphContext& ctx);
+    std::vector<DrawGroup> base_groups;
+    uint32_t base_first_command = 0;
+    uint32_t base_command_count = 0;
+    bool base_draws_prepared = false;
+
+    void draw_items(RenderGraphContext& ctx, std::span<const MeshDraw> items, uint32_t debug_id,
         bool in_order, const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources);
 
     // `render.dump_draws` (one-time flag dump_draws): for the next frames every mesh pass appends what it draws,
     // by mesh asset and LOD, to cache/bench/draws.csv. Several frames: the far shadow cascades take turns.
     static constexpr uint32_t draw_dump_frame_count = 4;
     uint32_t draw_dump_frames = 0;
-    void dump_draws(Name pass, uint32_t debug_id, const std::vector<const RenderPrimitive*>& items) const;
+    void dump_draws(Name pass, uint32_t debug_id, std::span<const MeshDraw> draws) const;
 };
 RH_OBJECT(GenericRenderGraph)

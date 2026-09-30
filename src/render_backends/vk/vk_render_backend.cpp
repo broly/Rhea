@@ -884,12 +884,32 @@ void VkRenderBackend::draw(RBCommandList cmd_list, uint32_t vertex_count, uint32
     vkCmdDraw(cmd, vertex_count, 1, first_vertex, first_instance);
 }
 
-void VkRenderBackend::draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset, uint32_t draw_count)
+void VkRenderBackend::draw_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset,
+    uint32_t draw_count, uint32_t stride)
 {
     if (draw_count == 0)
         return;
     const vk::BufferInfo& info = buffer_manager.get_buffer(buffer, frame);
-    vkCmdDrawIndirect(cmd_list.as<VkCommandBuffer>(), info.buffer, offset, draw_count, sizeof(VkDrawIndirectCommand));
+    vkCmdDrawIndirect(cmd_list.as<VkCommandBuffer>(), info.buffer, offset, draw_count, stride);
+}
+
+void VkRenderBackend::draw_indexed_indirect(RBCommandList cmd_list, RBBufferHandle buffer, RBFrameHandle frame,
+    uint64_t offset, uint32_t draw_count, uint32_t stride)
+{
+    if (draw_count == 0)
+        return;
+    const vk::BufferInfo& info = buffer_manager.get_buffer(buffer, frame);
+    vkCmdDrawIndexedIndirect(cmd_list.as<VkCommandBuffer>(), info.buffer, offset, draw_count, stride);
+}
+
+MeshIndexRange VkRenderBackend::get_mesh_index_range(uint32_t mesh_index) const
+{
+    return mesh_manager.get_index_range(mesh_index);
+}
+
+void VkRenderBackend::bind_mesh_index_block(RBCommandList cmd_list, uint32_t block)
+{
+    mesh_manager.bind_index_block(cmd_list.as<VkCommandBuffer>(), block);
 }
 
 void VkRenderBackend::trace_rays(RBCommandList cmd, PipelineObject* pipeline_object, Extent resolution, float depth)
@@ -1038,6 +1058,37 @@ void VkRenderBackend::debug_full_barrier(RBCommandList cmd)
         1, &barrier,
         0, nullptr,
         0, nullptr);
+}
+
+void VkRenderBackend::cmd_buffer_barrier(RBCommandList cmd, BufferBarrier kind)
+{
+    constexpr VkPipelineStageFlags draw_stages = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+    VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    VkPipelineStageFlags src_stages = 0;
+    VkPipelineStageFlags dst_stages = 0;
+    switch (kind)
+    {
+    case BufferBarrier::compute_to_draw:
+        src_stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        dst_stages = draw_stages | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT;
+        break;
+    case BufferBarrier::compute_to_compute:
+        src_stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        dst_stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        break;
+    case BufferBarrier::draw_to_compute:
+        // write after read: an execution dependency is enough
+        src_stages = draw_stages | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        dst_stages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        break;
+    }
+    vkCmdPipelineBarrier(cmd.as<VkCommandBuffer>(), src_stages, dst_stages, 0, 1, &barrier, 0, nullptr, 0, nullptr);
 }
 
 RBQueryPool VkRenderBackend::create_occlusion_pool(uint32_t query_count)

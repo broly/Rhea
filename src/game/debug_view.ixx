@@ -18,10 +18,8 @@ export enum class DebugViewMode : uint32_t
     BASE_COLOR,
     ROUGHNESS,
     WORLD_NORMAL,
-    VIEW_NORMAL,
     GEOMETRY_NORMAL,
     LINEAR_DEPTH,
-    WORLD_POSITION,
     MOTION_VECTORS,
     EMISSIVE,
 
@@ -50,10 +48,8 @@ export constexpr const char* get_debug_view_mode_name(DebugViewMode mode)
         case DebugViewMode::BASE_COLOR:      return "GBuffer: Base Color";
         case DebugViewMode::ROUGHNESS:       return "GBuffer: Roughness";
         case DebugViewMode::WORLD_NORMAL:    return "GBuffer: World Normal";
-        case DebugViewMode::VIEW_NORMAL:     return "GBuffer: View Normal";
         case DebugViewMode::GEOMETRY_NORMAL: return "GBuffer: Geometry Normal";
         case DebugViewMode::LINEAR_DEPTH:    return "GBuffer: Linear Depth";
-        case DebugViewMode::WORLD_POSITION:  return "GBuffer: World Position";
         case DebugViewMode::MOTION_VECTORS:  return "GBuffer: Motion Vectors";
         case DebugViewMode::EMISSIVE:        return "GBuffer: Emissive";
         default:                             return "Unknown";
