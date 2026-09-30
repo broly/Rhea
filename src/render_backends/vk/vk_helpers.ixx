@@ -113,6 +113,14 @@ export namespace vk
                 physicalDevice,
                 memRequirements.memoryTypeBits,
                 properties);
+        // VRAM_DIAG (temporary)
+        {
+            static uint64_t total = 0;
+            total += memRequirements.size;
+            if (memRequirements.size >= (8u << 20))
+                std::printf("VRAM_DIAG buffer %.1f MB (props %u, usage %u), buffers total %.1f MB\n",
+                    double(memRequirements.size) / 1048576.0, unsigned(properties), unsigned(usage), double(total) / 1048576.0);
+        }
 
         VkMemoryAllocateFlagsInfo flagsInfo{
             VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO

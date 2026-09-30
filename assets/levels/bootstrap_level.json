@@ -615,6 +615,9 @@
 					"heightmap": "terrain/sponza_valley.r16",
 					"splatmap": "terrain/sponza_valley_splat.png",
 					"puddlemap": "terrain/sponza_valley_puddles.png",
+					// densities of the ground foliage (TerrainFoliage below): R grass, G dandelions, B daisies,
+					// A rare flowers; tools/foliage/generate_foliage_mask.py, brush Foliage of the Terrain window
+					"foliagemap": "terrain/sponza_valley_foliage.png",
 					"samples": 512,
 					"spacing": 1.0,
 					"min_height": -20.0,
@@ -660,6 +663,27 @@
 							"layer3_orm": "TEXTURE(textures/terrain/rock_orm.png)"
 						}
 					}
+				},
+				// grass and flowers grown on the GPU around the camera where the foliagemap says (module foliage);
+				// render.foliage.distance / density scale them
+				"TerrainFoliage": {
+					"wind_strength": 0.35,
+					"wind_heading": 0.5,
+					"gust_speed": 4.0,
+					"gust_scale": 14.0,
+					"gust_strength": 0.6,
+					"interaction_radius": 0.6,
+					"types": [
+						{"name": "meadow_tall", "asset": "foliage/grass_medium_01.json", "variants": ["tall_a", "tall_b", "tall_c", "mid_a", "mid_b"], "channel": 0, "density": 10.0, "fade_start": 24.0, "fade_end": 42.0, "lod1_distance": 7.0, "lod2_distance": 16.0, "scale_min": 1.4, "scale_max": 2.3, "sink": 0.01, "ground_align": 0.2, "tint": { "x": 1.15, "y": 1.18, "z": 1.0 }, "tint_variation": 0.15, "dry_color": { "x": 0.62, "y": 0.52, "z": 0.3 }, "dry_fraction": 0.08, "color_noise": 0.3, "wind": 1.0, "seed": 1 },
+						{"name": "meadow_clumps", "asset": "foliage/grass_medium_01.json", "variants": ["mid_c", "small_a", "small_b", "large_a", "large_b", "large_c"], "channel": 0, "density": 8.0, "fade_start": 18.0, "fade_end": 32.0, "lod1_distance": 5.0, "lod2_distance": 11.0, "scale_min": 1.3, "scale_max": 2.0, "sink": 0.015, "ground_align": 0.5, "tint_variation": 0.15, "dry_color": { "x": 0.62, "y": 0.52, "z": 0.3 }, "dry_fraction": 0.05, "color_noise": 0.3, "wind": 0.7, "seed": 2, "tint": { "x": 1.15, "y": 1.18, "z": 1.0 } },
+						{"name": "grass_low", "asset": "foliage/grass_bermuda_01.json", "variants": ["medium_a", "medium_b", "medium_c", "medium_d", "medium_e", "medium_f", "seedling_a", "seedling_b", "seedling_c", "seedling_d", "single_a", "single_b", "small_c", "small_e", "small_f", "dead_b"], "channel": 0, "density": 40.0, "mask_threshold": 0.15, "fade_start": 9.0, "fade_end": 17.0, "lod1_distance": 4.0, "lod2_distance": 8.0, "scale_min": 1.8, "scale_max": 3.0, "sink": 0.005, "ground_align": 0.6, "tint": { "x": 1.1, "y": 1.18, "z": 1.0 }, "tint_variation": 0.2, "dry_color": { "x": 0.6, "y": 0.5, "z": 0.3 }, "dry_fraction": 0.06, "color_noise": 0.3, "wind": 0.6, "seed": 3 },
+						{"name": "dry_tufts", "asset": "foliage/grass_medium_02.json", "channel": 0, "density": 1.5, "patch_scale": 7.0, "patch_coverage": 0.4, "fade_start": 25.0, "fade_end": 42.0, "lod1_distance": 6.0, "lod2_distance": 14.0, "scale_min": 1.3, "scale_max": 2.0, "sink": 0.01, "ground_align": 0.3, "tint_variation": 0.15, "color_noise": 0.2, "wind": 0.9, "seed": 4 },
+						{"name": "dandelion", "asset": "foliage/dandelion_01.json", "channel": 1, "density": 3.0, "patch_scale": 3.0, "patch_coverage": 0.6, "fade_start": 25.0, "fade_end": 42.0, "lod1_distance": 5.0, "lod2_distance": 12.0, "scale_min": 1.3, "scale_max": 1.9, "sink": 0.005, "ground_align": 0.7, "tint_variation": 0.1, "color_noise": 0.15, "wind": 0.6, "seed": 5 },
+						{"name": "white_flowers", "asset": "foliage/flower_heliophila.json", "channel": 2, "density": 0.8, "patch_scale": 3.0, "patch_coverage": 0.5, "fade_start": 25.0, "fade_end": 42.0, "lod1_distance": 5.0, "lod2_distance": 12.0, "scale_min": 0.8, "scale_max": 1.2, "sink": 0.005, "ground_align": 0.5, "tint_variation": 0.1, "color_noise": 0.1, "wind": 0.9, "seed": 6 },
+						{"name": "celandine", "asset": "foliage/celandine_01.json", "channel": 2, "density": 1.5, "patch_scale": 4.0, "patch_coverage": 0.45, "fade_start": 22.0, "fade_end": 38.0, "lod1_distance": 5.0, "lod2_distance": 12.0, "scale_min": 1.1, "scale_max": 1.6, "sink": 0.005, "ground_align": 0.8, "tint_variation": 0.1, "color_noise": 0.15, "wind": 0.5, "seed": 7 },
+						{"name": "periwinkle", "asset": "foliage/periwinkle_plant.json", "channel": 3, "density": 0.9, "patch_scale": 3.0, "patch_coverage": 0.45, "fade_start": 25.0, "fade_end": 42.0, "lod1_distance": 5.0, "lod2_distance": 12.0, "scale_min": 0.9, "scale_max": 1.3, "sink": 0.005, "ground_align": 0.3, "tint_variation": 0.1, "color_noise": 0.1, "wind": 0.8, "seed": 8 },
+						{"name": "sorrel", "asset": "foliage/shrub_sorrel_01.json", "channel": 3, "density": 5.0, "patch_scale": 2.5, "patch_coverage": 0.4, "fade_start": 15.0, "fade_end": 26.0, "lod1_distance": 4.0, "lod2_distance": 9.0, "scale_min": 2.0, "scale_max": 3.0, "sink": 0.003, "ground_align": 0.7, "tint_variation": 0.1, "color_noise": 0.1, "wind": 0.6, "seed": 9 }
+					]
 				}
 			}
 		},

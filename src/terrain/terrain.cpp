@@ -179,6 +179,22 @@ namespace
         return puddles;
     }
 
+    Texture load_foliage(const Terrain& terrain)
+    {
+        if (!terrain.foliagemap.empty())
+        {
+            std::optional<Texture> file = Texture::create_from_file(paths::get_assets_path() / terrain.foliagemap);
+            if (file && file->extent.width == file->extent.height)
+                return std::move(*file);
+            LogTerrain.Log<Warning>("Foliage map '%s' not found or not square: no ground foliage", terrain.foliagemap.c_str());
+        }
+        Texture foliage;
+        foliage.extent = Extent(terrain.foliage_resolution, terrain.foliage_resolution);
+        foliage.format = TextureFormat::RGBA8;
+        foliage.bulk.resize(size_t(terrain.foliage_resolution) * terrain.foliage_resolution * 4, std::byte{0});
+        return foliage;
+    }
+
     // 1 inside the inner part of the brush, fading to 0 at the radius
     float brush_weight(const TerrainBrush& brush, float distance)
     {
@@ -252,6 +268,8 @@ namespace
                 case TerrainBrushMode::paint:
                 case TerrainBrushMode::water:
                 case TerrainBrushMode::dry:
+                case TerrainBrushMode::foliage:
+                case TerrainBrushMode::clear_foliage:
                     break;
                 }
                 h = std::clamp(h, data.min_height, data.max_height);
@@ -359,6 +377,44 @@ namespace
         data.unsaved = true;
     }
 
+    // The density of one foliage channel moves toward the brush's profile (full in the inner part, 0 at the
+    // radius), clearing mirrors it: like the puddles, the falloff is the edge of the patch
+    void grow(TerrainData& data, const TerrainBrush& brush, glm::vec2 local, float dt)
+    {
+        Texture& foliage = terrain::get_foliage(data);
+        const int32_t resolution = int32_t(foliage.extent.width);
+        const float texel = data.size() / float(resolution);
+        const TerrainRect rect = brush_rect(local - glm::vec2(0.5f * texel), brush.radius, texel, resolution);
+        if (rect.empty() || brush.foliage_channel > 3)
+            return;
+
+        const bool fill = brush.mode == TerrainBrushMode::foliage;
+        const float rate = std::clamp(brush.strength, 0.0f, 1.0f) * 6.0f * dt;
+        auto* texels = reinterpret_cast<uint8_t*>(foliage.bulk.data());
+        for (int32_t z = rect.min_z; z <= rect.max_z; ++z)
+        {
+            for (int32_t x = rect.min_x; x <= rect.max_x; ++x)
+            {
+                const glm::vec2 center = (glm::vec2(float(x), float(z)) + 0.5f) * texel;
+                const float weight = brush_weight(brush, glm::length(center - local));
+                if (weight <= 0.0f)
+                    continue;
+
+                uint8_t& density = texels[(size_t(z) * resolution + size_t(x)) * 4 + brush.foliage_channel];
+                const int32_t old_density = density;
+                const int32_t target = int32_t(std::lround((fill ? weight : 1.0f - weight) * 255.0f));
+                const int32_t distance = fill ? target - old_density : old_density - target;
+                if (distance <= 0)
+                    continue;
+                // at least one step (8 bit densities, small per frame amounts)
+                const int32_t step = int32_t(std::ceil(float(distance) * std::min(rate, 1.0f)));
+                density = uint8_t(fill ? old_density + step : old_density - step);
+            }
+        }
+        data.dirty_foliage.add(rect);
+        data.unsaved = true;
+    }
+
     [[=scene::on_spawned<Terrain>]]
     void spawn_terrain(World& world, ecs::Entity root, const SerializationContext&)
     {
@@ -402,6 +458,12 @@ namespace
         puddles.transition_path = std::format("{}#terrain{}", puddles.name, root.bits());
         data->puddles = AssetManager::get().register_external_texture(std::move(puddles));
         terrain.material->parameters["puddles"] = data->puddles;
+
+        // read by the ground foliage (module foliage), not by the terrain material
+        Texture foliage = load_foliage(terrain);
+        foliage.name = terrain.foliagemap.empty() ? std::string("terrain_foliage") : terrain.foliagemap;
+        foliage.transition_path = std::format("{}#terrain{}", foliage.name, root.bits());
+        data->foliage = AssetManager::get().register_external_texture(std::move(foliage));
 
         const std::string name = scene::get_name(registry, root);
         const uint32_t quads = terrain.samples - 1;
@@ -484,6 +546,11 @@ namespace terrain
         return AssetManager::get().loaded_textures.at(data.puddles);
     }
 
+    Texture& get_foliage(const TerrainData& data)
+    {
+        return AssetManager::get().loaded_textures.at(data.foliage);
+    }
+
     std::optional<float> height_at(const TerrainData& data, glm::vec2 world_xz)
     {
         const glm::vec2 local = (world_xz - glm::vec2(data.origin.x, data.origin.z)) / data.spacing;
@@ -537,6 +604,8 @@ namespace terrain
             paint(data, brush, local, dt);
         else if (brush.mode == TerrainBrushMode::water || brush.mode == TerrainBrushMode::dry)
             flood(data, brush, local, dt);
+        else if (brush.mode == TerrainBrushMode::foliage || brush.mode == TerrainBrushMode::clear_foliage)
+            grow(data, brush, local, dt);
         else
             sculpt(data, brush, local, dt);
     }
@@ -567,6 +636,7 @@ namespace terrain
                 backend->update_mesh_vertices(MeshPrimHandle{ chunk.mesh, 0, 0 }, vertices);
             }
             data.dirty_heights = {};
+            ++data.heights_version;
         }
 
         auto upload = [&] (TextureHandle handle, TerrainRect& rect) {
@@ -582,6 +652,11 @@ namespace terrain
         };
         upload(data.splat, data.dirty_splat);
         upload(data.puddles, data.dirty_puddles);
+        if (!data.dirty_foliage.empty())
+        {
+            upload(data.foliage, data.dirty_foliage);
+            ++data.foliage_version;
+        }
     }
 
     void commit_collision(TerrainData& data, phys::PhysicsScene& physics, ecs::Entity owner)
@@ -653,6 +728,16 @@ namespace terrain
             if (!get_puddles(data).save_to_file(puddle_path))
             {
                 error = "could not write " + puddle_path.string();
+                return false;
+            }
+        }
+
+        if (!terrain.foliagemap.empty())
+        {
+            const std::filesystem::path foliage_path = paths::get_assets_path() / terrain.foliagemap;
+            if (!get_foliage(data).save_to_file(foliage_path))
+            {
+                error = "could not write " + foliage_path.string();
                 return false;
             }
         }

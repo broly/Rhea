@@ -39,6 +39,9 @@ export
         [[=rh::edit, =rh::read_only]] std::string splatmap;
         // PNG, R = water level of the puddles (terrain.frag); no file: dry (Save writes it)
         [[=rh::edit, =rh::read_only]] std::string puddlemap;
+        // PNG, RGBA = densities of the ground foliage kinds (TerrainFoliage, module foliage says which kind
+        // grows on which channel); no file: none (Save writes it)
+        [[=rh::edit, =rh::read_only]] std::string foliagemap;
 
         [[=rh::edit, =rh::read_only]] uint32_t samples = 512;             // per side, a multiple of 4
         [[=rh::edit, =rh::read_only]] float spacing = 1.0f;               // m between samples
@@ -46,6 +49,7 @@ export
         [[=rh::edit, =rh::read_only]] float max_height = 80.0f;
         [[=rh::edit, =rh::read_only]] uint32_t splat_resolution = 2048;   // of a new splat map
         [[=rh::edit, =rh::read_only]] uint32_t puddle_resolution = 1024;  // of a new puddle map
+        [[=rh::edit, =rh::read_only]] uint32_t foliage_resolution = 1024; // of a new foliage map
         [[=rh::edit, =rh::read_only]] uint32_t chunk_quads = 64;         // per side of a chunk mesh
 
         // names of the layers in the editor (material slots 0..3)
@@ -114,6 +118,7 @@ export
         std::vector<float> heights;                 // samples^2, relative to the entity, rows along x
         TextureHandle splat;                        // CPU copy is AssetManager's (terrain::get_splat)
         TextureHandle puddles;                      // RGBA8, R = water level (terrain::get_puddles)
+        TextureHandle foliage;                      // RGBA8, densities of the foliage kinds (terrain::get_foliage)
         std::vector<TerrainChunk> chunks;
 
         phys::Shape shape;
@@ -123,6 +128,11 @@ export
         TerrainRect dirty_heights;
         TerrainRect dirty_splat;                    // texels
         TerrainRect dirty_puddles;                  // texels
+        TerrainRect dirty_foliage;                  // texels
+        // counts the uploads of edited heights / foliage densities (commit_render): the ground foliage renderer
+        // copies the heights again when it changes
+        uint32_t heights_version = 0;
+        uint32_t foliage_version = 0;
         bool collision_dirty = false;
         bool unsaved = false;
 
@@ -138,6 +148,8 @@ export
         flatten,    // toward flatten_height
         water,      // puddle water level up, to the shape of the brush
         dry,        // and down
+        foliage,    // density of the ground foliage on channel `foliage_channel` up (Shift: down)
+        clear_foliage,
     };
 
     struct TerrainBrush
@@ -147,6 +159,7 @@ export
         float strength = 0.5f;          // 0..1
         float falloff = 0.6f;           // 0: hard edge, 1: fades out from the center
         uint32_t layer = 0;             // paint
+        uint32_t foliage_channel = 0;   // foliage: channel of the foliage map (R G B A)
         float flatten_height = 0.0f;    // flatten: world height
     };
 
@@ -176,5 +189,6 @@ export
         // The splat map texels (RGBA8, splat_resolution^2), AssetManager's copy: uploaded from it
         Texture& get_splat(const TerrainData& data);
         Texture& get_puddles(const TerrainData& data);
+        Texture& get_foliage(const TerrainData& data);
     }
 }

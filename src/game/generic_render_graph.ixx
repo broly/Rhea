@@ -24,6 +24,7 @@ import :debug_view;
 import :reflection_probes;
 import :sky_renderer;
 import :particle_renderer;
+import :foliage_renderer;
 import :occlusion_culling;
 import :draw_list;
 import rhcomponents;
@@ -466,6 +467,9 @@ public:
 
     // sprites of the particle systems, main graph only (pass "Particles")
     std::unique_ptr<ParticleRenderer> particles;
+
+    // grass and flowers on the terrain, main graph only (passes FoliageCull, GroundFoliage)
+    std::unique_ptr<FoliageRenderer> foliage;
 
     // GPU occlusion culling of the base pass, main graph only (passes OcclusionCullEarly, HZB, OcclusionCullLate,
     // GeometryBaseLate)

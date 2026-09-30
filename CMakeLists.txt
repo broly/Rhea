@@ -73,6 +73,7 @@ set(RHEA_MODULE_DIRS
     src/trees
     src/props
     src/particles
+    src/foliage
     src/sky
     src/engine
     src/render_backends/vk

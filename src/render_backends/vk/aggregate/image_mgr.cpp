@@ -524,6 +524,15 @@ RBImageHandle vk::ImageManager::create_image(const RBImageDesc& desc)
             mem_req.memoryTypeBits,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
+    // VRAM_DIAG (temporary)
+    {
+        static uint64_t total = 0;
+        total += mem_req.size;
+        if (mem_req.size >= (4u << 20))
+            std::printf("VRAM_DIAG image %.1f MB '%s' %ux%ux%u mips %u layers %u, images total %.1f MB\n",
+                double(mem_req.size) / 1048576.0, desc.name.to_string().c_str(), extent.width, extent.height, res.depth, desc.mip_levels,
+                desc.get_num_layers(), double(total) / 1048576.0);
+    }
     VK_CHECK(vkAllocateMemory(instance.device, &alloc_info, nullptr, &res.memory));
     VK_CHECK(vkBindImageMemory(instance.device, res.image, res.memory, 0));
     

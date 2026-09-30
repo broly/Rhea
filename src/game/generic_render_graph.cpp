@@ -385,6 +385,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         occlusion = std::make_unique<OcclusionCulling>();
         occlusion->init(*renderer, *backend);
 
+        foliage = std::make_unique<FoliageRenderer>();
+        foliage->init(*renderer, *backend);
+
         sky_downscale = uint32_t(std::clamp(cv_sky_downscale.get(), 1, 8));
         atmosphere_buffer = create_texture({
             .name = NAME(atmosphere_buffer),
@@ -611,6 +614,37 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         });
     }
     
+    // ground foliage: grown after the hierarchical depth of the early draws (culls it too), drawn over the base pass
+    if (foliage)
+    {
+        add_pass({
+            .name = "FoliageCull",
+            .condition = [this] () { return foliage->is_active(); },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                foliage->cull(ctx, camera_resource, occlusion->get_resource());
+            },
+            .type = RenderPassType::compute
+        });
+
+        add_pass({
+            .name = "GroundFoliage",
+            .condition = [this] () { return foliage->is_active(); },
+            .writes = base_pass_targets(RBLoadOp::Load),
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("GroundFoliage");
+                ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+                foliage->draw(ctx, {
+                    .camera = camera_resource,
+                    .mesh_table = mesh_table_resource,
+                    .material_table = pbr_material_table_resource,
+                    .textures = textures_resource,
+                });
+            },
+        });
+    }
+
     // emissive watch ring (see EMISSIVE_RING_SIZE): g_emissive as the base pass left it
     if (emissive_diagnostics_enabled())
     add_pass({
@@ -1185,6 +1219,18 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
         // screen sized targets keep a zero extent in their description
         const Extent depth_extent = resolution.is_zero() ? backend->get_swapchain_extent() : resolution;
         occlusion->prepare(ctx, get_image(gbuffer[GBUFFER_SLOTS::DEPTH]), depth_extent);
+    }
+
+    if (foliage)
+    {
+        foliage->prepare(ctx, *engine->scene_view, {
+            .view_proj = current_camera_ubo.proj * current_camera_ubo.view,
+            .camera_position = current_camera_ubo.camera_pos,
+            .hzb_valid = occlusion && cv_occlusion_culling.get(),
+            .hzb_width = occlusion ? occlusion->get_hzb_width() : 0,
+            .hzb_height = occlusion ? occlusion->get_hzb_height() : 0,
+            .hzb_levels = occlusion ? occlusion->get_hzb_levels() : 0,
+        });
     }
 
     if (particles)
