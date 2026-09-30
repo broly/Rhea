@@ -15,14 +15,20 @@
     #error "BINDING_UBO_SHADOW_DEBUG definition is missing. Provide this resource: shadow"
 #endif
 
+#ifndef BINDING_SAMPLER_CLOUD_SHADOW
+    #define BINDING_SAMPLER_CLOUD_SHADOW 0
+    #error "BINDING_SAMPLER_CLOUD_SHADOW definition is missing. Provide this resource: shadow"
+#endif
+
 layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW)
 uniform sampler2DShadow u_shadow_depth;
 
 layout(set = SET_SHADOW_RESOURCE, binding = BINDING_UBO_SHADOW_DEBUG)
 uniform sampler2D u_shadow_depth_debug;
 
-
-
+// r: share of the directional light the clouds let through (cloud_shadow.frag)
+layout(set = SET_SHADOW_RESOURCE, binding = BINDING_SAMPLER_CLOUD_SHADOW)
+uniform sampler2D u_cloud_shadow;
 
 float hash12(vec2 p)
 {
@@ -74,8 +80,29 @@ float cascade_shadow(int cascade, vec3 world_pos, vec3 Ng, out float edge)
     return lit / 9.0;
 }
 
+// Shadow of the clouds (SkyRenderer, pass "CloudShadow"): the share of the directional light which gets through
+// them to the point. A map in light space around the camera, every point on a ray of the light reads the same
+// texel; lit beyond the map.
+float cloud_shadow(vec3 world_pos)
+{
+    float strength = light_ubo.dir_light.cloud_shadow_params.x;
+    if (strength <= 0.0)
+        return 1.0;
+
+    vec2 uv = vec2(dot(world_pos, light_ubo.dir_light.cloud_shadow_u.xyz) + light_ubo.dir_light.cloud_shadow_u.w,
+                   dot(world_pos, light_ubo.dir_light.cloud_shadow_v.xyz) + light_ubo.dir_light.cloud_shadow_v.w);
+    float edge = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
+    if (edge <= 0.0)
+        return 1.0;
+    float transmittance = textureLod(u_cloud_shadow, uv, 0.0).r;
+    // fades out towards the border of the map
+    return mix(1.0, transmittance, strength * clamp(edge * 16.0, 0.0, 1.0));
+}
+
+// Share of the directional light which reaches the point: the cascades (scene) and the clouds above it
 float shadow_factor(vec3 world_pos, vec3 Ng)
 {
+    float clouds = cloud_shadow(world_pos);
     int count = int(light_ubo.dir_light.cascade_params.x + 0.5);
     float band = light_ubo.dir_light.cascade_params.y;
     for (int cascade = 0; cascade < count; ++cascade)
@@ -91,9 +118,9 @@ float shadow_factor(vec3 world_pos, vec3 Ng)
             if (next >= 0.0)
                 shadow = mix(next, shadow, edge / band);
         }
-        return shadow;
+        return shadow * clouds;
     }
-    return 1.0;
+    return clouds;
 }
 
 

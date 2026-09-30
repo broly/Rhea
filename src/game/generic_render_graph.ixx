@@ -234,6 +234,8 @@ public:
         RenderGraphContext& ctx);
     
     RGTextureHandle shadow_map;
+    // what the clouds let through of the directional light, a map across it around the camera (SkyRenderer)
+    RGTextureHandle cloud_shadow_map;
     // sky of the frame at 1 / sky_downscale of the screen (SkyRenderer): atmosphere, clouds, and the clouds
     // of the two previous frames (layer history_index is written, the other one read)
     RGTextureHandle atmosphere_buffer;

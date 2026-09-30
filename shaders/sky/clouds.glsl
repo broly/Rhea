@@ -175,6 +175,48 @@ float cloud_light_depth(vec3 p, vec2 axis_xz, vec3 light_dir, int steps)
     return depth * sky_ubo.cloud_layer.w;
 }
 
+// a low light shines through the layer for tens of kilometers: the shadow takes the clouds of this much of it
+const float CLOUD_SHADOW_MAX_PATH = 20000.0;
+
+// Share of the light from light_dir (above the horizon) which the cloud layer lets through along the whole
+// line through `origin`, any point of it: what reaches everything below the clouds on that line.
+// steps: samples through the layer.
+float cloud_shadow_transmittance(vec3 origin, vec3 light_dir, int steps)
+{
+    if (sky_ubo.cloud_detail_offset.w < 0.5 || light_dir.y <= 0.0)
+        return 1.0;
+
+    float r0 = sky_ubo.planet.x + sky_ubo.planet.z;
+    float bottom = sky_ubo.cloud_layer.x;
+    float thickness = sky_ubo.cloud_layer.y;
+    float top = bottom + thickness;
+    float b = (r0 + origin.y) * light_dir.y;
+
+    // The line goes up: it enters the layer where it leaves the sphere of its base and leaves it through the
+    // sphere of its top. Behind the origin (t < 0) when that is above them: still ahead of what is lit.
+    float t0, t1;
+    if (!cloud_sphere_roots(b, (origin.y - top) * (2.0 * r0 + origin.y + top), t0, t1))
+        return 1.0;
+    float base_near, base_far;
+    if (cloud_sphere_roots(b, (origin.y - bottom) * (2.0 * r0 + origin.y + bottom), base_near, base_far))
+        t0 = base_far;
+    t1 = min(t1, t0 + CLOUD_SHADOW_MAX_PATH);
+
+    float step_length = (t1 - t0) / float(steps);
+    float lod = cloud_lod(step_length, sky_ubo.cloud_scale.x, CLOUD_SHAPE_TEXELS);
+    float detail_lod = cloud_lod(step_length, sky_ubo.cloud_scale.y, CLOUD_DETAIL_TEXELS);
+    vec2 axis_xz = origin.xz;
+
+    float depth = 0.0;
+    for (int i = 0; i < steps; ++i)
+    {
+        vec3 p = origin + light_dir * (t0 + (float(i) + 0.5) * step_length);
+        float height = (cloud_altitude(p, axis_xz) - bottom) / thickness;
+        depth += cloud_density(p, height, lod, detail_lod);
+    }
+    return exp(-depth * step_length * sky_ubo.cloud_layer.w);
+}
+
 float cloud_phase_hg(float cos_theta, float g)
 {
     float g2 = g * g;

@@ -364,7 +364,15 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         .format = TextureFormat::Depth32F,
         .usage = RenderTextureUsage::DepthStencil | RenderTextureUsage::Sampled
     });
-    
+
+    // what the clouds let through of the directional light (SkyRenderer, pass "CloudShadow"); never written
+    // and never read (strength 0 in the light UBO) by a graph without a sky
+    cloud_shadow_map = create_texture({
+        .name = NAME(cloud_shadow_map),
+        .extent = { SkyRenderer::cloud_shadow_texels, SkyRenderer::cloud_shadow_texels },
+        .format = TextureFormat::R16F,
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled
+    });
     
     
     debug_line_buffer = backend->create_vertex_buffer(VertexBufferDesc {
@@ -440,13 +448,31 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
     });
     
-    // time sliced probe baking: capture faces sample the shadow map, the lighting samples the probes
+    // shadow of the clouds on the scene, sampled with the shadow map (resources/shadow.glsl)
+    if (sky)
+    {
+        add_pass({
+            .name = "CloudShadow",
+            .writes = {
+                { cloud_shadow_map, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("CloudShadow");
+                sky->draw_cloud_shadow(ctx, light_resource);
+                ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+            },
+        });
+    }
+
+    // time sliced probe baking: capture faces sample the shadow maps, the lighting samples the probes
     if (reflection_probes)
     {
         add_pass({
             .name = "ReflectionProbes",
             .reads = {
-                { shadow_map, RBImageUsageType::SampledFragment }
+                { shadow_map, RBImageUsageType::SampledFragment },
+                { cloud_shadow_map, RBImageUsageType::SampledFragment }
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
@@ -730,6 +756,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .name = Names::pass_lighting,
         .reads = {
             {  shadow_map, RBImageUsageType::SampledFragment },
+            { cloud_shadow_map, RBImageUsageType::SampledFragment },
             { brdf_lut, RBImageUsageType::SampledFragment, RBLoadOp::Load },
             { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::NORMAL], RBImageUsageType::SampledFragment },
@@ -979,9 +1006,8 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
         engine->scene_view->get_processor<SceneViewProcessor_Mesh>().upload_primitive_table(*primitive_table_resource, ctx.frame);
     }
     
-    prepare_geometry_resources(ctx);
-    
-    // the sky first: the probes capture it and take their fallback ambient from it
+    // the sky first: the light UBO carries its cloud shadow map, the probes capture it and take their
+    // fallback ambient from it
     if (sky)
     {
         sky->prepare(ctx, *engine->scene_view, {
@@ -994,6 +1020,8 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
             .downscale = sky_downscale,
         });
     }
+
+    prepare_geometry_resources(ctx);
 
     if (reflection_probes)
     {
@@ -1167,6 +1195,14 @@ LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
         light_ubo.dir_light.color = dir_light->color;
 
         write_shadow_cascades(light_ubo.dir_light);
+
+        if (sky)
+        {
+            const SkyRenderer::CloudShadow& cloud_shadow = sky->get_cloud_shadow();
+            light_ubo.dir_light.cloud_shadow_u = cloud_shadow.u;
+            light_ubo.dir_light.cloud_shadow_v = cloud_shadow.v;
+            light_ubo.dir_light.cloud_shadow_params = cloud_shadow.params;
+        }
     }
 
     return light_ubo;
@@ -1260,6 +1296,13 @@ void GenericRenderGraph::prepare_geometry_resources(
             shadow_resource->update_image(
                 "u_shadow_depth_debug",
                 get_image(shadow_map),
+            {
+                    .frame = ctx.frame
+                });
+
+            shadow_resource->update_image(
+                "u_cloud_shadow",
+                get_image(cloud_shadow_map),
             {
                     .frame = ctx.frame
                 });

@@ -30,6 +30,13 @@ struct SkyMarchPushConstants
 };
 RH_REGISTER_TYPE(SkyMarchPushConstants)
 
+// cloud_shadow.frag
+struct CloudShadowPushConstants
+{
+    uint32_t steps;
+};
+RH_REGISTER_TYPE(CloudShadowPushConstants)
+
 // Cost of the sky: texels of its buffers (downscale), and for the clouds the long steps per ray (steps) and
 // the samples towards the light per sample inside a cloud (light_steps). The history hides the noise of the
 // dithered cloud samples.
@@ -43,6 +50,10 @@ export cvar::Var<int> cv_clouds_light_steps(
     "render.clouds.light_steps", 6, "Samples towards the light per cloud sample (1-16)");
 export cvar::Var<float> cv_clouds_history(
     "render.clouds.history", 0.9f, "Share of the reprojected previous frames in the cloud buffer (0: none, noisy; 0.95: smooth, lags)");
+export cvar::Var<bool> cv_clouds_shadows(
+    "render.clouds.shadows", true, "Shadows of the clouds on the scene (their strength: VolumetricClouds::shadow)");
+export cvar::Var<int> cv_clouds_shadow_steps(
+    "render.clouds.shadow_steps", 32, "Samples through the cloud layer per texel of the cloud shadow map (4-128)");
 
 // Sky of the main view: the SkyAtmosphere / VolumetricClouds of the level (SceneViewProcessor_Sky) and its
 // directional light as a frame of rendering.
@@ -54,6 +65,9 @@ export cvar::Var<float> cv_clouds_history(
 //                   reprojected history
 //   draw_sky        pass "Sky": the buffers upsampled behind the scene, with sun, moon and stars at the
 //                   full resolution between them
+//   draw_cloud_shadow  pass "CloudShadow": what the clouds let through of the directional light, as a map
+//                   across that light around the camera (shaders/resources/shadow.glsl reads it with the
+//                   shadow cascades: lighting, reflection probe captures)
 //
 // The reflection probes capture the same sky through the "sky" resource (probe_sky.frag, coarser clouds).
 // The marches themselves are shaders/sky/atmosphere.glsl and shaders/sky/clouds.glsl, shared by every pass
@@ -84,6 +98,23 @@ public:
     void dispatch_march(RenderGraphContext& ctx, RenderResource* camera, RenderResource* gbuffer, Extent extent);
     void draw_sky(RenderGraphContext& ctx, RenderResource* camera, RenderResource* gbuffer);
 
+    // Cloud shadow map: cloud_shadow_texels^2 texels over cloud_shadow_size^2 meters across the directional
+    // light, centered on the camera. 8 m per texel: the shapes of the clouds are tens of meters
+    static constexpr uint32_t cloud_shadow_texels = 512;
+    static constexpr float cloud_shadow_size = 4096.0f;
+    // Projection of this frame's map, as the light UBO carries it (DirectionalLight::cloud_shadow_*).
+    // strength 0: no cloud shadows (no clouds, no light above the horizon, switched off).
+    struct CloudShadow
+    {
+        glm::vec4 u{ 0.0f };
+        glm::vec4 v{ 0.0f };
+        glm::vec4 params{ 0.0f };
+    };
+    const CloudShadow& get_cloud_shadow() const { return cloud_shadow; }
+    // Fills the bound target of cloud_shadow_texels^2 (leaves its viewport set). light: the light UBO with
+    // get_cloud_shadow() in it.
+    void draw_cloud_shadow(RenderGraphContext& ctx, RenderResource* light);
+
     // Average radiance of the clear sky over the upper hemisphere, cosine weighted: irradiance / pi of a
     // surface facing up. The ambient of what no reflection probe covers.
     glm::vec3 get_sky_ambient() const { return sky_ambient; }
@@ -100,8 +131,10 @@ private:
 
     std::shared_ptr<PipelineFamily> march_family;
     std::shared_ptr<PipelineFamily> sky_family;
+    std::shared_ptr<PipelineFamily> cloud_shadow_family;
     PipelineObject* march_pipeline = nullptr;
     PipelineObject* sky_pipeline = nullptr;
+    PipelineObject* cloud_shadow_pipeline = nullptr;
 
     // tiling noise volumes of the clouds (tools/sky/generate_cloud_noise.py)
     RBImageHandle cloud_shape;
@@ -113,4 +146,5 @@ private:
     RBImageHandle history_image;    // recreated (resize, downscale): it holds no history
     float cloud_coverage = 0.0f;
     glm::vec3 sky_ambient = glm::vec3(0.0f);
+    CloudShadow cloud_shadow;
 };

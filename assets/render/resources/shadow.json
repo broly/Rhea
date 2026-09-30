@@ -15,6 +15,12 @@
 				"type": "sampler",
 				"sampler": "shadow",
 				"binding": "BINDING_UBO_SHADOW_DEBUG"
+			},
+			"cloud_shadow": {
+				"variable": "u_cloud_shadow",
+				"type": "sampler",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_CLOUD_SHADOW"
 			}
 		},
 		"set": "SET_SHADOW_RESOURCE"

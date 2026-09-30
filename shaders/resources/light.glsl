@@ -27,6 +27,10 @@ struct DirectionalLight
     vec4 cascade_texel;                 // world size of a shadow texel, per cascade
     vec4 cascade_depth_range;           // m between the near and far plane, per cascade
     vec4 cascade_params;                // x: cascades in use, y: blend band (tile uv), z: 1 / atlas texels, w: tiles per side
+    // shadow of the clouds, a map in light space: uv of p = (dot(p, u.xyz) + u.w, dot(p, v.xyz) + v.w)
+    vec4 cloud_shadow_u;                // xyz: u axis (world, unit) / size of the map, w: offset
+    vec4 cloud_shadow_v;                // the same for v
+    vec4 cloud_shadow_params;           // x: strength (0: no cloud shadows), y: size of the map (m), z: dot(camera position, towards the light)
 };
 
 layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) 

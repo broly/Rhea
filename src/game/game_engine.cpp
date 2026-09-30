@@ -164,9 +164,12 @@ void GameEngine::on_debug_ui_render_panel()
     // towards the light ----
     ImGui::SeparatorText("Sky");
     checkbox("Volumetric clouds", cv_clouds_enabled, "Clouds of the VolumetricClouds of the level (their look: the sky entity, Windows > Sky)");
+    ImGui::SameLine();
+    checkbox("Cloud shadows", cv_clouds_shadows, cv_clouds_shadows.get_description().c_str());
     for (auto [label, var, min, max] : { std::tuple{ "Downscale", &cv_sky_downscale, 1, 8 },
                                          std::tuple{ "Cloud steps", &cv_clouds_steps, 8, 256 },
-                                         std::tuple{ "Cloud light steps", &cv_clouds_light_steps, 1, 16 } })
+                                         std::tuple{ "Cloud light steps", &cv_clouds_light_steps, 1, 16 },
+                                         std::tuple{ "Cloud shadow steps", &cv_clouds_shadow_steps, 4, 128 } })
     {
         int value = var->get();
         if (ImGui::SliderInt(label, &value, min, max))

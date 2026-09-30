@@ -77,6 +77,7 @@ void SkyRenderer::init(Renderer& in_renderer, RenderBackend& in_backend)
     checkf(sky_model, "material model 'sky' is missing (assets/render/schemas/sky.json)");
     march_family = renderer->query_pipeline_family("SkyMarch", sky_model);
     sky_family = renderer->query_pipeline_family("Sky", sky_model);
+    cloud_shadow_family = renderer->query_pipeline_family("CloudShadow", sky_model);
 
     cloud_shape = load_volume(*backend, cloud_shape_path);
     cloud_detail = load_volume(*backend, cloud_detail_path);
@@ -89,6 +90,7 @@ void SkyRenderer::prepare(RenderGraphContext& ctx, SceneView& scene_view, const 
     // pipelines are requested every frame: hot reload drops the PSO cache
     march_pipeline = march_family->request_pipeline({});
     sky_pipeline = sky_family->request_pipeline({});
+    cloud_shadow_pipeline = cloud_shadow_family->request_pipeline({});
 
     // ---- the sky of the level and its directional light ----
     const RenderObject_Sky* active = scene_view.get_processor<SceneViewProcessor_Sky>().get_active_sky();
@@ -101,10 +103,12 @@ void SkyRenderer::prepare(RenderGraphContext& ctx, SceneView& scene_view, const 
     // the directional light: what reaches the ground
     glm::vec3 light_direction(0.0f, 1.0f, 0.0f);   // towards the light
     glm::vec3 light_color(0.0f);
+    bool has_light = false;
     if (const auto light = scene_view.get_processor<SceneViewProcessor_Light>().get_directional_light())
     {
         light_direction = -glm::normalize(light->direction);
         light_color = glm::vec3(light->color);
+        has_light = true;
     }
 
     // a sky controller places the sun and the moon and says which lights the clouds; otherwise the sun is
@@ -188,6 +192,24 @@ void SkyRenderer::prepare(RenderGraphContext& ctx, SceneView& scene_view, const 
         std::clamp(clouds.powder, 0.0f, 1.0f));
     ubo.cloud_march = glm::vec4(std::max(clouds.max_distance, 1000.0f), float(inputs.time), 0.0f, 0.0f);
 
+    // ---- shadow of the clouds: a map across the directional light (what it is cast by), around the camera ----
+    cloud_shadow = {};
+    const float shadow_strength = std::clamp(clouds.shadow, 0.0f, 1.0f);
+    if (clouds.enabled && has_light && light_direction.y > 0.0f && shadow_strength > 0.0f && cv_clouds_shadows.get())
+    {
+        const glm::vec3 up = std::abs(light_direction.y) > 0.99f ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+        const glm::vec3 axis_u = glm::normalize(glm::cross(up, light_direction));
+        const glm::vec3 axis_v = glm::cross(light_direction, axis_u);
+        // the center moves in whole texels: the shadows do not crawl when the camera moves
+        const float texel = cloud_shadow_size / float(cloud_shadow_texels);
+        const float center_u = std::floor(glm::dot(inputs.camera_position, axis_u) / texel) * texel;
+        const float center_v = std::floor(glm::dot(inputs.camera_position, axis_v) / texel) * texel;
+        cloud_shadow.u = glm::vec4(axis_u / cloud_shadow_size, 0.5f - center_u / cloud_shadow_size);
+        cloud_shadow.v = glm::vec4(axis_v / cloud_shadow_size, 0.5f - center_v / cloud_shadow_size);
+        cloud_shadow.params = glm::vec4(shadow_strength, cloud_shadow_size,
+            glm::dot(inputs.camera_position, light_direction), 0.0f);
+    }
+
     sky_resource->update_uniform_buffer("sky_ubo", ubo, ctx.frame);
     sky_resource->update_image("u_cloud_shape", cloud_shape, { .frame = ctx.frame });
     sky_resource->update_image("u_cloud_detail", cloud_detail, { .frame = ctx.frame });
@@ -235,5 +257,18 @@ void SkyRenderer::draw_sky(RenderGraphContext& ctx, RenderResource* camera, Rend
 
     if (ctx.bind_pipeline(sky_pipeline))
         ctx.bind(camera, gbuffer, sky_resource, buffers_resource);
+    ctx.draw_fullscreen();
+}
+
+void SkyRenderer::draw_cloud_shadow(RenderGraphContext& ctx, RenderResource* light)
+{
+    PROFILE("SkyRenderer::draw_cloud_shadow");
+
+    backend->set_viewport(ctx.cmd, 0, 0, cloud_shadow_texels, cloud_shadow_texels);
+    if (ctx.bind_pipeline(cloud_shadow_pipeline))
+        ctx.bind(light, sky_resource);
+    ctx.push_constants(CloudShadowPushConstants{
+        .steps = uint32_t(std::clamp(cv_clouds_shadow_steps.get(), 4, 128)),
+    });
     ctx.draw_fullscreen();
 }

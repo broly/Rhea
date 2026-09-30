@@ -108,6 +108,9 @@ export
         [[=rh::edit, =rh::range<0.f, 1.f>]] float powder = 0.5f;
         // clouds further than this dissolve into the haze, m
         [[=rh::edit, =rh::speed<100.f>]] float max_distance = 60000.0f;
+        // how much of the directional light the clouds take from what is below them: 0 no cloud shadows,
+        // 1 nothing but ambient light under a thick cloud (the rest stands for the light it scatters down)
+        [[=rh::edit, =rh::range<0.f, 1.f>]] float shadow = 0.8f;
 
         // accumulated wind, m (runtime)
         [[=rh::transient]] vec3 offset{ 0.0f, 0.0f, 0.0f };
