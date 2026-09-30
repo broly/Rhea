@@ -40,6 +40,7 @@ void SceneViewProcessor_Sky::process()
             continue;
         sky.atmosphere = submitted.atmosphere;
         sky.clouds = submitted.clouds;
+        sky.fog = submitted.fog;
     }
 }
 

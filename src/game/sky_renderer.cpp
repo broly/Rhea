@@ -57,6 +57,11 @@ namespace
         return backend.create_texture_3d(texture, texture.extent.height / texture.extent.width, true);
     }
 
+    // VolumetricFog densities are per kilometer
+    constexpr float per_kilometer = 1.0e-3f;
+    // how far the large shapes of the fog noise lift and lower the layer, in falloff heights at VolumetricFog::noise 1
+    constexpr float fog_roll = 0.8f;
+
     float disc_cos(float angular_diameter_degrees)
     {
         return std::cos(glm::radians(std::max(angular_diameter_degrees, 0.01f) * 0.5f));
@@ -71,13 +76,17 @@ void SkyRenderer::init(Renderer& in_renderer, RenderBackend& in_backend)
     sky_resource = renderer->find_resource("sky");
     buffers_resource = renderer->find_resource("sky_buffers");
     targets_resource = renderer->find_resource("sky_targets");
-    checkf(sky_resource && buffers_resource && targets_resource, "sky resources are missing (assets/render/resources)");
+    fog_buffers_resource = renderer->find_resource("fog_buffers");
+    checkf(sky_resource && buffers_resource && targets_resource && fog_buffers_resource,
+        "sky resources are missing (assets/render/resources)");
 
     auto sky_model = renderer->find_model("sky");
     checkf(sky_model, "material model 'sky' is missing (assets/render/schemas/sky.json)");
     march_family = renderer->query_pipeline_family("SkyMarch", sky_model);
     sky_family = renderer->query_pipeline_family("Sky", sky_model);
     cloud_shadow_family = renderer->query_pipeline_family("CloudShadow", sky_model);
+    fog_march_family = renderer->query_pipeline_family("FogMarch", sky_model);
+    fog_family = renderer->query_pipeline_family("Fog", sky_model);
 
     cloud_shape = load_volume(*backend, cloud_shape_path);
     cloud_detail = load_volume(*backend, cloud_detail_path);
@@ -91,6 +100,8 @@ void SkyRenderer::prepare(RenderGraphContext& ctx, SceneView& scene_view, const 
     march_pipeline = march_family->request_pipeline({});
     sky_pipeline = sky_family->request_pipeline({});
     cloud_shadow_pipeline = cloud_shadow_family->request_pipeline({});
+    fog_march_pipeline = fog_march_family->request_pipeline({});
+    fog_pipeline = fog_family->request_pipeline({});
 
     // ---- the sky of the level and its directional light ----
     const RenderObject_Sky* active = scene_view.get_processor<SceneViewProcessor_Sky>().get_active_sky();
@@ -99,6 +110,9 @@ void SkyRenderer::prepare(RenderGraphContext& ctx, SceneView& scene_view, const 
     if (!active || !cv_clouds_enabled.get())
         clouds.enabled = false;
     cloud_coverage = clouds.enabled ? std::clamp(clouds.coverage, 0.0f, 1.0f) : 0.0f;
+    VolumetricFog fog = active ? active->fog : VolumetricFog{};
+    if (!active || !cv_fog_enabled.get())
+        fog.enabled = false;
 
     // the directional light: what reaches the ground
     glm::vec3 light_direction(0.0f, 1.0f, 0.0f);   // towards the light
@@ -192,6 +206,22 @@ void SkyRenderer::prepare(RenderGraphContext& ctx, SceneView& scene_view, const 
         std::clamp(clouds.powder, 0.0f, 1.0f));
     ubo.cloud_march = glm::vec4(std::max(clouds.max_distance, 1000.0f), float(inputs.time), 0.0f, 0.0f);
 
+    // ---- fog: the layer in the low ground and the haze (the weather thickens it together with the air) ----
+    const float fog_ground = fog.enabled ? std::max(fog.density, 0.0f) * per_kilometer : 0.0f;
+    const float fog_haze = fog.enabled ? std::max(fog.haze, 0.0f) * std::max(atmosphere.mie, 0.0f) * per_kilometer : 0.0f;
+    fog_active = fog_ground > 0.0f || fog_haze > 0.0f;
+    const float fog_falloff = std::max(fog.falloff, 0.1f);
+    const float fog_noise = std::clamp(fog.noise, 0.0f, 1.0f);
+    ubo.fog_layer = glm::vec4(fog_ground, fog.base_height, 1.0f / fog_falloff, fog_haze);
+    // beyond the cloud shadow map the fog is lit by what the clouds let through on average: the gaps between them
+    ubo.fog_haze = glm::vec4(1.0f / std::max(fog.haze_height, 1.0f), std::max(fog.max_distance, 10.0f),
+        std::max(fog.ambient, 0.0f), 1.0f - 0.9f * cloud_coverage);
+    ubo.fog_albedo = glm::vec4(glm::clamp(fog.albedo.glm(), glm::vec3(0.0f), glm::vec3(1.0f)),
+        std::clamp(fog.anisotropy, 0.0f, 0.95f));
+    ubo.fog_noise = glm::vec4(1.0f / std::max(fog.noise_size, 1.0f), fog_noise, fog_noise * fog_roll * fog_falloff,
+        std::max(fog.shafts, 0.0f));
+    ubo.fog_offset = glm::vec4(fog.offset.glm(), fog_active ? 1.0f : 0.0f);
+
     // ---- shadow of the clouds: a map across the directional light (what it is cast by), around the camera ----
     cloud_shadow = {};
     const float shadow_strength = std::clamp(clouds.shadow, 0.0f, 1.0f);
@@ -227,6 +257,18 @@ void SkyRenderer::prepare(RenderGraphContext& ctx, SceneView& scene_view, const 
         history_frames = 0;
     }
     downscale = std::max(inputs.downscale, 1u);
+
+    fog_buffers_resource->update_image("u_fog", inputs.fog, { .frame = ctx.frame });
+    fog_buffers_resource->update_image("u_fog_history", inputs.fog_history,
+        { .frame = ctx.frame, .layer_index = inputs.history_layer });
+    // no march while there is no fog: what the history holds then is stale
+    if (inputs.fog_history != fog_history_image || !fog_active)
+    {
+        fog_history_image = inputs.fog_history;
+        fog_history_frames = 0;
+    }
+    fog_downscale = std::max(inputs.fog_downscale, 1u);
+
     frame_counter++;
 }
 
@@ -270,5 +312,34 @@ void SkyRenderer::draw_cloud_shadow(RenderGraphContext& ctx, RenderResource* lig
     ctx.push_constants(CloudShadowPushConstants{
         .steps = uint32_t(std::clamp(cv_clouds_shadow_steps.get(), 4, 128)),
     });
+    ctx.draw_fullscreen();
+}
+
+void SkyRenderer::draw_fog_march(RenderGraphContext& ctx, RenderResource* camera, RenderResource* gbuffer, RenderResource* light,
+    RenderResource* shadow, RenderResource* reflection, Extent extent)
+{
+    PROFILE("SkyRenderer::draw_fog_march");
+
+    backend->set_viewport(ctx.cmd, 0, 0, extent.width, extent.height);
+    if (ctx.bind_pipeline(fog_march_pipeline))
+        ctx.bind(camera, gbuffer, light, shadow, reflection, sky_resource, fog_buffers_resource);
+    ctx.push_constants(FogMarchPushConstants{
+        .steps = uint32_t(std::clamp(cv_fog_steps.get(), 8, 128)),
+        // a new buffer holds no history: two frames fill both layers of it
+        .history_weight = fog_history_frames >= 2 ? std::clamp(cv_fog_history.get(), 0.0f, 0.98f) : 0.0f,
+        .frame = frame_counter,
+        .downscale = fog_downscale,
+    });
+    fog_history_frames++;
+    ctx.draw_fullscreen();
+}
+
+void SkyRenderer::draw_fog(RenderGraphContext& ctx, RenderResource* gbuffer)
+{
+    PROFILE("SkyRenderer::draw_fog");
+
+    if (ctx.bind_pipeline(fog_pipeline))
+        ctx.bind(gbuffer, fog_buffers_resource);
+    ctx.push_constants(FogPushConstants{ .downscale = fog_downscale });
     ctx.draw_fullscreen();
 }

@@ -3,7 +3,7 @@
 
 // Sky of the frame (game: SkyRenderer, src/game/sky_renderer.cpp): the atmosphere, the celestial bodies and
 // the cloud layer as the SkyAtmosphere / VolumetricClouds components of the level describe them, and the
-// noise volumes of the clouds. Read by sky/atmosphere.glsl and sky/clouds.glsl.
+// noise volumes of the clouds, and the VolumetricFog. Read by sky/atmosphere.glsl, sky/clouds.glsl and sky/fog.glsl.
 
 #ifndef SET_SKY
     #define SET_SKY 0
@@ -49,6 +49,12 @@ uniform SkyUBO
     vec4 cloud_albedo;          // rgb, w: ambient strength
     vec4 cloud_phase;           // x: forward anisotropy, y: backward anisotropy, z: weight of the backward lobe, w: powder
     vec4 cloud_march;           // x: max distance, y: time (s)
+    // fog (sky/fog.glsl): a layer in the low ground and a haze everywhere
+    vec4 fog_layer;             // x: extinction of the ground fog at and below its base, y: base (world y), z: 1 / falloff height, w: extinction of the haze at world y = 0
+    vec4 fog_haze;              // x: 1 / scale height of the haze, y: max distance, z: ambient strength, w: share of the light the clouds let through on average
+    vec4 fog_albedo;            // rgb, w: forward anisotropy
+    vec4 fog_noise;             // x: 1 / size of the wisps, y: their strength, z: how far they lift the layer (m), w: scale of the directional light in the haze
+    vec4 fog_offset;            // xyz: wind offset of the wisps (m), w: 1 when there is fog to draw
 } sky_ubo;
 
 // tiling noise volumes (tools/sky/generate_cloud_noise.py)

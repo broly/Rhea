@@ -80,6 +80,30 @@ float cascade_shadow(int cascade, vec3 world_pos, vec3 Ng, out float edge)
     return lit / 9.0;
 }
 
+// Share of the directional light which reaches a point in the air (fog, sky/fog.glsl): one tap of the first
+// cascade that contains it, no bias and no filter - the march which calls it averages many samples per ray.
+// Lit beyond the cascades.
+float cascade_shadow_volume(vec3 world_pos)
+{
+    int count = int(light_ubo.dir_light.cascade_params.x + 0.5);
+    float tiles = light_ubo.dir_light.cascade_params.w;
+    float atlas_texel = light_ubo.dir_light.cascade_params.z;
+    int tiles_per_side = int(tiles + 0.5);
+    for (int cascade = 0; cascade < count; ++cascade)
+    {
+        vec4 clip = light_ubo.dir_light.cascade_vp[cascade] * vec4(world_pos, 1.0);
+        vec3 proj = clip.xyz / clip.w;
+        vec2 uv = proj.xy * 0.5 + 0.5;
+        float edge = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
+        // the bilinear comparison stays inside the tile
+        if (edge < atlas_texel * tiles || proj.z < 0.0 || proj.z > 1.0)
+            continue;
+        vec2 tile = vec2(float(cascade % tiles_per_side), float(cascade / tiles_per_side));
+        return textureLod(u_shadow_depth, vec3((uv + tile) / tiles, proj.z), 0.0);
+    }
+    return 1.0;
+}
+
 // Shadow of the clouds (SkyRenderer, pass "CloudShadow"): the share of the directional light which gets through
 // them to the point. A map in light space around the camera, every point on a ray of the light reads the same
 // texel; lit beyond the map.

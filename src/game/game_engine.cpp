@@ -178,6 +178,21 @@ void GameEngine::on_debug_ui_render_panel()
     }
     slider("Cloud history", cv_clouds_history, 0.0f, 0.98f, cv_clouds_history.get_description().c_str());
 
+    // ---- fog: texels of its buffer (downscale) x samples per ray ----
+    ImGui::SeparatorText("Fog");
+    checkbox("Volumetric fog", cv_fog_enabled, "Fog and light shafts of the VolumetricFog of the level (their look: the sky entity, Windows > Sky)");
+    ImGui::PushID("fog");
+    for (auto [label, var, min, max] : { std::tuple{ "Downscale", &cv_fog_downscale, 1, 8 },
+                                         std::tuple{ "Steps", &cv_fog_steps, 8, 128 } })
+    {
+        int value = var->get();
+        if (ImGui::SliderInt(label, &value, min, max))
+            var->set(value);
+        ImGui::SetItemTooltip("%s", var->get_description().c_str());
+    }
+    slider("History", cv_fog_history, 0.0f, 0.98f, cv_fog_history.get_description().c_str());
+    ImGui::PopID();
+
     ImGui::SeparatorText("Reflection probes");
 
     ReflectionProbeSystem* probes = std::static_pointer_cast<GameRenderer>(renderer)->get_reflection_probes();

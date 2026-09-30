@@ -52,15 +52,17 @@ namespace
         result.cloud_thickness = glm::mix(a.cloud_thickness, b.cloud_thickness, t);
         result.wind_speed = glm::mix(a.wind_speed, b.wind_speed, t);
         result.haze = glm::mix(a.haze, b.haze, t);
+        result.fog = glm::mix(a.fog, b.fog, t);
         result.sun_light = glm::mix(a.sun_light, b.sun_light, t);
         return result;
     }
 
     // The weather the level was authored with: what the components of the sky say
-    Weather weather_of(const SkyAtmosphere& atmosphere, const VolumetricClouds* clouds)
+    Weather weather_of(const SkyAtmosphere& atmosphere, const VolumetricClouds* clouds, const VolumetricFog* fog)
     {
         Weather result;
         result.haze = atmosphere.mie;
+        result.fog = fog && fog->enabled ? fog->density : 0.0f;
         if (clouds)
         {
             result.cloud_coverage = clouds->enabled ? clouds->coverage : 0.0f;
@@ -120,16 +122,17 @@ namespace
     // take this frame's wind.
     [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<SkyControl>, =ecs::before<CloudWind>]]
     void update_sky_controllers(ecs::Query<SkyController, SkyAtmosphere> skies, ecs::Query<VolumetricClouds> cloud_layers,
-        ecs::Query<const Name, Light, Transform> lights, ecs::Res<ecs::FrameTime> time)
+        ecs::Query<VolumetricFog> fog_layers, ecs::Query<const Name, Light, Transform> lights, ecs::Res<ecs::FrameTime> time)
     {
         skies.each([&] (ecs::Entity e, SkyController& controller, SkyAtmosphere& atmosphere) {
             const float dt = float(time->dt);
             VolumetricClouds* clouds = cloud_layers.get(e);
+            VolumetricFog* fog = fog_layers.get(e);
 
             // ---- time and weather ----
             advance_time(controller, dt);
             if (!controller.started)
-                controller.current_weather = weather_of(atmosphere, clouds);
+                controller.current_weather = weather_of(atmosphere, clouds, fog);
             advance_weather(controller, controller.current_weather, dt);
 
             const Weather& weather = controller.current_weather;
@@ -160,6 +163,8 @@ namespace
                 clouds->thickness = weather.cloud_thickness;
                 clouds->wind_speed = weather.wind_speed;
             }
+            if (fog)
+                fog->density = weather.fog * std::max(key.fog, 0.0f);
 
             // ---- the directional light: the sun, or the moon once the sun is down ----
             const AtmosphereModel model = AtmosphereModel::from(atmosphere);
@@ -248,6 +253,7 @@ SkyKey sky::evaluate_rail(const SkyController& controller, float hour)
     result.light_tint = glm::mix(before->light_tint.glm(), after->light_tint.glm(), t);
     result.light_intensity = glm::mix(before->light_intensity, after->light_intensity, t);
     result.sky_intensity = glm::mix(before->sky_intensity, after->sky_intensity, t);
+    result.fog = glm::mix(before->fog, after->fog, t);
     result.time_scale = glm::mix(before->time_scale, after->time_scale, t);
     return result;
 }

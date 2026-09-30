@@ -24,12 +24,12 @@ export
 
     // System sets of render_sync.cpp (component types, hooks and systems register themselves there;
     // the systems need the SceneView resource, ResMut<SceneView>):
-    //   Update:    advance_clouds (the wind moves the VolumetricClouds)
+    //   Update:    advance_clouds (the wind moves the VolumetricClouds and the VolumetricFog)
     //   Late:      sync_render_proxies (after scene::TransformPropagation), mesh colliders created at runtime
     //   PostLoad:  mesh colliders of a loaded level
     struct RenderSync {};
     struct MeshColliderSync {};
-    // advance_clouds: systems which set the wind of VolumetricClouds run before it
+    // advance_clouds: systems which set the wind of VolumetricClouds / VolumetricFog run before it
     struct CloudWind {};
 
     // Union of the world bounds of all registered meshes (zero box when there are none)

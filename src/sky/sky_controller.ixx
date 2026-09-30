@@ -17,6 +17,7 @@ import framework;
 //
 //   SkyAtmosphere     (same entity)  where the sun and the moon are, the stars, the haze
 //   VolumetricClouds  (same entity)  coverage, density, altitude, wind
+//   VolumetricFog     (same entity)  density of the ground fog (the weather, thicker at the hours the rail says)
 //   directional Light (entity `sun`) the sun by day and the moon by night: direction, and the color the
 //                                    atmosphere leaves of it at the ground
 //
@@ -44,6 +45,8 @@ export
         [[=rh::edit, =rh::speed<0.1f>]] float wind_speed = 12.0f;            // m/s
         // SkyAtmosphere::mie: 1 clear air, more for mist
         [[=rh::edit, =rh::range<0.f, 10.f>]] float haze = 1.0f;
+        // VolumetricFog::density: the fog in the low ground, optical depth per kilometer
+        [[=rh::edit, =rh::speed<0.1f>]] float fog = 6.0f;
         // share of the sun (moon) light the weather leaves at the ground, apart from the shadows of its clouds
         // (those are cast by the renderer, VolumetricClouds::shadow): rain, mist, a veil above the layer
         [[=rh::edit, =rh::range<0.f, 1.f>]] float sun_light = 1.0f;
@@ -56,6 +59,7 @@ export
         vec3 light_tint{ 1.0f, 1.0f, 1.0f };    // of the directional light
         float light_intensity = 1.0f;           // its scale
         float sky_intensity = 1.0f;             // SkyAtmosphere::intensity
+        float fog = 1.0f;                       // scale of the ground fog (Weather::fog): the morning mist
         float time_scale = 1.0f;                // speed of the time of day around this hour
     };
 

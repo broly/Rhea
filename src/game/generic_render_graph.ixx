@@ -208,7 +208,9 @@ public:
     void add_skeleton_lines(std::vector<LineVertex>& vertices);
     void draw_debug_lines(RenderGraphContext& ctx);
     
-    void add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong = true);
+    // condition: the pass runs on the frames it returns true for (every frame when empty)
+    void add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong = true,
+        std::function<bool()> condition = {});
     
     void prepare_nn_denoiser_passes();
 
@@ -242,6 +244,10 @@ public:
     RGTextureHandle clouds_buffer;
     RGTextureHandle clouds_history;
     uint32_t sky_downscale = 1;     // render.sky.downscale the buffers were created with
+    // fog of the frame at 1 / fog_downscale of the screen (SkyRenderer), and of the two previous frames
+    RGTextureHandle fog_buffer;
+    RGTextureHandle fog_history;
+    uint32_t fog_downscale = 1;     // render.fog.downscale the buffers were created with
     RGTextureHandle swapchain_color;
     
     HDROutputTextureArray hdr_color_present;
@@ -295,21 +301,50 @@ public:
     
     RBAccelStruct tlas = {};
     
-    RenderResource* camera_resource = nullptr;
-    RenderResource* gbuffer_resource = nullptr;
-    RenderResource* dbuffer_resource = nullptr;
-    RenderResource* light_resource = nullptr;
-    RenderResource* shadow_resource = nullptr;
-    RenderResource* reflection_resource = nullptr;
-    RenderResource* ssr_resource = nullptr;
-    RenderResource* hdr_color_output_resource = nullptr;
-    RenderResource* hdr_color_storage_resource = nullptr;
-    RenderResource* tlas_resource = nullptr;
-    RenderResource* mesh_table_resource = nullptr;
-    RenderResource* base_color_resource = nullptr;
-    RenderResource* pbr_material_table_resource = nullptr;
-    RenderResource* textures_resource = nullptr;
-    RenderResource* primitive_table_resource = nullptr;
+    [[=rh::resource]]
+    RenderResource* camera_resource;
+    
+    [[=rh::resource]]
+    RenderResource* gbuffer_resource;
+    
+    [[=rh::resource]]
+    RenderResource* dbuffer_resource;
+    
+    [[=rh::resource]]
+    RenderResource* light_resource;
+    
+    [[=rh::resource]]
+    RenderResource* shadow_resource;
+    
+    [[=rh::resource]]
+    RenderResource* reflection_resource;
+    
+    [[=rh::resource]]
+    RenderResource* ssr_resource;
+    
+    [[=rh::resource]]
+    RenderResource* hdr_color_output_resource;
+    
+    [[=rh::resource]]
+    RenderResource* hdr_color_storage_resource;
+    
+    [[=rh::resource]]
+    RenderResource* tlas_resource;
+    
+    [[=rh::resource]]
+    RenderResource* mesh_table_resource;
+    
+    [[=rh::resource]]
+    RenderResource* base_color_resource;
+    
+    [[=rh::resource]]
+    RenderResource* pbr_material_table_resource;
+    
+    [[=rh::resource]]
+    RenderResource* textures_resource;
+    
+    [[=rh::resource]]
+    RenderResource* primitive_table_resource;
     
     Extent resolution;
     Extent swapchain_extent;
@@ -387,7 +422,7 @@ public:
     // runtime baked reflection probes, main graph only (pass "ReflectionProbes")
     std::unique_ptr<ReflectionProbeSystem> reflection_probes;
 
-    // sky and clouds, main graph only (passes "SkyMarch", "Sky")
+    // sky, clouds and fog, main graph only (passes "CloudShadow", "SkyMarch", "Sky", "FogMarch", "Fog")
     std::unique_ptr<SkyRenderer> sky;
 
     // mesh draws of the frame: records + indirect commands

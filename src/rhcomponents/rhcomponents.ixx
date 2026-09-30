@@ -1,7 +1,7 @@
 ﻿export module rhcomponents;
 
 // Render components of scene entities (MeshRenderer, SkinnedMesh, Camera, Light, ReflectionCapture,
-// SkyAtmosphere, VolumetricClouds, MeshCollider) and their sync to the SceneView processors (render_sync).
+// SkyAtmosphere, VolumetricClouds, VolumetricFog, MeshCollider) and their sync to the SceneView processors (render_sync).
 export import :mesh;
 export import :skinned_mesh;
 export import :camera;

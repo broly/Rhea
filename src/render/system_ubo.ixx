@@ -83,6 +83,12 @@ export struct SkyUBO
     glm::vec4 cloud_albedo;          // rgb, w: ambient strength
     glm::vec4 cloud_phase;           // x: forward anisotropy, y: backward anisotropy, z: weight of the backward lobe, w: powder
     glm::vec4 cloud_march;           // x: max distance, y: time (s)
+    // fog (shaders/sky/fog.glsl): a layer in the low ground and a haze everywhere
+    glm::vec4 fog_layer;             // x: extinction of the ground fog at and below its base, y: base (world y), z: 1 / falloff height, w: extinction of the haze at world y = 0
+    glm::vec4 fog_haze;              // x: 1 / scale height of the haze, y: max distance, z: ambient strength, w: share of the light the clouds let through on average
+    glm::vec4 fog_albedo;            // rgb, w: forward anisotropy
+    glm::vec4 fog_noise;             // x: 1 / size of the wisps, y: their strength, z: how far they lift the layer (m), w: scale of the directional light in the haze
+    glm::vec4 fog_offset;            // xyz: wind offset of the wisps (m), w: 1 when there is fog to draw
 };
 RH_REGISTER_TYPE(SkyUBO)
 

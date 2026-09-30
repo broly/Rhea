@@ -283,6 +283,49 @@ export namespace reflect
         }(std::make_index_sequence<editable_fields_of<T>().size()>());
     }
 
+    namespace detail
+    {
+        template<typename Annotation>
+        consteval void collect_annotated_fields(std::meta::info type, std::vector<std::meta::info>& fields)
+        {
+            const auto ctx = std::meta::access_context::unchecked();
+            for (std::meta::info base : std::meta::bases_of(type, ctx))
+                collect_annotated_fields<Annotation>(std::meta::type_of(base), fields);
+            for (std::meta::info member : std::meta::nonstatic_data_members_of(type, ctx))
+                if (std::meta::has_identifier(member) && has_annotation<Annotation>(member))
+                    fields.push_back(member);
+        }
+    }
+
+    // Fields of T with an annotation of type Annotation, in declaration order, fields of bases first.
+    // Of any access (unlike fields_of): a field is never skipped silently for being protected / private.
+    template<typename T, typename Annotation>
+    consteval std::span<const std::meta::info> annotated_fields_of()
+    {
+        std::vector<std::meta::info> fields;
+        detail::collect_annotated_fields<Annotation>(std::meta::dealias(^^T), fields);
+        return std::define_static_array(fields);
+    }
+
+    // I-th field of T with an Annotation, passed to for_each_annotated_field callbacks
+    template<typename T, typename Annotation, size_t I>
+    struct AnnotatedField
+    {
+        static constexpr std::meta::info info = annotated_fields_of<T, Annotation>()[I];
+        static constexpr std::string_view name = std::meta::identifier_of(info);
+        using type = typename [:std::meta::type_of(info):];
+    };
+
+    // Like for_each_field, but for the fields with an annotation of type Annotation:
+    //     reflect::for_each_annotated_field<T, rh::Resource>([&] <typename F> () { use(F::name, obj.[:F::info:]); });
+    template<typename T, typename Annotation, typename Func>
+    void for_each_annotated_field(Func&& func)
+    {
+        [&]<size_t... I>(std::index_sequence<I...>) {
+            (func.template operator()<AnnotatedField<T, Annotation, I>>(), ...);
+        }(std::make_index_sequence<annotated_fields_of<T, Annotation>().size()>());
+    }
+
     template<typename T>
     consteval std::string_view type_name_of()
     {

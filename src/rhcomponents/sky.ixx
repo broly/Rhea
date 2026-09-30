@@ -117,10 +117,57 @@ export
         [[=rh::transient]] vec3 detail_offset{ 0.0f, 0.0f, 0.0f };
     };
 
+    // Fog of the level, on the entity of its SkyAtmosphere: a layer which lies in the low ground (full density
+    // up to base_height, thinning out above it, broken up by drifting wisps) and a thin haze everywhere.
+    // Ray marched from the eye (shaders/sky/fog.glsl) and lit by the sky and by the directional light through
+    // the shadow cascades and the shadow of the clouds: the shafts of light between them ("god rays") are
+    // that light seen in the haze.
+    //
+    //     "VolumetricFog": { "density": 6, "base_height": 2, "falloff": 6, "shafts": 4 }
+    struct VolumetricFog
+    {
+        [[=rh::edit]] bool enabled = true;
+        // ground fog: optical depth per kilometer at and below base_height. 4: light mist, 15: things fade
+        // out within ~250 m, 60: thick fog
+        [[=rh::edit, =rh::speed<0.1f>]] float density = 6.0f;
+        [[=rh::edit, =rh::speed<0.1f>]] float base_height = 0.0f;   // world y, m
+        // m above base_height over which the fog thins out to 1 / e
+        [[=rh::edit, =rh::speed<0.1f>]] float falloff = 6.0f;
+
+        // how much the noise breaks the layer up (0: even), and the size of its wisps, m
+        [[=rh::edit, =rh::range<0.f, 1.f>]] float noise = 0.8f;
+        [[=rh::edit, =rh::speed<1.f>]] float noise_size = 90.0f;
+        // the wisps drift towards wind_direction (degrees from -Z, clockwise seen from above) at wind_speed m/s
+        [[=rh::edit, =rh::range<0.f, 360.f>]] float wind_direction = 60.0f;
+        [[=rh::edit, =rh::speed<0.05f>]] float wind_speed = 1.5f;
+
+        // haze: optical depth per kilometer at world y = 0 in clear air (scaled by SkyAtmosphere::mie: the
+        // weather thickens it), thinning out to 1 / e every haze_height m. What the light shafts are seen in:
+        // thin, or it veils the sky and the clouds they come from.
+        [[=rh::edit, =rh::speed<0.01f>]] float haze = 0.06f;
+        [[=rh::edit, =rh::speed<10.f>]] float haze_height = 1200.0f;
+
+        [[=rh::edit, =rh::color]] vec3 albedo{ 1.0f, 1.0f, 1.0f };
+        // forward scattering of the haze: how tightly the light shafts glow around the sun (the ground fog
+        // scatters wider)
+        [[=rh::edit, =rh::range<0.f, 0.95f>]] float anisotropy = 0.8f;
+        // scale of the directional light in the haze (1: physical): the strength of the light shafts, without
+        // the veil more haze would draw over the sky
+        [[=rh::edit, =rh::range<0.f, 16.f>]] float shafts = 4.0f;
+        // scale of the sky light in the fog
+        [[=rh::edit, =rh::range<0.f, 4.f>]] float ambient = 1.0f;
+        // the fog in front of the sky is marched this far, m
+        [[=rh::edit, =rh::speed<10.f>]] float max_distance = 4000.0f;
+
+        // accumulated wind, m (runtime)
+        [[=rh::transient]] vec3 offset{ 0.0f, 0.0f, 0.0f };
+    };
+
     struct SceneViewProxy_Sky : public SceneViewProxy_Transform
     {
         SkyAtmosphere atmosphere;
         VolumetricClouds clouds;    // enabled = false when the entity has none
+        VolumetricFog fog;          // the same
     };
 
     // The atmosphere as the renderer and the CPU estimates use it (SI units: meters, 1 / m).

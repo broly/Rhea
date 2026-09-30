@@ -22,7 +22,9 @@
 					"day_length": 600,
 					"sun": "dir_light0",
 					"weather": "overcast"
-				}
+				},
+				// the floor of the valley is at y -1 .. -3
+				"VolumetricFog": { "base_height": -1.0 }
 			}
 		},
 		{

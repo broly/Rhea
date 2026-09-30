@@ -136,6 +136,10 @@ namespace
             proxy.clouds = *clouds;
         else
             proxy.clouds.enabled = false;
+        if (const VolumetricFog* fog = registry.get<VolumetricFog>(e))
+            proxy.fog = *fog;
+        else
+            proxy.fog.enabled = false;
         return proxy;
     }
 
@@ -143,7 +147,8 @@ namespace
     bool same_proxy(const SceneViewProxy_Sky& a, const SceneViewProxy_Sky& b)
     {
         return std::memcmp(&a.atmosphere, &b.atmosphere, sizeof(SkyAtmosphere)) == 0
-            && std::memcmp(&a.clouds, &b.clouds, sizeof(VolumetricClouds)) == 0;
+            && std::memcmp(&a.clouds, &b.clouds, sizeof(VolumetricClouds)) == 0
+            && std::memcmp(&a.fog, &b.fog, sizeof(VolumetricFog)) == 0;
     }
 
     template<typename Data>
@@ -286,8 +291,15 @@ namespace
 {
     // The clouds drift with the wind: the offsets of their noise accumulate, so the wind may change at any time
     [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<CloudWind>]]
-    void advance_clouds(ecs::Query<VolumetricClouds> clouds, ecs::Res<ecs::FrameTime> time)
+    void advance_clouds(ecs::Query<VolumetricClouds> clouds, ecs::Query<VolumetricFog> fogs, ecs::Res<ecs::FrameTime> time)
     {
+        // the wisps of the fog: they also rise slowly, the layer keeps changing
+        fogs.each([&] (VolumetricFog& fog) {
+            const float heading = glm::radians(fog.wind_direction);
+            const glm::vec3 wind = glm::vec3(std::sin(heading), -0.15f, -std::cos(heading)) * fog.wind_speed;
+            fog.offset = fog.offset.glm() - wind * float(time->dt);
+        });
+
         clouds.each([&] (VolumetricClouds& layer) {
             const float heading = glm::radians(layer.wind_direction);
             const glm::vec3 wind = glm::vec3(std::sin(heading), 0.0f, -std::cos(heading)) * layer.wind_speed;
@@ -314,7 +326,7 @@ namespace
 
     ECS_REGISTER()
     SCENE_REGISTER_COMPONENTS(MeshRenderer, MeshCollider, SkinnedMesh, Camera, Light, ReflectionCapture, SkyAtmosphere,
-        VolumetricClouds)
+        VolumetricClouds, VolumetricFog)
 }
 
 AABB compute_world_bounds(ecs::Registry& registry)

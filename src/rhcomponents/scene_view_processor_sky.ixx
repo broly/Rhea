@@ -15,12 +15,13 @@ import render_scene;
 import :sky;
 #include "object/object_reflection_macro.h"
 
-// Render side of a SkyAtmosphere entity (and of its VolumetricClouds)
+// Render side of a SkyAtmosphere entity (and of its VolumetricClouds / VolumetricFog)
 export struct RenderObject_Sky
 {
     bool registered = false;
     SkyAtmosphere atmosphere;
     VolumetricClouds clouds;    // enabled = false: the sky has no clouds
+    VolumetricFog fog;          // enabled = false: no fog
 };
 
 export class SceneViewProcessor_Sky : public SceneViewProcessor

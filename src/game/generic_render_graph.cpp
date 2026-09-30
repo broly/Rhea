@@ -55,24 +55,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
 {
     engine = RhGlobals::engine;
     
-    camera_resource = renderer->find_resource("camera");
-    light_resource = renderer->find_resource("light");
-    shadow_resource = renderer->find_resource("shadow");
-    reflection_resource = renderer->find_resource("reflection");
-    gbuffer_resource = renderer->find_resource("gbuffer");
-    dbuffer_resource = renderer->find_resource("dbuffer");
-    ssr_resource = renderer->find_resource("ssr");
-    hdr_color_output_resource = renderer->find_resource("hdr_color_output");
-    hdr_color_storage_resource = renderer->find_resource("hdr_color_storage");
-    tlas_resource = renderer->find_resource("tlas");
-    mesh_table_resource = renderer->find_resource("mesh_table");
-    base_color_resource = renderer->find_resource("base_color");
-    pbr_material_table_resource = renderer->find_resource("pbr_material_table");
-    textures_resource = renderer->find_resource("textures");
-    primitive_table_resource = renderer->find_resource("primitive_table");
-    
-    
-    
+    fetch_declared_resource();
+
     
     auto& asset_manager = AssetManager::get();
     
@@ -407,6 +391,21 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         clouds_history = create_texture({
             .name = NAME(clouds_history),
             .extent_divisor = sky_downscale,
+            .format = TextureFormat::RGBA16F,
+            .usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
+            .num_layers = 2
+        });
+
+        fog_downscale = uint32_t(std::clamp(cv_fog_downscale.get(), 1, 8));
+        fog_buffer = create_texture({
+            .name = NAME(fog_buffer),
+            .extent_divisor = fog_downscale,
+            .format = TextureFormat::RGBA16F,
+            .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
+        });
+        fog_history = create_texture({
+            .name = NAME(fog_history),
+            .extent_divisor = fog_downscale,
             .format = TextureFormat::RGBA16F,
             .usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
             .num_layers = 2
@@ -909,7 +908,55 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .num_layers = 1,
         .type = RenderPassType::transfer
     });
-    
+
+    // ---- fog over the lit frame, reflections included: marched at a fraction of the resolution, lit through
+    // the shadow maps (the light shafts), then blended over the scene and the sky ----
+    if (sky)
+    {
+        const auto has_fog = [this] () { return sky->has_fog(); };
+
+        add_pass({
+            .name = "FogMarch",
+            .condition = has_fog,
+            .reads = {
+                { gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::SampledFragment },
+                { gbuffer_hist[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::SampledFragment },
+                { shadow_map, RBImageUsageType::SampledFragment },
+                { cloud_shadow_map, RBImageUsageType::SampledFragment },
+                { fog_history, RBImageUsageType::SampledFragment }
+            },
+            .writes = {
+                { fog_buffer, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("FogMarch");
+                sky->draw_fog_march(ctx, camera_resource, gbuffer_resource, light_resource, shadow_resource,
+                    reflection_resource, textures[fog_buffer.id].desc.extent);
+                ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+            },
+        });
+
+        add_copy_pass("COPY_fog_to_history", fog_buffer, fog_history, true, has_fog);
+
+        add_pass({
+            .name = "Fog",
+            .condition = has_fog,
+            .reads = {
+                { gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::SampledFragment },
+                { fog_buffer, RBImageUsageType::SampledFragment }
+            },
+            .writes = {
+                { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Load },
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("Fog");
+                sky->draw_fog(ctx, gbuffer_resource);
+            },
+        });
+    }
+
     if (readback_nn && render_settings::enable_raytracing)
     {
         add_exr_dump_pass({
@@ -1018,6 +1065,9 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
             .clouds_history = get_image(clouds_history),
             .history_layer = history_index ^ 1,
             .downscale = sky_downscale,
+            .fog = get_image(fog_buffer),
+            .fog_history = get_image(fog_history),
+            .fog_downscale = fog_downscale,
         });
     }
 
@@ -1104,6 +1154,15 @@ void GenericRenderGraph::begin_frame()
         sky_downscale = downscale;
         for (RGTextureHandle texture : { atmosphere_buffer, clouds_buffer, clouds_history })
             resize_texture(texture, downscale);
+    }
+
+    // the same for render.fog.downscale
+    const uint32_t fog_scale = uint32_t(std::clamp(cv_fog_downscale.get(), 1, 8));
+    if (sky && fog_scale != fog_downscale)
+    {
+        fog_downscale = fog_scale;
+        for (RGTextureHandle texture : { fog_buffer, fog_history })
+            resize_texture(texture, fog_scale);
     }
 }
 
@@ -2243,11 +2302,13 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
 
 }
 
-void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong)
+void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong,
+    std::function<bool()> condition)
 {
     const uint32_t num_layers = ping_pong ? 2 : 1;
     add_pass({
         .name = name,
+        .condition = std::move(condition),
         .reads = {
             { src, RBImageUsageType::TransferSrc }
         },

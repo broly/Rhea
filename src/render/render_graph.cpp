@@ -459,6 +459,7 @@ static bool needs_barrier(RBImageUsageType prev, RBImageUsageType next)
 void RenderGraph::compile()
 {
     assert(!graph_compiled);
+    checkf(declared_resources_fetched, "You have to call fetch_declared_resources in init_resources");
 
     // =========================
     // CREATE IMAGES

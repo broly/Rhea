@@ -247,12 +247,41 @@ export struct ExrDumpPassDesc
     std::function<bool()> pass_condition = nullptr;
 };
 
+export namespace rh
+{
+    struct Resource {};
+    constexpr inline Resource resource;
+}
+
 export class RenderGraph : public RhObject
 {
 public:
     void setup(
         const std::shared_ptr<RenderBackend>& in_backend,
         const std::shared_ptr<Renderer>& in_renderer);
+    
+    bool declared_resources_fetched = false;
+    
+    // Fills every [[=rh::resource]] field of Self and its bases from the renderer. The resource is named as
+    // the field without its "_resource" suffix (camera_resource -> "camera"); nullptr when there is none.
+    // Self is the class of the calling code, not of the object: fields of its descendants are not seen.
+    template<typename Self>
+    void fetch_declared_resource(this Self& self)
+    {
+        reflect::for_each_annotated_field<Self, rh::Resource>([&] <typename F> () {
+            static_assert(std::is_same_v<typename F::type, RenderResource*>,
+                "[[=rh::resource]] field must be a RenderResource*");
+
+            constexpr std::string_view suffix = "_resource";
+            constexpr std::string_view resource_name = F::name.ends_with(suffix)
+                ? F::name.substr(0, F::name.size() - suffix.size())
+                : F::name;
+            const Name rname = resource_name;
+            auto res = self.[:F::info:] = self.renderer->find_resource(rname);
+            checkf(res != nullptr, "required resource not found %s", rname.to_string().c_str());
+        });
+        self.declared_resources_fetched = true;
+    }
     
     virtual void init_resources(const std::map<Name, bool>& parameters) = 0;
     virtual void build_passes(const std::map<Name, bool>& parameters) = 0;
