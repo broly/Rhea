@@ -6,7 +6,8 @@
 // plus an axis aligned box used both as the influence volume (weight fades in over blend distance) and as
 // the parallax proxy (reflection rays are intersected with the box before the cube lookup).
 // Probes are blended by weight (reflection_probe_weights): full inside a box, fading out around it, the
-// space no box covers interpolated between all probes. Sky ambient only while no probe is baked.
+// space no box covers interpolated between all probes and the sky probe (a slot holding the sky alone, looked
+// up without a box). Flat sky ambient only while nothing is baked.
 
 #ifndef SET_IBL
     #define SET_IBL 0
@@ -43,8 +44,8 @@ layout(set = SET_IBL, binding = BINDING_UBO_REFLECTION_PROBES)
 uniform ReflectionProbesUBO
 {
     GPUReflectionProbe probes[MAX_REFLECTION_PROBES];
-    uvec4 info;         // x: slots to scan, y: unused, z: specular mips, w: parallax on
-    vec4 sky_ambient;   // rgb
+    uvec4 info;         // x: slots to scan, y: slot of the sky probe + 1 (0: none), z: specular mips, w: parallax on
+    vec4 sky_ambient;   // rgb, w: distance to the probe boxes where the sky probe weighs as much as a probe
     vec4 intensity;     // x: diffuse, y: specular (0: off)
     vec4 ssr_params;    // x: SSR intensity (0: off), used by ssr_composite.frag
 } reflection_probes_ubo;
@@ -108,13 +109,14 @@ vec3 reflection_probe_parallax_dir(in GPUReflectionProbe probe, vec3 pos, vec3 R
     return normalize(mix(dir / len, R, roughness * roughness));
 }
 
-// Blend weights of all probes at pos (sum 1, or 0 when no probe is baked). Continuous in space and
+// Blend weights of all probes and of the sky probe at pos (sum 1, or false when nothing is baked). Continuous in space and
 // independent of the camera:
 //  - influence: 1 inside a probe box, fading to 0 over blend distance outside of it. Surfaces lying on the
 //    box faces (floor, walls the box was fitted to) get the full weight.
 //  - overlapping influences are normalized.
-//  - the part no influence covers is shared by all probes by inverse square distance to their boxes.
-bool reflection_probe_weights(vec3 pos, out float weights[MAX_REFLECTION_PROBES])
+//  - the part no influence covers is shared by all probes by inverse square distance to their boxes; the sky
+//    probe takes part as a probe at a fixed distance (far from every box it is all there is).
+bool reflection_probe_weights(vec3 pos, out float weights[MAX_REFLECTION_PROBES], out float sky_weight)
 {
     const uint count = min(reflection_probes_ubo.info.x, uint(MAX_REFLECTION_PROBES));
 
@@ -139,8 +141,14 @@ bool reflection_probe_weights(vec3 pos, out float weights[MAX_REFLECTION_PROBES]
         fallback_total += fallback[i];
     }
 
+    sky_weight = 0.0;
+    const float sky_distance = reflection_probes_ubo.sky_ambient.w;
+    const float sky_fallback = reflection_probes_ubo.info.y != 0u ? 1.0 / (0.25 + sky_distance * sky_distance) : 0.0;
     if (fallback_total <= 0.0)
-        return false;
+    {
+        sky_weight = 1.0;
+        return sky_fallback > 0.0;
+    }
 
     if (total >= 1.0)
     {
@@ -149,9 +157,10 @@ bool reflection_probe_weights(vec3 pos, out float weights[MAX_REFLECTION_PROBES]
     }
     else
     {
-        float rest = (1.0 - total) / fallback_total;
+        float rest = (1.0 - total) / (fallback_total + sky_fallback);
         for (uint i = 0u; i < count; ++i)
             weights[i] += rest * fallback[i];
+        sky_weight = rest * sky_fallback;
     }
     return true;
 }
@@ -160,7 +169,8 @@ bool reflection_probe_weights(vec3 pos, out float weights[MAX_REFLECTION_PROBES]
 vec3 sample_reflection_probes_irradiance(vec3 pos, vec3 N)
 {
     float weights[MAX_REFLECTION_PROBES];
-    if (!reflection_probe_weights(pos, weights))
+    float sky_weight;
+    if (!reflection_probe_weights(pos, weights, sky_weight))
         return reflection_probes_ubo.sky_ambient.rgb * reflection_probes_ubo.intensity.x;
 
     const uint count = min(reflection_probes_ubo.info.x, uint(MAX_REFLECTION_PROBES));
@@ -172,6 +182,8 @@ vec3 sample_reflection_probes_irradiance(vec3 pos, vec3 N)
             continue;
         irradiance += weights[i] * reflection_probes_ubo.probes[i].box_max.w * textureLod(u_probe_irradiance[i], N, 0.0).rgb;
     }
+    if (sky_weight >= 1e-3)
+        irradiance += sky_weight * textureLod(u_probe_irradiance[reflection_probes_ubo.info.y - 1u], N, 0.0).rgb;
     return irradiance * reflection_probes_ubo.intensity.x;
 }
 
@@ -179,7 +191,8 @@ vec3 sample_reflection_probes_irradiance(vec3 pos, vec3 N)
 vec3 sample_reflection_probes_specular(vec3 pos, vec3 R, float roughness)
 {
     float weights[MAX_REFLECTION_PROBES];
-    if (!reflection_probe_weights(pos, weights))
+    float sky_weight;
+    if (!reflection_probe_weights(pos, weights, sky_weight))
         return reflection_probes_ubo.sky_ambient.rgb * reflection_probes_ubo.intensity.y;
 
     const uint count = min(reflection_probes_ubo.info.x, uint(MAX_REFLECTION_PROBES));
@@ -194,6 +207,8 @@ vec3 sample_reflection_probes_specular(vec3 pos, vec3 R, float roughness)
         vec3 dir = parallax ? reflection_probe_parallax_dir(probe, pos, R, roughness) : R;
         specular += weights[i] * probe.box_max.w * textureLod(u_probe_specular[i], dir, lod).rgb;
     }
+    if (sky_weight >= 1e-3)
+        specular += sky_weight * textureLod(u_probe_specular[reflection_probes_ubo.info.y - 1u], R, lod).rgb;
     return specular * reflection_probes_ubo.intensity.y;
 }
 

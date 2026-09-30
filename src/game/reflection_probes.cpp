@@ -256,11 +256,11 @@ void ReflectionProbeSystem::update_slots(SceneView& scene_view, const FrameInput
 {
     const auto& captures = scene_view.get_processor<SceneViewProcessor_ReflectionCapture>().captures;
 
-    if (captures.size() > kMaxReflectionProbes && !warned_slot_overflow)
+    if (captures.size() > sky_slot && !warned_slot_overflow)
     {
         warned_slot_overflow = true;
         LogReflectionProbes.Log("%zu reflection captures, only the first %u slots are used",
-            captures.size(), kMaxReflectionProbes);
+            captures.size(), sky_slot);
     }
 
     const bool rebake_all = rebake_all_requested;
@@ -269,6 +269,25 @@ void ReflectionProbeSystem::update_slots(SceneView& scene_view, const FrameInput
     for (uint32_t slot = 0; slot < kMaxReflectionProbes; ++slot)
     {
         SlotState& state = slots[slot];
+        if (slot == sky_slot)
+        {
+            static const Name sky_name("sky");
+            state.active = cv_probes_sky.get();
+            state.name = sky_name;
+            state.force = state.force || rebake_all;
+            const bool auto_rebake = cv_probes_auto_rebake.get();
+            const bool sun_differs = auto_rebake &&
+                sun_changed(state.baked_sun_direction, state.baked_sun_color, probe_lights.sun_direction, probe_lights.sun_color);
+            const bool sky_differs = auto_rebake && sky_changed(state.baked_sky, glm::vec4(inputs.sky_ambient, inputs.cloud_coverage));
+            state.valid = state.valid && state.active;
+            state.dirty = state.active && (!state.valid || state.force || sun_differs || sky_differs);
+            state.dirty_reason = !state.valid ? "first bake" : state.force ? "requested" : sun_differs ? "sun changed" : "sky changed";
+            if (!state.active && job && job->slot == slot)
+                job.reset();
+            if (!state.active && fade && fade->slot == slot)
+                fade.reset();
+            continue;
+        }
         const RenderObject_ReflectionCapture* capture = slot < captures.size() ? &captures[slot] : nullptr;
 
         state.active = capture && capture->registered && capture->active;
@@ -321,7 +340,7 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
     const auto& captures = scene_view.get_processor<SceneViewProcessor_ReflectionCapture>().captures;
 
     // the probe moved while it was being captured: start over from its new position
-    if (job && captures[job->slot].capture_version != job->capture_version)
+    if (job && job->slot != sky_slot && captures[job->slot].capture_version != job->capture_version)
         job.reset();
 
     // ---- a finished capture starts filtering into its slot (one filter at a time: the source descriptor) ----
@@ -396,8 +415,8 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
             if (fade && fade->slot == slot)
                 continue;
 
-            const RenderObject_ReflectionCapture& capture = captures[slot];
-            const float distance = distance_to_box(inputs.camera_position, capture.box_min, capture.box_max);
+            const float distance = slot == sky_slot ? 0.0f
+                : distance_to_box(inputs.camera_position, captures[slot].box_min, captures[slot].box_max);
             const float score = !state.valid
                 ? 1.0e6f / (1.0f + distance)
                 : (float(current_time - state.bake_time) + 0.1f) / (1.0f + distance * 0.2f);
@@ -411,12 +430,12 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
         if (!best)
             return;
 
-        const RenderObject_ReflectionCapture& capture = captures[*best];
+        const bool sky = *best == sky_slot;
         job = Job{
             .slot = *best,
-            .capture_version = capture.capture_version,
+            .capture_version = sky ? 0u : captures[*best].capture_version,
             .next_face = 0,
-            .position = capture.position,
+            .position = sky ? inputs.camera_position : captures[*best].position,
             .sun_direction = probe_lights.sun_direction,
             .sun_color = probe_lights.sun_color,
             .sky = glm::vec4(inputs.sky_ambient, inputs.cloud_coverage),
@@ -463,7 +482,7 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
     for (uint32_t slot = 0; slot < kMaxReflectionProbes; ++slot)
     {
         const SlotState& state = slots[slot];
-        if (!enabled || !state.active || !state.valid)
+        if (!enabled || !state.active || !state.valid || slot == sky_slot)
             continue;
 
         const RenderObject_ReflectionCapture& capture = captures[slot];
@@ -475,8 +494,9 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
         count = slot + 1;
     }
 
-    probes_ubo.info = glm::uvec4(count, 0u, specular_mips, cv_probes_parallax.get() ? 1u : 0u);
-    probes_ubo.sky_ambient = glm::vec4(inputs.sky_ambient, 0.0f);
+    const bool sky_baked = enabled && slots[sky_slot].active && slots[sky_slot].valid;
+    probes_ubo.info = glm::uvec4(count, sky_baked ? sky_slot + 1 : 0u, specular_mips, cv_probes_parallax.get() ? 1u : 0u);
+    probes_ubo.sky_ambient = glm::vec4(inputs.sky_ambient, std::max(cv_probes_sky_distance.get(), 0.1f));
     probes_ubo.intensity = glm::vec4(
         cv_probes_diffuse.get() ? cv_probes_diffuse_intensity.get() : 0.0f,
         cv_probes_specular.get() ? cv_probes_specular_intensity.get() : 0.0f,
@@ -514,7 +534,9 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
         capture_ubo.light_position[index] = glm::vec4(points[index].first, 1.0f);
         capture_ubo.light_color[index] = glm::vec4(points[index].second, 0.0f);
     }
-    capture_ubo.light_info = glm::uvec4((uint32_t)num_points, probe_lights.sun_visible ? 1u : 0u, 0u, 0u);
+    // no sun lobe in the sky probe: it is what mirrors show, the sun's highlight comes from the light itself
+    const bool sky_capture = frame_work.face_count > 0 && frame_work.slot == sky_slot;
+    capture_ubo.light_info = glm::uvec4((uint32_t)num_points, probe_lights.sun_visible && !sky_capture ? 1u : 0u, 0u, 0u);
 
     probe_capture_resource->update_uniform_buffer("probe_capture_ubo", capture_ubo, ctx.frame);
     // the filter reads the finished capture, the capture pass draws into the other one
@@ -670,6 +692,14 @@ void ReflectionProbeSystem::render_face(RenderGraphContext& ctx, SceneView& scen
     ctx.bind(probe_capture_resource, sky_resource);
     ctx.push_constants(ProbeFacePushConstants{ face, 0, 0.0f, 0, 1.0f });
     ctx.draw_fullscreen();
+
+    if (frame_work.slot == sky_slot)
+    {
+        backend->end_render_pass(ctx.cmd);
+        transition(ctx, capture_color, RBImageUsageType::SampledFragment, face, 1, 0, 1);
+        faces_rendered++;
+        return;
+    }
 
     // ---- static opaque geometry of the pbr model ----
     const glm::mat4 view_proj = face_view_proj(face, frame_work.position);

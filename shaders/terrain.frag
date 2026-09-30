@@ -15,6 +15,7 @@
 // Layer textures: base color with the height in alpha, normal map (OpenGL convention: green = up in the
 // image), ORM (ao, roughness, metallic). Layers tile in world space (layer_tiling = meters per repeat);
 // layers with layer_triplanar != 0 are projected along the three axes (rock on steep slopes).
+// Puddles: a water level mask over the terrain (see main).
 // Parameters left at 0 in the material fall back to the defaults below.
 
 // ================== INPUTS ==================
@@ -181,6 +182,31 @@ void main()
     float ao = mix(1.0, orm.r, clamp(or_default(mat.params1.z, 1.0), 0.0, 1.0));
     float roughness = clamp(orm.g * or_default(mat.params1.x, 1.0), 0.04, 1.0);
     float metallic = clamp(orm.b * mat.params1.y, 0.0, 1.0);
+
+    // ---- puddles: the mask (uv = the terrain's 0..1) is a water level. It first wets the ground (darker,
+    // glossier, the layers' own normal), then floods the low texels of the layers (stones stick out), then
+    // covers everything; the water is a flat mirror. Slopes stay dry.
+    float level = read_texture_or(mat.textures2.w, v_uv, vec4(0.0)).r * or_default(mat.params13.x, 1.0);
+    level *= smoothstep(0.90, 0.98, Ng.y);
+    if (level > 0.0)
+    {
+        // in layer heights: 0 at level 0.3 (the ground is wet by then), above every texel at level 1
+        float depth = (level - 0.3) / 0.7 * 1.25 - dot(heights, blend);
+        float water = smoothstep(0.0, 0.08, depth);
+        float wetness = max(smoothstep(0.0, 0.3, level), water);
+
+        albedo *= mix(1.0, or_default(mat.params13.z, 0.5), wetness);
+        vec3 deep = or_default(mat.params12, vec4(0.03, 0.028, 0.022, 1.0)).rgb;
+        albedo = mix(albedo, deep, water * (1.0 - exp(-max(depth, 0.0) * or_default(mat.params13.w, 1.5))));
+
+        roughness = mix(roughness, roughness * 0.45, wetness);
+        roughness = mix(roughness, or_default(mat.params13.y, 0.03), water);
+        roughness = max(roughness, 0.02);
+        N = normalize(mix(N, vec3(0.0, 1.0, 0.0), water));
+        ao = mix(ao, 1.0, water);
+        metallic *= 1.0 - water;
+    }
+
     if ((get_debug_index() & GEOMETRY_DEBUG_GLOSSY) != 0u)
         roughness *= 0.25;
 

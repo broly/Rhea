@@ -1604,6 +1604,8 @@ namespace
         case TerrainBrushMode::lower:   return "Lower";
         case TerrainBrushMode::smooth:  return "Smooth";
         case TerrainBrushMode::flatten: return "Flatten";
+        case TerrainBrushMode::water:   return "Water";
+        case TerrainBrushMode::dry:     return "Dry";
         }
         return "?";
     }
@@ -1710,6 +1712,10 @@ void EngineDebugUI::update_terrain_brush(Engine& engine, const ViewData& view)
         step.mode = TerrainBrushMode::lower;
     else if (io.KeyShift && step.mode == TerrainBrushMode::lower)
         step.mode = TerrainBrushMode::raise;
+    else if (io.KeyShift && step.mode == TerrainBrushMode::water)
+        step.mode = TerrainBrushMode::dry;
+    else if (io.KeyShift && step.mode == TerrainBrushMode::dry)
+        step.mode = TerrainBrushMode::water;
     terrain::apply_brush(*data, step, glm::vec2(editor.hit->x, editor.hit->z), std::min(io.DeltaTime, 0.1f));
     terrain::commit_render(*data);
 }
@@ -1741,9 +1747,10 @@ void EngineDebugUI::register_terrain_commands(Engine& engine)
             };
             TerrainBrush brush = terrain_editor.brush;
             float x = 0.0f, z = 0.0f, value = 0.0f, seconds = 0.5f;
-            static constexpr std::array<std::pair<std::string_view, TerrainBrushMode>, 5> modes{ {
+            static constexpr std::array<std::pair<std::string_view, TerrainBrushMode>, 7> modes{ {
                 { "paint", TerrainBrushMode::paint }, { "raise", TerrainBrushMode::raise }, { "lower", TerrainBrushMode::lower },
-                { "smooth", TerrainBrushMode::smooth }, { "flatten", TerrainBrushMode::flatten } } };
+                { "smooth", TerrainBrushMode::smooth }, { "flatten", TerrainBrushMode::flatten },
+                { "water", TerrainBrushMode::water }, { "dry", TerrainBrushMode::dry } } };
             const auto mode = args.empty() ? modes.end()
                 : std::ranges::find_if(modes, [&] (const auto& m) { return m.first == args[0]; });
             const bool needs_value = mode != modes.end() && (mode->second == TerrainBrushMode::paint || mode->second == TerrainBrushMode::flatten);
@@ -1753,7 +1760,7 @@ void EngineDebugUI::register_terrain_commands(Engine& engine)
                 || (args.size() > first_optional && !number(args[first_optional], brush.strength))
                 || (args.size() > first_optional + 1 && !number(args[first_optional + 1], seconds)))
             {
-                cvar::print("terrain.stroke <paint|raise|lower|smooth|flatten> <x> <z> <radius> [layer|height] [strength] [seconds]",
+                cvar::print("terrain.stroke <paint|raise|lower|smooth|flatten|water|dry> <x> <z> <radius> [layer|height] [strength] [seconds]",
                     cvar::Output::error);
                 return;
             }
@@ -1773,7 +1780,7 @@ void EngineDebugUI::register_terrain_commands(Engine& engine)
             if (data.collision_dirty)
                 terrain::commit_collision(data, engine.world->get_physics(), e);
         },
-        "<paint|raise|lower|smooth|flatten> <x> <z> <radius> [layer|height] [strength] [seconds]");
+        "<paint|raise|lower|smooth|flatten|water|dry> <x> <z> <radius> [layer|height] [strength] [seconds]");
 
     add("terrain.save", "Writes the terrain's heightmap and splat map (the paths of its Terrain component)",
         [terrain_of] (cvar::Args) {
@@ -1816,8 +1823,9 @@ void EngineDebugUI::draw_terrain_window(Engine& engine)
     ImGui::SetItemTooltip("The camera turns with the right mouse button meanwhile");
 
     TerrainBrush& brush = editor.brush;
-    // painting on the first row, sculpting on the second
-    for (TerrainBrushMode mode : { TerrainBrushMode::paint, TerrainBrushMode::raise, TerrainBrushMode::lower,
+    // painting and puddles on the first row, sculpting on the second
+    for (TerrainBrushMode mode : { TerrainBrushMode::paint, TerrainBrushMode::water, TerrainBrushMode::dry,
+                                   TerrainBrushMode::raise, TerrainBrushMode::lower,
                                    TerrainBrushMode::smooth, TerrainBrushMode::flatten })
     {
         if (mode != TerrainBrushMode::paint && mode != TerrainBrushMode::raise)
@@ -1850,7 +1858,8 @@ void EngineDebugUI::draw_terrain_window(Engine& engine)
     ImGui::SliderFloat("Radius", &brush.radius, 0.5f, 60.0f, "%.1f m", ImGuiSliderFlags_Logarithmic);
     ImGui::SliderFloat("Strength", &brush.strength, 0.01f, 1.0f, "%.2f");
     ImGui::SliderFloat("Falloff", &brush.falloff, 0.0f, 1.0f, "%.2f");
-    if (brush.mode == TerrainBrushMode::raise || brush.mode == TerrainBrushMode::lower)
+    if (brush.mode == TerrainBrushMode::raise || brush.mode == TerrainBrushMode::lower
+        || brush.mode == TerrainBrushMode::water || brush.mode == TerrainBrushMode::dry)
         ImGui::TextDisabled("Shift: the opposite direction");
 
     if (editor.hit)

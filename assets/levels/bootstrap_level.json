@@ -611,6 +611,7 @@
 				"Terrain": {
 					"heightmap": "terrain/sponza_valley.r16",
 					"splatmap": "terrain/sponza_valley_splat.png",
+					"puddlemap": "terrain/sponza_valley_puddles.png",
 					"samples": 512,
 					"spacing": 1.0,
 					"min_height": -20.0,
@@ -639,7 +640,8 @@
 							"layer_tint_1": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 },
 							"layer_tint_2": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 },
 							"layer_tint_3": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 },
-							"layer_roughness": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 },
+							// grass_orm.png is glossy (roughness 0.26 on average): without this the grass mirrors the sky
+							"layer_roughness": { "r": 3.0, "g": 1.0, "b": 1.0, "a": 1.0 },
 							"layer_normal_strength": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 },
 							"layer0_base_color": "TEXTURE(textures/terrain/grass_basecolor_height.png)",
 							"layer0_normal": "TEXTURE(textures/terrain/grass_normal_gl.png)",

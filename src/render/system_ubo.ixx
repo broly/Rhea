@@ -95,8 +95,8 @@ export struct GPUReflectionProbe
 export struct ReflectionProbesUBO
 {
     GPUReflectionProbe probes[kMaxReflectionProbes];
-    glm::uvec4 info;         // x: slots to scan, y: unused, z: specular mips, w: parallax on
-    glm::vec4 sky_ambient;   // rgb: radiance used while no probe is baked
+    glm::uvec4 info;         // x: slots to scan, y: sky probe slot + 1 (0: none), z: specular mips, w: parallax on
+    glm::vec4 sky_ambient;   // rgb: radiance used while nothing is baked, w: sky probe distance
     glm::vec4 intensity;     // x: diffuse, y: specular (0: off)
     glm::vec4 ssr_params;    // x: SSR intensity (0: off) - ssr_composite.frag
 };

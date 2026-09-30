@@ -53,6 +53,10 @@ export cvar::Var<float> cv_probes_diffuse_intensity(
     "render.probes.diffuse_intensity", 1.0f, "Scale of the probes' diffuse irradiance");
 export cvar::Var<float> cv_probes_specular_intensity(
     "render.probes.specular_intensity", 1.0f, "Scale of the probes' specular reflections");
+export cvar::Var<bool> cv_probes_sky(
+    "render.probes.sky", true, "Sky probe: a capture of the sky alone, lights and reflects where no probe is near (off: flat sky ambient)");
+export cvar::Var<float> cv_probes_sky_distance(
+    "render.probes.sky_distance", 12.0f, "Distance to the probe boxes (m) where the sky probe weighs as much as a probe");
 export cvar::Var<bool> cv_probes_show_volumes(
     "render.probes.show_volumes", false, "Draw probe boxes and capture points", {}, cvar::none);
 
@@ -88,6 +92,10 @@ public:
     static constexpr uint32_t prefilter_samples = 64;
     static constexpr uint32_t fade_update_interval = 3;   // frames between crossfade updates of a slot
     static constexpr uint32_t irradiance_samples = 128;
+    // The last slot is the sky probe: the sky alone seen from the camera (no geometry, no box, no parallax).
+    // What no probe box covers is shared between it and the probes (reflection_probe_weights): puddles in
+    // the open reflect the sky and its clouds.
+    static constexpr uint32_t sky_slot = kMaxReflectionProbes - 1;
     static constexpr float capture_near = 0.05f;
     static constexpr float capture_far = 500.0f;
 

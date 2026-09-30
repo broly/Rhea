@@ -162,6 +162,23 @@ namespace
         return splat;
     }
 
+    Texture load_puddles(const Terrain& terrain)
+    {
+        if (!terrain.puddlemap.empty())
+        {
+            std::optional<Texture> file = Texture::create_from_file(paths::get_assets_path() / terrain.puddlemap);
+            if (file && file->extent.width == file->extent.height)
+                return std::move(*file);
+        }
+        Texture puddles;
+        puddles.extent = Extent(terrain.puddle_resolution, terrain.puddle_resolution);
+        puddles.format = TextureFormat::RGBA8;
+        puddles.bulk.resize(size_t(terrain.puddle_resolution) * terrain.puddle_resolution * 4, std::byte{0});
+        for (size_t i = 3; i < puddles.bulk.size(); i += 4)
+            puddles.bulk[i] = std::byte{255};
+        return puddles;
+    }
+
     // 1 inside the inner part of the brush, fading to 0 at the radius
     float brush_weight(const TerrainBrush& brush, float distance)
     {
@@ -233,6 +250,8 @@ namespace
                     h = glm::mix(h, flatten_target, std::clamp(rate * 10.0f * weight * dt, 0.0f, 1.0f));
                     break;
                 case TerrainBrushMode::paint:
+                case TerrainBrushMode::water:
+                case TerrainBrushMode::dry:
                     break;
                 }
                 h = std::clamp(h, data.min_height, data.max_height);
@@ -301,6 +320,45 @@ namespace
         data.unsaved = true;
     }
 
+    // The water level moves toward the brush's profile (full in the inner part, 0 at the radius): the falloff
+    // is the shore of the puddle. Drying mirrors it.
+    void flood(TerrainData& data, const TerrainBrush& brush, glm::vec2 local, float dt)
+    {
+        Texture& puddles = terrain::get_puddles(data);
+        const int32_t resolution = int32_t(puddles.extent.width);
+        const float texel = data.size() / float(resolution);
+        const TerrainRect rect = brush_rect(local - glm::vec2(0.5f * texel), brush.radius, texel, resolution);
+        if (rect.empty())
+            return;
+
+        const bool fill = brush.mode == TerrainBrushMode::water;
+        const float rate = std::clamp(brush.strength, 0.0f, 1.0f) * 6.0f * dt;
+        auto* texels = reinterpret_cast<uint8_t*>(puddles.bulk.data());
+        for (int32_t z = rect.min_z; z <= rect.max_z; ++z)
+        {
+            for (int32_t x = rect.min_x; x <= rect.max_x; ++x)
+            {
+                const glm::vec2 center = (glm::vec2(float(x), float(z)) + 0.5f) * texel;
+                const float weight = brush_weight(brush, glm::length(center - local));
+                if (weight <= 0.0f)
+                    continue;
+
+                uint8_t* level = texels + (size_t(z) * resolution + size_t(x)) * 4;
+                const int32_t old_level = level[0];
+                const int32_t target = int32_t(std::lround((fill ? weight : 1.0f - weight) * 255.0f));
+                const int32_t distance = fill ? target - old_level : old_level - target;
+                if (distance <= 0)
+                    continue;
+                // at least one step (8 bit levels, small per frame amounts)
+                const int32_t step = int32_t(std::ceil(float(distance) * std::min(rate, 1.0f)));
+                const uint8_t new_level = uint8_t(fill ? old_level + step : old_level - step);
+                level[0] = level[1] = level[2] = new_level;
+            }
+        }
+        data.dirty_puddles.add(rect);
+        data.unsaved = true;
+    }
+
     [[=scene::on_spawned<Terrain>]]
     void spawn_terrain(World& world, ecs::Entity root, const SerializationContext&)
     {
@@ -338,6 +396,12 @@ namespace
         splat.transition_path = std::format("{}#terrain{}", splat.name, root.bits());
         data->splat = AssetManager::get().register_external_texture(std::move(splat));
         terrain.material->parameters["splat"] = data->splat;
+
+        Texture puddles = load_puddles(terrain);
+        puddles.name = terrain.puddlemap.empty() ? std::string("terrain_puddles") : terrain.puddlemap;
+        puddles.transition_path = std::format("{}#terrain{}", puddles.name, root.bits());
+        data->puddles = AssetManager::get().register_external_texture(std::move(puddles));
+        terrain.material->parameters["puddles"] = data->puddles;
 
         const std::string name = scene::get_name(registry, root);
         const uint32_t quads = terrain.samples - 1;
@@ -393,6 +457,11 @@ namespace terrain
         return AssetManager::get().loaded_textures.at(data.splat);
     }
 
+    Texture& get_puddles(const TerrainData& data)
+    {
+        return AssetManager::get().loaded_textures.at(data.puddles);
+    }
+
     std::optional<float> height_at(const TerrainData& data, glm::vec2 world_xz)
     {
         const glm::vec2 local = (world_xz - glm::vec2(data.origin.x, data.origin.z)) / data.spacing;
@@ -444,6 +513,8 @@ namespace terrain
         const glm::vec2 local = world_xz - glm::vec2(data.origin.x, data.origin.z);
         if (brush.mode == TerrainBrushMode::paint)
             paint(data, brush, local, dt);
+        else if (brush.mode == TerrainBrushMode::water || brush.mode == TerrainBrushMode::dry)
+            flood(data, brush, local, dt);
         else
             sculpt(data, brush, local, dt);
     }
@@ -476,18 +547,19 @@ namespace terrain
             data.dirty_heights = {};
         }
 
-        if (!data.dirty_splat.empty())
-        {
-            const Texture& splat = get_splat(data);
-            const TerrainRect& rect = data.dirty_splat;
-            backend->update_texture_2d(renderer.get_texture(data.splat), splat, TextureRegion{
+        auto upload = [&] (TextureHandle handle, TerrainRect& rect) {
+            if (rect.empty())
+                return;
+            backend->update_texture_2d(renderer.get_texture(handle), AssetManager::get().loaded_textures.at(handle), TextureRegion{
                 .x = uint32_t(rect.min_x),
                 .y = uint32_t(rect.min_z),
                 .width = uint32_t(rect.max_x - rect.min_x + 1),
                 .height = uint32_t(rect.max_z - rect.min_z + 1),
             });
-            data.dirty_splat = {};
-        }
+            rect = {};
+        };
+        upload(data.splat, data.dirty_splat);
+        upload(data.puddles, data.dirty_puddles);
     }
 
     void commit_collision(TerrainData& data, phys::PhysicsScene& physics, ecs::Entity owner)
@@ -551,6 +623,16 @@ namespace terrain
         {
             error = "could not write " + splat_path.string();
             return false;
+        }
+
+        if (!terrain.puddlemap.empty())
+        {
+            const std::filesystem::path puddle_path = paths::get_assets_path() / terrain.puddlemap;
+            if (!get_puddles(data).save_to_file(puddle_path))
+            {
+                error = "could not write " + puddle_path.string();
+                return false;
+            }
         }
 
         terrain.data->unsaved = false;

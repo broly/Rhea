@@ -37,13 +37,16 @@ export
         [[=rh::edit, =rh::read_only]] std::string heightmap;
         // PNG, RGBA = weights of layers 0..3; no file: layer 0 everywhere (Save writes it)
         [[=rh::edit, =rh::read_only]] std::string splatmap;
+        // PNG, R = water level of the puddles (terrain.frag); no file: dry (Save writes it)
+        [[=rh::edit, =rh::read_only]] std::string puddlemap;
 
         [[=rh::edit, =rh::read_only]] uint32_t samples = 512;             // per side, a multiple of 4
         [[=rh::edit, =rh::read_only]] float spacing = 1.0f;               // m between samples
         [[=rh::edit, =rh::read_only]] float min_height = -20.0f;          // m, relative to the entity
         [[=rh::edit, =rh::read_only]] float max_height = 80.0f;
         [[=rh::edit, =rh::read_only]] uint32_t splat_resolution = 2048;   // of a new splat map
-        [[=rh::edit, =rh::read_only]] uint32_t chunk_quads = 64;          // per side of a chunk mesh
+        [[=rh::edit, =rh::read_only]] uint32_t puddle_resolution = 1024;  // of a new puddle map
+        [[=rh::edit, =rh::read_only]] uint32_t chunk_quads = 64;         // per side of a chunk mesh
 
         // names of the layers in the editor (material slots 0..3)
         std::vector<std::string> layer_names = { "layer 0", "layer 1", "layer 2", "layer 3" };
@@ -100,6 +103,7 @@ export
 
         std::vector<float> heights;                 // samples^2, relative to the entity, rows along x
         TextureHandle splat;                        // CPU copy is AssetManager's (terrain::get_splat)
+        TextureHandle puddles;                      // RGBA8, R = water level (terrain::get_puddles)
         std::vector<TerrainChunk> chunks;
 
         phys::Shape shape;
@@ -108,6 +112,7 @@ export
         // edits not uploaded yet (terrain::commit_render), collision not rebuilt (terrain::commit_collision)
         TerrainRect dirty_heights;
         TerrainRect dirty_splat;                    // texels
+        TerrainRect dirty_puddles;                  // texels
         bool collision_dirty = false;
         bool unsaved = false;
 
@@ -121,6 +126,8 @@ export
         lower,
         smooth,     // toward the average of the neighbors
         flatten,    // toward flatten_height
+        water,      // puddle water level up, to the shape of the brush
+        dry,        // and down
     };
 
     struct TerrainBrush
@@ -158,5 +165,6 @@ export
 
         // The splat map texels (RGBA8, splat_resolution^2), AssetManager's copy: uploaded from it
         Texture& get_splat(const TerrainData& data);
+        Texture& get_puddles(const TerrainData& data);
     }
 }
