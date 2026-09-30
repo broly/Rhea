@@ -36,6 +36,14 @@ export cvar::Var<int> cv_shadow_interval_2(
 export cvar::Var<int> cv_shadow_interval_3(
     "render.shadows.interval_3", 4, "Frames between renders of shadow cascade 3 (1: every frame)");
 
+// Performance experiments (tools/bench/run_pose.py --a / --b): meshes left out of a pass by name, to see what
+// they cost. Comma separated parts of mesh names, '*' is every mesh, '-part' keeps the meshes with that part:
+// "*,-.glb,-exterior" hides the Sponza interior (its meshes are glTF node names, trees and props are .glb files)
+export cvar::Var<std::string> cv_debug_hide_base(
+    "render.debug.hide_base", "", "Meshes not drawn by the base pass: name parts, '*' all, '-part' keeps", {}, cvar::none);
+export cvar::Var<std::string> cv_debug_hide_shadow(
+    "render.debug.hide_shadow", "", "Meshes not drawn into the shadow maps: name parts, '*' all, '-part' keeps", {}, cvar::none);
+
 // A shadow cascade as rendered into its atlas tile: the light UBO carries these, so a tile that was not rendered
 // this frame is still sampled with the matrix it was rendered with
 export struct ShadowCascade
@@ -436,5 +444,11 @@ public:
     // in the given order, for passes which blend). bind_resources binds the pass resources after a pipeline.
     void draw_items(RenderGraphContext& ctx, const std::vector<const RenderPrimitive*>& items, uint32_t debug_id,
         bool in_order, const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources);
+
+    // `render.dump_draws` (one-time flag dump_draws): for the next frames every mesh pass appends what it draws,
+    // by mesh asset and LOD, to cache/bench/draws.csv. Several frames: the far shadow cascades take turns.
+    static constexpr uint32_t draw_dump_frame_count = 4;
+    uint32_t draw_dump_frames = 0;
+    void dump_draws(Name pass, uint32_t debug_id, const std::vector<const RenderPrimitive*>& items) const;
 };
 RH_OBJECT(GenericRenderGraph)

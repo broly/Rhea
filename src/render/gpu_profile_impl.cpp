@@ -66,6 +66,7 @@ namespace gpuprof
                 r.min_ms = std::min(r.min_ms, ms);
                 r.max_ms = std::max(r.max_ms, ms);
                 r.samples.push_back(ms);
+                r.frames.push_back(fp.frame_id);
             }
         }
 
@@ -90,6 +91,7 @@ namespace gpuprof
         c.backend->cmd_reset_timestamp_pool(cmd, fp.pool, kMaxPassesPerFrame * 2);
         fp.pass_names.clear();
         fp.in_use = false;
+        fp.frame_id = ++c.frame_counter;
     }
 
     void frame_end()
@@ -171,10 +173,11 @@ namespace gpuprof
         std::cout << "GPU profiling data dumped to gpu_profiling_dump.txt\n";
     }
 
-    void dump_json()
+    void dump_json(std::string_view suffix)
     {
         auto& c = ctx();
-        auto path = paths::get_project_path() / "gpu_profiling_dump.json";
+        auto path = paths::get_project_path() /
+            (suffix.empty() ? std::string("gpu_profiling_dump.json") : std::format("gpu_profiling_dump_{}.json", suffix));
 
         // { "pass_name": [ms_frame0, ms_frame1, ...], ... }
         Json::Value root(Json::objectValue);

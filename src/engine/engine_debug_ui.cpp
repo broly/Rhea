@@ -342,6 +342,11 @@ void EngineDebugUI::register_console_commands(Engine& engine)
         engine.renderer->set_flag("reset_temporal_accum", true, false, true);
     });
 
+    add("render.dump_draws", "Writes what every mesh pass draws in the next frames, by mesh and LOD, to cache/bench/draws.csv",
+        [&engine] (cvar::Args) {
+            engine.renderer->set_flag("dump_draws", true, false, true);
+        });
+
     auto flag_names = [&engine] {
         std::vector<std::string> names;
         if (const auto graph = engine.renderer->get_main_render_graph())
@@ -431,10 +436,10 @@ void EngineDebugUI::register_console_commands(Engine& engine)
         gpuprof::set_enabled(true);
         cv_window_gpu_profiler.set(true);
     });
-    add("gpuprof.stop", "Dumps the GPU profile and stops the profiler (O)", [] (cvar::Args) {
-        gpuprof::dump_json();
+    add("gpuprof.stop", "Dumps the GPU profile and stops the profiler (O)", [] (cvar::Args args) {
+        gpuprof::dump_json(args.empty() ? std::string_view() : std::string_view(args[0]));
         gpuprof::set_enabled(false);
-    });
+    }, "[name: gpu_profiling_dump_<name>.json]");
     add("gpuprof.dump", "Dumps the GPU profile to JSON", [] (cvar::Args) {
         gpuprof::dump_json();
     });

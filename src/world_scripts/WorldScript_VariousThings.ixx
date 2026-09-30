@@ -8,6 +8,7 @@ import glm;
 import rhmath;
 import character_controller;
 import character_light_rig;
+import benchmark;
 import reflect;
 import properties;
 import cvar;
@@ -71,6 +72,19 @@ public:
     // `camera.look <x> <y> <z> <target x> <y> <z>` (console, RHEA_EXEC automation): free camera at a pose
     std::unique_ptr<cvar::Command> camera_look_command;
     std::optional<std::pair<glm::vec3, glm::vec3>> pending_camera_look;
+
+    // `bench.run <route> [name] [quit]` (console, tools/bench/run_bench.py): the character runs a route, the
+    // camera looks around, every frame is recorded
+    struct BenchmarkRequest
+    {
+        std::string route;
+        std::string name;
+        uint32_t laps = 0;   // 0: as the route says
+        bool quit = false;
+    };
+    std::unique_ptr<cvar::Command> bench_command;
+    std::optional<BenchmarkRequest> pending_benchmark;
+    Benchmark benchmark;
 
 private:
     Transform get_camera_transform() const;

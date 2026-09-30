@@ -84,6 +84,9 @@ namespace
     // `player.teleport <x> <y> <z>` (console, Terrain window): the player's feet, applied at the next fixed tick
     std::optional<glm::vec3> pending_teleport;
 
+    // set_scripted_player_input
+    std::optional<CharacterInput> scripted_input;
+
     cvar::Command teleport_command("player.teleport", "Moves the player character (feet) to a world position",
         [] (cvar::Args args) {
             auto parse = [] (const std::string& text, float& value) {
@@ -122,6 +125,13 @@ namespace
             command.camera_yaw = player.camera_yaw;
             if (!player.enabled)
                 return;
+            if (scripted_input)
+            {
+                command.move_axis = scripted_input->move_axis;
+                command.walk = scripted_input->walk;
+                command.jump = scripted_input->jump;
+                return;
+            }
             if (input->is_key_down(Key::W)) command.move_axis.y += 1.0f;
             if (input->is_key_down(Key::S)) command.move_axis.y -= 1.0f;
             if (input->is_key_down(Key::D)) command.move_axis.x += 1.0f;
@@ -580,6 +590,11 @@ bool init_character(World& world, ecs::Entity e, const std::string& locomotion_j
     registry.add<CharacterInput>(e);
     registry.add<CharacterAnimator>(e, std::move(animator));
     return true;
+}
+
+void set_scripted_player_input(const std::optional<CharacterInput>& input)
+{
+    scripted_input = input;
 }
 
 Transform make_character_camera(World& world, ecs::Entity character, float camera_yaw, float camera_pitch)

@@ -65,12 +65,43 @@ export namespace prof
     inline thread_local ProfileNode* tls_current_node = nullptr;
 
     // ------------------------------------------------------------
+    // Frame counters (draws, triangles...): summed over a frame, the finished frame is kept for readers
+    // (benchmark). Main thread only.
+    // ------------------------------------------------------------
+    struct FrameCounters
+    {
+        std::map<std::string, uint64_t, std::less<>> current;
+        std::map<std::string, uint64_t, std::less<>> last_frame;
+    };
+
+    inline FrameCounters& get_counters()
+    {
+        static FrameCounters counters;
+        return counters;
+    }
+
+    void count(std::string_view name, uint64_t value)
+    {
+        auto& current = get_counters().current;
+        auto it = current.find(name);
+        if (it == current.end())
+            it = current.emplace(std::string(name), 0).first;
+        it->second += value;
+    }
+
+    // ------------------------------------------------------------
     // Frame control
     // ------------------------------------------------------------
     FORCEINLINE void frame_start()
     {
         auto& ctx = get_context();
         tls_current_node = &ctx.root;
+
+        // values are zeroed, not erased: no allocations in a steady frame
+        FrameCounters& counters = get_counters();
+        std::swap(counters.current, counters.last_frame);
+        for (auto& [name, value] : counters.current)
+            value = 0;
     }
 
     FORCEINLINE void frame_end()

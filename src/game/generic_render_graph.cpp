@@ -723,14 +723,19 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_copy_pass("COPY_gbuffer_linear_depth_to_history", 
         gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], gbuffer_hist[GBUFFER_SLOTS::LINEAR_DEPTH]);
     
-    add_copy_pass("COPY_gbuffer_world_normal_to_history", 
-        gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], gbuffer_hist[GBUFFER_SLOTS::WORLD_NORMAL]);
-    
-    // add_copy_pass("COPY_gbuffer_depth_to_history", 
+    // the history of the normals and positions is read by the ray traced GI only (SVGF, RTXGI reprojection):
+    // the position copy alone is 0.3-0.5 ms at 2560x1506 (RGBA32F)
+    if constexpr (render_settings::enable_raytracing)
+    {
+        add_copy_pass("COPY_gbuffer_world_normal_to_history",
+            gbuffer[GBUFFER_SLOTS::WORLD_NORMAL], gbuffer_hist[GBUFFER_SLOTS::WORLD_NORMAL]);
+
+        add_copy_pass("COPY_gbuffer_position_to_history",
+            gbuffer[GBUFFER_SLOTS::POSITION], gbuffer_hist[GBUFFER_SLOTS::POSITION]);
+    }
+
+    // add_copy_pass("COPY_gbuffer_depth_to_history",
     //     gbuffer[GBUFFER_SLOT_DEPTH], gbuffer_hist[GBUFFER_SLOT_DEPTH]);
-    
-    add_copy_pass("COPY_gbuffer_position_to_history", 
-        gbuffer[GBUFFER_SLOTS::POSITION], gbuffer_hist[GBUFFER_SLOTS::POSITION]);
     
   
     
@@ -1059,6 +1064,16 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     show_skeleton = ctx.params.get_int(DebugViewParams::show_skeleton, 0) != 0;
     
     prepared_batches.clear();
+
+    if (draw_dump_frames > 0)
+        --draw_dump_frames;
+    if (auto dump = one_time_render_flags.find("dump_draws"); dump != one_time_render_flags.end() && dump->second)
+    {
+        draw_dump_frames = draw_dump_frame_count;
+        const std::filesystem::path path = paths::get_cache_path() / "bench" / "draws.csv";
+        std::filesystem::create_directories(path.parent_path());
+        std::ofstream(path) << "frame,pass,cascade,mesh,lod,draws,triangles\n";
+    }
 
     {
         PROFILE("DrawList::begin_frame");
@@ -1670,6 +1685,42 @@ void GenericRenderGraph::dispatch_skinning(RenderGraphContext& ctx)
     }
 }
 
+namespace
+{
+    // cv_debug_hide_base / cv_debug_hide_shadow: "part,part,-kept part", '*' hides every mesh
+    struct MeshNameFilter
+    {
+        explicit MeshNameFilter(const std::string& text)
+        {
+            for (const auto part : std::views::split(text, ','))
+            {
+                const std::string_view term(part.begin(), part.end());
+                if (term.empty())
+                    continue;
+                if (term == "*")
+                    hide_all = true;
+                else if (term.front() == '-')
+                    keep.emplace_back(term.substr(1));
+                else
+                    hide.emplace_back(term);
+            }
+        }
+
+        bool hides(const RenderPrimitive& prim) const
+        {
+            if (!hide_all && hide.empty())
+                return false;
+            const std::string& name = prim.mesh.mesh.get().name;
+            const auto in_name = [&] (const std::string& term) { return name.find(term) != std::string::npos; };
+            return (hide_all || std::ranges::any_of(hide, in_name)) && !std::ranges::any_of(keep, in_name);
+        }
+
+        std::vector<std::string> hide;
+        std::vector<std::string> keep;
+        bool hide_all = false;
+    };
+}
+
 void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 {
     PROFILE("GenericRenderGraph::draw_scene");
@@ -1705,15 +1756,18 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
                 return a.get_sort_key() < b.get_sort_key();
             });
     }
-    
-    
+
+
     PROFILE("GenericRenderGraph::draw_scene - items");
     const bool translucent = ctx.pass_name == Names::pass_geometry_translucent;
+    const bool base_pass = ctx.pass_name == Names::pass_geometry_base;
 
     std::vector<const RenderPrimitive*> primitives;
     primitives.reserve(items.size());
+    const MeshNameFilter hidden(base_pass ? cv_debug_hide_base.get() : std::string());
     for (const ViewRenderItem& item : items)
-        primitives.push_back(item.primitive);
+        if (!hidden.hides(*item.primitive))
+            primitives.push_back(item.primitive);
 
     const uint32_t geometry_debug = (uint32_t)ctx.params.get_int(GeometryDebug::param, 0);
     const bool diag_geometry = diag_enabled() && ctx.pass_name == Names::pass_geometry_base;
@@ -1735,10 +1789,51 @@ void GenericRenderGraph::draw_scene(RenderGraphContext& ctx)
 
 }
 
+// Frame counters of a pass (prof::count, read by the benchmark): its draws and triangles
+static void count_draws(Name pass, uint64_t draws, uint64_t indices)
+{
+    static std::unordered_map<Name, std::pair<std::string, std::string>> names;
+    auto it = names.find(pass);
+    if (it == names.end())
+        it = names.emplace(pass, std::pair{ "draws " + pass.to_string(), "triangles " + pass.to_string() }).first;
+    prof::count(it->second.first, draws);
+    prof::count(it->second.second, indices / 3);
+}
+
+void GenericRenderGraph::dump_draws(Name pass, uint32_t debug_id, const std::vector<const RenderPrimitive*>& items) const
+{
+    struct Row
+    {
+        uint64_t draws = 0;
+        uint64_t triangles = 0;
+    };
+    // mesh asset, LOD level
+    std::map<std::pair<std::string, uint32_t>, Row> rows;
+    for (const RenderPrimitive* prim : items)
+    {
+        if (!prim->get_pass_info(pass))
+            continue;
+        Row& row = rows[{ prim->mesh.mesh.get().name, prim->lod_level }];
+        ++row.draws;
+        row.triangles += prim->mesh.get().indices.size() / 3;
+    }
+
+    std::ofstream file(paths::get_cache_path() / "bench" / "draws.csv", std::ios::app);
+    // debug_id: the cascade of a shadow pass
+    for (const auto& [key, row] : rows)
+        file << std::format("{},{},{},{},{},{},{}\n", draw_dump_frame_count - draw_dump_frames, pass.to_string(), debug_id,
+            key.first, key.second, row.draws, row.triangles);
+}
+
 void GenericRenderGraph::draw_items(RenderGraphContext& ctx, const std::vector<const RenderPrimitive*>& items,
     uint32_t debug_id, bool in_order, const std::function<void(const RenderPrimitivePassInfo&)>& bind_resources)
 {
     PROFILE("GenericRenderGraph::draw_items");
+
+    uint64_t draw_count = 0;
+    uint64_t index_count = 0;
+    if (draw_dump_frames > 0)
+        dump_draws(ctx.pass_name, debug_id, items);
 
     auto bind = [&] (const RenderPrimitivePassInfo& info)
     {
@@ -1766,8 +1861,12 @@ void GenericRenderGraph::draw_items(RenderGraphContext& ctx, const std::vector<c
             if (!info)
                 continue;
             bind(*info);
-            ctx.draw((uint32_t)prim->mesh.get().indices.size(), 0, draw_list.add_record(record_of(*prim, *info)));
+            const uint32_t indices = (uint32_t)prim->mesh.get().indices.size();
+            ctx.draw(indices, 0, draw_list.add_record(record_of(*prim, *info)));
+            ++draw_count;
+            index_count += indices;
         }
+        count_draws(ctx.pass_name, draw_count, index_count);
         return;
     }
 
@@ -1796,11 +1895,17 @@ void GenericRenderGraph::draw_items(RenderGraphContext& ctx, const std::vector<c
     {
         const uint32_t first_command = draw_list.command_count();
         for (const auto& [prim, info] : group.draws)
-            draw_list.add_draw(record_of(*prim, *info), (uint32_t)prim->mesh.get().indices.size());
+        {
+            const uint32_t indices = (uint32_t)prim->mesh.get().indices.size();
+            draw_list.add_draw(record_of(*prim, *info), indices);
+            index_count += indices;
+        }
+        draw_count += group.draws.size();
 
         bind(*group.info);
         draw_list.draw_indirect(ctx, first_command, draw_list.command_count() - first_command);
     }
+    count_draws(ctx.pass_name, draw_count, index_count);
 }
 
 bool GenericRenderGraph::emissive_diagnostics_enabled()
@@ -1937,6 +2042,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
     const uint32_t tile = Constants::shadowmap_extent.width / Constants::shadow_atlas_tiles;
     std::vector<const RenderPrimitive*> primitives;
     primitives.reserve(mesh_processor.primitives.size());
+    const MeshNameFilter hidden(cv_debug_hide_shadow.get());
     for (uint32_t cascade = 0; cascade < shadow_cascade_count; ++cascade)
     {
         if (!shadow_cascades[cascade].rendered_this_frame)
@@ -1947,7 +2053,7 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
         // the LOD follows the camera, not the light: the shadow of what the camera sees
         const glm::vec3 viewer = glm::vec3(current_camera_ubo.camera_pos);
         for (const RenderPrimitive& prim : mesh_processor.primitives)
-            if (prim.in_shadow_lod_range(viewer) && frustum.test_aabb_world(prim.bounds))
+            if (prim.in_shadow_lod_range(viewer) && frustum.test_aabb_world(prim.bounds) && !hidden.hides(prim))
                 primitives.push_back(&prim);
 
         const int32_t x = int32_t(cascade % Constants::shadow_atlas_tiles * tile);

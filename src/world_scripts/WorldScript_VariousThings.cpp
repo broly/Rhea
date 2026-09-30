@@ -180,6 +180,29 @@ void WorldScript_VariousThings::tick(double dt)
                 pending_camera_look = { glm::vec3(v[0], v[1], v[2]), glm::vec3(v[3], v[4], v[5]) };
             }, "<x> <y> <z> <target x> <target y> <target z>");
     }
+    if (!bench_command)
+    {
+        bench_command = std::make_unique<cvar::Command>("bench.run",
+            "Runs the player character along a route (assets/bench/*.json) and records every frame to cache/bench",
+            [this] (cvar::Args args) {
+                if (args.empty())
+                {
+                    cvar::print("bench.run <route asset> [output name] [laps=<n>] [quit]", cvar::Output::error);
+                    return;
+                }
+                BenchmarkRequest request{ .route = args[0], .name = std::filesystem::path(args[0]).stem().string() };
+                for (size_t i = 1; i < args.size(); ++i)
+                {
+                    if (args[i] == "quit")
+                        request.quit = true;
+                    else if (args[i].starts_with("laps="))
+                        request.laps = uint32_t(std::max(std::atoi(args[i].c_str() + 5), 0));
+                    else
+                        request.name = args[i];
+                }
+                pending_benchmark = std::move(request);
+            }, "<route asset> [output name] [laps=<n>] [quit]");
+    }
 
     static bool do_once = false;
 
@@ -380,6 +403,22 @@ void WorldScript_VariousThings::tick(double dt)
             animator->select_expression((current + step) % count - 1);
         }
         expression_key_was_down = n_down;
+    }
+
+    if (pending_benchmark)
+    {
+        const BenchmarkRequest request = std::move(*pending_benchmark);
+        pending_benchmark.reset();
+        if (!character)
+            cvar::print("bench.run: no player character in the level", cvar::Output::error);
+        else if (benchmark.start(*world, request.route, request.name, request.laps, request.quit))
+            character_mode = true;
+    }
+    // the benchmark holds the keys and the camera
+    if (benchmark.is_active())
+    {
+        character_mode = true;
+        benchmark.tick(*world, character, yaw, pitch);
     }
 
     // the character moves in the fixed ticks (character_controller), here only the camera follows it

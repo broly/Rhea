@@ -41,8 +41,24 @@ void Engine::run()
     // RHEA_BACKGROUND=1: the window opens without taking the keyboard focus (automation: RHEA_EXEC + screenshots)
     const char* background_env = std::getenv("RHEA_BACKGROUND");
     const bool background = background_env && background_env[0] == '1';
-    window_create(window, 1280, 720, "Rhea", {
-        .maximized = soak_seconds > 0.0,
+    // RHEA_WINDOW=maximized | <width>x<height>: the window of automated runs (benchmarks at the size the game is played at)
+    int window_width = 1280;
+    int window_height = 720;
+    bool maximized = soak_seconds > 0.0;
+    if (const char* window_env = std::getenv("RHEA_WINDOW"))
+    {
+        int width = 0;
+        int height = 0;
+        if (std::string_view(window_env) == "maximized")
+            maximized = true;
+        else if (std::sscanf(window_env, "%dx%d", &width, &height) == 2 && width > 0 && height > 0)
+        {
+            window_width = width;
+            window_height = height;
+        }
+    }
+    window_create(window, window_width, window_height, "Rhea", {
+        .maximized = maximized,
         .focus_on_show = soak_seconds <= 0.0 && !background,
     });
 

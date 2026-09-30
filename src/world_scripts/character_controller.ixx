@@ -153,4 +153,8 @@ export
 
     // Orbit camera around the character, pulled in front of walls
     Transform make_character_camera(World& world, ecs::Entity character, float camera_yaw, float camera_pitch);
+
+    // Automation (benchmark): while set, PlayerControlled characters take move_axis / walk / jump from it
+    // instead of the keyboard (camera_yaw still comes from PlayerControlled)
+    void set_scripted_player_input(const std::optional<CharacterInput>& input);
 }

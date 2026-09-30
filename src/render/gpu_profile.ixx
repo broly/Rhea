@@ -38,12 +38,14 @@ export namespace gpuprof
         double      min_ms       = 1e30;
         double      max_ms       = 0.0;
         std::vector<double> samples;   // per-frame ms, in capture order
+        std::vector<uint64_t> frames;  // frame id of every sample (a pass may run several times in a frame, or not at all)
     };
 
     struct FramePool
     {
         RBQueryPool              pool{};
         bool                     in_use = false;
+        uint64_t                 frame_id = 0;
         std::vector<std::string> pass_names;   // index i -> queries (2i, 2i+1)
     };
 
@@ -56,6 +58,7 @@ export namespace gpuprof
 
         std::array<FramePool, kRenderMaxFramesInFlight> frames{};
         uint32_t current_frame = 0;
+        uint64_t frame_counter = 0;     // frames recorded since init, the id of the one being recorded
         uint32_t next_query = 0;
         int32_t  open_pass_base = -1;   // query base of the currently-open pass (-1 = none)
 
@@ -72,6 +75,8 @@ export namespace gpuprof
     void set_enabled(bool v) { ctx().enabled = v; }
     bool is_enabled()        { return ctx().enabled; }
     void clear_results()     { ctx().results.clear(); }
+    // id of the last frame whose recording began (PassResult::frames), 0 before the first one
+    uint64_t current_frame_id() { return ctx().frame_counter; }
 
     // ---- lifecycle ----------------------------------------------------------
     void init(RenderBackend* backend);
@@ -87,5 +92,6 @@ export namespace gpuprof
 
     // ---- dump ---------------------------------------------------------------
     void dump();
-    void dump_json();   // per-frame samples per pass -> JSON for Python viz
+    // per-frame samples per pass -> gpu_profiling_dump.json (gpu_profiling_dump_<suffix>.json) for Python viz
+    void dump_json(std::string_view suffix = {});
 }
