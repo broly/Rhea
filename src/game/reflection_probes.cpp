@@ -98,6 +98,16 @@ void ReflectionProbeSystem::init(Renderer& in_renderer, RenderBackend& in_backen
             .is_cubemap = true,
         });
     }
+    sky_capture = backend->create_image({
+        .name = "probe_capture_sky",
+        .extent = { capture_size, capture_size },
+        .format = TextureFormat::RGBA16F,
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled |
+            RenderTextureUsage::TransferSrc | RenderTextureUsage::TransferDst,
+        .mip_levels = specular_mips,
+        .num_layers = 6,
+        .is_cubemap = true,
+    });
     capture_depth = backend->create_image({
         .name = "probe_capture_depth",
         .extent = { capture_size, capture_size },
@@ -282,10 +292,6 @@ void ReflectionProbeSystem::update_slots(SceneView& scene_view, const FrameInput
             state.valid = state.valid && state.active;
             state.dirty = state.active && (!state.valid || state.force || sun_differs || sky_differs);
             state.dirty_reason = !state.valid ? "first bake" : state.force ? "requested" : sun_differs ? "sun changed" : "sky changed";
-            if (!state.active && job && job->slot == slot)
-                job.reset();
-            if (!state.active && fade && fade->slot == slot)
-                fade.reset();
             continue;
         }
         const RenderObject_ReflectionCapture* capture = slot < captures.size() ? &captures[slot] : nullptr;
@@ -335,12 +341,46 @@ void ReflectionProbeSystem::update_slots(SceneView& scene_view, const FrameInput
     }
 }
 
+bool ReflectionProbeSystem::plan_sky(const FrameInputs& inputs)
+{
+    if (sky_cooldown > 0)
+        sky_cooldown--;
+
+    SlotState& state = slots[sky_slot];
+    // a sky nobody has seen yet does not wait
+    if (!state.active || !state.dirty || (state.valid && sky_cooldown > 0))
+        return false;
+
+    // lighting driven updates run all the time under an animated sun: not logged
+    if (!state.valid || state.force)
+        LogReflectionProbes.Log("Baking reflection probe 'sky' (slot %u): %s", sky_slot, state.dirty_reason);
+
+    frame_work.sky = true;
+
+    state.valid = true;
+    state.baked_position = inputs.camera_position;
+    state.baked_sun_direction = probe_lights.sun_direction;
+    state.baked_sun_color = probe_lights.sun_color;
+    state.baked_sky = glm::vec4(inputs.sky_ambient, inputs.cloud_coverage);
+    state.bake_time = current_time;
+    state.bake_count++;
+    state.dirty = false;
+    state.force = false;
+
+    sky_cooldown = (uint32_t)std::clamp(cv_probes_sky_interval.get(), 2, 60);
+    return true;
+}
+
 void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& inputs)
 {
+    // the capture UBO and the filter source are one per frame: the probes of the scene wait for the sky
+    if (plan_sky(inputs))
+        return;
+
     const auto& captures = scene_view.get_processor<SceneViewProcessor_ReflectionCapture>().captures;
 
     // the probe moved while it was being captured: start over from its new position
-    if (job && job->slot != sky_slot && captures[job->slot].capture_version != job->capture_version)
+    if (job && captures[job->slot].capture_version != job->capture_version)
         job.reset();
 
     // ---- a finished capture starts filtering into its slot (one filter at a time: the source descriptor) ----
@@ -408,6 +448,9 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
         float best_score = -1.0f;
         for (uint32_t slot = 0; slot < kMaxReflectionProbes; ++slot)
         {
+            // the sky probe has its own path (plan_sky)
+            if (slot == sky_slot)
+                continue;
             const SlotState& state = slots[slot];
             if (!state.active || !state.dirty)
                 continue;
@@ -415,8 +458,7 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
             if (fade && fade->slot == slot)
                 continue;
 
-            const float distance = slot == sky_slot ? 0.0f
-                : distance_to_box(inputs.camera_position, captures[slot].box_min, captures[slot].box_max);
+            const float distance = distance_to_box(inputs.camera_position, captures[slot].box_min, captures[slot].box_max);
             const float score = !state.valid
                 ? 1.0e6f / (1.0f + distance)
                 : (float(current_time - state.bake_time) + 0.1f) / (1.0f + distance * 0.2f);
@@ -430,12 +472,11 @@ void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& 
         if (!best)
             return;
 
-        const bool sky = *best == sky_slot;
         job = Job{
             .slot = *best,
-            .capture_version = sky ? 0u : captures[*best].capture_version,
+            .capture_version = captures[*best].capture_version,
             .next_face = 0,
-            .position = sky ? inputs.camera_position : captures[*best].position,
+            .position = captures[*best].position,
             .sun_direction = probe_lights.sun_direction,
             .sun_color = probe_lights.sun_color,
             .sky = glm::vec4(inputs.sky_ambient, inputs.cloud_coverage),
@@ -535,12 +576,13 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
         capture_ubo.light_color[index] = glm::vec4(points[index].second, 0.0f);
     }
     // no sun lobe in the sky probe: it is what mirrors show, the sun's highlight comes from the light itself
-    const bool sky_capture = frame_work.face_count > 0 && frame_work.slot == sky_slot;
-    capture_ubo.light_info = glm::uvec4((uint32_t)num_points, probe_lights.sun_visible && !sky_capture ? 1u : 0u, 0u, 0u);
+    capture_ubo.light_info = glm::uvec4((uint32_t)num_points, probe_lights.sun_visible && !frame_work.sky ? 1u : 0u, 0u, 0u);
 
     probe_capture_resource->update_uniform_buffer("probe_capture_ubo", capture_ubo, ctx.frame);
-    // the filter reads the finished capture, the capture pass draws into the other one
-    probe_capture_resource->update_image("u_probe_source", capture_colors[frame_work.filter_capture_index], { .frame = ctx.frame, .cubemap = true });
+    // the filter reads the finished capture, the capture pass draws into the other one (the sky probe: its own
+    // cube, rendered earlier in the same pass)
+    probe_capture_resource->update_image("u_probe_source",
+        frame_work.sky ? sky_capture : capture_colors[frame_work.filter_capture_index], { .frame = ctx.frame, .cubemap = true });
     probe_capture_resource->update_image("u_probe_scratch_specular", scratch_specular, { .frame = ctx.frame, .cubemap = true });
     probe_capture_resource->update_image("u_probe_scratch_irradiance", scratch_irradiance, { .frame = ctx.frame, .cubemap = true });
 }
@@ -612,6 +654,7 @@ void ReflectionProbeSystem::initialize_images(RenderGraphContext& ctx)
     // (unbaked slots are never sampled, the UBO marks them invalid)
     for (RBImageHandle capture : capture_colors)
         transition(ctx, capture, RBImageUsageType::SampledFragment);
+    transition(ctx, sky_capture, RBImageUsageType::SampledFragment);
     transition(ctx, scratch_specular, RBImageUsageType::SampledFragment);
     transition(ctx, scratch_irradiance, RBImageUsageType::SampledFragment);
     for (uint32_t slot = 0; slot < kMaxReflectionProbes; ++slot)
@@ -629,33 +672,42 @@ void ReflectionProbeSystem::execute(RenderGraphContext& ctx, SceneView& scene_vi
     if (!images_initialized)
         initialize_images(ctx);
 
-    if (frame_work.face_count == 0 && !frame_work.filter && !frame_work.blend)
+    if (frame_work.face_count == 0 && !frame_work.filter && !frame_work.blend && !frame_work.sky)
         return;
+
+    // the sky probe: the whole update at once, no crossfade (the lighting follows the sky like it follows the sun)
+    if (frame_work.sky)
+    {
+        for (uint32_t face = 0; face < 6; ++face)
+            render_face(ctx, scene_view, draw_list, sky_capture, face, true);
+        filter_capture(ctx, sky_capture, specular_images[sky_slot], irradiance_images[sky_slot]);
+    }
 
     // the finished capture first: the faces below go to the other cube
     if (frame_work.filter)
     {
         const uint32_t slot = frame_work.filter_slot;
+        const RBImageHandle source = capture_colors[frame_work.filter_capture_index];
         if (frame_work.filter_to_scratch)
-            filter_capture(ctx, frame_work.filter_capture_index, scratch_specular, scratch_irradiance);
+            filter_capture(ctx, source, scratch_specular, scratch_irradiance);
         else
-            filter_capture(ctx, frame_work.filter_capture_index, specular_images[slot], irradiance_images[slot]);
+            filter_capture(ctx, source, specular_images[slot], irradiance_images[slot]);
     }
     if (frame_work.blend)
         blend_into_slot(ctx, frame_work.blend_slot, frame_work.blend_alpha);
 
     for (uint32_t face = frame_work.first_face; face < frame_work.first_face + frame_work.face_count; ++face)
-        render_face(ctx, scene_view, draw_list, face);
+        render_face(ctx, scene_view, draw_list, capture_colors[frame_work.capture_index], face, false);
 
     // later passes set their viewport only when it differs from the swapchain
     backend->update_viewport(ctx.cmd, {}, true);
 }
 
-void ReflectionProbeSystem::render_face(RenderGraphContext& ctx, SceneView& scene_view, DrawList& draw_list, uint32_t face)
+void ReflectionProbeSystem::render_face(RenderGraphContext& ctx, SceneView& scene_view, DrawList& draw_list,
+    RBImageHandle capture_color, uint32_t face, bool sky_only)
 {
     PROFILE("ReflectionProbeSystem::render_face");
 
-    const RBImageHandle capture_color = capture_colors[frame_work.capture_index];
     transition(ctx, capture_color, RBImageUsageType::ColorAttachment, face, 1, 0, 1);
     transition(ctx, capture_depth, RBImageUsageType::DepthStencilAttachment);
 
@@ -693,7 +745,7 @@ void ReflectionProbeSystem::render_face(RenderGraphContext& ctx, SceneView& scen
     ctx.push_constants(ProbeFacePushConstants{ face, 0, 0.0f, 0, 1.0f });
     ctx.draw_fullscreen();
 
-    if (frame_work.slot == sky_slot)
+    if (sky_only)
     {
         backend->end_render_pass(ctx.cmd);
         transition(ctx, capture_color, RBImageUsageType::SampledFragment, face, 1, 0, 1);
@@ -768,13 +820,12 @@ void ReflectionProbeSystem::draw_filter_face(RenderGraphContext& ctx, Name pass,
     backend->end_render_pass(ctx.cmd);
 }
 
-void ReflectionProbeSystem::filter_capture(RenderGraphContext& ctx, uint32_t capture_index, RBImageHandle specular,
+void ReflectionProbeSystem::filter_capture(RenderGraphContext& ctx, RBImageHandle source, RBImageHandle specular,
     RBImageHandle irradiance)
 {
     PROFILE("ReflectionProbeSystem::filter_capture");
 
     // source mips for filtered importance sampling
-    const RBImageHandle source = capture_colors[capture_index];
     backend->generate_mips(ctx.cmd, source);
     transition(ctx, source, RBImageUsageType::SampledFragment);
 

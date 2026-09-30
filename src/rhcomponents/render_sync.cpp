@@ -58,6 +58,7 @@ namespace
         proxy.transform = world;
         proxy.mesh = renderer.mesh;
         proxy.bounds = get_mesh_bounds(renderer, world);
+        proxy.lods = renderer.lods;
         proxy.materials = renderer.materials;
         if (const SkinnedMesh* skinned = registry.get<SkinnedMesh>(e))
             proxy.skinning = skinned->pose;
@@ -66,7 +67,8 @@ namespace
 
     bool same_proxy(const SceneViewProxy_Mesh& a, const SceneViewProxy_Mesh& b)
     {
-        return same(a.transform, b.transform) && a.mesh == b.mesh && a.materials == b.materials && a.skinning == b.skinning;
+        return same(a.transform, b.transform) && a.mesh == b.mesh && a.lods == b.lods && a.materials == b.materials
+            && a.skinning == b.skinning;
     }
 
     SceneViewProxy_Camera make_proxy(const ecs::Registry&, ecs::Entity, const Camera& camera, const Transform& world)

@@ -222,6 +222,10 @@ void GameEngine::on_debug_ui_render_panel()
     if (ImGui::SliderInt("Blend frames", &blend_frames, 1, 120))
         cv_probes_blend_frames.set(blend_frames);
     ImGui::SetItemTooltip("Frames a rebaked probe crossfades from its old capture to the new one (1: switch at once)");
+    int sky_interval = cv_probes_sky_interval.get();
+    if (ImGui::SliderInt("Sky interval", &sky_interval, 2, 60))
+        cv_probes_sky_interval.set(sky_interval);
+    ImGui::SetItemTooltip("Least frames between two updates of the sky probe: it follows the sun and the weather at once, without a crossfade");
 
     const auto status = probes->get_status();
     if (status.empty())

@@ -52,8 +52,13 @@ public:
     {
         bool has_dir_light = false;
         std::array<RenderObject_Light, NumLights> result;
-        std::vector<RenderObject_Light> sorted_lights = lights;
-        
+        // black lights add nothing (vacated slots, a switched off light rig): they must not take the place
+        // of the lit ones
+        std::vector<RenderObject_Light> sorted_lights;
+        for (const RenderObject_Light& light : lights)
+            if (light.type != LightType::point || light.color.x > 0.0f || light.color.y > 0.0f || light.color.z > 0.0f)
+                sorted_lights.push_back(light);
+
         std::sort(sorted_lights.begin(), sorted_lights.end(),
             [origin](const RenderObject_Light& a, const RenderObject_Light& b) {
                 

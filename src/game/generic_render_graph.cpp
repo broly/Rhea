@@ -1911,8 +1911,10 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
 
         const Frustum frustum = Frustum::from_view_projection(shadow_cascades[cascade].vp);
         primitives.clear();
+        // the LOD follows the camera, not the light: the shadow of what the camera sees
+        const glm::vec3 viewer = glm::vec3(current_camera_ubo.camera_pos);
         for (const RenderPrimitive& prim : mesh_processor.primitives)
-            if (frustum.test_aabb_world(prim.bounds))
+            if (prim.in_shadow_lod_range(viewer) && frustum.test_aabb_world(prim.bounds))
                 primitives.push_back(&prim);
 
         const int32_t x = int32_t(cascade % Constants::shadow_atlas_tiles * tile);
@@ -2086,6 +2088,8 @@ void GenericRenderGraph::draw_mesh_wireframe(RenderGraphContext& ctx)
     {
         // only primitives drawn by the scene passes (skips released slots)
         if (!prim.get_pass_info(Names::pass_geometry_base) && !prim.get_pass_info(Names::pass_geometry_translucent))
+            continue;
+        if (!prim.in_lod_range(glm::vec3(current_camera_ubo.camera_pos)))
             continue;
 
         // wireframe_mesh.vert: 3 edges (6 line vertices) per triangle

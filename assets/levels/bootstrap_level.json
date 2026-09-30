@@ -664,6 +664,35 @@
 			}
 		},
 		{
+			// cypresses by the building and along the road, jacarandas and small trees in the meadows, firs on the
+			// hills: placed by tools/trees/scatter_trees.py, species imported by tools/trees/import_trees.py.
+			// After the terrain: the trees stand on it.
+			"name": "trees",
+			"components": {
+				"Transform": {
+					"position": { "x": 0, "y": 0, "z": 0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
+				},
+				"Trees": { "placement": "levels/sponza_trees.json" }
+			}
+		},
+		{
+			// cliffs set into the mountain slopes with the rocks fallen off them, rock groups in the meadows and
+			// by the wayside, stumps and fallen trunks among the trees: placed by tools/props/scatter_props.py
+			// (it reads the terrain and the trees), props imported by tools/props/import_props.py.
+			// After the terrain: the props lie on it.
+			"name": "props",
+			"components": {
+				"Transform": {
+					"position": { "x": 0, "y": 0, "z": 0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
+				},
+				"Props": { "placement": "levels/sponza_props.json" }
+			}
+		},
+		{
 			"name": "cosmo_bunny",
 			"prefab": "prefabs/cosmo_bunny.json",
 			"components": {
@@ -675,7 +704,8 @@
 			}
 		},
 		// light rig around the imported character: positions and colors are driven every frame by
-		// CharacterLightRig (src/world_scripts/character_light_rig.cpp), L switches presets
+		// CharacterLightRig (src/world_scripts/character_light_rig.cpp), L switches presets.
+		// Off by default (black lights): cvar character.light_rig
 		{
 			"name": "cosmo_bunny_light_0",
 			"components": {

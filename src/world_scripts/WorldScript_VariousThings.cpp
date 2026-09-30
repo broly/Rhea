@@ -24,6 +24,12 @@ import cvar;
 
 constexpr bool DO_NN_SAMPLES = false;
 
+namespace
+{
+    cvar::Var<bool> cv_character_light_rig("character.light_rig", false,
+        "Light rig around the character: point lights and the sun tint of the lighting preset (L)");
+}
+
 Transform WorldScript_VariousThings::get_camera_transform() const
 {
     return scene::get_world_transform(world->registry, camera);
@@ -306,7 +312,8 @@ void WorldScript_VariousThings::tick(double dt)
 
     const bool free_camera = !character || !character_mode;
 
-    // light rig: L next preset (LeftShift + L previous), M freezes / resumes the time of day
+    // light rig (cvar character.light_rig, off by default): L next preset (LeftShift + L previous),
+    // M freezes / resumes the time of day
     if (character && !light_rig_init_attempted)
     {
         light_rig_init_attempted = true;
@@ -316,8 +323,10 @@ void WorldScript_VariousThings::tick(double dt)
     }
     if (light_rig)
     {
+        light_rig->enabled = cv_character_light_rig.get();
+
         const bool l_down = input->is_key_down(Key::L);
-        if (l_down && !light_preset_key_was_down)
+        if (l_down && !light_preset_key_was_down && light_rig->enabled)
         {
             if (input->is_key_down(Key::LeftShift))
                 light_rig->previous_preset();
@@ -629,6 +638,12 @@ void WorldScript_VariousThings::draw_debug_ui()
     if (light_rig)
     {
         ImGui::SeparatorText("Lighting");
+        bool rig_enabled = cv_character_light_rig.get();
+        if (ImGui::Checkbox("Character light rig", &rig_enabled))
+            cv_character_light_rig.set(rig_enabled);
+        ImGui::SetItemTooltip("%s", cv_character_light_rig.get_description().c_str());
+
+        ImGui::BeginDisabled(!rig_enabled);
         if (ImGui::BeginCombo("Preset (L)", light_rig->get_preset_name()))
         {
             for (size_t index = 0; index < light_rig->get_preset_count(); index++)
@@ -636,6 +651,7 @@ void WorldScript_VariousThings::draw_debug_ui()
                     light_rig->set_preset(index);
             ImGui::EndCombo();
         }
+        ImGui::EndDisabled();
 
         bool frozen = is_sun_frozen();
         if (ImGui::Checkbox("Freeze sun (M)", &frozen))

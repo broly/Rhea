@@ -143,7 +143,7 @@ void CharacterLightRig::set_preset(size_t index)
 
 glm::vec3 CharacterLightRig::get_sun_tint() const
 {
-    return PRESETS[preset_index].sun_tint;
+    return enabled ? PRESETS[preset_index].sun_tint : glm::vec3(1.0f);
 }
 
 void CharacterLightRig::apply_preset_log() const
@@ -155,6 +155,15 @@ void CharacterLightRig::tick(ecs::Registry& registry)
 {
     if (!registry.alive(character))
         return;
+
+    if (!enabled)
+    {
+        // black point lights are skipped by the renderer (SceneViewProcessor_Light::query_nearest_lights_limited)
+        for (const ecs::Entity entity : lights)
+            if (Light* light = registry.get<Light>(entity))
+                light->color = glm::vec4(0.0f);
+        return;
+    }
 
     const Transform ct = scene::get_world_transform(registry, character);
     const glm::vec3 base = ct.position.glm();

@@ -151,6 +151,10 @@ export namespace phys
         // stored in PhysicsSettings::shape_cache_dir; it is rebuilt when the geometry changes.
         Shape create_mesh_shape(const TriangleMeshShape& mesh, std::string_view cache_key = {});
 
+        // The shape scaled: instances of one cooked shape at different sizes share its data.
+        // Spheres and capsules only scale uniformly. Invalid for an invalid shape.
+        Shape create_scaled_shape(const Shape& shape, glm::vec3 scale);
+
         // Cooked shape cache in PhysicsSettings::shape_cache_dir, for shapes that are slow to build.
         // `hash` covers the source data and the cooking parameters (hash_mesh, hash_value): a load
         // with another hash misses. Thread safe; no-ops without a cache dir or key.

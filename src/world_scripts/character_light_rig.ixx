@@ -41,9 +41,13 @@ public:
     size_t get_preset_index() const { return preset_index; }
     const char* get_preset_name(size_t index) const;
     void set_preset(size_t index);
+    // white while the rig is off
     glm::vec3 get_sun_tint() const;
 
     void tick(ecs::Registry& registry);
+
+    // off: the lights are black (not drawn) and the sun is not tinted, the character is lit by the level alone
+    bool enabled = false;
 
 private:
     void apply_preset_log() const;

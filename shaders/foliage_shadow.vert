@@ -1,0 +1,31 @@
+#version 450
+
+// Shadow map pass of the "foliage" material model: shadow.vert plus the uv for the alpha test of the leaves
+
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_nonuniform_qualifier : enable
+
+#include "definitions.glsl"
+
+#include "resources/light.glsl"
+#include "resources/mesh_table.glsl"
+#include "resources/primitive_table.glsl"
+#include "push_constants/model_push_constants.glsl"
+
+layout(location = 0) out vec2 v_uv;
+
+void main()
+{
+    forward_draw_record();
+
+    Vertex vertex = fetch_vertex(get_mesh_index(), gl_VertexIndex);
+
+    GPUPrimitiveInfo primitive_info = get_primitive_info(get_primitive_index());
+    mat4 transform_curr = primitive_info.current_transform;
+
+    v_uv = vertex.uv;
+
+    // the push constants carry the cascade (GenericRenderGraph::draw_scene_shadow)
+    gl_Position = light_ubo.dir_light.cascade_vp[get_debug_index()] * transform_curr * vec4(vertex.position, 1.0);
+}

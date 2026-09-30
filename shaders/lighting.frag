@@ -72,7 +72,13 @@ void main()
     
     // ---- character shading models (see character/shading_models.glsl) ----
     uint shading_model = decode_shading_model(get_gbuffer_GEOMETRY_NORMAL(uv).a);
-    const bool legacy_model = shading_model == SHADING_MODEL_ID_CLEAR || shading_model == SHADING_MODEL_ID_LEGACY;
+    // foliage: the legacy model plus transmission, g_emissive holds its color instead of emissive
+    const bool foliage_model = shading_model == SHADING_MODEL_ID_FOLIAGE;
+    const bool legacy_model = shading_model == SHADING_MODEL_ID_CLEAR || shading_model == SHADING_MODEL_ID_LEGACY
+        || foliage_model;
+    const vec3 transmission = foliage_model ? emissive : vec3(0.0);
+    if (foliage_model)
+        emissive = vec3(0.0);
     
     if (lighting_debug(LIGHTING_DEBUG_PROBE_MIRROR))
     {
@@ -144,28 +150,27 @@ void main()
         vec3 Lcol = light_ubo.lights[i].color.rgb;
 
         vec3 L = normalize(Lpos - pos);
-        float NdotL = max(dot(N, L), 0.0);
-
-        if (NdotL <= 0.0) 
-            continue;
+        float NdotL = dot(N, L);
 
         float dist = length(Lpos - pos);
         float attenuation = 1.0 / (dist * dist + 1.0);
 
-        direct += diffuse_albedo / 3.14159265 * Lcol * attenuation * NdotL;
+        // a leaf lit from behind passes a part of the light through
+        direct += (diffuse_albedo * max(NdotL, 0.0) + transmission * max(-NdotL, 0.0)) / 3.14159265 * Lcol * attenuation;
     }
     
     if (light_ubo.has_dir_light == 1)
     {
         vec3 L = normalize(-light_ubo.dir_light.direction.xyz);
-        float NdotL = max(dot(N, L), 0.0);
+        float NdotL = dot(N, L);
 
-        if (NdotL > 0.0)
+        if (NdotL > 0.0 || foliage_model)
         {
-            float shadow = lighting_debug(LIGHTING_DEBUG_NO_SHADOWS) ? 1.0 : shadow_factor(pos, Ng);
+            // the shadow lookup is offset along the normal, away from the surface: for a leaf, on its lit side
+            float shadow = lighting_debug(LIGHTING_DEBUG_NO_SHADOWS) ? 1.0 : shadow_factor(pos, foliage_model && dot(Ng, L) < 0.0 ? -Ng : Ng);
             vec3 radiance = light_ubo.dir_light.color.rgb * shadow;
 
-            direct += diffuse_albedo / 3.14159265 * radiance * NdotL;
+            direct += (diffuse_albedo * max(NdotL, 0.0) + transmission * max(-NdotL, 0.0)) / 3.14159265 * radiance;
         }
     }
 
@@ -178,6 +183,11 @@ void main()
     // image based specular (split sum with the analytic env BRDF, occluded by the material AO), applied in
     // SSRComposite to SSR / reflection probe radiance
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 specular_weight = env_brdf_approx(F0, roughness, NdotV) * specular_occlusion(NdotV, ao, roughness);
+    // leaves are seen edge on all over a crown: the Fresnel peak there would mirror the sky in single pixels
+    // (the crown sparkles), and most of what a leaf reflects is other leaves, not the sky
+    if (foliage_model)
+        specular_weight = env_brdf_approx(F0, max(roughness, 0.6), max(NdotV, 0.5)) * 0.4 * ao;
     if (!lighting_debug(LIGHTING_DEBUG_NO_SPECULAR_IBL))
-        out_specular_weight = vec4(env_brdf_approx(F0, roughness, NdotV) * specular_occlusion(NdotV, ao, roughness), 1.0);
+        out_specular_weight = vec4(specular_weight, 1.0);
 }

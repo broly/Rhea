@@ -83,7 +83,7 @@ void SceneViewProcessor_Mesh::process()
         dirty = true;
 
         bool is_new = ro.primitives.empty();
-        bool mesh_changed = ro.mesh != submitted.mesh;
+        bool mesh_changed = ro.mesh != submitted.mesh || ro.lods != submitted.lods;
 
         glm::mat4 new_world = submitted.transform.matrix();
         bool transform_changed = ro.world != new_world;
@@ -93,133 +93,146 @@ void SceneViewProcessor_Mesh::process()
             retire_primitives(ro);
 
             ro.mesh   = submitted.mesh;
+            ro.lods   = submitted.lods;
             ro.world  = new_world;
             ro.bounds = submitted.bounds;
 
-            const auto& mesh = submitted.mesh.get();
+            checkf(submitted.lods.empty() || !submitted.skinning, "Mesh '%s': skinned meshes have no LODs",
+                submitted.debug_name.to_string().c_str());
 
-            for (uint32_t geom = 0; geom < mesh.mesh_geometry.size(); ++geom)
+            // level 0: the mesh itself, level n: lods[n - 1]. One set of primitives per level, the view picks
+            // by distance (RenderPrimitive::in_lod_range)
+            for (uint32_t level = 0; level <= submitted.lods.size(); ++level)
             {
-                const auto& geometry = mesh.mesh_geometry[geom];
+                const MeshHandle level_mesh = level == 0 ? submitted.mesh : submitted.lods[level - 1].mesh;
+                const auto& mesh = level_mesh.get();
 
-                for (uint32_t prim_index = 0;
-                     prim_index < geometry.primitives.size();
-                     ++prim_index)
+                for (uint32_t geom = 0; geom < mesh.mesh_geometry.size(); ++geom)
                 {
-                    uint32_t mat_index =
-                        geometry.primitives[prim_index]
-                            .material_index.value_or(0);
-                    
-                    checkf(mat_index < submitted.materials.size(),
-                        "Mesh '%s': no material for slot %u (%zu provided)",
-                        submitted.debug_name.to_string().c_str(), mat_index, submitted.materials.size());
-                    
-                    auto material = submitted.materials[mat_index];
-                    
-                    // explicitly hidden material (e.g. fully transparent UE materials)
-                    if (auto visible_it = material->parameters.find("visible");
-                        visible_it != material->parameters.end() &&
-                        visible_it->second.is<float>() && visible_it->second.as<float>() == 0.0f)
+                    const auto& geometry = mesh.mesh_geometry[geom];
+
+                    for (uint32_t prim_index = 0;
+                         prim_index < geometry.primitives.size();
+                         ++prim_index)
                     {
-                        continue;
-                    }
+                        uint32_t mat_index =
+                            geometry.primitives[prim_index]
+                                .material_index.value_or(0);
                     
-                    auto blend_mode = material->get_enum_parameter<BlendMode>("blend_mode");
-
-                    auto model =
-                        renderer.find_model(material->model);
-                    checkf(model, "Material model '%s' not found", material->model.to_string().c_str());
+                        checkf(mat_index < submitted.materials.size(),
+                            "Mesh '%s': no material for slot %u (%zu provided)",
+                            submitted.debug_name.to_string().c_str(), mat_index, submitted.materials.size());
                     
-                    const bool masked_in_base_pass = model->supports_masked.value_or(false);
+                        auto material = submitted.materials[mat_index];
+                    
+                        // explicitly hidden material (e.g. fully transparent UE materials)
+                        if (auto visible_it = material->parameters.find("visible");
+                            visible_it != material->parameters.end() &&
+                            visible_it->second.is<float>() && visible_it->second.as<float>() == 0.0f)
+                        {
+                            continue;
+                        }
+                    
+                        auto blend_mode = material->get_enum_parameter<BlendMode>("blend_mode");
 
-                    RenderPrimitive rp{};
-                    rp.mesh = MeshPrimHandle{
-                        submitted.mesh, geom, prim_index };
-                    rp.world = &ro.world;
-                    rp.bounds = ro.bounds;
+                        auto model =
+                            renderer.find_model(material->model);
+                        checkf(model, "Material model '%s' not found", material->model.to_string().c_str());
+                    
+                        const bool masked_in_base_pass = model->supports_masked.value_or(false);
 
-                    std::set<Name> passes;
+                        RenderPrimitive rp{};
+                        rp.mesh = MeshPrimHandle{
+                            level_mesh, geom, prim_index };
+                        rp.world = &ro.world;
+                        rp.bounds = ro.bounds;
+                        rp.lod_level = level;
+                        rp.masked = blend_mode == BlendMode::masked;
+
+                        std::set<Name> passes;
         
-                    if (blend_mode == BlendMode::opaque ||
-                        (blend_mode == BlendMode::masked && masked_in_base_pass))
-                    {
-                        passes.emplace("GeometryBase");
-                        // passes.emplace("DepthPrepass");
-                    }
-                    else if (blend_mode == BlendMode::translucent)
-                         passes.emplace("GeometryTranslucent");
+                        if (blend_mode == BlendMode::opaque ||
+                            (blend_mode == BlendMode::masked && masked_in_base_pass))
+                        {
+                            passes.emplace("GeometryBase");
+                            // passes.emplace("DepthPrepass");
+                        }
+                        else if (blend_mode == BlendMode::translucent)
+                             passes.emplace("GeometryTranslucent");
                     
-                    if (blend_mode != BlendMode::translucent)
-                        passes.emplace("ShadowMap");
+                        if (blend_mode != BlendMode::translucent)
+                            passes.emplace("ShadowMap");
                     
-                    for (Name pass_name : passes)
-                    {
+                        for (Name pass_name : passes)
+                        {
                         
-                        auto instance =
-                            renderer.query_material_instance(
-                                submitted.materials[mat_index], pass_name);
+                            auto instance =
+                                renderer.query_material_instance(
+                                    submitted.materials[mat_index], pass_name);
                         
-                        auto geom_pipeline_family =
-                            renderer.query_pipeline_family(pass_name, model);
+                            auto geom_pipeline_family =
+                                renderer.query_pipeline_family(pass_name, model);
 
-                        rp.passes.emplace(pass_name);
-                        auto& info = rp.info_by_pass[pass_name];
-                        info.pipeline_family = geom_pipeline_family;
-                        info.shader_key = geom_pipeline_family->make_shader_key(pass_name, instance->material);
-                        info.pipeline = geom_pipeline_family->request_pipeline(info.shader_key);
-                        info.material_instance = instance;
-                        if (pass_name != "shadowmap")
-                            instance->apply_material_parameters();
+                            rp.passes.emplace(pass_name);
+                            auto& info = rp.info_by_pass[pass_name];
+                            info.pipeline_family = geom_pipeline_family;
+                            info.shader_key = geom_pipeline_family->make_shader_key(pass_name, instance->material);
+                            info.pipeline = geom_pipeline_family->request_pipeline(info.shader_key);
+                            info.material_instance = instance;
+                            if (pass_name != "shadowmap")
+                                instance->apply_material_parameters();
                     
                     
-                        info.material_index = instance->material_id;
+                            info.material_index = instance->material_id;
+                        }
+                    
+                        if (submitted.skinning)
+                        {
+                            // per-instance skinned copy with its own vertices and BLAS
+                            const SkeletalMesh& skeletal = submitted.skinning->mesh.get();
+                            checkf(geom == 0, "Skeletal meshes have a single geometry");
+                        
+                            rp.skinned = renderer.get_backend()->create_skinned_mesh(
+                                rp.mesh,
+                                skeletal.primitive_skins[prim_index],
+                                skeletal.skeleton.num_bones(),
+                                skeletal.primitive_morphs[prim_index],
+                                skeletal.num_morph_targets(),
+                                rt_build_mode);
+                            rp.skinning = submitted.skinning;
+                            rp.mesh_index = rp.skinned->mesh_index;
+                        }
+                        else
+                        {
+                            auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, rt_build_mode);
+                            rp.mesh_index = result.mesh_index;
+                        }
+                        
+                        // todo: temp. exact pass is bad idea
+                        auto mat_instance_TODO_EXACT_PASS =
+                                renderer.query_material_instance(
+                                    submitted.materials[mat_index], "GeometryBase");
+                    
+                        // shadow instances are never filled with parameters (see above):
+                        // shadow pipelines which alpha test read the base pass material
+                        if (auto shadow_it = rp.info_by_pass.find("ShadowMap"); shadow_it != rp.info_by_pass.end())
+                            shadow_it->second.material_index = mat_instance_TODO_EXACT_PASS->material_id;
+                        
+                        rp.primitive_material_id = mat_instance_TODO_EXACT_PASS->material_id;
+                        
+                        rp.debug_texture_name = 
+                        rp.id = render_primitive_id_counter++;
+                        primitives.push_back(rp);
+                    
+                        ro.prev_world = ro.world;
+                        write_primitive_info(ro, rp);
+                    
+                        
+                        ro.primitives.push_back(primitives.size() - 1);
                     }
-                    
-                    if (submitted.skinning)
-                    {
-                        // per-instance skinned copy with its own vertices and BLAS
-                        const SkeletalMesh& skeletal = submitted.skinning->mesh.get();
-                        checkf(geom == 0, "Skeletal meshes have a single geometry");
-                        
-                        rp.skinned = renderer.get_backend()->create_skinned_mesh(
-                            rp.mesh,
-                            skeletal.primitive_skins[prim_index],
-                            skeletal.skeleton.num_bones(),
-                            skeletal.primitive_morphs[prim_index],
-                            skeletal.num_morph_targets(),
-                            rt_build_mode);
-                        rp.skinning = submitted.skinning;
-                        rp.mesh_index = rp.skinned->mesh_index;
-                    }
-                    else
-                    {
-                        auto result = renderer.get_backend()->get_or_create_mesh_buffers(rp.mesh, rt_build_mode);
-                        rp.mesh_index = result.mesh_index;
-                    }
-                        
-                    // todo: temp. exact pass is bad idea
-                    auto mat_instance_TODO_EXACT_PASS =
-                            renderer.query_material_instance(
-                                submitted.materials[mat_index], "GeometryBase");
-                    
-                    // shadow instances are never filled with parameters (see above):
-                    // shadow pipelines which alpha test read the base pass material
-                    if (auto shadow_it = rp.info_by_pass.find("ShadowMap"); shadow_it != rp.info_by_pass.end())
-                        shadow_it->second.material_index = mat_instance_TODO_EXACT_PASS->material_id;
-                        
-                    rp.primitive_material_id = mat_instance_TODO_EXACT_PASS->material_id;
-                        
-                    rp.debug_texture_name = 
-                    rp.id = render_primitive_id_counter++;
-                    primitives.push_back(rp);
-                    
-                    ro.prev_world = ro.world;
-                    write_primitive_info(ro, rp);
-                    
-                        
-                    ro.primitives.push_back(primitives.size() - 1);
                 }
             }
+            update_lod_ranges(ro);
 
             continue;
         }
@@ -233,6 +246,7 @@ void SceneViewProcessor_Mesh::process()
             // (otherwise frustum culling tests the spawn position)
             ro.bounds = submitted.mesh.get().bounds * submitted.transform;
             ro.moved = true;
+            update_lod_ranges(ro);
             
             for (RenderPrimitiveId prim_index : ro.primitives)
             {
@@ -262,6 +276,32 @@ void SceneViewProcessor_Mesh::process()
     // TLAS instance transforms follow moved meshes
     if (!moved_last_frame.empty() && render_settings::enable_raytracing)
         dirty = true;
+}
+
+void SceneViewProcessor_Mesh::update_lod_ranges(RenderObject_Mesh& ro)
+{
+    if (ro.lods.empty())
+        return;
+
+    const float scale = std::max({ glm::length(glm::vec3(ro.world[0])), glm::length(glm::vec3(ro.world[1])),
+                                   glm::length(glm::vec3(ro.world[2])) });
+    for (RenderPrimitiveId prim_index : ro.primitives)
+    {
+        RenderPrimitive& rp = primitives[prim_index];
+        rp.lod_min = rp.lod_level == 0 ? 0.0f : ro.lods[rp.lod_level - 1].distance * scale;
+        rp.lod_max = rp.lod_level < ro.lods.size() ? ro.lods[rp.lod_level].distance * scale
+                                                   : std::numeric_limits<float>::max();
+
+        rp.shadow_lod_min = rp.lod_min;
+        rp.shadow_lod_max = rp.lod_max;
+        if (rp.masked)
+        {
+            // level n casts over the range of level n - 1, the last level over its own as well
+            const bool last = rp.lod_level == ro.lods.size();
+            rp.shadow_lod_min = rp.lod_level <= 1 ? 0.0f : ro.lods[rp.lod_level - 2].distance * scale;
+            rp.shadow_lod_max = rp.lod_level == 0 ? 0.0f : last ? std::numeric_limits<float>::max() : rp.lod_min;
+        }
+    }
 }
 
 void SceneViewProcessor_Mesh::write_primitive_info(const RenderObject_Mesh& ro, const RenderPrimitive& rp)
@@ -336,12 +376,15 @@ void SceneViewProcessor_Mesh::gather_for_view(const glm::mat4& view_matrix, cons
     PROFILE(__FUNCTION__);
     out_items.clear();
     out_items.reserve(primitives.size());
+
+    // the LOD is picked by the distance to the origin of the view
+    const glm::vec3 viewer = glm::vec3(glm::inverse(view_matrix)[3]);
     
 
     for (const auto& prim : primitives)
     {
         // Frustum culling
-        if (!frustum.test_aabb_world(prim.bounds))
+        if (!prim.in_lod_range(viewer) || !frustum.test_aabb_world(prim.bounds))
             continue;
         
         auto info_it = prim.info_by_pass.find(pass_name);

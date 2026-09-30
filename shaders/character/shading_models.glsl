@@ -8,11 +8,14 @@
 //   default lit: emissive.rgb = emissive,        emissive.a = metallic
 //   skin:        emissive.rgb = subsurface color, emissive.a = scatter
 //   hair:        emissive.rgb = tangent * 0.5 + 0.5, emissive.a = scatter
+// Foliage (foliage.frag) is lit by the legacy path plus the light passing through the leaves:
+//   foliage:     emissive.rgb = transmission color (albedo x tint x strength), emissive.a = metallic
 
 #define SHADING_MODEL_ID_CLEAR       0u
 #define SHADING_MODEL_ID_DEFAULT_LIT 1u
 #define SHADING_MODEL_ID_SKIN        2u
 #define SHADING_MODEL_ID_HAIR        3u
+#define SHADING_MODEL_ID_FOLIAGE     4u
 #define SHADING_MODEL_ID_LEGACY      255u
 
 float encode_shading_model(uint id)

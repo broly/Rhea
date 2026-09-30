@@ -31,6 +31,7 @@ export using RenderPrimitiveId = uint32_t;
 export struct RenderObject_Mesh
 {
     MeshHandle mesh;
+    std::vector<MeshLod> lods;
     glm::mat4 world;
     AABB bounds;
 
@@ -78,6 +79,29 @@ export struct RenderPrimitive
     uint64_t skinned_pose_version = 0;
     
     bool is_skinned() const { return skinned.has_value(); }
+
+    // ---- LOD (MeshRenderer::lods) ----
+    // 0: the mesh itself, n: lods[n - 1]
+    uint32_t lod_level = 0;
+    // drawn while the viewer is within [lod_min, lod_max) of the bounds
+    float lod_min = 0.0f;
+    float lod_max = std::numeric_limits<float>::max();
+    // Same for the shadow maps. Masked primitives (leaves) cast the shadow of the next level: the alpha
+    // tested outline is as good, with a fraction of the triangles in every cascade.
+    bool masked = false;
+    float shadow_lod_min = 0.0f;
+    float shadow_lod_max = std::numeric_limits<float>::max();
+
+    bool in_lod_range(const glm::vec3& viewer) const { return in_range(viewer, lod_min, lod_max); }
+    bool in_shadow_lod_range(const glm::vec3& viewer) const { return in_range(viewer, shadow_lod_min, shadow_lod_max); }
+
+    bool in_range(const glm::vec3& viewer, float min, float max) const
+    {
+        if (min <= 0.0f && max == std::numeric_limits<float>::max())
+            return true;
+        const float distance = glm::length(glm::max(glm::max(bounds.min - viewer, viewer - bounds.max), glm::vec3(0.0f)));
+        return distance >= min && distance < max;
+    }
 
     
     std::set<Name> passes;
@@ -137,6 +161,8 @@ public:
 
     // Stops drawing the object's primitives (their slots stay allocated: ids index the primitive table)
     void retire_primitives(RenderObject_Mesh& ro);
+    // Distance ranges of the object's primitives from its LOD distances and scale
+    void update_lod_ranges(RenderObject_Mesh& ro);
     
     std::vector<RenderPrimitive> primitives;
     

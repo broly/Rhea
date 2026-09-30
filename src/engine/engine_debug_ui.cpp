@@ -1177,7 +1177,7 @@ void EngineDebugUI::draw_help_window()
         {"Mouse wheel", "Field of view (free camera)"},
         {"F / V", "Frame the character / face close-up"},
         {"T / N / 0", "Next pose / expression, back to locomotion"},
-        {"L / M", "Next lighting preset / freeze the sun"},
+        {"L / M", "Next lighting preset (character.light_rig on) / freeze the sun"},
         {"F1 F2 F3 F4", "Lit / wireframe / gbuffer channels / skeletons"},
         {"R", "Reload shaders"},
         {"B", "Reset temporal accumulation"},

@@ -57,6 +57,8 @@ export cvar::Var<bool> cv_probes_sky(
     "render.probes.sky", true, "Sky probe: a capture of the sky alone, lights and reflects where no probe is near (off: flat sky ambient)");
 export cvar::Var<float> cv_probes_sky_distance(
     "render.probes.sky_distance", 12.0f, "Distance to the probe boxes (m) where the sky probe weighs as much as a probe");
+export cvar::Var<int> cv_probes_sky_interval(
+    "render.probes.sky_interval", 4, "Least frames between two updates of the sky probe (2-60). It updates as soon as the sun or the sky changes, the probes of the scene wait that frame");
 export cvar::Var<bool> cv_probes_show_volumes(
     "render.probes.show_volumes", false, "Draw probe boxes and capture points", {}, cvar::none);
 
@@ -79,6 +81,12 @@ export cvar::Var<bool> cv_probes_show_volumes(
 // Priority: probes without a bake, then the dirty probes by staleness over distance to the camera. Dirty:
 // moved / (re)activated, the lights visible to probes or the sky changed, update_interval elapsed, camera entered the box
 // (rebake_on_enter), request_rebake_all.
+//
+// The sky probe (sky_slot) stays out of that queue: it lights what no box covers, and the direct light of
+// the sun changes at once, so a sky waiting for its turn and fading in shows as the terrain going dark and
+// brightening over seconds. When the sun or the sky changes it renders its 6 faces (sky only, its own capture
+// cube) and is filtered straight into its slot within one frame, at most every sky_interval frames. The
+// capture UBO and the filter source are one per frame: the probes of the scene do nothing in that frame.
 //
 // Shading side (resources/reflection.glsl): every slot is bound as samplerCube arrays, the UBO carries the
 // boxes (influence + parallax proxy) of baked probes.
@@ -211,17 +219,22 @@ private:
         bool blend = false;
         uint32_t blend_slot = 0;
         float blend_alpha = 1.0f;
+        // the sky probe: all faces into sky_capture, filtered into its slot (nothing of the above then)
+        bool sky = false;
     };
 
     void gather_lights(SceneView& scene_view);
     void update_slots(SceneView& scene_view, const FrameInputs& inputs);
+    // true: the sky probe takes this frame
+    bool plan_sky(const FrameInputs& inputs);
     void plan_work(SceneView& scene_view, const FrameInputs& inputs);
     void write_descriptors(RenderGraphContext& ctx, SceneView& scene_view, const FrameInputs& inputs);
     void draw_debug_volumes(SceneView& scene_view) const;
 
     void initialize_images(RenderGraphContext& ctx);
-    void render_face(RenderGraphContext& ctx, SceneView& scene_view, DrawList& draw_list, uint32_t face);
-    void filter_capture(RenderGraphContext& ctx, uint32_t capture_index, RBImageHandle specular, RBImageHandle irradiance);
+    void render_face(RenderGraphContext& ctx, SceneView& scene_view, DrawList& draw_list, RBImageHandle capture_color,
+        uint32_t face, bool sky_only);
+    void filter_capture(RenderGraphContext& ctx, RBImageHandle source, RBImageHandle specular, RBImageHandle irradiance);
     void blend_into_slot(RenderGraphContext& ctx, uint32_t slot, float alpha);
     void draw_filter_face(RenderGraphContext& ctx, Name pass, RBLoadOp load, RBImageHandle target, Name target_name,
         uint32_t size, uint32_t face, uint32_t mip, PipelineObject* pipeline, const ProbeFacePushConstants& pc);
@@ -258,6 +271,8 @@ private:
 
     // cubes with mips, the sources of the filters: one is captured while the other fades into its slot
     std::array<RBImageHandle, 2> capture_colors;
+    // the sky probe's own capture cube: captured and filtered within one frame, whatever the other two hold
+    RBImageHandle sky_capture;
     RBImageHandle capture_depth;
     // a filtered capture waiting to be blended into its slot
     RBImageHandle scratch_specular;
@@ -269,6 +284,7 @@ private:
     std::array<SlotState, kMaxReflectionProbes> slots;
     std::optional<Job> job;
     std::optional<Fade> fade;
+    uint32_t sky_cooldown = 0;   // frames until the sky probe may update again
     ProbeLights probe_lights;
     FrameWork frame_work;
     bool rebake_all_requested = false;

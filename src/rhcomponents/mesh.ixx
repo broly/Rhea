@@ -13,11 +13,22 @@ import glm;
 
 export
 {
+    // A lower detail version of a MeshRenderer's mesh: drawn instead of it once the camera is `distance`
+    // (m, times the largest scale of the entity) away from the bounds. Same primitives (material slots) as the mesh.
+    struct MeshLod
+    {
+        MeshHandle mesh;
+        float distance = 0.0f;
+
+        bool operator==(const MeshLod&) const = default;
+    };
+
     // What the mesh scene view processor gets for one mesh entity
     struct SceneViewProxy_Mesh : public SceneViewProxy_Transform
     {
         MeshHandle mesh;
         AABB bounds;
+        std::vector<MeshLod> lods;
         std::vector<std::shared_ptr<Material>> materials;
 
         // set for skinned meshes (SkinnedMesh)
@@ -28,6 +39,8 @@ export
     struct MeshRenderer
     {
         MeshHandle mesh;
+        // by ascending distance
+        std::vector<MeshLod> lods;
         std::vector<std::shared_ptr<Material>> materials;
         [[=rh::edit]] bool visible = true;
     };

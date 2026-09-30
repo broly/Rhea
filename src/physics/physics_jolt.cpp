@@ -495,6 +495,16 @@ namespace phys
         return shape;
     }
 
+    Shape PhysicsScene::create_scaled_shape(const Shape& shape, glm::vec3 scale)
+    {
+        const JPH::Shape* jolt_shape = get_jolt_shape(shape);
+        if (!jolt_shape)
+            return {};
+        if (scale == glm::vec3(1.0f))
+            return shape;
+        return make_shape(jolt_shape->ScaleShape(to_jolt(scale)), "scaled shape");
+    }
+
     Shape PhysicsScene::load_cached_shape(std::string_view cache_key, uint64_t hash) const
     {
         if (cache_key.empty() || backend->settings.shape_cache_dir.empty())
