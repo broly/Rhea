@@ -173,6 +173,8 @@ public:   /// API Section
     virtual RBRenderPass get_or_create_render_pass(const FramebufferDesc& fb) override;
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) override;
     virtual RBImageHandle create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info) override;
+    virtual void update_texture_2d(RBImageHandle image, const Texture& data, const TextureRegion& region) override;
+    virtual void update_mesh_vertices(MeshPrimHandle mesh, std::span<const Vertex> vertices) override;
     virtual Extent get_viewport_extent() const override;
     virtual RenderResource* create_resource(const RenderResourceDesc& desc) override;
     virtual RBAccelStruct build_tlas(RBCommandList cmd, const std::vector<TLASInfo>& objects) override;
@@ -180,6 +182,8 @@ public:   /// API Section
     virtual void copy_image(RBCommandList cmd, const CopyImageParams& params) override;
     
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) override;
+    virtual void set_viewport(const RBCommandList& cmd, int32_t x, int32_t y, uint32_t width, uint32_t height) override;
+    virtual void clear_depth(const RBCommandList& cmd, int32_t x, int32_t y, uint32_t width, uint32_t height, float depth = 1.0f) override;
     virtual uint32_t get_num_images_in_flight() const override;
     RBDeviceAddress get_buffer_device_address(RBBufferHandle buffer_handle, RBFrameHandle frame) const override;
     // Initialization section

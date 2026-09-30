@@ -16,11 +16,17 @@ struct PointLight
     vec4 color;
 };
 
+#define SHADOW_CASCADES 4
+
+// system_ubo.ixx
 struct DirectionalLight
 {
-    mat4 light_vp;
+    mat4 cascade_vp[SHADOW_CASCADES];   // light view-projection of each cascade (ZO depth)
     vec4 direction;
     vec4 color;
+    vec4 cascade_texel;                 // world size of a shadow texel, per cascade
+    vec4 cascade_depth_range;           // m between the near and far plane, per cascade
+    vec4 cascade_params;                // x: cascades in use, y: blend band (tile uv), z: 1 / atlas texels, w: tiles per side
 };
 
 layout(set = SET_LIGHT, binding = BINDING_UBO_LIGHT) 

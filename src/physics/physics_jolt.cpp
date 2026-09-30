@@ -26,6 +26,7 @@ module;
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #ifdef JPH_DEBUG_RENDERER
@@ -450,6 +451,16 @@ namespace phys
                 for (const glm::vec3& p : d.points)
                     points.push_back(to_jolt(p));
                 return make_shape(JPH::ConvexHullShapeSettings(points).Create(), "convex hull");
+            }
+            else if constexpr (std::is_same_v<T, HeightFieldShape>)
+            {
+                if (d.sample_count < 8 || d.heights.size() != size_t(d.sample_count) * d.sample_count)
+                    return {};
+                JPH::HeightFieldShapeSettings settings(d.heights.data(), to_jolt(d.offset),
+                    JPH::Vec3(d.spacing, 1.0f, d.spacing), d.sample_count);
+                settings.mBlockSize = 4;
+                settings.mBitsPerSample = settings.CalculateBitsPerSampleForError(d.max_error);
+                return make_shape(settings.Create(), "height field");
             }
             else
             {

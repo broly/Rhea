@@ -58,6 +58,10 @@ struct GPUMaterial
     vec4 params13;
     vec4 params14;
     vec4 params15;
+
+    // more texture slots (terrain layers)
+    uvec4 textures2;
+    uvec4 textures3;
 };
 
 // ================= MATERIAL BUFFER =================

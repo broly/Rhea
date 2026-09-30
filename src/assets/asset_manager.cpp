@@ -172,6 +172,8 @@ CubemapHandle AssetManager::load_cubemap(const std::string& rel_path)
 
 TextureHandle AssetManager::register_external_texture(Texture&& tex)
 {
+    // textures load on worker threads (load_texture) and share the id counter
+    std::scoped_lock<std::mutex> lock(mutex);
     const uint32_t texture_id = ++textures_counter;
     tex.id = texture_id;
     

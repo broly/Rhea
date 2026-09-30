@@ -48,6 +48,8 @@ namespace
         for (uint32_t index = 0; index < scene.objects.size(); ++index)
         {
             AssetSceneObject& object = scene.objects[index];
+            if (std::ranges::any_of(scene_desc.hidden_meshes, [&] (const std::string& prefix) { return object.mesh.name.starts_with(prefix); }))
+                continue;
 
             MeshRenderer renderer;
             for (const auto& material_name : object.mesh.material_names)

@@ -24,7 +24,29 @@ import :debug_view;
 import :reflection_probes;
 import :draw_list;
 import rhcomponents;
+import cvar;
 #include "object/object_reflection_macro.h"
+
+// Time sliced shadow cascades (GenericRenderGraph::update_shadow_cascades): cascades 0 and 1 render every frame,
+// the far ones (most of the terrain) every few frames
+export cvar::Var<int> cv_shadow_interval_2(
+    "render.shadows.interval_2", 2, "Frames between renders of shadow cascade 2 (1: every frame)");
+export cvar::Var<int> cv_shadow_interval_3(
+    "render.shadows.interval_3", 4, "Frames between renders of shadow cascade 3 (1: every frame)");
+
+// A shadow cascade as rendered into its atlas tile: the light UBO carries these, so a tile that was not rendered
+// this frame is still sampled with the matrix it was rendered with
+export struct ShadowCascade
+{
+    glm::mat4 vp{ 1.0f };
+    glm::vec3 center{ 0.0f };           // world, of the fitted sphere
+    float radius = 0.0f;
+    float texel = 0.0f;                 // world size of a shadow texel
+    float depth_range = 1.0f;           // m between the near and far plane
+    glm::vec3 light_direction{ 0.0f };
+    bool valid = false;
+    bool rendered_this_frame = false;
+};
 
 
 struct DrawItem
@@ -196,7 +218,15 @@ public:
     
     bool is_debugging() const;
     
-    glm::mat4 build_dir_light_vp() const;
+    // cascades of the directional light's shadow fitted around current_camera_ubo, casters from the scene bounds
+    std::array<ShadowCascade, shadow_cascade_count> fit_shadow_cascades(const glm::vec3& light_direction) const;
+    // picks the cascades to render this frame (shadow_cascades): 0 and 1 always, the far ones at their interval,
+    // any of them when its fit moved or the sun turned too far, all when the atlas is new
+    void update_shadow_cascades(const glm::vec3& light_direction);
+    // the rendered cascades -> the light UBO
+    void write_shadow_cascades(DirectionalLight& light) const;
+
+    const std::array<ShadowCascade, shadow_cascade_count>& get_shadow_cascades() const { return shadow_cascades; }
     
     virtual CameraUBO make_camera_ubo(RenderGraphContext& ctx, bool zero_pos = false, uint32_t face_index = 0) const;
     LightUBO build_light_ubo(glm::vec3 camera_position) const;
@@ -283,7 +313,11 @@ public:
     bool allow_shadow_debug;
     
     CameraUBO current_camera_ubo;
-        
+
+    std::array<ShadowCascade, shadow_cascade_count> shadow_cascades;
+    uint64_t shadow_frame = 0;
+    RBImageHandle shadow_atlas_image{};     // a recreated atlas renders every cascade
+
     
     PipelineObject* shadow_debug_pipeline;
     PipelineObject* clouds_pipeline;

@@ -10,6 +10,7 @@ import character_controller;
 import character_light_rig;
 import reflect;
 import properties;
+import cvar;
 
 export class WorldScript_VariousThings : public WorldScript
 {
@@ -68,6 +69,10 @@ public:
     uint32_t last_gbuffer_view_mode = 0;
     bool debug_view_keys_were_down[4] = {};
     bool dump_key_was_down = false;
+
+    // `camera.look <x> <y> <z> <target x> <y> <z>` (console, RHEA_EXEC automation): free camera at a pose
+    std::unique_ptr<cvar::Command> camera_look_command;
+    std::optional<std::pair<glm::vec3, glm::vec3>> pending_camera_look;
 
 private:
     Transform get_camera_transform() const;

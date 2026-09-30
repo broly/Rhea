@@ -11,6 +11,7 @@ import fixed_string;
 import json_utils;
 import log;
 import name;
+import cvar;
 
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -79,7 +80,38 @@ namespace
         phys::Shape shape;
     };
 
+    // `player.teleport <x> <y> <z>` (console, Terrain window): the player's feet, applied at the next fixed tick
+    std::optional<glm::vec3> pending_teleport;
+
+    cvar::Command teleport_command("player.teleport", "Moves the player character (feet) to a world position",
+        [] (cvar::Args args) {
+            auto parse = [] (const std::string& text, float& value) {
+                return std::from_chars(text.data(), text.data() + text.size(), value).ec == std::errc{};
+            };
+            glm::vec3 position;
+            if (args.size() != 3 || !parse(args[0], position.x) || !parse(args[1], position.y) || !parse(args[2], position.z))
+            {
+                cvar::print("player.teleport <x> <y> <z>", cvar::Output::error);
+                return;
+            }
+            pending_teleport = position;
+        }, "<x> <y> <z>");
+
     // ------------------------------------------------------------------ systems
+
+    [[=ecs::system<ecs::Phase::FixedPre>]]
+    void teleport_player(ecs::Query<CharacterMovement, const PlayerControlled> characters, ecs::ResMut<phys::PhysicsScene> physics)
+    {
+        if (!pending_teleport)
+            return;
+        characters.each([&] (CharacterMovement& movement, const PlayerControlled&) {
+            movement.position = movement.previous_position = *pending_teleport;
+            movement.vertical_velocity = 0.0f;
+            movement.speed = 0.0f;
+            physics->set_character_position(movement.capsule, *pending_teleport);
+        });
+        pending_teleport.reset();
+    }
 
     [[=ecs::system<ecs::Phase::FixedPre>]]
     void read_player_input(ecs::Query<CharacterInput, const PlayerControlled> characters, ecs::Res<Input> input)

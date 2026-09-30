@@ -14,6 +14,7 @@ import assets;
 import :mesh_gpu_data;
 import render;
 import glm;
+import rhmath;
 #include "common/assertion_macros.h"
 
 
@@ -78,6 +79,8 @@ namespace vk
         
         
         GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode);
+        // same vertex count; the caller makes sure the GPU is idle. False when not uploaded.
+        bool update_vertices(MeshPrimHandle handle, std::span<const Vertex> vertices);
         
         void build_blas(
             MeshGPUData& data,

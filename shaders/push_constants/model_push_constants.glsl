@@ -25,7 +25,7 @@ uint get_primitive_index()
     return get_draw_record().primitive_id;
 }
 
-// base pass: GeometryDebug bits (generic_render_graph.ixx)
+// base pass: GeometryDebug bits (generic_render_graph.ixx); shadow map: the cascade (draw_scene_shadow)
 uint get_debug_index()
 {
     return model_pc.debug_id;

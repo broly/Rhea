@@ -15,6 +15,7 @@ import :gpu_types;
 import :skinning;
 
 import assets;
+import rhmath;
 
 // Pending readback handle: opaque readback queue index
 export struct PendingReadbackHandle { uint64_t id = 0; };
@@ -39,6 +40,15 @@ export struct TextureCreationInfo
     RBImageLayout initial_layout = RBImageLayout::undefined;
     RBImageLayout current_layout = RBImageLayout::undefined;
     uint32_t array_layers = 1;
+};
+
+// Texels of a 2D texture (mip 0)
+export struct TextureRegion
+{
+    uint32_t x = 0;
+    uint32_t y = 0;
+    uint32_t width = 0;
+    uint32_t height = 0;
 };
 
 export struct CopyImageParams
@@ -179,7 +189,21 @@ public:
 
     virtual RBImageHandle create_texture_2d(const Texture& data, const TextureCreationInfo& texture_creation_info) = 0;
     virtual RBImageHandle create_texture_cubemap(const Cubemap& data, const TextureCreationInfo& texture_creation_info) = 0;
+
+    // Editing tools (terrain painting and sculpting). Both wait until the GPU is idle first: the frames in
+    // flight read the resource, and it is one buffer / image for all of them.
+    // Replaces `region` of mip 0 of a create_texture_2d RGBA8 texture with the same texels of `data`
+    // (same extent) and rebuilds the mips.
+    virtual void update_texture_2d(RBImageHandle image, const Texture& data, const TextureRegion& region) = 0;
+    // Overwrites the vertices of an uploaded mesh primitive (get_or_create_mesh_buffers), same count;
+    // no-op for primitives not uploaded yet
+    virtual void update_mesh_vertices(MeshPrimHandle mesh, std::span<const Vertex> vertices) = 0;
+
     virtual void update_viewport(const RBCommandList& cmd, Extent extent, bool use_swapchain_extent = false) = 0;
+    // viewport and scissor of a region of the attachments (shadow atlas tiles)
+    virtual void set_viewport(const RBCommandList& cmd, int32_t x, int32_t y, uint32_t width, uint32_t height) = 0;
+    // clears a region of the depth attachment of the current render pass (shadow atlas tiles)
+    virtual void clear_depth(const RBCommandList& cmd, int32_t x, int32_t y, uint32_t width, uint32_t height, float depth = 1.0f) = 0;
 
     virtual uint32_t get_num_images_in_flight() const = 0;
     

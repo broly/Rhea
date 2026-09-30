@@ -25,6 +25,8 @@ public:
     bool is_key_down(Key key) const {
         if (is_mouse_key(key) ? mouse_captured : keyboard_captured)
             return false;
+        if (tool_captured.contains(key))
+            return false;
         return is_key_physically_down(key);
     }
 
@@ -51,6 +53,15 @@ public:
         keyboard_captured = keyboard;
     }
 
+    // An editing tool of the debug UI uses the button in the viewport (terrain brush): the game sees it
+    // as released until the tool lets it go
+    void set_tool_capture(Key key, bool captured) {
+        if (captured)
+            tool_captured.insert(key);
+        else
+            tool_captured.erase(key);
+    }
+
     bool is_mouse_captured() const { return mouse_captured; }
     bool is_keyboard_captured() const { return keyboard_captured; }
 
@@ -71,4 +82,5 @@ private:
     double scroll_delta = 0.0;
     bool mouse_captured = false;
     bool keyboard_captured = false;
+    std::unordered_set<Key> tool_captured;
 };

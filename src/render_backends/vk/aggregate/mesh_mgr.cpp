@@ -116,6 +116,42 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     return gpu;
 }
 
+bool vk::MeshManager::update_vertices(MeshPrimHandle handle, std::span<const Vertex> vertices)
+{
+    auto it = mesh_map.find(handle);
+    if (it == mesh_map.end())
+        return false;
+    const MeshGPUData& data = it->second;
+    checkf(vertices.size() == data.vertex_count, "update_vertices: %zu vertices for a mesh of %u",
+        vertices.size(), data.vertex_count);
+    checkf(data.blas == VK_NULL_HANDLE, "update_vertices: the BLAS would need a rebuild");
+
+    const VkDeviceSize size = vertices.size_bytes();
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+    vk::create_buffer(instance.device, instance.physical_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging_buffer, staging_memory);
+    vk::update_buffer(instance.device, staging_memory, vertices.data(), size);
+
+    command_pool.submit([&] (VkCommandBuffer cmd)
+    {
+        VkBufferCopy copy{};
+        copy.size = size;
+        vkCmdCopyBuffer(cmd, staging_buffer, data.vertex_buffer, 1, &copy);
+
+        // vertices are read through buffer device addresses by the vertex shaders
+        VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, 1, &barrier, 0, nullptr, 0, nullptr);
+    });
+
+    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
+    return true;
+}
+
 void vk::MeshManager::build_blas(MeshGPUData& data, VkDeviceAddress vertex_address, VkDeviceAddress index_address)
 {
     // --- Geometry description ---

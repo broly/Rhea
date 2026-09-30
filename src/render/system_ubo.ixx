@@ -24,11 +24,18 @@ export struct PointLight
     glm::vec4 color;
 };
 
+// Cascaded shadow map of the directional light: the cascades are tiles of one depth atlas
+// (GenericRenderGraph::build_shadow_cascades, shaders/resources/shadow.glsl)
+export inline constexpr uint32_t shadow_cascade_count = 4;
+
 export struct DirectionalLight
 {
-    glm::mat4 light_vp;  // view-projection for shadow
-    glm::vec4 direction; // xyz normalized (world)
-    glm::vec4 color;     // rgb * intensity
+    glm::mat4 cascade_vp[shadow_cascade_count];  // light view-projection of each cascade (ZO depth)
+    glm::vec4 direction;            // xyz normalized (world)
+    glm::vec4 color;                // rgb * intensity
+    glm::vec4 cascade_texel;        // world size of a shadow texel, per cascade
+    glm::vec4 cascade_depth_range;  // m between the near and far plane, per cascade
+    glm::vec4 cascade_params;       // x: cascades in use, y: blend band (tile uv), z: 1 / atlas texels, w: tiles per side
 };
 
 export struct alignas(16) LightUBO

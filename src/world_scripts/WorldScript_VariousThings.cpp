@@ -163,6 +163,23 @@ void WorldScript_VariousThings::tick(double dt)
     auto input = RhGlobals::engine->input;
     Transform t = get_camera_transform();
 
+    if (!camera_look_command)
+    {
+        camera_look_command = std::make_unique<cvar::Command>("camera.look",
+            "Free camera at a position, looking at a target", [this] (cvar::Args args) {
+                float v[6];
+                for (size_t i = 0; i < 6; ++i)
+                {
+                    if (args.size() != 6 || std::from_chars(args[i].data(), args[i].data() + args[i].size(), v[i]).ec != std::errc{})
+                    {
+                        cvar::print("camera.look <x> <y> <z> <target x> <target y> <target z>", cvar::Output::error);
+                        return;
+                    }
+                }
+                pending_camera_look = { glm::vec3(v[0], v[1], v[2]), glm::vec3(v[3], v[4], v[5]) };
+            }, "<x> <y> <z> <target x> <target y> <target z>");
+    }
+
     static bool do_once = false;
 
 
@@ -255,7 +272,8 @@ void WorldScript_VariousThings::tick(double dt)
     // yaw / pitch edited in the debug UI
     bool handled = yaw != applied_yaw || pitch != applied_pitch;
 
-    if (input->is_key_down(Key::MouseLeft))
+    // right button too: the left one paints while the Terrain window's brush is on
+    if (input->is_key_down(Key::MouseLeft) || input->is_key_down(Key::MouseRight))
     {
         if (!rotation_started)
         {
@@ -538,6 +556,23 @@ void WorldScript_VariousThings::tick(double dt)
 
     if (soak_test && frame_character(t, true))
         handled = true;
+
+    if (pending_camera_look)
+    {
+        const auto [position, target] = *pending_camera_look;
+        pending_camera_look.reset();
+        character_mode = false;
+        if (PlayerControlled* player = character ? registry.get<PlayerControlled>(character) : nullptr)
+            player->enabled = false;
+        t.position = position;
+        // inverse of from_euler_rotation(pitch, yaw, 0), see frame_character
+        const glm::vec3 dir = glm::normalize(target - position);
+        pitch = asinf(glm::clamp(dir.y, -1.0f, 1.0f));
+        yaw = atan2f(-dir.x, -dir.z);
+        t.rotation = math::from_euler_rotation(glm::vec3(pitch, yaw, 0));
+        set_camera_transform(t);
+        handled = false;
+    }
 
     if (handled && free_camera)
         set_camera_transform(t);

@@ -44,8 +44,12 @@ export struct GPUMaterial
     glm::vec4 params13 = glm::vec4{0.f};
     glm::vec4 params14 = glm::vec4{0.f};
     glm::vec4 params15 = glm::vec4{0.f};
+
+    // more texture slots (terrain layers)
+    glm::uvec4 textures2 = glm::uvec4{0};
+    glm::uvec4 textures3 = glm::uvec4{0};
 };
-static_assert(sizeof(GPUMaterial) == 288);
+static_assert(sizeof(GPUMaterial) == 320);
 RH_REGISTER_TYPE(GPUMaterial)
 
 export class MaterialManager : public RhObject

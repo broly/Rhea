@@ -182,7 +182,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         {
             .name = "g_position",
             .extent = resolution,
-            .format = TextureFormat::RGBA16F,
+            // absolute world position: half floats step 6 cm at 64 m from the origin, far more than the
+            // shadow normal offset (acne away from the origin, Rhea-xfu); float keeps it sub-millimeter
+            .format = TextureFormat::RGBA32F,
             .usage  = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferSrc,
             .external = false,
             .dimension = capture_dimension
@@ -263,7 +265,8 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
         {
             .name = "g_position_hist",
             .extent = resolution,
-            .format = TextureFormat::RGBA16F,
+            // same format as g_position (history copy)
+            .format = TextureFormat::RGBA32F,
             .usage  = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
             .external = false,
             .dimension = capture_dimension,
@@ -407,7 +410,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     add_pass({
         .name = "ShadowMap",
         .writes = {
-            { shadow_map, RBImageUsageType::DepthStencilAttachment, RBLoadOp::Clear }
+            // time sliced cascades: tiles not rendered this frame are kept, rendered ones cleared by draw_scene_shadow
+            { shadow_map, RBImageUsageType::DepthStencilAttachment, RBLoadOp::Load }
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
@@ -1077,8 +1081,7 @@ LightUBO GenericRenderGraph::build_light_ubo(glm::vec3 camera_position) const
 
         light_ubo.dir_light.color = dir_light->color;
 
-        light_ubo.dir_light.light_vp =
-            build_dir_light_vp();
+        write_shadow_cascades(light_ubo.dir_light);
     }
 
     return light_ubo;
@@ -1312,51 +1315,143 @@ bool GenericRenderGraph::is_debugging() const
 }
 
 
-glm::mat4 GenericRenderGraph::build_dir_light_vp() const
+std::array<ShadowCascade, shadow_cascade_count> GenericRenderGraph::fit_shadow_cascades(const glm::vec3& light_direction) const
 {
-    auto& scene_view = engine->scene_view;
-    auto& light_processor = scene_view->get_processor<SceneViewProcessor_Light>();
+    std::array<ShadowCascade, shadow_cascade_count> result;
+    const CameraUBO& camera = current_camera_ubo;
+    const float near = std::max(camera.near, 0.05f);
+    const float far = std::max(std::min(camera.far, Constants::shadow_distance), near + 1.0f);
+    const uint32_t tile_texels = Constants::shadowmap_extent.width / Constants::shadow_atlas_tiles;
 
-    auto dir = light_processor.get_directional_light();
-    if (!dir)
-        return glm::mat4(1.0f);
-
-    const AABB& aabb = scene_view->world_aabb;
-    glm::vec3 center = aabb.center();
-
-    glm::vec3 lightDir = glm::normalize(dir->direction);
-
-    glm::vec3 up =
-        fabs(glm::dot(lightDir, glm::vec3(0,1,0))) > 0.99f
-            ? glm::vec3(0,0,1)
-            : glm::vec3(0,1,0);
-
-    float dist = aabb.scalar_radius();
-    glm::vec3 lightPos = center - lightDir * dist;
-
-    glm::mat4 lightView = glm::lookAt(lightPos, center, up);
-
-    glm::vec3 corners[8];
-    aabb.get_corners(corners);
-
-    glm::vec3 minLS(FLT_MAX);
-    glm::vec3 maxLS(-FLT_MAX);
-
-    for (int i = 0; i < 8; ++i)
+    // splits between uniform and logarithmic (practical split scheme)
+    std::array<float, shadow_cascade_count + 1> splits{};
+    splits[0] = near;
+    for (uint32_t i = 1; i <= shadow_cascade_count; ++i)
     {
-        glm::vec3 p = glm::vec3(lightView * glm::vec4(corners[i], 1.0f));
-        minLS = glm::min(minLS, p);
-        maxLS = glm::max(maxLS, p);
+        const float t = float(i) / float(shadow_cascade_count);
+        const float logarithmic = near * std::pow(far / near, t);
+        const float uniform = near + (far - near) * t;
+        splits[i] = glm::mix(uniform, logarithmic, Constants::shadow_split_lambda);
     }
 
-    
-    glm::mat4 lightProj = glm::orthoZO(
-        minLS.x, maxLS.x,
-        minLS.y, maxLS.y,
-        0.f, -minLS.z * 10
-    );
+    // light space: rotation only, the cascades are fitted in it
+    const glm::vec3 up = std::abs(light_direction.y) > 0.99f ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
+    const glm::mat4 light_view = glm::lookAt(glm::vec3(0.0f), light_direction, up);
 
-    return lightProj * lightView;
+    // casters anywhere in the scene reach every cascade: its depth range covers the scene bounds
+    const AABB& scene_bounds = engine->scene_view->world_aabb;
+    glm::vec3 scene_corners[8];
+    scene_bounds.get_corners(scene_corners);
+    float scene_min_z = std::numeric_limits<float>::max();
+    float scene_max_z = std::numeric_limits<float>::lowest();
+    for (const glm::vec3& corner : scene_corners)
+    {
+        const float z = (light_view * glm::vec4(corner, 1.0f)).z;
+        scene_min_z = std::min(scene_min_z, z);
+        scene_max_z = std::max(scene_max_z, z);
+    }
+
+    const glm::vec3 position(camera.inv_view[3]);
+    const glm::vec3 right(camera.inv_view[0]);
+    const glm::vec3 camera_up(camera.inv_view[1]);
+    const glm::vec3 forward = -glm::vec3(camera.inv_view[2]);
+    const float tan_x = 1.0f / std::abs(camera.proj[0][0]);
+    const float tan_y = 1.0f / std::abs(camera.proj[1][1]);
+
+    for (uint32_t cascade = 0; cascade < shadow_cascade_count; ++cascade)
+    {
+        // bounding sphere of the frustum slice: the size does not change when the camera turns (no shimmering)
+        std::array<glm::vec3, 8> corners;
+        glm::vec3 center(0.0f);
+        for (uint32_t i = 0; i < 8; ++i)
+        {
+            const float depth = splits[cascade + (i >> 2)];
+            const float sx = (i & 1) ? 1.0f : -1.0f;
+            const float sy = (i & 2) ? 1.0f : -1.0f;
+            corners[i] = position + forward * depth + right * (sx * tan_x * depth) + camera_up * (sy * tan_y * depth);
+            center += corners[i] / 8.0f;
+        }
+        float radius = 0.0f;
+        for (const glm::vec3& corner : corners)
+            radius = std::max(radius, glm::length(corner - center));
+        radius = std::ceil(radius * 4.0f) / 4.0f;
+
+        // the center moves in whole texels (no shimmering when the camera moves)
+        const float texel = 2.0f * radius / float(tile_texels);
+        glm::vec3 center_ls(light_view * glm::vec4(center, 1.0f));
+        center_ls.x = std::floor(center_ls.x / texel) * texel;
+        center_ls.y = std::floor(center_ls.y / texel) * texel;
+
+        // the light looks along -z: near / far are distances along it
+        const float z_near = -std::max(scene_max_z, center_ls.z + radius) - 1.0f;
+        const float z_far = -std::min(scene_min_z, center_ls.z - radius) + 1.0f;
+        const glm::mat4 projection = glm::orthoZO(center_ls.x - radius, center_ls.x + radius,
+                                                  center_ls.y - radius, center_ls.y + radius, z_near, z_far);
+
+        result[cascade] = ShadowCascade{
+            .vp = projection * light_view,
+            .center = center,
+            .radius = radius,
+            .texel = texel,
+            .depth_range = z_far - z_near,
+            .light_direction = light_direction,
+            .valid = true,
+        };
+    }
+    return result;
+}
+
+void GenericRenderGraph::update_shadow_cascades(const glm::vec3& light_direction)
+{
+    // a new atlas (first frame, graph rebuilt) holds no cascade yet
+    const RBImageHandle atlas = get_image(shadow_map);
+    if (atlas != shadow_atlas_image)
+    {
+        shadow_atlas_image = atlas;
+        for (ShadowCascade& cascade : shadow_cascades)
+            cascade.valid = false;
+    }
+
+    // the far cascades take turns: 2 on odd frames, 3 on even ones (with the default intervals 2 and 4)
+    const uint64_t frame = shadow_frame++;
+    const uint64_t interval_2 = uint64_t(std::max(cv_shadow_interval_2.get(), 1));
+    const uint64_t interval_3 = uint64_t(std::max(cv_shadow_interval_3.get(), 1));
+    const std::array<bool, shadow_cascade_count> scheduled{
+        true,
+        true,
+        frame % interval_2 == 1 % interval_2,
+        frame % interval_3 == 0,
+    };
+
+    const std::array<ShadowCascade, shadow_cascade_count> fitted = fit_shadow_cascades(light_direction);
+    for (uint32_t i = 0; i < shadow_cascade_count; ++i)
+    {
+        ShadowCascade& cascade = shadow_cascades[i];
+        const ShadowCascade& fit = fitted[i];
+        // a stale tile still shades what it covers; it has to follow when the camera left it (teleport, fast
+        // flight), the field of view changed or the sun turned (its shadows would visibly lag)
+        const bool moved = glm::length(fit.center - cascade.center) > 0.25f * fit.radius
+            || std::abs(fit.radius - cascade.radius) > 0.02f * fit.radius;
+        const bool sun_turned = glm::dot(fit.light_direction, cascade.light_direction) < std::cos(glm::radians(1.0f));
+        const bool render = !cascade.valid || scheduled[i] || moved || sun_turned;
+        if (render)
+            cascade = fit;
+        cascade.rendered_this_frame = render;
+    }
+}
+
+void GenericRenderGraph::write_shadow_cascades(DirectionalLight& light) const
+{
+    const bool all_valid = std::ranges::all_of(shadow_cascades, [] (const ShadowCascade& c) { return c.valid; });
+    for (uint32_t i = 0; i < shadow_cascade_count; ++i)
+    {
+        light.cascade_vp[i] = shadow_cascades[i].vp;
+        light.cascade_texel[i] = shadow_cascades[i].texel;
+        light.cascade_depth_range[i] = shadow_cascades[i].depth_range;
+    }
+    // before the first shadow pass nothing is in the atlas: lit
+    light.cascade_params = glm::vec4(all_valid ? float(shadow_cascade_count) : 0.0f, 0.1f,
+        1.0f / float(Constants::shadowmap_extent.width), float(Constants::shadow_atlas_tiles));
 }
 
 void GenericRenderGraph::dispatch_skinning(RenderGraphContext& ctx)
@@ -1674,23 +1769,49 @@ void GenericRenderGraph::draw_scene_shadow(RenderGraphContext& ctx)
     
     auto& mesh_processor = engine->scene_view->get_processor<SceneViewProcessor_Mesh>();
 
-    ctx.backend.update_viewport(ctx.cmd, Constants::shadowmap_extent);
+    const auto dir_light = engine->scene_view->get_processor<SceneViewProcessor_Light>().get_directional_light();
+    if (!dir_light)
+        return;
 
+    // time sliced: the atlas keeps the tiles of the cascades not rendered this frame (the pass loads it), the
+    // light UBO carries the matrices every tile was rendered with. Uploaded now: every pass of the frame (and
+    // the shadow shaders) must see this frame's cascades, even when nothing binds a shadow pipeline.
+    update_shadow_cascades(glm::normalize(dir_light->direction));
+    light_resource->update_uniform_buffer("light_ubo", build_light_ubo(current_camera_ubo.camera_pos), ctx.frame);
+
+    // one tile of the atlas per cascade, the cascade index goes to the shaders in the push constants
+    const uint32_t tile = Constants::shadowmap_extent.width / Constants::shadow_atlas_tiles;
     std::vector<const RenderPrimitive*> primitives;
     primitives.reserve(mesh_processor.primitives.size());
-    for (const RenderPrimitive& prim : mesh_processor.primitives)
-        primitives.push_back(&prim);
-
-    draw_items(ctx, primitives, 0, false, [&] (const RenderPrimitivePassInfo& info)
+    for (uint32_t cascade = 0; cascade < shadow_cascade_count; ++cascade)
     {
-        bind_shadow_globals(ctx);
+        if (!shadow_cascades[cascade].rendered_this_frame)
+            continue;
 
-        // alpha tested shadow pipelines sample material textures
-        if (info.pipeline_family->uses_resource("pbr_material_table"))
-            ctx.bind(pbr_material_table_resource);
-        if (info.pipeline_family->uses_resource("textures"))
-            ctx.bind(textures_resource);
-    });
+        const Frustum frustum = Frustum::from_view_projection(shadow_cascades[cascade].vp);
+        primitives.clear();
+        for (const RenderPrimitive& prim : mesh_processor.primitives)
+            if (frustum.test_aabb_world(prim.bounds))
+                primitives.push_back(&prim);
+
+        const int32_t x = int32_t(cascade % Constants::shadow_atlas_tiles * tile);
+        const int32_t y = int32_t(cascade / Constants::shadow_atlas_tiles * tile);
+        ctx.backend.set_viewport(ctx.cmd, x, y, tile, tile);
+        ctx.backend.clear_depth(ctx.cmd, x, y, tile, tile);
+        // rebind: draw_items pushes the cascade index when it binds a pipeline
+        ctx.current_pipeline = nullptr;
+        draw_items(ctx, primitives, cascade, false, [&] (const RenderPrimitivePassInfo& info)
+        {
+            bind_shadow_globals(ctx);
+
+            // alpha tested shadow pipelines sample material textures
+            if (info.pipeline_family->uses_resource("pbr_material_table"))
+                ctx.bind(pbr_material_table_resource);
+            if (info.pipeline_family->uses_resource("textures"))
+                ctx.bind(textures_resource);
+        });
+    }
+    ctx.backend.set_viewport(ctx.cmd, 0, 0, Constants::shadowmap_extent.width, Constants::shadowmap_extent.height);
 }
 
 void GenericRenderGraph::draw_clouds(RenderGraphContext& ctx, RGTextureHandle depth_texture, RGTextureHandle noise_texture)

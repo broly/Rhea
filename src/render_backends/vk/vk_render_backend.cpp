@@ -178,6 +178,39 @@ void VkRenderBackend::update_viewport(const RBCommandList& cmd, Extent extent, b
     vkCmdSetScissor (cmd, 0, 1, &scissor);
 }
 
+void VkRenderBackend::set_viewport(const RBCommandList& cmd, int32_t x, int32_t y, uint32_t width, uint32_t height)
+{
+    VkViewport viewport{};
+    viewport.x = float(x);
+    viewport.y = float(y);
+    viewport.width = float(width);
+    viewport.height = float(height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = { x, y };
+    scissor.extent = { width, height };
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+}
+
+void VkRenderBackend::clear_depth(const RBCommandList& cmd, int32_t x, int32_t y, uint32_t width, uint32_t height, float depth)
+{
+    VkClearAttachment attachment{};
+    attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    attachment.clearValue.depthStencil = { depth, 0 };
+
+    VkClearRect rect{};
+    rect.rect.offset = { x, y };
+    rect.rect.extent = { width, height };
+    rect.baseArrayLayer = 0;
+    rect.layerCount = 1;
+
+    vkCmdClearAttachments(cmd, 1, &attachment, 1, &rect);
+}
+
 uint32_t VkRenderBackend::get_num_images_in_flight() const
 {
     return vk::MAX_FRAMES_IN_FLIGHT;
@@ -581,6 +614,20 @@ ImageReadback VkRenderBackend::finalize_readback(PendingReadbackHandle handle)
 RBImageHandle VkRenderBackend::create_texture_2d(const Texture& tex, const TextureCreationInfo& texture_creation_info)
 {
     return image_manager.create_texture_2d(tex, texture_creation_info);
+}
+
+void VkRenderBackend::update_texture_2d(RBImageHandle image, const Texture& data, const TextureRegion& region)
+{
+    PROFILE(__FUNCTION__);
+    wait_idle();
+    image_manager.update_texture_2d(image, data, region);
+}
+
+void VkRenderBackend::update_mesh_vertices(MeshPrimHandle mesh, std::span<const Vertex> vertices)
+{
+    PROFILE(__FUNCTION__);
+    wait_idle();
+    mesh_manager.update_vertices(mesh, vertices);
 }
 
 RBImageHandle VkRenderBackend::create_texture_cubemap(const Cubemap& cubemap, const TextureCreationInfo& texture_creation_info)

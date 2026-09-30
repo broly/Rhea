@@ -707,6 +707,77 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     return image;
 }
 
+void vk::ImageManager::update_texture_2d(RBImageHandle image, const Texture& tex, const TextureRegion& region)
+{
+    const ImageResource& res = get_image_resource(image);
+    checkf(tex.format == TextureFormat::RGBA8 && tex.extent == res.extent && res.num_layers == 1,
+        "update_texture_2d: '%s' is not a 2D RGBA8 texture of the data's extent", tex.name.c_str());
+    checkf(region.x + region.width <= tex.extent.width && region.y + region.height <= tex.extent.height,
+        "update_texture_2d: region outside of '%s'", tex.name.c_str());
+    if (region.width == 0 || region.height == 0)
+        return;
+
+    constexpr size_t pixel_size = 4;
+    const size_t row_size = region.width * pixel_size;
+    const size_t upload_size = row_size * region.height;
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+    vk::create_buffer(
+        instance.device, instance.physical_device,
+        upload_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buffer, staging_memory);
+
+    void* mapped = nullptr;
+    VK_CHECK(vkMapMemory(instance.device, staging_memory, 0, upload_size, 0, &mapped));
+    for (uint32_t row = 0; row < region.height; ++row)
+    {
+        const size_t source_offset = ((size_t)(region.y + row) * tex.extent.width + region.x) * pixel_size;
+        memcpy((std::byte*)mapped + row * row_size, tex.bulk.data() + source_offset, row_size);
+    }
+    vkUnmapMemory(instance.device, staging_memory);
+
+    const uint32_t mip_levels = res.mip_levels;
+    immediate_command_pool.submit([&](VkCommandBuffer cmd)
+    {
+        // every mip: the copy writes mip 0, the blits the others
+        ImageBarrierParams to_transfer;
+        to_transfer.debug_pass_name = Name("UpdateTexture");
+        to_transfer.image = image;
+        to_transfer.dst_usage = RBImageUsageType::TransferDst;
+        to_transfer.pass_type = RenderPassType::transfer;
+        transition_image(cmd, to_transfer);
+
+        VkBufferImageCopy copy{};
+        copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copy.imageSubresource.mipLevel = 0;
+        copy.imageSubresource.baseArrayLayer = 0;
+        copy.imageSubresource.layerCount = 1;
+        copy.imageOffset = { (int32_t)region.x, (int32_t)region.y, 0 };
+        copy.imageExtent = { region.width, region.height, 1 };
+        vkCmdCopyBufferToImage(cmd, staging_buffer, res.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+        if (mip_levels > 1)
+        {
+            // ends with every mip in SHADER_READ_ONLY (state tracked)
+            generate_mipmaps(cmd, image, tex.extent.width, tex.extent.height, mip_levels);
+        }
+        else
+        {
+            ImageBarrierParams to_sampled;
+            to_sampled.debug_pass_name = Name("UpdateTexture");
+            to_sampled.image = image;
+            to_sampled.dst_usage = RBImageUsageType::SampledFragment;
+            to_sampled.pass_type = RenderPassType::graphics;
+            transition_image(cmd, to_sampled);
+        }
+    });
+
+    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
+}
+
 RBImageHandle vk::ImageManager::create_fallback_texture(const Texture& tex,
     const TextureCreationInfo& texture_creation_info)
 {

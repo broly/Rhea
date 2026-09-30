@@ -26,5 +26,6 @@ void main()
     v_uv = vertex.uv;
     v_world_normal = normalize(transpose(inverse(mat3(transform_curr))) * vertex.normal);
 
-    gl_Position = light_ubo.dir_light.light_vp * transform_curr * vec4(vertex.position, 1.0);
+    // the push constants carry the cascade (GenericRenderGraph::draw_scene_shadow)
+    gl_Position = light_ubo.dir_light.cascade_vp[get_debug_index()] * transform_curr * vec4(vertex.position, 1.0);
 }

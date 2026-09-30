@@ -18,7 +18,8 @@ import rhcomponents;
 // (Name, Transform, MeshRenderer and, with `collision`, MeshCollider) of the entity with this component.
 //
 //     "GltfScene": { "asset_path": "gltf/sponza/Sponza.gltf", "textures_dir": "textures/sponza", "collision": true,
-//                    "collision_overrides": { "wood_door": "box", "lamps_": "convex_hull", "decals_": "none" } }
+//                    "collision_overrides": { "wood_door": "box", "lamps_": "convex_hull", "decals_": "none" },
+//                    "hidden_meshes": [ "master_material" ] }
 export struct GltfScene
 {
     [[=rh::edit, =rh::read_only]] std::string asset_path;
@@ -33,6 +34,8 @@ export struct GltfScene
     [[=rh::edit, =rh::read_only]] float simplify_error = 0.02f;
     // mesh name prefix -> collision type, the longest matching prefix wins
     std::map<std::string, MeshCollision> collision_overrides;
+    // mesh name prefixes not imported at all (authoring leftovers: material swatches, ...)
+    std::vector<std::string> hidden_meshes;
 
     MeshCollisionSettings get_collision_settings(std::string_view mesh_name) const;
 };

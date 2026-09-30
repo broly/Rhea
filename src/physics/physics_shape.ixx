@@ -35,7 +35,18 @@ export namespace phys
         std::vector<uint32_t> indices;      // 3 per triangle
     };
 
-    using ShapeDesc = std::variant<SphereShape, CapsuleShape, BoxShape, ConvexHullShape, TriangleMeshShape>;
+    // Regular grid of heights (terrain), static geometry only. Sample (x, z) lies at
+    // offset + (x * spacing, heights[z * sample_count + x], z * spacing) in body space.
+    struct HeightFieldShape
+    {
+        uint32_t sample_count = 0;          // per side; a multiple of 4, fastest when sample_count / 4 is a power of two
+        float spacing = 1.0f;
+        glm::vec3 offset{ 0.0f };
+        std::vector<float> heights;         // sample_count^2, rows along x
+        float max_error = 0.005f;           // m, the heights are compressed within it
+    };
+
+    using ShapeDesc = std::variant<SphereShape, CapsuleShape, BoxShape, ConvexHullShape, TriangleMeshShape, HeightFieldShape>;
 
     // Content hash for the cooked shape cache (PhysicsScene::load_cached_shape): chain the source data
     // and every cooking parameter, so a change of either rebuilds the shape

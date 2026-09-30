@@ -27,6 +27,7 @@ import cvar;
 import physics;
 import debug_draw;
 import ecs;
+import terrain;
 
 
 namespace
@@ -43,6 +44,9 @@ namespace
     cvar::Var<bool> cv_window_imgui_demo("ui.windows.imgui_demo", false, "Dear ImGui demo window (widget reference)");
     cvar::Var<bool> cv_window_physics("ui.windows.physics", false, "Physics stats, debug drawing and probes");
     cvar::Var<bool> cv_window_ecs("ui.windows.ecs", false, "ECS: simulation tick, systems, archetypes");
+    cvar::Var<bool> cv_window_terrain("ui.windows.terrain", false, "Terrain editor: paint layers, sculpt, save");
+    cvar::Var<bool> cv_terrain_brush("terrain.brush", false,
+        "Terrain window: the left mouse button paints / sculpts in the viewport (the camera turns with the right one)");
 
     cvar::Var<bool> cv_physics_draw("physics.debug.draw", false, "Draw collision shapes near the camera");
     cvar::Var<bool> cv_physics_draw_fixed("physics.debug.draw_fixed", false,
@@ -313,6 +317,20 @@ void EngineDebugUI::register_console_commands(Engine& engine)
         glfwSetWindowShouldClose(engine.window.handle, GLFW_TRUE);
     });
 
+    add("after", "Runs a console line after a delay (automation, with RHEA_EXEC)",
+        [this, &engine] (cvar::Args args) {
+            float seconds = 0.0f;
+            if (args.size() < 2 || std::from_chars(args[0].data(), args[0].data() + args[0].size(), seconds).ec != std::errc{})
+            {
+                cvar::print("after <seconds> <command> [arguments]", cvar::Output::error);
+                return;
+            }
+            std::string line;
+            for (size_t i = 1; i < args.size(); ++i)
+                line += (i > 1 ? " " : "") + args[i];
+            delayed_commands.push_back({ engine.world->get_time_seconds() + seconds, std::move(line) });
+        }, "<seconds> <command> [arguments]");
+
     add("render.reload_shaders", "Rebuilds all pipelines from the shader sources (R)", [&engine] (cvar::Args) {
         engine.render_hot_reload();
     });
@@ -451,6 +469,8 @@ void EngineDebugUI::register_console_commands(Engine& engine)
         "<entity name>", [entity_labels] (size_t arg_index) {
             return arg_index == 0 ? entity_labels() : std::vector<std::string>{};
         });
+
+    register_terrain_commands(engine);
 }
 
 ecs::Entity EngineDebugUI::get_selected(Engine& engine)
@@ -477,6 +497,7 @@ void EngineDebugUI::draw(Engine& engine)
     draw_world_scripts_window(engine);
     draw_help_window();
     draw_physics_window(engine);
+    draw_terrain_window(engine);
     draw_ecs_window(engine);
     if (cv_window_imgui_demo.get())
     {
@@ -487,6 +508,7 @@ void EngineDebugUI::draw(Engine& engine)
     }
 
     draw_viewport_overlay(engine, view);
+    update_terrain_brush(engine, view);
     handle_picking(engine, view);
 }
 
@@ -532,6 +554,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         item("GPU Profiler", cv_window_gpu_profiler);
         item("Console Variables", cv_window_cvars);
         item("Physics", cv_window_physics);
+        item("Terrain", cv_window_terrain);
         item("ECS", cv_window_ecs);
         ImGui::Separator();
         item("Hotkeys", cv_window_help);
@@ -1246,6 +1269,9 @@ void EngineDebugUI::handle_picking(Engine& engine, const ViewData& view)
 {
     if (!view.valid || !cv_viewport_picking.get())
         return;
+    // the left button belongs to the terrain brush
+    if (cv_window_terrain.get() && cv_terrain_brush.get())
+        return;
 
     const ImGuiIO& io = ImGui::GetIO();
     // a click (not a camera drag) on the viewport, not on a window
@@ -1323,6 +1349,38 @@ namespace
 
 void EngineDebugUI::draw_world_debug(Engine& engine)
 {
+    // the terrain brush takes the left button again in draw() while it is on (the UI may be hidden now)
+    engine.input->set_tool_capture(Key::MouseLeft, false);
+
+    // RHEA_EXEC="line; line": console lines once the level runs (automation, screenshots), see `after`
+    if (!startup_commands_run)
+    {
+        startup_commands_run = true;
+        if (const char* exec = std::getenv("RHEA_EXEC"))
+        {
+            std::string_view lines = exec;
+            while (!lines.empty())
+            {
+                const size_t end = std::min(lines.find(';'), lines.size());
+                if (std::string_view line = lines.substr(0, end); line.find_first_not_of(' ') != std::string_view::npos)
+                    cvar::execute(line);
+                lines.remove_prefix(std::min(end + 1, lines.size()));
+            }
+        }
+    }
+    const double now = engine.world->get_time_seconds();
+    for (size_t i = 0; i < delayed_commands.size();)
+    {
+        if (delayed_commands[i].first > now)
+        {
+            ++i;
+            continue;
+        }
+        const std::string line = std::move(delayed_commands[i].second);
+        delayed_commands.erase(delayed_commands.begin() + i);
+        cvar::execute(line);
+    }
+
     probe_hit.reset();
     probe_hit_owner.clear();
 
@@ -1501,6 +1559,322 @@ void EngineDebugUI::draw_physics_window(Engine& engine)
         }
         ImGui::EndDisabled();
         ImGui::TextDisabled("Test bodies are visible with debug draw");
+    }
+
+    ImGui::End();
+}
+
+
+/************************************************************************
+ * TERRAIN
+ ***********************************************************************/
+
+namespace
+{
+    struct TerrainEditor
+    {
+        TerrainBrush brush;
+        bool flatten_pick = true;           // flatten to the height under the cursor when the stroke starts
+        bool stroke = false;
+        std::optional<glm::vec3> hit;       // under the cursor
+        std::string status;
+    };
+    TerrainEditor terrain_editor;
+
+    const char* brush_mode_name(TerrainBrushMode mode)
+    {
+        switch (mode)
+        {
+        case TerrainBrushMode::paint:   return "Paint";
+        case TerrainBrushMode::raise:   return "Raise";
+        case TerrainBrushMode::lower:   return "Lower";
+        case TerrainBrushMode::smooth:  return "Smooth";
+        case TerrainBrushMode::flatten: return "Flatten";
+        }
+        return "?";
+    }
+
+    // the selected entity when it is a terrain, else the first one
+    ecs::Entity find_terrain(ecs::Registry& registry, ecs::Entity selected)
+    {
+        if (selected && registry.alive(selected) && registry.has<Terrain>(selected))
+            return selected;
+        ecs::Entity found;
+        ecs::Query<const Terrain>(registry).each([&] (ecs::Entity e, const Terrain&) {
+            if (!found)
+                found = e;
+        });
+        return found;
+    }
+
+    void draw_brush_ring(const TerrainData& data, glm::vec2 center, float radius, const glm::vec4& color)
+    {
+        constexpr int segments = 64;
+        glm::vec3 previous{};
+        for (int i = 0; i <= segments; ++i)
+        {
+            const float angle = float(i) / float(segments) * 6.2831853f;
+            const glm::vec2 xz = center + radius * glm::vec2(std::cos(angle), std::sin(angle));
+            const glm::vec3 point(xz.x, terrain::height_at(data, xz).value_or(data.origin.y) + 0.05f, xz.y);
+            if (i > 0)
+                debug_draw::line(previous, point, color, { .depth_test = false });
+            previous = point;
+        }
+    }
+
+    void teleport_player(glm::vec3 feet)
+    {
+        cvar::execute(std::format("player.teleport {} {} {}", feet.x, feet.y, feet.z));
+    }
+}
+
+void EngineDebugUI::update_terrain_brush(Engine& engine, const ViewData& view)
+{
+    TerrainEditor& editor = terrain_editor;
+    editor.hit.reset();
+
+    ecs::Registry& registry = engine.world->registry;
+    const ecs::Entity terrain_entity = find_terrain(registry, get_selected(engine));
+    Terrain* terrain = terrain_entity ? registry.get<Terrain>(terrain_entity) : nullptr;
+    TerrainData* data = terrain ? terrain->data.get() : nullptr;
+
+    const ImGuiIO& io = ImGui::GetIO();
+    const bool enabled = cv_window_terrain.get() && cv_terrain_brush.get() && view.valid && data;
+    const bool button_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+
+    // stroke end: the collision catches up with the sculpted heights
+    if (editor.stroke && (!enabled || !button_down))
+    {
+        editor.stroke = false;
+        if (data && data->collision_dirty)
+            terrain::commit_collision(*data, engine.world->get_physics(), terrain_entity);
+    }
+    if (!enabled)
+        return;
+
+    // the game does not turn the camera with the left button (see draw_world_debug)
+    engine.input->set_tool_capture(Key::MouseLeft, true);
+
+    if (!io.WantCaptureMouse)
+    {
+        const glm::vec2 ndc = glm::vec2(io.MousePos.x, io.MousePos.y) / view.viewport * 2.0f - 1.0f;
+        const glm::mat4 inverse_view_proj = glm::inverse(view.view_proj);
+        glm::vec4 near_point = inverse_view_proj * glm::vec4(ndc, 0.0f, 1.0f);
+        glm::vec4 far_point = inverse_view_proj * glm::vec4(ndc, 1.0f, 1.0f);
+        near_point /= near_point.w;
+        far_point /= far_point.w;
+        editor.hit = terrain::raycast(*data, view.position, glm::normalize(glm::vec3(far_point) - glm::vec3(near_point)));
+    }
+
+    TerrainBrush& brush = editor.brush;
+    if (editor.hit)
+    {
+        const glm::vec2 center(editor.hit->x, editor.hit->z);
+        const glm::vec4 color = brush.mode == TerrainBrushMode::paint ? glm::vec4(0.3f, 0.9f, 1.0f, 1.0f)
+                                                                       : glm::vec4(1.0f, 0.75f, 0.2f, 1.0f);
+        draw_brush_ring(*data, center, brush.radius, color);
+        const float inner = brush.radius * (1.0f - brush.falloff);
+        if (inner > 0.05f)
+            draw_brush_ring(*data, center, inner, color * glm::vec4(1.0f, 1.0f, 1.0f, 0.5f));
+    }
+
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle) && editor.hit)
+        teleport_player(*editor.hit + glm::vec3(0.0f, 0.05f, 0.0f));
+
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && editor.hit)
+    {
+        editor.stroke = true;
+        if (brush.mode == TerrainBrushMode::flatten && editor.flatten_pick)
+            brush.flatten_height = editor.hit->y;
+    }
+    if (!editor.stroke || !editor.hit)
+        return;
+
+    TerrainBrush step = brush;
+    // Shift inverts raise / lower
+    if (io.KeyShift && step.mode == TerrainBrushMode::raise)
+        step.mode = TerrainBrushMode::lower;
+    else if (io.KeyShift && step.mode == TerrainBrushMode::lower)
+        step.mode = TerrainBrushMode::raise;
+    terrain::apply_brush(*data, step, glm::vec2(editor.hit->x, editor.hit->z), std::min(io.DeltaTime, 0.1f));
+    terrain::commit_render(*data);
+}
+
+void EngineDebugUI::register_terrain_commands(Engine& engine)
+{
+    auto add = [this] (std::string_view name, std::string_view description, cvar::Command::Handler handler,
+        std::string_view usage = {}, cvar::Command::Completer completer = {}) {
+        console_commands.push_back(std::make_unique<cvar::Command>(name, description, std::move(handler), usage,
+            std::move(completer)));
+    };
+    auto terrain_of = [this, &engine] () -> std::pair<ecs::Entity, Terrain*> {
+        ecs::Registry& registry = engine.world->registry;
+        const ecs::Entity e = find_terrain(registry, get_selected(engine));
+        Terrain* terrain = e ? registry.get<Terrain>(e) : nullptr;
+        if (!terrain || !terrain->data)
+        {
+            cvar::print("No terrain in the level", cvar::Output::error);
+            return { e, nullptr };
+        }
+        return { e, terrain };
+    };
+
+    // scripted edits (automation, precise values): the same brush as the Terrain window
+    add("terrain.stroke", "Applies the terrain brush at a world position: paint <layer>, raise, lower, smooth, flatten <height>",
+        [this, &engine, terrain_of] (cvar::Args args) {
+            auto number = [] (const std::string& text, float& value) {
+                return std::from_chars(text.data(), text.data() + text.size(), value).ec == std::errc{};
+            };
+            TerrainBrush brush = terrain_editor.brush;
+            float x = 0.0f, z = 0.0f, value = 0.0f, seconds = 0.5f;
+            static constexpr std::array<std::pair<std::string_view, TerrainBrushMode>, 5> modes{ {
+                { "paint", TerrainBrushMode::paint }, { "raise", TerrainBrushMode::raise }, { "lower", TerrainBrushMode::lower },
+                { "smooth", TerrainBrushMode::smooth }, { "flatten", TerrainBrushMode::flatten } } };
+            const auto mode = args.empty() ? modes.end()
+                : std::ranges::find_if(modes, [&] (const auto& m) { return m.first == args[0]; });
+            const bool needs_value = mode != modes.end() && (mode->second == TerrainBrushMode::paint || mode->second == TerrainBrushMode::flatten);
+            const size_t first_optional = needs_value ? 5 : 4;
+            if (mode == modes.end() || args.size() < first_optional || !number(args[1], x) || !number(args[2], z)
+                || !number(args[3], brush.radius) || (needs_value && !number(args[4], value))
+                || (args.size() > first_optional && !number(args[first_optional], brush.strength))
+                || (args.size() > first_optional + 1 && !number(args[first_optional + 1], seconds)))
+            {
+                cvar::print("terrain.stroke <paint|raise|lower|smooth|flatten> <x> <z> <radius> [layer|height] [strength] [seconds]",
+                    cvar::Output::error);
+                return;
+            }
+            const auto [e, terrain] = terrain_of();
+            if (!terrain)
+                return;
+            brush.mode = mode->second;
+            if (brush.mode == TerrainBrushMode::paint)
+                brush.layer = uint32_t(std::clamp(value, 0.0f, 3.0f));
+            if (brush.mode == TerrainBrushMode::flatten)
+                brush.flatten_height = value;
+            TerrainData& data = *terrain->data;
+            // in steps of a frame at 60 FPS, like a held mouse button
+            for (float t = 0.0f; t < seconds; t += 1.0f / 60.0f)
+                terrain::apply_brush(data, brush, glm::vec2(x, z), 1.0f / 60.0f);
+            terrain::commit_render(data);
+            if (data.collision_dirty)
+                terrain::commit_collision(data, engine.world->get_physics(), e);
+        },
+        "<paint|raise|lower|smooth|flatten> <x> <z> <radius> [layer|height] [strength] [seconds]");
+
+    add("terrain.save", "Writes the terrain's heightmap and splat map (the paths of its Terrain component)",
+        [terrain_of] (cvar::Args) {
+            const auto [e, terrain] = terrain_of();
+            if (!terrain)
+                return;
+            std::string error;
+            if (terrain::save(*terrain, error))
+                cvar::print(std::format("Saved {}, {}", terrain->heightmap, terrain->splatmap));
+            else
+                cvar::print("Save failed: " + error, cvar::Output::error);
+        });
+}
+
+void EngineDebugUI::draw_terrain_window(Engine& engine)
+{
+    if (!begin_window("Terrain", cv_window_terrain, viewport_point(0.70f, 0.30f), viewport_size(0.24f, 0.5f)))
+        return;
+
+    TerrainEditor& editor = terrain_editor;
+    ecs::Registry& registry = engine.world->registry;
+    const ecs::Entity terrain_entity = find_terrain(registry, get_selected(engine));
+    Terrain* terrain = terrain_entity ? registry.get<Terrain>(terrain_entity) : nullptr;
+    if (!terrain || !terrain->data)
+    {
+        ImGui::TextDisabled("No terrain in the level");
+        ImGui::End();
+        return;
+    }
+    TerrainData& data = *terrain->data;
+
+    ImGui::Text("%s: %u x %u samples, %.0f m, %zu chunks%s", get_entity_label(registry, terrain_entity).c_str(),
+        data.samples, data.samples, data.size(), data.chunks.size(), data.unsaved ? " (modified)" : "");
+
+    // ---- brush ----
+    ImGui::SeparatorText("Brush");
+    bool brush_on = cv_terrain_brush.get();
+    if (ImGui::Checkbox("Edit with the left mouse button", &brush_on))
+        cv_terrain_brush.set(brush_on);
+    ImGui::SetItemTooltip("The camera turns with the right mouse button meanwhile");
+
+    TerrainBrush& brush = editor.brush;
+    // painting on the first row, sculpting on the second
+    for (TerrainBrushMode mode : { TerrainBrushMode::paint, TerrainBrushMode::raise, TerrainBrushMode::lower,
+                                   TerrainBrushMode::smooth, TerrainBrushMode::flatten })
+    {
+        if (mode != TerrainBrushMode::paint && mode != TerrainBrushMode::raise)
+            ImGui::SameLine();
+        if (ImGui::RadioButton(brush_mode_name(mode), brush.mode == mode))
+            brush.mode = mode;
+    }
+
+    if (brush.mode == TerrainBrushMode::paint)
+    {
+        for (uint32_t layer = 0; layer < 4; ++layer)
+        {
+            const std::string label = layer < terrain->layer_names.size() ? terrain->layer_names[layer]
+                                                                          : std::format("layer {}", layer);
+            if (layer > 0)
+                ImGui::SameLine();
+            if (ImGui::RadioButton(label.c_str(), brush.layer == layer))
+                brush.layer = layer;
+        }
+    }
+    if (brush.mode == TerrainBrushMode::flatten)
+    {
+        ImGui::Checkbox("Height under the cursor", &editor.flatten_pick);
+        ImGui::SetItemTooltip("Takes the height where the stroke starts");
+        ImGui::BeginDisabled(editor.flatten_pick);
+        ImGui::DragFloat("Height", &brush.flatten_height, 0.05f, data.origin.y + data.min_height,
+            data.origin.y + data.max_height, "%.2f m");
+        ImGui::EndDisabled();
+    }
+    ImGui::SliderFloat("Radius", &brush.radius, 0.5f, 60.0f, "%.1f m", ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Strength", &brush.strength, 0.01f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Falloff", &brush.falloff, 0.0f, 1.0f, "%.2f");
+    if (brush.mode == TerrainBrushMode::raise || brush.mode == TerrainBrushMode::lower)
+        ImGui::TextDisabled("Shift: the opposite direction");
+
+    if (editor.hit)
+    {
+        const Texture& splat = terrain::get_splat(data);
+        const glm::vec2 uv = (glm::vec2(editor.hit->x, editor.hit->z) - glm::vec2(data.origin.x, data.origin.z)) / data.size();
+        const uint32_t tx = std::min(uint32_t(std::max(uv.x, 0.0f) * float(splat.extent.width)), splat.extent.width - 1);
+        const uint32_t tz = std::min(uint32_t(std::max(uv.y, 0.0f) * float(splat.extent.height)), splat.extent.height - 1);
+        const auto* w = reinterpret_cast<const uint8_t*>(splat.bulk.data()) + (size_t(tz) * splat.extent.width + tx) * 4;
+        ImGui::Text("Cursor %.1f, %.2f, %.1f  weights %d %d %d %d", editor.hit->x, editor.hit->y, editor.hit->z,
+            w[0], w[1], w[2], w[3]);
+    }
+
+    // ---- file ----
+    ImGui::SeparatorText("File");
+    if (ImGui::Button("Save"))
+    {
+        std::string error;
+        editor.status = terrain::save(*terrain, error) ? std::format("Saved {}, {}", terrain->heightmap, terrain->splatmap)
+                                                       : "Save failed: " + error;
+    }
+    ImGui::SetItemTooltip("%s\n%s", terrain->heightmap.c_str(), terrain->splatmap.c_str());
+    if (!editor.status.empty())
+        ImGui::TextWrapped("%s", editor.status.c_str());
+
+    // ---- player ----
+    ImGui::SeparatorText("Player");
+    const glm::vec2 spot(terrain->teleport_spot.x, terrain->teleport_spot.z);
+    if (ImGui::Button("Teleport player"))
+    {
+        if (const std::optional<float> height = terrain::height_at(data, spot))
+            teleport_player(glm::vec3(spot.x, *height + 0.05f, spot.y));
+    }
+    ImGui::SetItemTooltip("To the Terrain's teleport_spot (%.1f, %.1f): outside of Sponza", spot.x, spot.y);
+    if (cv_terrain_brush.get())
+    {
+        ImGui::SameLine();
+        ImGui::TextDisabled("middle click: to the cursor");
     }
 
     ImGui::End();

@@ -23,5 +23,6 @@ void main()
     GPUPrimitiveInfo primitive_info = get_primitive_info(prim_id);
     mat4 transform_curr = primitive_info.current_transform;
     
-    gl_Position = light_ubo.dir_light.light_vp * transform_curr * vec4(vertex.position, 1.0);
+    // the push constants carry the cascade (GenericRenderGraph::draw_scene_shadow)
+    gl_Position = light_ubo.dir_light.cascade_vp[get_debug_index()] * transform_curr * vec4(vertex.position, 1.0);
 }

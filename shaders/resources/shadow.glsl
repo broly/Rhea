@@ -37,29 +37,63 @@ mat2 rot2(float a)
     return mat2(c, -s, s, c);
 }
 
-float shadow_factor(vec3 world_pos, vec3 Ng)
+// Cascaded shadow map (GenericRenderGraph::build_shadow_cascades): every cascade is a tile of one depth atlas.
+// The first cascade that contains the point is used, blended into the next one near its border; points
+// outside of all cascades (farther than the shadow distance) are lit. Works for any view: the cascade is
+// found by position, not by view depth (probe captures sample it too).
+
+// Shadow of one cascade (1 lit), -1 when the point is outside of it. edge: distance to the tile border (uv)
+float cascade_shadow(int cascade, vec3 world_pos, vec3 Ng, out float edge)
 {
-    vec3 shadow_pos = world_pos + Ng * 0.003;
+    edge = 0.0;
+    float texel = light_ubo.dir_light.cascade_texel[cascade];
+    float ndotl = clamp(dot(Ng, -light_ubo.dir_light.direction.xyz), 0.0, 1.0);
+    // normal offset in texels of this cascade, more at grazing angles (acne)
+    vec3 p = world_pos + Ng * texel * (1.0 + 2.0 * (1.0 - ndotl));
 
-    vec4 light_clip = light_ubo.dir_light.light_vp * vec4(shadow_pos, 1.0);
-    vec3 proj = light_clip.xyz / light_clip.w;
-
-    if (proj.x < -1.0 || proj.x > 1.0 ||
-        proj.y < -1.0 || proj.y > 1.0 ||
-        proj.z <  0.0 || proj.z > 1.0)
-        return 1.0;
-
+    vec4 clip = light_ubo.dir_light.cascade_vp[cascade] * vec4(p, 1.0);
+    vec3 proj = clip.xyz / clip.w;
     vec2 uv = proj.xy * 0.5 + 0.5;
 
-    float ndotl = max(dot(Ng, -light_ubo.dir_light.direction.xyz), 0.0);
-    float bias = mix(0.0005, 0.0025, 1.0 - ndotl);
+    float tiles = light_ubo.dir_light.cascade_params.w;
+    float atlas_texel = light_ubo.dir_light.cascade_params.z;
+    edge = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
+    // the 3x3 filter stays inside the tile
+    if (edge < 2.0 * atlas_texel * tiles || proj.z < 0.0 || proj.z > 1.0)
+        return -1.0;
 
-    float shadow = texture(
-        u_shadow_depth,
-        vec3(uv, proj.z - bias)
-    );
+    int tiles_per_side = int(tiles + 0.5);
+    vec2 tile = vec2(float(cascade % tiles_per_side), float(cascade / tiles_per_side));
+    vec2 atlas_uv = (uv + tile) / tiles;
+    float depth = proj.z - (0.01 + 0.5 * texel) / light_ubo.dir_light.cascade_depth_range[cascade];
 
-    return shadow;
+    float lit = 0.0;
+    for (int y = -1; y <= 1; ++y)
+        for (int x = -1; x <= 1; ++x)
+            lit += textureLod(u_shadow_depth, vec3(atlas_uv + vec2(x, y) * atlas_texel, depth), 0.0);
+    return lit / 9.0;
+}
+
+float shadow_factor(vec3 world_pos, vec3 Ng)
+{
+    int count = int(light_ubo.dir_light.cascade_params.x + 0.5);
+    float band = light_ubo.dir_light.cascade_params.y;
+    for (int cascade = 0; cascade < count; ++cascade)
+    {
+        float edge;
+        float shadow = cascade_shadow(cascade, world_pos, Ng, edge);
+        if (shadow < 0.0)
+            continue;
+        if (edge < band && cascade + 1 < count)
+        {
+            float next_edge;
+            float next = cascade_shadow(cascade + 1, world_pos, Ng, next_edge);
+            if (next >= 0.0)
+                shadow = mix(next, shadow, edge / band);
+        }
+        return shadow;
+    }
+    return 1.0;
 }
 
 

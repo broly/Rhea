@@ -138,6 +138,27 @@ void GameEngine::on_debug_ui_render_panel()
     int_param_bit("Probe mirror", LightingDebug::param, LightingDebug::probe_mirror,
         "Debug: every surface shows the probes' mirror reflection (roughness 0, parallax corrected) - what the probes captured and how their boxes line up");
 
+    // ---- directional light shadow: cascades 0 and 1 every frame, the far ones time sliced ----
+    ImGui::SeparatorText("Shadows");
+    for (auto [label, var] : { std::pair{ "Cascade 2 interval", &cv_shadow_interval_2 },
+                               std::pair{ "Cascade 3 interval", &cv_shadow_interval_3 } })
+    {
+        int interval = var->get();
+        if (ImGui::SliderInt(label, &interval, 1, 8))
+            var->set(interval);
+        ImGui::SetItemTooltip("%s", var->get_description().c_str());
+    }
+    if (const auto graph = std::dynamic_pointer_cast<GenericRenderGraph>(renderer->get_main_render_graph()))
+    {
+        const auto& cascades = graph->get_shadow_cascades();
+        std::string rendered;
+        for (uint32_t i = 0; i < cascades.size(); ++i)
+            rendered += std::format("{}{}: {:.0f} m{}", i ? "   " : "", i, cascades[i].radius,
+                cascades[i].rendered_this_frame ? " *" : "");
+        ImGui::TextDisabled("%s", rendered.c_str());
+        ImGui::SetItemTooltip("Radius of each cascade; * rendered this frame (the others keep their tile)");
+    }
+
     ImGui::SeparatorText("Reflection probes");
 
     ReflectionProbeSystem* probes = std::static_pointer_cast<GameRenderer>(renderer)->get_reflection_probes();
