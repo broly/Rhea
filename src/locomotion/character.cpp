@@ -40,6 +40,9 @@ namespace loco
         std::optional<LocomotionInput> scripted_input;
 
         cvar::Var<bool> cv_log("loco.debug.log", false, "Logs state changes of locomotion characters (gait, stance, modes, landing)");
+        cvar::Var<bool> cv_velocity_direction("loco.player.velocity_direction", false,
+            "The player character turns towards where it moves, never towards the camera (ALS velocity direction rotation "
+            "mode); off: it faces the view direction. Key 1 toggles it");
 
         struct LocomotionCameraProbe
         {
@@ -129,6 +132,41 @@ namespace loco
             pending_teleport.reset();
         }
 
+        void read_keyboard(LocomotionInput& command, LocomotionPlayer& player, const Input& input, float dt)
+        {
+            if (input.is_key_down(Key::W)) command.move_axis.y += 1.0f;
+            if (input.is_key_down(Key::S)) command.move_axis.y -= 1.0f;
+            if (input.is_key_down(Key::D)) command.move_axis.x += 1.0f;
+            if (input.is_key_down(Key::A)) command.move_axis.x -= 1.0f;
+            if (glm::length(command.move_axis) > 1.0f)
+                command.move_axis = glm::normalize(command.move_axis);
+
+            // Shift: held -> sprint, tapped -> roll
+            if (input.is_key_down(Key::LeftShift))
+            {
+                player.shift_held = player.shift_held < 0.0f ? 0.0f : player.shift_held + dt;
+                command.sprint = player.shift_held >= sprint_hold_time;
+            }
+            else
+            {
+                command.roll = player.shift_held >= 0.0f && player.shift_held < roll_tap_time;
+                player.shift_held = -1.0f;
+            }
+
+            command.jump = input.is_key_down(Key::Space);
+            command.aim = input.is_key_down(Key::MouseRight);
+
+            auto pressed = [&](Key key, bool& was_down) {
+                const bool down = input.is_key_down(key);
+                const bool edge = down && !was_down;
+                was_down = down;
+                return edge;
+            };
+            command.toggle_walk = pressed(Key::LeftAlt, player.alt_was_down);
+            command.toggle_crouch = pressed(Key::LeftControl, player.ctrl_was_down);
+            command.cycle_rotation_mode = pressed(Key::_1, player.one_was_down);
+        }
+
         [[=ecs::system<ecs::Phase::FixedPre>, =ecs::in_set<LocomotionInputSet>]]
         void read_locomotion_player_input(ecs::Query<LocomotionInput, LocomotionPlayer> players, ecs::Res<Input> input,
             ecs::Res<ecs::SimTime> time)
@@ -156,42 +194,20 @@ namespace loco
                     // one-shot flags fire once
                     scripted_input->toggle_walk = scripted_input->toggle_crouch = false;
                     scripted_input->roll = scripted_input->cycle_rotation_mode = false;
-                    return;
-                }
-
-                if (input->is_key_down(Key::W)) command.move_axis.y += 1.0f;
-                if (input->is_key_down(Key::S)) command.move_axis.y -= 1.0f;
-                if (input->is_key_down(Key::D)) command.move_axis.x += 1.0f;
-                if (input->is_key_down(Key::A)) command.move_axis.x -= 1.0f;
-                if (glm::length(command.move_axis) > 1.0f)
-                    command.move_axis = glm::normalize(command.move_axis);
-
-                // Shift: held -> sprint, tapped -> roll
-                if (input->is_key_down(Key::LeftShift))
-                {
-                    player.shift_held = player.shift_held < 0.0f ? 0.0f : player.shift_held + dt;
-                    command.sprint = player.shift_held >= sprint_hold_time;
                 }
                 else
-                {
-                    command.roll = player.shift_held >= 0.0f && player.shift_held < roll_tap_time;
-                    player.shift_held = -1.0f;
-                }
+                    read_keyboard(command, player, *input, dt);
 
-                command.jump = input->is_key_down(Key::Space);
-                command.aim = input->is_key_down(Key::MouseRight);
-
-                auto pressed = [&](Key key, bool& was_down) {
-                    const bool down = input->is_key_down(key);
-                    const bool edge = down && !was_down;
-                    was_down = down;
-                    return edge;
-                };
-                command.toggle_walk = pressed(Key::LeftAlt, player.alt_was_down);
-                command.toggle_crouch = pressed(Key::LeftControl, player.ctrl_was_down);
-                command.cycle_rotation_mode = pressed(Key::_1, player.one_was_down);
+                // the rotation mode of the player is a setting: the key toggles it
+                if (command.cycle_rotation_mode)
+                    cv_velocity_direction.set(!cv_velocity_direction.get());
+                command.cycle_rotation_mode = false;
+                command.set_rotation_mode = true;
+                command.rotation_mode = cv_velocity_direction.get() ? RotationMode::velocity_direction : RotationMode::view_direction;
             });
         }
+
+
 
 
         // ---------------------------------------------------------------- AAlsCharacter port
@@ -637,7 +653,9 @@ namespace loco
                 c.desired_gait = Gait::running;
             if (input.toggle_crouch)
                 c.desired_stance = c.desired_stance == Stance::standing ? Stance::crouching : Stance::standing;
-            if (input.cycle_rotation_mode)
+            if (input.set_rotation_mode)
+                c.desired_rotation_mode = input.rotation_mode;
+            else if (input.cycle_rotation_mode)
                 c.desired_rotation_mode = c.desired_rotation_mode == RotationMode::velocity_direction
                     ? RotationMode::view_direction : RotationMode::velocity_direction;
             c.desired_aiming = input.aim;

@@ -59,6 +59,9 @@ export cvar::Var<float> cv_probes_sky_distance(
     "render.probes.sky_distance", 12.0f, "Distance to the probe boxes (m) where the sky probe weighs as much as a probe");
 export cvar::Var<int> cv_probes_sky_interval(
     "render.probes.sky_interval", 4, "Least frames between two updates of the sky probe (2-60). It updates as soon as the sun or the sky changes, the probes of the scene wait that frame");
+export cvar::Var<float> cv_probes_sky_period(
+    "render.probes.sky_period", 0.5f, "Seconds between updates of the sky probe while nothing else asks for one (moving clouds); every update crossfades in over this time (0: only on changes, no crossfade)",
+    { .has_range = true, .min = 0.0f, .max = 10.0f });
 export cvar::Var<bool> cv_probes_show_volumes(
     "render.probes.show_volumes", false, "Draw probe boxes and capture points", {}, cvar::none);
 
@@ -84,9 +87,14 @@ export cvar::Var<bool> cv_probes_show_volumes(
 //
 // The sky probe (sky_slot) stays out of that queue: it lights what no box covers, and the direct light of
 // the sun changes at once, so a sky waiting for its turn and fading in shows as the terrain going dark and
-// brightening over seconds. When the sun or the sky changes it renders its 6 faces (sky only, its own capture
-// cube) and is filtered straight into its slot within one frame, at most every sky_interval frames. The
-// capture UBO and the filter source are one per frame: the probes of the scene do nothing in that frame.
+// brightening over seconds. It renders its 6 faces (sky only, its own capture cube) within one frame, at most
+// every sky_interval frames: when the sun or the sky changes, and every sky_period seconds anyway (the
+// clouds move all the time). An update is filtered into the sky's own scratch cubes and the slot follows
+// it linearly in time over sky_period (blended every fade_update_interval frames): the reflections of the
+// clouds drift instead of jumping from update to update. A big jump (first bake, rebake request, the sun or
+// the sky changed a lot at once) is filtered straight into the slot, the lighting follows it at once. The
+// capture UBO and the filter source are one per frame: the probes of the scene do nothing in that frame;
+// the scratch descriptor is one per frame too: a frame which blends a scene probe skips the sky blend.
 //
 // Shading side (resources/reflection.glsl): every slot is bound as samplerCube arrays, the UBO carries the
 // boxes (influence + parallax proxy) of baked probes.
@@ -219,14 +227,30 @@ private:
         bool blend = false;
         uint32_t blend_slot = 0;
         float blend_alpha = 1.0f;
-        // the sky probe: all faces into sky_capture, filtered into its slot (nothing of the above then)
+        // the sky probe: all faces into sky_capture, filtered into its slot or its scratch (nothing of the
+        // above then)
         bool sky = false;
+        bool sky_to_scratch = false;
+        // crossfade update of the sky slot: its scratch blended over it
+        bool sky_blend = false;
+        float sky_blend_alpha = 1.0f;
+    };
+
+    // the sky slot following its scratch (the latest update) linearly in time
+    struct SkyFade
+    {
+        double start = 0.0;
+        double duration = 1.0;
+        float progress = 0.0f;   // share of the way from the slot's content at start to the scratch, blended so far
+        uint32_t cooldown = 0;   // frames until the next blend update
     };
 
     void gather_lights(SceneView& scene_view);
     void update_slots(SceneView& scene_view, const FrameInputs& inputs);
     // true: the sky probe takes this frame
     bool plan_sky(const FrameInputs& inputs);
+    // after plan_work: this frame's step of the sky crossfade, unless a scene probe blends
+    void plan_sky_blend();
     void plan_work(SceneView& scene_view, const FrameInputs& inputs);
     void write_descriptors(RenderGraphContext& ctx, SceneView& scene_view, const FrameInputs& inputs);
     void draw_debug_volumes(SceneView& scene_view) const;
@@ -277,6 +301,9 @@ private:
     // a filtered capture waiting to be blended into its slot
     RBImageHandle scratch_specular;
     RBImageHandle scratch_irradiance;
+    // the latest update of the sky probe, which its slot crossfades to
+    RBImageHandle sky_scratch_specular;
+    RBImageHandle sky_scratch_irradiance;
     std::array<RBImageHandle, kMaxReflectionProbes> specular_images;
     std::array<RBImageHandle, kMaxReflectionProbes> irradiance_images;
     bool images_initialized = false;
@@ -285,6 +312,7 @@ private:
     std::optional<Job> job;
     std::optional<Fade> fade;
     uint32_t sky_cooldown = 0;   // frames until the sky probe may update again
+    std::optional<SkyFade> sky_fade;
     ProbeLights probe_lights;
     FrameWork frame_work;
     bool rebake_all_requested = false;

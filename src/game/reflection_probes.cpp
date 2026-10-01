@@ -30,6 +30,11 @@ namespace
     // sky change that makes them dirty: its average radiance (relative), the cloud coverage
     constexpr float sky_ambient_threshold = 0.05f;
     constexpr float cloud_coverage_threshold = 0.05f;
+    // a jump of the sun or the sky the sky probe follows at once instead of crossfading (sky.time set by
+    // hand, a weather switch): the direct light changed at once too
+    constexpr float sky_jump_sun_cos = 0.9962f;               // ~5 degrees
+    constexpr float sky_jump_relative = 0.3f;                 // sun color, sky ambient
+    constexpr float sky_jump_coverage = 0.2f;
 
     float distance_to_box(glm::vec3 point, glm::vec3 box_min, glm::vec3 box_max)
     {
@@ -105,6 +110,24 @@ void ReflectionProbeSystem::init(Renderer& in_renderer, RenderBackend& in_backen
         .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled |
             RenderTextureUsage::TransferSrc | RenderTextureUsage::TransferDst,
         .mip_levels = specular_mips,
+        .num_layers = 6,
+        .is_cubemap = true,
+    });
+    sky_scratch_specular = backend->create_image({
+        .name = "probe_sky_scratch_specular",
+        .extent = { specular_size, specular_size },
+        .format = TextureFormat::RGBA16F,
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+        .mip_levels = specular_mips,
+        .num_layers = 6,
+        .is_cubemap = true,
+    });
+    sky_scratch_irradiance = backend->create_image({
+        .name = "probe_sky_scratch_irradiance",
+        .extent = { irradiance_size, irradiance_size },
+        .format = TextureFormat::RGBA16F,
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+        .mip_levels = 1,
         .num_layers = 6,
         .is_cubemap = true,
     });
@@ -207,11 +230,13 @@ void ReflectionProbeSystem::prepare(RenderGraphContext& ctx, SceneView& scene_vi
     if (cv_probes_enabled.get())
     {
         plan_work(scene_view, inputs);
+        plan_sky_blend();
     }
     else
     {
         job.reset();
         fade.reset();
+        sky_fade.reset();
     }
     write_descriptors(ctx, scene_view, inputs);
 
@@ -347,15 +372,42 @@ bool ReflectionProbeSystem::plan_sky(const FrameInputs& inputs)
         sky_cooldown--;
 
     SlotState& state = slots[sky_slot];
+    if (!state.active)
+    {
+        sky_fade.reset();
+        return false;
+    }
+
+    // the clouds move all the time: an update every sky_period anyway, crossfaded over that time
+    const double period = std::max(cv_probes_sky_period.get(), 0.0f);
+    const bool periodic = period > 0.0 && cv_probes_auto_rebake.get() && current_time - state.bake_time >= period;
     // a sky nobody has seen yet does not wait
-    if (!state.active || !state.dirty || (state.valid && sky_cooldown > 0))
+    if (!(state.dirty || periodic) || (state.valid && sky_cooldown > 0))
         return false;
 
     // lighting driven updates run all the time under an animated sun: not logged
     if (!state.valid || state.force)
         LogReflectionProbes.Log("Baking reflection probe 'sky' (slot %u): %s", sky_slot, state.dirty_reason);
 
+    const float color_scale = std::max(glm::length(state.baked_sun_color), 1e-3f);
+    const float sky_scale = std::max(glm::length(glm::vec3(state.baked_sky)), 1e-3f);
+    const bool jump = !state.valid || state.force
+        || glm::dot(state.baked_sun_direction, probe_lights.sun_direction) < sky_jump_sun_cos
+        || glm::length(probe_lights.sun_color - state.baked_sun_color) / color_scale > sky_jump_relative
+        || glm::length(inputs.sky_ambient - glm::vec3(state.baked_sky)) / sky_scale > sky_jump_relative
+        || std::abs(inputs.cloud_coverage - state.baked_sky.w) > sky_jump_coverage;
+
     frame_work.sky = true;
+    frame_work.sky_to_scratch = !jump && period > 0.0;
+    if (frame_work.sky_to_scratch)
+    {
+        // from whatever the slot shows now (an unfinished fade included) to this update
+        sky_fade = SkyFade{ .start = current_time, .duration = period, .progress = 0.0f, .cooldown = 0 };
+    }
+    else
+    {
+        sky_fade.reset();
+    }
 
     state.valid = true;
     state.baked_position = inputs.camera_position;
@@ -369,6 +421,32 @@ bool ReflectionProbeSystem::plan_sky(const FrameInputs& inputs)
 
     sky_cooldown = (uint32_t)std::clamp(cv_probes_sky_interval.get(), 2, 60);
     return true;
+}
+
+void ReflectionProbeSystem::plan_sky_blend()
+{
+    if (!sky_fade)
+        return;
+    if (sky_fade->cooldown > 0)
+    {
+        sky_fade->cooldown--;
+        return;
+    }
+    // the scratch descriptor shows the scene probe's scratch this frame: next frame then
+    if (frame_work.blend)
+        return;
+
+    const float target = (float)std::clamp((current_time - sky_fade->start) / std::max(sky_fade->duration, 1e-3), 0.0, 1.0);
+    if (target <= sky_fade->progress)
+        return;
+
+    // the slot holds old + progress * (scratch - old): this blend moves it to old + target * (scratch - old)
+    frame_work.sky_blend = true;
+    frame_work.sky_blend_alpha = (target - sky_fade->progress) / (1.0f - sky_fade->progress);
+    sky_fade->progress = target;
+    sky_fade->cooldown = fade_update_interval - 1;
+    if (target >= 1.0f)
+        sky_fade.reset();
 }
 
 void ReflectionProbeSystem::plan_work(SceneView& scene_view, const FrameInputs& inputs)
@@ -583,8 +661,11 @@ void ReflectionProbeSystem::write_descriptors(RenderGraphContext& ctx, SceneView
     // cube, rendered earlier in the same pass)
     probe_capture_resource->update_image("u_probe_source",
         frame_work.sky ? sky_capture : capture_colors[frame_work.filter_capture_index], { .frame = ctx.frame, .cubemap = true });
-    probe_capture_resource->update_image("u_probe_scratch_specular", scratch_specular, { .frame = ctx.frame, .cubemap = true });
-    probe_capture_resource->update_image("u_probe_scratch_irradiance", scratch_irradiance, { .frame = ctx.frame, .cubemap = true });
+    // what this frame's blend reads: the sky's scratch only in a frame without a scene probe blend (plan_sky_blend)
+    probe_capture_resource->update_image("u_probe_scratch_specular",
+        frame_work.sky_blend ? sky_scratch_specular : scratch_specular, { .frame = ctx.frame, .cubemap = true });
+    probe_capture_resource->update_image("u_probe_scratch_irradiance",
+        frame_work.sky_blend ? sky_scratch_irradiance : scratch_irradiance, { .frame = ctx.frame, .cubemap = true });
 }
 
 void ReflectionProbeSystem::draw_debug_volumes(SceneView& scene_view) const
@@ -657,6 +738,8 @@ void ReflectionProbeSystem::initialize_images(RenderGraphContext& ctx)
     transition(ctx, sky_capture, RBImageUsageType::SampledFragment);
     transition(ctx, scratch_specular, RBImageUsageType::SampledFragment);
     transition(ctx, scratch_irradiance, RBImageUsageType::SampledFragment);
+    transition(ctx, sky_scratch_specular, RBImageUsageType::SampledFragment);
+    transition(ctx, sky_scratch_irradiance, RBImageUsageType::SampledFragment);
     for (uint32_t slot = 0; slot < kMaxReflectionProbes; ++slot)
     {
         transition(ctx, specular_images[slot], RBImageUsageType::SampledFragment);
@@ -672,16 +755,22 @@ void ReflectionProbeSystem::execute(RenderGraphContext& ctx, SceneView& scene_vi
     if (!images_initialized)
         initialize_images(ctx);
 
-    if (frame_work.face_count == 0 && !frame_work.filter && !frame_work.blend && !frame_work.sky)
+    if (frame_work.face_count == 0 && !frame_work.filter && !frame_work.blend && !frame_work.sky && !frame_work.sky_blend)
         return;
 
-    // the sky probe: the whole update at once, no crossfade (the lighting follows the sky like it follows the sun)
+    // the sky probe: the whole capture at once, into its slot (a jump: the lighting follows the sky like it
+    // follows the sun) or into its scratch, which the slot crossfades to (plan_sky_blend)
     if (frame_work.sky)
     {
         for (uint32_t face = 0; face < 6; ++face)
             render_face(ctx, scene_view, draw_list, sky_capture, face, true);
-        filter_capture(ctx, sky_capture, specular_images[sky_slot], irradiance_images[sky_slot]);
+        if (frame_work.sky_to_scratch)
+            filter_capture(ctx, sky_capture, sky_scratch_specular, sky_scratch_irradiance);
+        else
+            filter_capture(ctx, sky_capture, specular_images[sky_slot], irradiance_images[sky_slot]);
     }
+    if (frame_work.sky_blend)
+        blend_into_slot(ctx, sky_slot, frame_work.sky_blend_alpha);
 
     // the finished capture first: the faces below go to the other cube
     if (frame_work.filter)

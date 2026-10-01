@@ -49,10 +49,13 @@ export namespace loco
         bool toggle_crouch = false;
         bool cycle_rotation_mode = false;
         bool roll = false;
+        // the desired rotation mode, when the input sets it (the player: cvar loco.player.velocity_direction)
+        bool set_rotation_mode = false;
+        RotationMode rotation_mode = RotationMode::view_direction;
     };
 
     // Reads LocomotionInput from the keyboard (ALS layout: WASD, Shift hold sprint / tap roll, Alt walk,
-    // Ctrl crouch, Space jump, right mouse aim, 1 rotation mode). The camera owner sets camera_yaw / pitch.
+    // Ctrl crouch, Space jump, right mouse aim, 1 rotation mode: toggles cvar loco.player.velocity_direction). The camera owner sets camera_yaw / pitch.
     struct LocomotionPlayer
     {
         [[=rh::edit]] bool enabled = true;
