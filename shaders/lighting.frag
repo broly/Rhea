@@ -7,6 +7,7 @@
 #include "resources/hdr_color_output.glsl"
 #include "resources/shadow.glsl"
 #include "resources/reflection.glsl"
+#include "resources/gtao.glsl"
 #include "pbr_helpers.glsl"
 #include "character/character_lighting.glsl"
 #include "utils/gbuffer_position.glsl"
@@ -23,6 +24,8 @@ uniform ColorOutputConstants
 {
     uint buffer_index;
     uint debug_flags;  // LightingDebug bits (generic_render_graph.ixx)
+    uint gtao_downscale;    // screen pixels per texel of u_gtao, 0: no GTAO
+    float gtao_foliage;     // strength of GTAO on leaves
 } pc;
 
 const uint LIGHTING_DEBUG_NO_DIFFUSE_GI = 1u;
@@ -36,6 +39,53 @@ const uint LIGHTING_DEBUG_PROBE_MIRROR = 64u;
 bool lighting_debug(uint flag)
 {
     return (pc.debug_flags & flag) != 0u;
+}
+
+// GTAO visibility at a screen pixel (GtaoRenderer). Downscaled: the 4 texels around the pixel, bilinear
+// weights times how well the depth each texel was computed for matches the pixel's (no halos across edges);
+// none matching: the closest in depth.
+float gtao_visibility(ivec2 pixel, float depth)
+{
+    if (pc.gtao_downscale == 0u || depth <= 0.0)
+        return 1.0;
+    if (pc.gtao_downscale == 1u)
+        return texelFetch(u_gtao, pixel, 0).r;
+
+    const ivec2 size = textureSize(u_gtao, 0);
+    const vec2 position = (vec2(pixel) + 0.5) / float(pc.gtao_downscale) - 0.5;
+    const ivec2 base = ivec2(floor(position));
+    const vec2 f = position - vec2(base);
+
+    float sum = 0.0;
+    float weight_sum = 0.0;
+    float closest = 1.0;
+    float closest_difference = 1.0e30;
+    for (int i = 0; i < 4; ++i)
+    {
+        const ivec2 offset = ivec2(i & 1, i >> 1);
+        const vec4 texel = texelFetch(u_gtao, clamp(base + offset, ivec2(0), size - 1), 0);
+        const vec2 bilinear = mix(1.0 - f, f, vec2(offset));
+        const float difference = abs(texel.g - depth);
+        const float weight = bilinear.x * bilinear.y * exp(-difference / (0.02 * depth));
+        sum += texel.r * weight;
+        weight_sum += weight;
+        if (difference < closest_difference)
+        {
+            closest_difference = difference;
+            closest = texel.r;
+        }
+    }
+    return weight_sum > 1e-4 ? sum / weight_sum : closest;
+}
+
+// Light bouncing between the occluders brightens the occlusion of bright surfaces (Jimenez et al. 2016,
+// fitted to ray traced multi bounce AO)
+vec3 ao_multi_bounce(float visibility, vec3 albedo)
+{
+    const vec3 a = 2.0404 * albedo - 0.3324;
+    const vec3 b = -4.7951 * albedo + 0.6417;
+    const vec3 c = 2.7552 * albedo + 0.6903;
+    return max(vec3(visibility), ((visibility * a + b) * visibility + c) * visibility);
 }
 
 void main()
@@ -99,6 +149,13 @@ void main()
         : texture(u_hdr_color_present[pc.buffer_index], uv).rgb;
     if (lighting_debug(LIGHTING_DEBUG_NO_DIFFUSE_GI))
         gi = vec3(0.0);
+
+    // ambient occlusion: the material's (texture) and the screen space one, whichever occludes more
+    const float linear_depth = texelFetch(u_gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], ivec2(gl_FragCoord.xy), 0).r;
+    float screen_ao = gtao_visibility(ivec2(gl_FragCoord.xy), linear_depth);
+    if (foliage_model)
+        screen_ao = mix(1.0, screen_ao, pc.gtao_foliage);
+    const float ao = min(get_gbuffer_WORLD_NORMAL(uv).a, screen_ao);
     
     if (!legacy_model)
     {
@@ -106,7 +163,7 @@ void main()
             shading_model,
             vec4(albedo, albedo_roughness.a),
             N,
-            get_gbuffer_WORLD_NORMAL(uv).a,
+            ao,
             get_gbuffer_EMISSIVE(uv));
         
         vec3 radiance = vec3(0.0);
@@ -140,7 +197,6 @@ void main()
 
     // ---- legacy PBR model ----
     const float metallic = clamp(get_gbuffer_EMISSIVE(uv).a, 0.0, 1.0);
-    const float ao = get_gbuffer_WORLD_NORMAL(uv).a;
     vec3 diffuse_albedo = albedo * (1.0 - metallic);
     
     vec3 direct = vec3(0.0);
@@ -175,7 +231,7 @@ void main()
         }
     }
 
-    vec3 indirect = gi * diffuse_albedo * ao;
+    vec3 indirect = gi * diffuse_albedo * ao_multi_bounce(ao, diffuse_albedo);
 
     vec3 color = direct + indirect + emissive;
 

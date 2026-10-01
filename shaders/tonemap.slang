@@ -1,5 +1,6 @@
 import resources.hdr_color_output;
 import resources.gbuffer;
+import resources.gtao;
 import resources.hdr_color_defines;
 import utils.tonemapping;
 import nn_denoiser.nn_denoiser_resource;
@@ -47,6 +48,7 @@ static const uint VIEW_GEOMETRY_NORMAL = 6;
 static const uint VIEW_LINEAR_DEPTH    = 7;
 static const uint VIEW_MOTION_VECTORS  = 8;
 static const uint VIEW_EMISSIVE        = 9;
+static const uint VIEW_AMBIENT_OCCLUSION = 10;
 
 static const float3 DEBUG_VIEW_BACKGROUND = float3(0.03, 0.03, 0.035);
 
@@ -108,6 +110,10 @@ bool get_debug_view_color(uint view_mode, float2 uv, out float3 color)
         }
         case VIEW_EMISSIVE:
             color = GBuffer::get<GBuffer::Slot::EMISSIVE>(uv).rgb;
+            break;
+        case VIEW_AMBIENT_OCCLUSION:
+            // GTAO result (denoised, its own resolution), without the material AO
+            color = GTAO::visibility(uv).xxx;
             break;
         default:
             // unknown mode -> magenta

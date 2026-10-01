@@ -1,0 +1,89 @@
+#version 450
+
+// One pass of the GTAO denoiser (GtaoRenderer, passes "GTAODenoise1" / "GTAODenoise2", XeGTAO's): a 3 x 3
+// blur that stops at the edges gtao.comp found between depth discontinuities. Two passes average the
+// per-pixel noise of the slice directions and steps; the first blurs more (lower center weight).
+// Source and target: resources/gtao.glsl layout (visibility, depth, packed edges); depth and edges are kept.
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "resources/gtao_denoise.glsl"
+
+layout(push_constant) uniform GTAODenoisePushConstants
+{
+    float blur_beta;    // center weight of the last pass (the first one takes a fifth): lower blurs more
+    uint final_pass;
+    uint enabled;       // 0: copies the source (the raw noise of gtao.comp)
+    uint pad;
+} pc;
+
+ivec2 g_size;
+
+vec4 fetch(ivec2 texel)
+{
+    return texelFetch(u_gtao_denoise_source, clamp(texel, ivec2(0), g_size - 1), 0);
+}
+
+// left, right, top, bottom: 1 the neighbor is the same surface, 0 an edge
+vec4 unpack_edges(float packed)
+{
+    uint bits = uint(packed + 0.5);
+    return vec4((bits >> 6u) & 3u, (bits >> 4u) & 3u, (bits >> 2u) & 3u, bits & 3u) / 3.0;
+}
+
+void main()
+{
+    const ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    g_size = imageSize(u_gtao_denoise_target);
+    if (any(greaterThanEqual(texel, g_size)))
+        return;
+
+    const vec4 center = fetch(texel);
+    // no surface (depth 0), or the denoiser is off
+    if (pc.enabled == 0u || center.y <= 0.0)
+    {
+        imageStore(u_gtao_denoise_target, texel, center);
+        return;
+    }
+
+    const vec4 left = fetch(texel + ivec2(-1, 0));
+    const vec4 right = fetch(texel + ivec2(1, 0));
+    const vec4 top = fetch(texel + ivec2(0, -1));
+    const vec4 bottom = fetch(texel + ivec2(0, 1));
+    const vec4 top_left = fetch(texel + ivec2(-1, -1));
+    const vec4 top_right = fetch(texel + ivec2(1, -1));
+    const vec4 bottom_left = fetch(texel + ivec2(-1, 1));
+    const vec4 bottom_right = fetch(texel + ivec2(1, 1));
+
+    vec4 edges_c = unpack_edges(center.z);
+    const vec4 edges_l = unpack_edges(left.z);
+    const vec4 edges_r = unpack_edges(right.z);
+    const vec4 edges_t = unpack_edges(top.z);
+    const vec4 edges_b = unpack_edges(bottom.z);
+
+    // an edge counts when either side of it sees it
+    edges_c *= vec4(edges_l.y, edges_r.x, edges_t.w, edges_b.z);
+
+    // a pixel cut off on most sides leaks a little: lone noisy pixels on thin geometry get blurred too
+    const float leak_threshold = 2.5;
+    const float leak_strength = 0.5;
+    const float edginess = clamp(4.0 - leak_threshold - dot(edges_c, vec4(1.0)), 0.0, 1.0)
+        / (4.0 - leak_threshold) * leak_strength;
+    edges_c = clamp(edges_c + edginess, 0.0, 1.0);
+
+    // diagonals: reachable over either of the two neighbors between
+    const float diagonal = 0.85 * 0.5;
+    const float weight_tl = diagonal * (edges_c.x * edges_l.z + edges_c.z * edges_t.x);
+    const float weight_tr = diagonal * (edges_c.z * edges_t.y + edges_c.y * edges_r.z);
+    const float weight_bl = diagonal * (edges_c.w * edges_b.x + edges_c.x * edges_l.w);
+    const float weight_br = diagonal * (edges_c.y * edges_r.w + edges_c.w * edges_b.y);
+
+    const float center_weight = pc.final_pass != 0u ? pc.blur_beta : pc.blur_beta / 5.0;
+
+    const float sum = center.x * center_weight
+        + left.x * edges_c.x + right.x * edges_c.y + top.x * edges_c.z + bottom.x * edges_c.w
+        + top_left.x * weight_tl + top_right.x * weight_tr + bottom_left.x * weight_bl + bottom_right.x * weight_br;
+    const float weight = center_weight + dot(edges_c, vec4(1.0)) + weight_tl + weight_tr + weight_bl + weight_br;
+
+    imageStore(u_gtao_denoise_target, texel, vec4(sum / weight, center.yzw));
+}

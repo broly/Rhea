@@ -22,6 +22,7 @@ export enum class DebugViewMode : uint32_t
     LINEAR_DEPTH,
     MOTION_VECTORS,
     EMISSIVE,
+    AMBIENT_OCCLUSION,  // GTAO result (not a g-buffer channel, drawn by the tonemap pass like them)
 
     COUNT [[=rh::transient]]
 };
@@ -52,6 +53,7 @@ export constexpr const char* get_debug_view_mode_name(DebugViewMode mode)
         case DebugViewMode::LINEAR_DEPTH:    return "GBuffer: Linear Depth";
         case DebugViewMode::MOTION_VECTORS:  return "GBuffer: Motion Vectors";
         case DebugViewMode::EMISSIVE:        return "GBuffer: Emissive";
+        case DebugViewMode::AMBIENT_OCCLUSION: return "GTAO: Ambient Occlusion";
         default:                             return "Unknown";
     }
 }

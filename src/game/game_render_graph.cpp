@@ -54,6 +54,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_ACCUM], RBImageUsageType::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_FILTERED], RBImageUsageType::SampledFragment },        
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_NEURAL_DENOISED], RBImageUsageType::SampledFragment },
+                { gtao_result, RBImageUsageType::SampledFragment },
             },
             .writes = {
                 { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
@@ -64,7 +65,8 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 {
                     ctx.bind(
                         hdr_color_output_resource, 
-                        gbuffer_resource);
+                        gbuffer_resource,
+                        gtao_resource);
                     if (nn_denoiser_state.initialized)
                     {
                         ctx.bind(nn_denoiser_state.resource);

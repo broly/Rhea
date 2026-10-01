@@ -26,6 +26,7 @@ import :sky_renderer;
 import :particle_renderer;
 import :foliage_renderer;
 import :occlusion_culling;
+import :gtao_renderer;
 import :draw_list;
 import rhcomponents;
 import cvar;
@@ -203,6 +204,8 @@ struct ColorOutputConstants
 {
     uint32_t buffer_index;
     uint32_t debug_flags = 0;  // LightingDebug bits
+    uint32_t gtao_downscale = 0;   // screen pixels per texel of the GTAO result, 0: no GTAO this frame
+    float gtao_foliage = 1.0f;     // strength of GTAO on leaves
 };
 RH_REGISTER_TYPE(ColorOutputConstants)
 
@@ -300,6 +303,13 @@ public:
     RGTextureHandle ssr_texture;
     uint32_t history_index = 0;
 
+    // GTAO at 1 / gtao_downscale of the screen (GtaoRenderer, main graph): raw samples, after the first
+    // denoise pass, result (read by the lighting pass; a 1 x 1 texture nobody writes in the other graphs)
+    RGTextureHandle gtao_raw;
+    RGTextureHandle gtao_mid;
+    RGTextureHandle gtao_result;
+    uint32_t gtao_downscale = 1;    // render.gtao.downscale the GTAO targets were created with
+
     // Full-screen "sky flash" diagnostics: occlusion queries per frame in flight, [frame * DIAG_COUNT + DIAG_*]:
     // samples drawn by the sky pass (where depth is empty) and by the base geometry pass.
     // Read back when the frame slot comes around again, logged when the sky covers most of the screen.
@@ -361,6 +371,9 @@ public:
     
     [[=rh::resource]]
     RenderResource* ssr_resource;
+    
+    [[=rh::resource]]
+    RenderResource* gtao_resource;
     
     [[=rh::resource]]
     RenderResource* hdr_color_output_resource;
@@ -474,6 +487,9 @@ public:
     // GPU occlusion culling of the base pass, main graph only (passes OcclusionCullEarly, HZB, OcclusionCullLate,
     // GeometryBaseLate)
     std::unique_ptr<OcclusionCulling> occlusion;
+
+    // screen space ambient occlusion, main graph only (passes GTAO, GTAODenoise1, GTAODenoise2)
+    std::unique_ptr<GtaoRenderer> gtao;
 
     // mesh draws of the frame: records + indirect commands
     DrawList draw_list;

@@ -423,6 +423,32 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
             .usage = RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
             .num_layers = 2
         });
+
+        gtao = std::make_unique<GtaoRenderer>();
+        gtao->init(*renderer, *backend);
+
+        // rgba: visibility, linear depth, packed edges (resources/gtao.glsl)
+        gtao_downscale = uint32_t(std::clamp(cv_gtao_downscale.get(), 1, 2));
+        for (auto [handle, name] : { std::pair{ &gtao_raw, "gtao_raw" }, std::pair{ &gtao_mid, "gtao_mid" },
+                 std::pair{ &gtao_result, "gtao_result" } })
+        {
+            *handle = create_texture({
+                .name = name,
+                .extent_divisor = gtao_downscale,
+                .format = TextureFormat::RGBA16F,
+                .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+            });
+        }
+    }
+    else
+    {
+        // the lighting pass samples it, the push constants tell it not to
+        gtao_result = create_texture({
+            .name = NAME(gtao_result),
+            .extent = { 1, 1 },
+            .format = TextureFormat::RGBA16F,
+            .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+        });
     }
 
     if constexpr (render_settings::enable_nn_denoiser)
@@ -856,6 +882,61 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
     
     
+    // ---- ambient occlusion of the indirect light: GTAO, then two denoise passes ----
+    if (gtao)
+    {
+        add_pass({
+            .name = "GTAO",
+            .condition = [] () { return cv_gtao_enabled.get(); },
+            .reads = {
+                { gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::Sampled },
+            },
+            .writes = {
+                { gtao_raw, RBImageUsageType::StorageImage }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("GTAO");
+                gtao->dispatch_gtao(ctx, camera_resource, gbuffer_resource, textures[gtao_raw.id].desc.extent);
+            },
+            .type = RenderPassType::compute
+        });
+
+        add_pass({
+            .name = "GTAODenoise1",
+            .condition = [] () { return cv_gtao_enabled.get(); },
+            .reads = {
+                { gtao_raw, RBImageUsageType::Sampled }
+            },
+            .writes = {
+                { gtao_mid, RBImageUsageType::StorageImage }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("GTAODenoise1");
+                gtao->dispatch_denoise(ctx, 0, textures[gtao_mid.id].desc.extent);
+            },
+            .type = RenderPassType::compute
+        });
+
+        add_pass({
+            .name = "GTAODenoise2",
+            .condition = [] () { return cv_gtao_enabled.get(); },
+            .reads = {
+                { gtao_mid, RBImageUsageType::Sampled }
+            },
+            .writes = {
+                { gtao_result, RBImageUsageType::StorageImage }
+            },
+            .execute = [this] (RenderGraphContext& ctx)
+            {
+                PROFILE("GTAODenoise2");
+                gtao->dispatch_denoise(ctx, 1, textures[gtao_result.id].desc.extent);
+            },
+            .type = RenderPassType::compute
+        });
+    }
+    
     add_pass({
         .name = Names::pass_lighting,
         .reads = {
@@ -871,7 +952,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             { gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL], RBImageUsageType::SampledFragment },
             { gbuffer[GBUFFER_SLOTS::EMISSIVE], RBImageUsageType::SampledFragment },
-            { decal_albedo, RBImageUsageType::SampledFragment }
+            { decal_albedo, RBImageUsageType::SampledFragment },
+            { gtao_result, RBImageUsageType::SampledFragment }
         },
         .writes = { 
             { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::ColorAttachment, RBLoadOp::Clear },
@@ -885,7 +967,7 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             if (ctx.bind_pipeline(lighting_pipeline))
             {
                 ctx.bind(camera_resource, light_resource, hdr_color_output_resource, gbuffer_resource, dbuffer_resource, shadow_resource,
-                    reflection_resource);
+                    reflection_resource, gtao_resource);
             }
             
             // indirect light: SVGF-filtered RTXGI, or the reflection capture IBL without ray tracing
@@ -894,6 +976,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 ? (uint32_t)COLOR_OUTPUT_HDR::RTXGI_FILTERED
                 : LIGHTING_GI_FROM_IBL;
             pc.debug_flags = (uint32_t)ctx.params.get_int(LightingDebug::param, 0);
+            pc.gtao_downscale = gtao && cv_gtao_enabled.get() ? gtao_downscale : 0;
+            pc.gtao_foliage = std::clamp(cv_gtao_foliage.get(), 0.0f, 1.0f);
             if (!emissive_diagnostics_enabled())
                 pc.debug_flags &= ~LightingDebug::emissive_watch;
             ctx.push_constants(pc);
@@ -1258,6 +1342,17 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
         prepare_ssr(ctx);
         prepare_raytracing(ctx);
     }
+
+    gtao_resource->update_image("u_gtao", get_image(gtao_result), { .frame = ctx.frame });
+    if (gtao)
+    {
+        gtao->prepare(ctx, {
+            .downscale = gtao_downscale,
+            .raw = get_image(gtao_raw),
+            .mid = get_image(gtao_mid),
+            .result = get_image(gtao_result),
+        });
+    }
     
     if constexpr (render_settings::enable_nn_denoiser)
     {
@@ -1330,6 +1425,15 @@ void GenericRenderGraph::begin_frame()
     {
         ssr_downscale = ssr_scale;
         resize_texture(ssr_texture, ssr_scale);
+    }
+
+    // the same for render.gtao.downscale
+    const uint32_t gtao_scale = uint32_t(std::clamp(cv_gtao_downscale.get(), 1, 2));
+    if (gtao && gtao_scale != gtao_downscale)
+    {
+        gtao_downscale = gtao_scale;
+        for (RGTextureHandle texture : { gtao_raw, gtao_mid, gtao_result })
+            resize_texture(texture, gtao_scale);
     }
 
     // the same for render.fog.downscale

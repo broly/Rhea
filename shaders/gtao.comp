@@ -1,0 +1,239 @@
+#version 450
+
+// Ground truth ambient occlusion (Jimenez et al. 2016, "Practical Realtime Strategies for Accurate Indirect
+// Occlusion"), after Intel's XeGTAO (MIT): GtaoRenderer, pass "GTAO". One texel per downscale x downscale
+// screen pixels: the cosine weighted visibility of the hemisphere above the surface, integrated over `slices`
+// planes around the view ray. Each slice searches its two horizons with `steps` depth samples per side.
+// Writes (resources/gtao.glsl): visibility, linear depth of the texel's pixel, packed edges (denoiser), 0.
+// Differs from XeGTAO: no depth mip chain (the full resolution linear depth is sampled), the normal comes from
+// the g-buffer (interpolated vertex normal, no normal map), the noise does not change over time (no TAA to
+// average it): gtao_denoise.comp blurs it away.
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "resources/camera.glsl"
+#include "resources/gbuffer.glsl"
+#include "resources/gtao_main.glsl"
+
+layout(push_constant) uniform GTAOPushConstants
+{
+    // x: radius (m), y: share of the radius the occluders fade out over, z: thin occluder compensation,
+    // w: power of the visibility
+    vec4 params;
+    uint slices;        // planes around the view ray
+    uint steps;         // depth samples per side of a slice
+    uint downscale;     // screen pixels per texel, per axis
+    uint pad;
+} pc;
+
+const float GTAO_PI = 3.14159265359;
+const float GTAO_HALF_PI = 1.57079632679;
+// a sample whose depth is no surface (sky) lies this far away: out of every falloff
+const float GTAO_NO_SURFACE = 1.0e5;
+
+ivec2 g_screen;
+// view xy / linear depth = uv * g_view_mul + g_view_add (uv of the screen, v down, as gbuffer_position.glsl)
+vec2 g_view_mul;
+vec2 g_view_add;
+
+// acos, max error ~0.0002 rad (XeGTAO)
+float fast_acos(float x)
+{
+    float a = abs(x);
+    float result = (-0.156583 * a + GTAO_HALF_PI) * sqrt(1.0 - a);
+    return x >= 0.0 ? result : GTAO_PI - result;
+}
+
+// Index along a Hilbert curve over a 64 x 64 tile: neighbors get well spread noise (XeGTAO)
+uint hilbert_index(uint x, uint y)
+{
+    const uint width = 64u;
+    uint index = 0u;
+    for (uint level = width / 2u; level > 0u; level /= 2u)
+    {
+        uint region_x = (x & level) > 0u ? 1u : 0u;
+        uint region_y = (y & level) > 0u ? 1u : 0u;
+        index += level * level * ((3u * region_x) ^ region_y);
+        if (region_y == 0u)
+        {
+            if (region_x == 1u)
+            {
+                x = width - 1u - x;
+                y = width - 1u - y;
+            }
+            uint swap = x;
+            x = y;
+            y = swap;
+        }
+    }
+    return index;
+}
+
+float load_depth(ivec2 pixel)
+{
+    float depth = texelFetch(u_gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], pixel, 0).r;
+    return depth > 0.0 ? depth : GTAO_NO_SURFACE;
+}
+
+// view space (right handed, -z forward) position of the surface at a pixel of the screen
+vec3 view_position(ivec2 pixel, float depth)
+{
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(g_screen);
+    return vec3((uv * g_view_mul + g_view_add) * depth, -depth);
+}
+
+// How much each of the 4 neighbors (left, right, top, bottom) belongs to the surface of the center, 0: an
+// edge. The depth slope across the center is allowed, so planes seen at a grazing angle stay connected.
+vec4 calculate_edges(float center, float left, float right, float top, float bottom, float spacing)
+{
+    vec4 edges = vec4(left, right, top, bottom) - center;
+    float slope_lr = (edges.y - edges.x) * 0.5;
+    float slope_tb = (edges.w - edges.z) * 0.5;
+    vec4 adjusted = edges + vec4(slope_lr, -slope_lr, slope_tb, -slope_tb);
+    edges = min(abs(edges), abs(adjusted));
+    return clamp(1.25 - edges / (center * 0.011 * spacing), 0.0, 1.0);
+}
+
+// 2 bits per edge, an integer in 0..255 (exact in a half float)
+float pack_edges(vec4 edges)
+{
+    edges = round(clamp(edges, 0.0, 1.0) * 2.9);
+    return dot(edges, vec4(64.0, 16.0, 4.0, 1.0));
+}
+
+void main()
+{
+    const ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(texel, imageSize(u_gtao_raw_target))))
+        return;
+
+    g_screen = textureSize(u_gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], 0);
+    // clip = proj * view: ndc.x = P00 x / -z - P20, with ndc = uv * 2 - 1
+    const mat4 P = camera_ubo.proj;
+    g_view_mul = vec2(2.0 / P[0][0], 2.0 / P[1][1]);
+    g_view_add = vec2((P[2][0] - 1.0) / P[0][0], (P[2][1] - 1.0) / P[1][1]);
+
+    const int scale = int(pc.downscale);
+    const ivec2 pixel = min(texel * scale + scale / 2, g_screen - 1);
+    const float depth = texelFetch(u_gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], pixel, 0).r;
+    if (depth <= 0.0)
+    {
+        // no surface: open, depth 0 keeps the denoiser and the upsampling from taking it
+        imageStore(u_gtao_raw_target, texel, vec4(1.0, 0.0, 0.0, 0.0));
+        return;
+    }
+
+    const ivec2 last = g_screen - 1;
+    const vec3 center = view_position(pixel, depth);
+    const vec3 view_vec = normalize(-center);
+
+    // the interpolated vertex normal: smooth over low poly surfaces (a normal from the depth buffer shows their
+    // facets), facing the camera (the back side of two sided leaves)
+    const vec3 world_normal = texelFetch(u_gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], pixel, 0).rgb * 2.0 - 1.0;
+    vec3 normal = normalize(mat3(camera_ubo.view) * world_normal);
+    if (dot(normal, view_vec) < 0.0)
+        normal = -normal;
+
+    const vec4 edges = calculate_edges(depth,
+        load_depth(clamp(pixel + ivec2(-scale, 0), ivec2(0), last)),
+        load_depth(clamp(pixel + ivec2(scale, 0), ivec2(0), last)),
+        load_depth(clamp(pixel + ivec2(0, -scale), ivec2(0), last)),
+        load_depth(clamp(pixel + ivec2(0, scale), ivec2(0), last)),
+        float(scale));
+
+    const float radius = pc.params.x;
+    const float falloff_range = max(pc.params.y, 0.01) * radius;
+    const float falloff_from = radius - falloff_range;
+    const float falloff_mul = -1.0 / falloff_range;
+    const float falloff_add = falloff_from / falloff_range + 1.0;
+    const float thin_compensation = pc.params.z;
+
+    // view space size of a screen pixel at this depth (pixels are square), signed per axis
+    const vec2 view_per_pixel = g_view_mul / vec2(g_screen);
+    const float screen_radius = radius / (abs(view_per_pixel.x) * depth);
+    // a radius of a few pixels: the occlusion fades out instead of aliasing
+    float visibility = clamp((10.0 - screen_radius) / 100.0, 0.0, 1.0) * 0.5;
+    // the first sample leaves the center pixel
+    const float min_s = 1.3 / screen_radius;
+
+    const uint index = hilbert_index(uint(texel.x) % 64u, uint(texel.y) % 64u);
+    const vec2 noise = fract(0.5 + float(index) * vec2(0.75487766624669276005, 0.5698402909980532659114));
+
+    const float slice_count = float(pc.slices);
+    const float step_count = float(pc.steps);
+    for (uint slice = 0u; slice < pc.slices; ++slice)
+    {
+        const float phi = (float(slice) + noise.x) / slice_count * GTAO_PI;
+        const vec2 screen_dir = vec2(cos(phi), sin(phi));
+        const vec2 omega = screen_dir * screen_radius;
+
+        // the slice: the plane through the view ray and the screen direction (at constant depth in view space)
+        const vec3 direction = vec3(normalize(screen_dir * view_per_pixel), 0.0);
+        const vec3 ortho_direction = direction - dot(direction, view_vec) * view_vec;
+        const vec3 axis = normalize(cross(ortho_direction, view_vec));
+        const vec3 projected_normal = normal - axis * dot(normal, axis);
+        float projected_normal_length = length(projected_normal);
+        const float sign_norm = dot(ortho_direction, projected_normal) >= 0.0 ? 1.0 : -1.0;
+        const float cos_norm = clamp(dot(projected_normal, view_vec) / max(projected_normal_length, 1e-5), 0.0, 1.0);
+        // angle of the normal from the view vector in the slice, towards +direction
+        const float n = sign_norm * fast_acos(cos_norm);
+
+        // the horizons start at the tangent plane: below it nothing counts
+        const float low_horizon_cos0 = cos(n + GTAO_HALF_PI);
+        const float low_horizon_cos1 = cos(n - GTAO_HALF_PI);
+        float horizon_cos0 = low_horizon_cos0;     // +direction side
+        float horizon_cos1 = low_horizon_cos1;     // -direction side
+
+        for (uint step_index = 0u; step_index < pc.steps; ++step_index)
+        {
+            // golden ratio sequence over the steps of all slices, shifted by the pixel's noise
+            const float step_noise = fract(noise.y + float(slice + step_index * pc.steps) * 0.6180339887498948482);
+            float s = (float(step_index) + step_noise) / step_count;
+            s = s * s + min_s;     // denser close to the center
+            const ivec2 offset = ivec2(round(s * omega));
+
+            // off the screen nothing is known: such a sample does not occlude (clamped to the border it would
+            // lie off the slice and darken the border pixels)
+            const ivec2 unclamped0 = pixel + offset;
+            const ivec2 unclamped1 = pixel - offset;
+            const ivec2 pixel0 = clamp(unclamped0, ivec2(0), last);
+            const ivec2 pixel1 = clamp(unclamped1, ivec2(0), last);
+            const float on_screen0 = unclamped0 == pixel0 ? 1.0 : 0.0;
+            const float on_screen1 = unclamped1 == pixel1 ? 1.0 : 0.0;
+            const vec3 delta0 = view_position(pixel0, load_depth(pixel0)) - center;
+            const vec3 delta1 = view_position(pixel1, load_depth(pixel1)) - center;
+            const float dist0 = length(delta0);
+            const float dist1 = length(delta1);
+            const vec3 horizon_vec0 = delta0 / max(dist0, 1e-6);
+            const vec3 horizon_vec1 = delta1 / max(dist1, 1e-6);
+
+            // occluders fade out towards the radius; thin occluder compensation counts the distance along the
+            // view axis more (what is in front is assumed thin: light passes behind it)
+            const float falloff_base0 = length(vec3(delta0.xy, delta0.z * (1.0 + thin_compensation)));
+            const float falloff_base1 = length(vec3(delta1.xy, delta1.z * (1.0 + thin_compensation)));
+            const float weight0 = clamp(falloff_base0 * falloff_mul + falloff_add, 0.0, 1.0) * on_screen0;
+            const float weight1 = clamp(falloff_base1 * falloff_mul + falloff_add, 0.0, 1.0) * on_screen1;
+
+            const float shc0 = mix(low_horizon_cos0, dot(horizon_vec0, view_vec), weight0);
+            const float shc1 = mix(low_horizon_cos1, dot(horizon_vec1, view_vec), weight1);
+            horizon_cos0 = max(horizon_cos0, shc0);
+            horizon_cos1 = max(horizon_cos1, shc1);
+        }
+
+        // a normal almost perpendicular to the slice projects to nothing: keep a little of it (XeGTAO)
+        projected_normal_length = mix(projected_normal_length, 1.0, 0.05);
+
+        // horizon angles from the view vector, towards +direction, and the cosine weighted arc between them
+        const float h0 = -fast_acos(horizon_cos1);
+        const float h1 = fast_acos(horizon_cos0);
+        const float arc0 = (cos_norm + 2.0 * h0 * sin(n) - cos(2.0 * h0 - n)) / 4.0;
+        const float arc1 = (cos_norm + 2.0 * h1 * sin(n) - cos(2.0 * h1 - n)) / 4.0;
+        visibility += projected_normal_length * (arc0 + arc1);
+    }
+
+    visibility /= slice_count;
+    visibility = pow(clamp(visibility, 0.0, 1.0), pc.params.w);
+    visibility = max(visibility, 0.03);
+
+    imageStore(u_gtao_raw_target, texel, vec4(visibility, depth, pack_edges(edges), 0.0));
+}

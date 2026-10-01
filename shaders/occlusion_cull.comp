@@ -1,0 +1,141 @@
+#version 450
+
+// Two phase occlusion culling of the base pass draws (OcclusionCulling, src/game/occlusion_culling.*), one
+// invocation per draw the CPU found in the frustum:
+//   early  (phase 0)  draws what was visible at the end of the last frame
+//   late   (phase 1)  after the early draws: their depth, as a hierarchical depth, hides what is behind it.
+//                     Draws what is visible now and was not drawn early, and remembers what is visible.
+// Both write a copy of the draw commands with the instance count 0 or 1 into u_cull_commands.
+
+layout(local_size_x = 64) in;
+
+#include "resources/camera.glsl"
+#include "resources/occlusion.glsl"
+
+// resource "draw_list" (draw_list.glsl is for vertex / fragment shaders)
+#ifndef SET_DRAW_LIST
+    #define SET_DRAW_LIST 0
+    #error "SET_DRAW_LIST definition is missing. Provide this resource: draw_list"
+#endif
+
+struct GPUDrawRecord
+{
+    uint mesh_id;
+    uint primitive_id;
+    uint material_id;
+    uint user;
+};
+
+layout(std430, set = SET_DRAW_LIST, binding = BINDING_DRAW_RECORDS)
+readonly buffer DrawRecords
+{
+    GPUDrawRecord records[];
+} u_draw_records;
+
+layout(std430, set = SET_DRAW_LIST, binding = BINDING_DRAW_COMMANDS)
+readonly buffer DrawCommands
+{
+    DrawCommand commands[];
+} u_draw_commands;
+
+layout(std430, set = SET_DRAW_LIST, binding = BINDING_DRAW_BOUNDS)
+readonly buffer DrawBoundsBuffer
+{
+    DrawBounds bounds[];
+} u_draw_bounds;
+
+layout(push_constant) uniform OcclusionCullPushConstants
+{
+    uint first_command;
+    uint command_count;
+    uint phase;             // 0 early, 1 late
+    uint late_offset;       // commands between the early and the late copy
+    uint hzb_width;         // level 0
+    uint hzb_height;
+    uint hzb_levels;
+    uint visibility_capacity;
+} pc;
+
+// Offset and size of a level of the hierarchical depth
+void hzb_level(uint level, out uint offset, out uvec2 size)
+{
+    offset = 0u;
+    size = uvec2(pc.hzb_width, pc.hzb_height);
+    for (uint i = 0u; i < level; ++i)
+    {
+        offset += size.x * size.y;
+        size = max(size / 2u, uvec2(1u));
+    }
+}
+
+float hzb_fetch(uint offset, uvec2 size, vec2 uv)
+{
+    const uvec2 texel = min(uvec2(uv * vec2(size)), size - 1u);
+    return u_hzb.depth[offset + texel.y * size.x + texel.x];
+}
+
+// Behind the depth of the early draws everywhere on the screen rectangle of the bounds
+bool occluded(DrawBounds box)
+{
+    const mat4 view_proj = camera_ubo.proj * camera_ubo.view;
+    vec2 uv_min = vec2(1.0);
+    vec2 uv_max = vec2(0.0);
+    float nearest = 1.0;
+    for (int corner = 0; corner < 8; ++corner)
+    {
+        const vec3 p = vec3((corner & 1) != 0 ? box.max.x : box.min.x,
+                            (corner & 2) != 0 ? box.max.y : box.min.y,
+                            (corner & 4) != 0 ? box.max.z : box.min.z);
+        const vec4 clip = view_proj * vec4(p, 1.0);
+        // reaches the camera: cannot be behind anything
+        if (clip.w <= camera_ubo.near)
+            return false;
+        const vec3 ndc = clip.xyz / clip.w;
+        const vec2 uv = ndc.xy * 0.5 + 0.5;
+        uv_min = min(uv_min, uv);
+        uv_max = max(uv_max, uv);
+        nearest = min(nearest, ndc.z);
+    }
+    uv_min = clamp(uv_min, 0.0, 1.0);
+    uv_max = clamp(uv_max, 0.0, 1.0);
+    // off the screen (the CPU frustum test is conservative)
+    if (uv_max.x <= uv_min.x || uv_max.y <= uv_min.y)
+        return true;
+
+    // the level where the rectangle spans at most two texels per axis: its four corners cover it
+    const vec2 extent = (uv_max - uv_min) * vec2(pc.hzb_width, pc.hzb_height);
+    const uint level = min(uint(ceil(log2(max(max(extent.x, extent.y), 1.0)))), pc.hzb_levels - 1u);
+    uint offset;
+    uvec2 size;
+    hzb_level(level, offset, size);
+    const float farthest = max(
+        max(hzb_fetch(offset, size, uv_min), hzb_fetch(offset, size, vec2(uv_max.x, uv_min.y))),
+        max(hzb_fetch(offset, size, vec2(uv_min.x, uv_max.y)), hzb_fetch(offset, size, uv_max)));
+    return nearest > farthest;
+}
+
+void main()
+{
+    const uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.command_count)
+        return;
+    const uint command_index = pc.first_command + index;
+    DrawCommand command = u_draw_commands.commands[command_index];
+    const uint primitive = u_draw_records.records[command.first_instance].primitive_id;
+    // primitives beyond the buffer are always drawn early
+    const bool tracked = primitive < pc.visibility_capacity;
+    const bool was_visible = !tracked || u_visibility.visible[primitive] != 0u;
+
+    if (pc.phase == 0u)
+    {
+        command.instance_count = was_visible ? 1u : 0u;
+        u_cull_commands.commands[command_index] = command;
+        return;
+    }
+
+    const bool visible = !occluded(u_draw_bounds.bounds[command.first_instance]);
+    command.instance_count = visible && !was_visible ? 1u : 0u;
+    u_cull_commands.commands[pc.late_offset + command_index] = command;
+    if (tracked)
+        u_visibility.visible[primitive] = visible ? 1u : 0u;
+}

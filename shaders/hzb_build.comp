@@ -1,0 +1,63 @@
+#version 450
+
+// One level of the hierarchical depth (OcclusionCulling::build_hzb): every texel keeps the farthest depth of
+// the area it covers. Level 0 reads the depth buffer (its texels cover a few screen pixels), the others the
+// level below (2 x 2 texels, the levels are powers of two).
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "resources/occlusion.glsl"
+
+#ifndef SET_OCCLUSION_DEPTH
+    #define SET_OCCLUSION_DEPTH 0
+    #error "SET_OCCLUSION_DEPTH definition is missing. Provide this resource: occlusion_depth"
+#endif
+#ifndef BINDING_SAMPLER_OCCLUSION_DEPTH
+    #define BINDING_SAMPLER_OCCLUSION_DEPTH 0
+    #error "BINDING_SAMPLER_OCCLUSION_DEPTH definition is missing. Provide this resource: occlusion_depth"
+#endif
+
+layout(set = SET_OCCLUSION_DEPTH, binding = BINDING_SAMPLER_OCCLUSION_DEPTH)
+uniform sampler2D u_depth;
+
+layout(push_constant) uniform HZBPushConstants
+{
+    uint level;
+    uint src_offset;    // level - 1 in u_hzb (floats)
+    uint dst_offset;    // this level
+    uint src_width;     // level - 1, level 0: the depth buffer
+    uint src_height;
+    uint dst_width;
+    uint dst_height;
+} pc;
+
+void main()
+{
+    const uvec2 texel = gl_GlobalInvocationID.xy;
+    if (texel.x >= pc.dst_width || texel.y >= pc.dst_height)
+        return;
+
+    float depth = 0.0;
+    if (pc.level == 0u)
+    {
+        // every screen pixel the texel touches (src_width / src_height: the size of the depth buffer)
+        const ivec2 screen = ivec2(pc.src_width, pc.src_height);
+        const vec2 scale = vec2(screen) / vec2(pc.dst_width, pc.dst_height);
+        const ivec2 first = ivec2(floor(vec2(texel) * scale));
+        const ivec2 last = min(ivec2(ceil(vec2(texel + 1u) * scale)), screen) - 1;
+        for (int y = first.y; y <= last.y; ++y)
+            for (int x = first.x; x <= last.x; ++x)
+                depth = max(depth, texelFetch(u_depth, ivec2(x, y), 0).r);
+    }
+    else
+    {
+        const uvec2 source = texel * 2u;
+        const uvec2 source_last = min(source + 1u, uvec2(pc.src_width, pc.src_height) - 1u);
+        depth = max(
+            max(u_hzb.depth[pc.src_offset + source.y * pc.src_width + source.x],
+                u_hzb.depth[pc.src_offset + source.y * pc.src_width + source_last.x]),
+            max(u_hzb.depth[pc.src_offset + source_last.y * pc.src_width + source.x],
+                u_hzb.depth[pc.src_offset + source_last.y * pc.src_width + source_last.x]));
+    }
+    u_hzb.depth[pc.dst_offset + texel.y * pc.dst_width + texel.x] = depth;
+}

@@ -12,6 +12,7 @@ import :renderer;
 import :debug_view;
 import :reflection_probes;
 import :sky_renderer;
+import :gtao_renderer;
 import :generic_render_graph;
 import ecs;
 import name;
@@ -191,6 +192,29 @@ void GameEngine::on_debug_ui_render_panel()
         ImGui::SetItemTooltip("%s", var->get_description().c_str());
     }
     slider("History", cv_fog_history, 0.0f, 0.98f, cv_fog_history.get_description().c_str());
+    ImGui::PopID();
+
+    // ---- ambient occlusion: texels (downscale) x slices x 2 sides x steps depth samples ----
+    ImGui::SeparatorText("Ambient occlusion");
+    checkbox("GTAO", cv_gtao_enabled, cv_gtao_enabled.get_description().c_str());
+    ImGui::SameLine();
+    checkbox("Denoise", cv_gtao_denoise, cv_gtao_denoise.get_description().c_str());
+    ImGui::PushID("gtao");
+    for (auto [label, var, min, max] : { std::tuple{ "Downscale", &cv_gtao_downscale, 1, 2 },
+                                         std::tuple{ "Slices", &cv_gtao_slices, 1, 8 },
+                                         std::tuple{ "Steps", &cv_gtao_steps, 1, 8 } })
+    {
+        int value = var->get();
+        if (ImGui::SliderInt(label, &value, min, max))
+            var->set(value);
+        ImGui::SetItemTooltip("%s", var->get_description().c_str());
+    }
+    slider("Radius", cv_gtao_radius, 0.05f, 5.0f, cv_gtao_radius.get_description().c_str());
+    slider("Falloff", cv_gtao_falloff, 0.05f, 1.0f, cv_gtao_falloff.get_description().c_str());
+    slider("Power", cv_gtao_power, 0.5f, 5.0f, cv_gtao_power.get_description().c_str());
+    slider("Thin occluders", cv_gtao_thin_compensation, 0.0f, 0.7f, cv_gtao_thin_compensation.get_description().c_str());
+    slider("Blur beta", cv_gtao_blur_beta, 0.1f, 10.0f, cv_gtao_blur_beta.get_description().c_str());
+    slider("Foliage", cv_gtao_foliage, 0.0f, 1.0f, cv_gtao_foliage.get_description().c_str());
     ImGui::PopID();
 
     // ---- particles: sprites of the ParticleSystems of the level ----
