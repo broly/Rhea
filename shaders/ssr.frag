@@ -16,8 +16,24 @@ const int   REFINE_STEPS = 6;
 const float MAX_DIST    = 100.0;
 // below this the reflection hardly shows (specular weight x roughness fade): left to the probes
 const float MIN_CONTRIBUTION = 0.015;
-const float THICKNESS   = 0.002;
+// how deep behind its front face a surface of the depth buffer is assumed to be solid, m (+ a share of its
+// view depth): a ray passing farther behind it went behind an object (the character in front of a puddle,
+// a branch near the camera), not into it. View space metres: a threshold in NDC depth grows with depth^2
+const float MIN_THICKNESS   = 0.15;
+const float THICKNESS_SCALE = 0.02;
+// a ray hitting the back of what the camera sees (the surface faces away from it) reflects the hidden side
+// of that object, not the visible one
+const float BACKFACE_COS = 0.1;
 const float SELF_BIAS   = 0.05;
+
+ivec2 g_screen;
+
+// view depth (along the view axis) of the depth buffer at uv, 0: the sky. One pixel, not filtered: a
+// filtered depth makes surfaces between an object and its background at its silhouette
+float scene_view_depth(vec2 uv)
+{
+    return texelFetch(u_gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], clamp(ivec2(uv * vec2(g_screen)), ivec2(0), g_screen - 1), 0).r;
+}
 
 // Vulkan depth range [0, 1] (glm::perspectiveRH_ZO): NDC z is the depth itself
 vec3 reconstruct_view_pos(vec2 uv, float depth)
@@ -39,6 +55,7 @@ void main()
     // SSR may run at a fraction of the screen (render.ssr.downscale): the surface of one screen pixel of the
     // block, exactly (a filtered sample mixes depths and normals across edges)
     const ivec2 screen = textureSize(u_gbuffer[GBUFFER_SLOT_DEPTH], 0);
+    g_screen = screen;
     const ivec2 pixel = min(ivec2(v_uv * vec2(screen)), screen - 1);
     const vec2 v_uv = (vec2(pixel) + 0.5) / vec2(screen);
 
@@ -102,57 +119,74 @@ void main()
     // about one step per 8 pixels of a 1024 wide screen, at most LINEAR_STEPS
     int steps = int(clamp(max_comp * t_screen * 128.0, 4.0, float(LINEAR_STEPS)));
 
+    // view depth of the ray: 1 / w is affine in screen space along the segment, the depth itself is not
+    const float start_inv_w = 1.0 / start_clip.w;
+    const float end_inv_w = 1.0 / end_clip.w;
+
     float prev_t = 0.0;
+    // the previous step was behind the depth buffer too: the ray is hidden by something in front of it
+    bool hidden = false;
     for (int i = 1; i <= steps; i++)
     {
-        // NDC z is affine in screen space along the segment: linear interpolation is exact
         float t = t_screen * float(i) / float(steps);
         vec2 uv = start_uv + delta_uv * t;
 
-        float scene_depth = get_gbuffer_DEPTH(uv).r;
-        float ray_depth = mix(start_ndc.z, end_ndc.z, t);
+        float scene_depth = scene_view_depth(uv);
+        float ray_depth = 1.0 / mix(start_inv_w, end_inv_w, t);
 
-        if (ray_depth <= scene_depth)
+        if (scene_depth <= 0.0 || ray_depth <= scene_depth)
         {
+            hidden = false;
             prev_t = t;
             continue;
         }
 
-        // the ray went behind the depth buffer between prev_t and t: find the crossing
-        float lo = prev_t;
-        float hi = t;
-        for (int j = 0; j < REFINE_STEPS; j++)
+        if (!hidden)
         {
-            float mid = 0.5 * (lo + hi);
-            vec2 mid_uv = start_uv + delta_uv * mid;
-            if (mix(start_ndc.z, end_ndc.z, mid) > get_gbuffer_DEPTH(mid_uv).r)
-                hi = mid;
-            else
-                lo = mid;
+            // the ray went behind the depth buffer between prev_t and t: find the crossing
+            float lo = prev_t;
+            float hi = t;
+            for (int j = 0; j < REFINE_STEPS; j++)
+            {
+                float mid = 0.5 * (lo + hi);
+                float mid_scene = scene_view_depth(start_uv + delta_uv * mid);
+                if (mid_scene > 0.0 && 1.0 / mix(start_inv_w, end_inv_w, mid) > mid_scene)
+                    hi = mid;
+                else
+                    lo = mid;
+            }
+            uv = start_uv + delta_uv * hi;
+            scene_depth = scene_view_depth(uv);
+            ray_depth = 1.0 / mix(start_inv_w, end_inv_w, hi);
+            t = hi;
         }
-        t = hi;
-        uv = start_uv + delta_uv * t;
-        scene_depth = get_gbuffer_DEPTH(uv).r;
-        ray_depth = mix(start_ndc.z, end_ndc.z, t);
+        // else: still behind - either behind the same occluder, or the surface behind it moved up to the ray
+        // (the thickness test below tells), at the precision of a step
+        hidden = true;
+        prev_t = t;
 
-        // passed behind an object thicker than THICKNESS: no hit, the probes reflect it
-        if (ray_depth - scene_depth >= THICKNESS)
+        // went behind an object rather than into it: march on, the ray may come out behind it
+        if (scene_depth <= 0.0 || ray_depth - scene_depth > MIN_THICKNESS + THICKNESS_SCALE * scene_depth)
+            continue;
+
+        // the back of a surface (its camera facing side faces away from the ray): it reflects the side the
+        // camera does not see
+        vec3 hit_normal = normalize(mat3(camera_ubo.view) * (get_gbuffer_WORLD_NORMAL(uv).xyz * 2.0 - 1.0));
+        if (dot(hit_normal, refl_dir) > BACKFACE_COS)
+            continue;
+
+        vec3 hit_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], uv).rgb;
+        if (!is_finite(hit_color))
             return;
 
-        {
-            vec3 hit_color = texture(u_hdr_color_present[COLOR_OUTPUT_HDR_BASE], uv).rgb;
-            if (!is_finite(hit_color))
-                return;
+        // unreliable hits fade out towards the probes: near the screen border (the ray may continue
+        // off screen), at the end of the ray, and for rays back towards the camera
+        vec2 border = min(uv, 1.0 - uv);
+        float edge_fade = smoothstep(0.0, 0.08, min(border.x, border.y));
+        float distance_fade = 1.0 - smoothstep(0.75, 1.0, t);
+        float facing_fade = 1.0 - smoothstep(0.25, 0.75, refl_dir.z);
 
-            // unreliable hits fade out towards the probes: near the screen border (the ray may continue
-            // off screen), at the end of the ray, and for rays back towards the camera
-            vec2 border = min(uv, 1.0 - uv);
-            float edge_fade = smoothstep(0.0, 0.08, min(border.x, border.y));
-            float distance_fade = 1.0 - smoothstep(0.75, 1.0, t);
-            float facing_fade = 1.0 - smoothstep(0.25, 0.75, refl_dir.z);
-
-            out_ssr = vec4(hit_color, roughness_fade * edge_fade * distance_fade * facing_fade);
-            return;
-        }
+        out_ssr = vec4(hit_color, roughness_fade * edge_fade * distance_fade * facing_fade);
+        return;
     }
 }
