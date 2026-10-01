@@ -326,59 +326,20 @@ void Renderer::hot_reload()
     
 }
 
-// Uncompressed RGBA8 with mips: a 4096^2 texture takes 85 MB of video memory, the Sponza materials alone ~6 GB
-cvar::Var<int> cv_texture_max_size(
-    "render.textures.max_size", 2048, "Textures larger than this many texels per side are halved when uploaded until they fit (0: no limit)",
-    { .has_range = true, .min = 0.0f, .max = 16384.0f });
-
-namespace
-{
-    // `texture` halved (2x2 box filter) until both sides are at most max_size; nullopt when it fits already or is
-    // not 4 bytes per texel
-    std::optional<Texture> fitted_texture(const Texture& texture, uint32_t max_size)
-    {
-        const bool rgba8 = texture.format == TextureFormat::RGBA8 || texture.format == TextureFormat::RGBA8_UNORM
-            || texture.format == TextureFormat::RGBA8_SRGB;
-        if (max_size == 0 || std::max(texture.extent.width, texture.extent.height) <= max_size || !rgba8
-            || texture.bulk.size() != size_t(texture.extent.width) * texture.extent.height * 4)
-            return std::nullopt;
-
-        Texture result;
-        result.name = texture.name;
-        result.format = texture.format;
-        result.id = texture.id;
-        result.transition_path = texture.transition_path;
-        Extent extent = texture.extent;
-        std::vector<std::byte> source = texture.bulk;
-        while (std::max(extent.width, extent.height) > max_size && extent.width >= 2 && extent.height >= 2)
-        {
-            const Extent half(extent.width / 2, extent.height / 2);
-            std::vector<std::byte> target(size_t(half.width) * half.height * 4);
-            const auto* in = reinterpret_cast<const uint8_t*>(source.data());
-            auto* out = reinterpret_cast<uint8_t*>(target.data());
-            for (uint32_t y = 0; y < half.height; ++y)
-                for (uint32_t x = 0; x < half.width; ++x)
-                    for (uint32_t c = 0; c < 4; ++c)
-                    {
-                        const size_t row0 = (size_t(2 * y) * extent.width + 2 * x) * 4 + c;
-                        const size_t row1 = row0 + size_t(extent.width) * 4;
-                        out[(size_t(y) * half.width + x) * 4 + c] = uint8_t((uint32_t(in[row0]) + in[row0 + 4] + in[row1] + in[row1 + 4] + 2) / 4);
-                    }
-            source = std::move(target);
-            extent = half;
-        }
-        result.extent = extent;
-        result.bulk = std::move(source);
-        return result;
-    }
-}
-
 RBImageHandle Renderer::create_texture_from_asset(TextureHandle handle, bool generate_mips, 
                                                   RBImageLayout initial_layout,
                                                   RBImageLayout final_layout)
 {
+    PROFILE("Renderer::create_texture_from_asset");
     const Texture& source = handle.get();
-    const std::optional<Texture> fitted = fitted_texture(source, uint32_t(std::max(cv_texture_max_size.get(), 0)));
+    // material textures were fitted by the loading threads already, this catches the ones loaded synchronously
+    std::optional<Texture> fitted;
+    if (const uint32_t max_size = get_texture_max_size(); max_size != 0 && std::max(source.extent.width, source.extent.height) > max_size)
+    {
+        fitted = source;
+        if (!fitted->shrink_to_fit(max_size))
+            fitted.reset();
+    }
     const Texture& data = fitted ? *fitted : source;
     
     RBImageHandle image = render_backend->create_texture_2d(

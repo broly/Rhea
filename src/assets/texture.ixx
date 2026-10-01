@@ -56,8 +56,14 @@ export struct Texture
     
     static std::optional<Texture> create_from_file(const std::filesystem::path& path);
     bool save_to_file(const std::filesystem::path& path) const;
-    
+
+    // halved in place (2x2 box filter) until both sides are at most max_size (0: no limit); false when it fits
+    // already or is not 4 bytes per texel
+    bool shrink_to_fit(uint32_t max_size);
 };
+
+// cvar render.textures.max_size: material textures larger than this are halved when loaded (0: no limit)
+export uint32_t get_texture_max_size();
 
 
 export void serialize_json_value(TextureHandle& target, const Json::Value& value, const SerializationContext& context);

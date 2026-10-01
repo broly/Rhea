@@ -99,6 +99,17 @@ protected:
         submission_buffer.erase(submission_buffer.begin(), submission_buffer.end());
     }
     
+    // what read_submission_buffer will return, left in the buffer
+    template<typename T>
+    Generator<T> peek_submission_buffer()
+    {
+        assert(scene_proxy_size != 0 && scene_proxy_size != invalid_proxy_size);
+        
+        for (size_t proxy_position = 0; 
+            proxy_position < submission_buffer.size(); proxy_position += scene_proxy_size)
+            co_yield *reinterpret_cast<T*>(submission_buffer.data() + proxy_position);
+    }
+    
     void submit(const void* raw_proxy)
     {
         

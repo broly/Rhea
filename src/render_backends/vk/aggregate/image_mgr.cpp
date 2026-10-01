@@ -570,7 +570,10 @@ void vk::ImageManager::destroy_image(RBImageHandle handle, bool wait_fences)
     assert(handle.id < image_resources.size());
     
     if (wait_fences)
+    {
+        immediate_command_pool.flush_uploads();
         vkDeviceWaitIdle(instance.device);
+    }
 
     vk::ImageResource& res = image_resources[handle.id];
     
@@ -657,19 +660,11 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
     if (upload_size == 0)
         throw std::runtime_error("create_texture_2d: upload_size == 0");
 
-    VkBuffer staging_buffer;
-    VkDeviceMemory staging_memory;
+    // into the shared upload batch: no submit and wait per texture
+    const UploadStaging staging = immediate_command_pool.allocate_upload(upload_size);
+    std::memcpy(staging.data, tex.bulk.data(), upload_size);
 
-    vk::create_buffer(
-        instance.device, instance.physical_device,
-        upload_size,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        staging_buffer, staging_memory);
-
-    vk::update_buffer(instance.device, staging_memory, tex.bulk.data(), upload_size);
-
-    immediate_command_pool.submit([&](VkCommandBuffer cmd)
+    immediate_command_pool.record_upload([&](VkCommandBuffer cmd)
     {
         ImageBarrierParams params_before_copy;
         params_before_copy.image = image;
@@ -678,7 +673,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
         transition_image(cmd, params_before_copy);
 
         VkBufferImageCopy copy{};
-        copy.bufferOffset = 0;
+        copy.bufferOffset = staging.offset;
         copy.bufferRowLength = 0;
         copy.bufferImageHeight = 0;
         copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -690,7 +685,7 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
 
         vkCmdCopyBufferToImage(
             cmd,
-            staging_buffer,
+            staging.buffer,
             res.image,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1,
@@ -711,8 +706,6 @@ RBImageHandle vk::ImageManager::create_texture_2d(const Texture& tex, const Text
             transition_image(cmd, params_after_gen);
         }
     });
-
-    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
 
     LogVkImageManager.Log<Verbose>("Allocated GPU texture: %s (layers=%u)",
         tex.name.c_str(), array_layers);

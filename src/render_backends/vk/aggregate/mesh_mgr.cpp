@@ -61,8 +61,17 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     data.mesh_table_index = mesh_index;
 
     // triangles in the order that reuses the most transformed vertices (indexed draws, post transform cache)
-    std::vector<uint32_t> indices(primitive.indices.size());
-    meshopt_optimizeVertexCache(indices.data(), primitive.indices.data(), indices.size(), primitive.vertices.size());
+    std::vector<uint32_t> indices;
+    if (auto prepared = prepared_indices.find(handle); prepared != prepared_indices.end())
+    {
+        indices = std::move(prepared->second);
+        prepared_indices.erase(prepared);
+    }
+    else
+    {
+        indices.resize(primitive.indices.size());
+        meshopt_optimizeVertexCache(indices.data(), primitive.indices.data(), indices.size(), primitive.vertices.size());
+    }
 
     const VkDeviceSize vertex_size = primitive.vertices.size() * sizeof(Vertex);
     const VkDeviceSize index_size = indices.size() * sizeof(uint32_t);
@@ -106,6 +115,52 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     return gpu;
 }
 
+void vk::MeshManager::prepare_mesh_buffers(std::span<const MeshPrimHandle> handles)
+{
+    prepared_indices.clear();
+
+    // resolved here: the asset maps are not read from the workers
+    std::vector<std::pair<MeshPrimHandle, const Primitive*>> jobs;
+    for (const MeshPrimHandle& handle : handles)
+    {
+        if (mesh_map.contains(handle) || prepared_indices.contains(handle))
+            continue;
+        const Primitive& primitive = handle.get();
+        if (primitive.vertices.empty() || primitive.indices.empty())
+            continue;
+        prepared_indices.emplace(handle, std::vector<uint32_t>(primitive.indices.size()));
+        jobs.emplace_back(handle, &primitive);
+    }
+    if (jobs.empty())
+        return;
+
+    // biggest first: the last ones to start are short
+    std::ranges::sort(jobs, std::greater{}, [] (const auto& job) { return job.second->indices.size(); });
+    std::vector<std::vector<uint32_t>*> outputs;
+    outputs.reserve(jobs.size());
+    for (const auto& [handle, primitive] : jobs)
+        outputs.push_back(&prepared_indices.at(handle));
+
+    std::atomic<size_t> next_job = 0;
+    auto work = [&]
+    {
+        for (size_t i = next_job++; i < jobs.size(); i = next_job++)
+        {
+            const Primitive& primitive = *jobs[i].second;
+            meshopt_optimizeVertexCache(outputs[i]->data(), primitive.indices.data(), primitive.indices.size(),
+                primitive.vertices.size());
+        }
+    };
+    const size_t worker_count = std::min<size_t>(std::max(std::thread::hardware_concurrency(), 1u) - 1, jobs.size() - 1);
+    {
+        std::vector<std::jthread> workers;
+        workers.reserve(worker_count);
+        for (size_t i = 0; i < worker_count; ++i)
+            workers.emplace_back(work);
+        work();
+    }
+}
+
 std::pair<uint32_t, VkDeviceSize> vk::MeshManager::suballocate(std::vector<BufferBlock>& blocks, VkDeviceSize size,
     VkDeviceSize alignment, VkDeviceSize block_size)
 {
@@ -134,32 +189,20 @@ std::pair<uint32_t, VkDeviceSize> vk::MeshManager::suballocate(std::vector<Buffe
 void vk::MeshManager::upload(VkBuffer vertex_buffer, VkDeviceSize vertex_offset, const void* vertices, VkDeviceSize vertex_size,
     VkBuffer index_buffer, VkDeviceSize index_offset, const void* indices, VkDeviceSize index_size)
 {
-    VkBuffer staging_buffer;
-    VkDeviceMemory staging_memory;
-    vk::create_buffer(instance.device, instance.physical_device, vertex_size + index_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging_buffer, staging_memory);
-    void* mapped = nullptr;
-    vkMapMemory(instance.device, staging_memory, 0, vertex_size + index_size, 0, &mapped);
-    std::memcpy(mapped, vertices, vertex_size);
-    std::memcpy(static_cast<std::byte*>(mapped) + vertex_size, indices, index_size);
-    vkUnmapMemory(instance.device, staging_memory);
+    // into the shared upload batch: no submit and wait per primitive
+    const UploadStaging staging = command_pool.allocate_upload(vertex_size + index_size);
+    std::memcpy(staging.data, vertices, vertex_size);
+    std::memcpy(staging.data + vertex_size, indices, index_size);
 
-    command_pool.submit([&] (VkCommandBuffer cmd)
+    command_pool.record_upload([&] (VkCommandBuffer cmd)
     {
-        const VkBufferCopy vertex_copy{ .srcOffset = 0, .dstOffset = vertex_offset, .size = vertex_size };
-        vkCmdCopyBuffer(cmd, staging_buffer, vertex_buffer, 1, &vertex_copy);
-        const VkBufferCopy index_copy{ .srcOffset = vertex_size, .dstOffset = index_offset, .size = index_size };
-        vkCmdCopyBuffer(cmd, staging_buffer, index_buffer, 1, &index_copy);
-
-        // the blocks are read by the frames recorded after this (vertex pulling, index fetch, BLAS builds)
-        VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0, 1, &barrier, 0, nullptr, 0, nullptr);
+        const VkBufferCopy vertex_copy{ .srcOffset = staging.offset, .dstOffset = vertex_offset, .size = vertex_size };
+        vkCmdCopyBuffer(cmd, staging.buffer, vertex_buffer, 1, &vertex_copy);
+        const VkBufferCopy index_copy{ .srcOffset = staging.offset + vertex_size, .dstOffset = index_offset, .size = index_size };
+        vkCmdCopyBuffer(cmd, staging.buffer, index_buffer, 1, &index_copy);
+        // read by the frames recorded after this (vertex pulling, index fetch, BLAS builds): flush_uploads ends the
+        // batch with a barrier from the copies to every later command
     });
-    vk::destroy_buffer(instance.device, staging_buffer, staging_memory);
 }
 
 bool vk::MeshManager::update_vertices(MeshPrimHandle handle, std::span<const Vertex> vertices)

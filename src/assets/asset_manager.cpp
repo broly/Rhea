@@ -93,7 +93,7 @@ AnimationClipHandle AssetManager::load_animation(const std::string& rel_path)
     return handle;
 }
 
-TextureHandle AssetManager::load_texture(const std::string& rel_path)
+TextureHandle AssetManager::load_texture(const std::string& rel_path, uint32_t max_size)
 {
     if (texture_by_path.contains(rel_path))
     {
@@ -114,7 +114,8 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path)
     
     Texture texture = std::move(*texture_opt);
     assert(texture.extent.height > 0);
-    
+    texture.shrink_to_fit(max_size);
+
     std::scoped_lock<std::mutex> lock(mutex);
     
     texture.name = rel_path;
@@ -215,8 +216,8 @@ std::shared_future<TextureHandle> AssetManager::load_texture_async(const std::st
         return it->second;
     }
 
-    std::packaged_task<TextureHandle()> task([path]() {
-        return get().load_texture(path);
+    std::packaged_task<TextureHandle()> task([path, max_size = get_texture_max_size()]() {
+        return get().load_texture(path, max_size);
     });
 
     auto future = task.get_future().share();

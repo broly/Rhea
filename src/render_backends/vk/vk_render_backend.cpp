@@ -301,6 +301,12 @@ GPUMesh VkRenderBackend::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     return mesh_manager.get_or_create_mesh_buffers(handle, rt_build_mode);
 }
 
+void VkRenderBackend::prepare_mesh_buffers(std::span<const MeshPrimHandle> handles)
+{
+    PROFILE(__FUNCTION__);
+    mesh_manager.prepare_mesh_buffers(handles);
+}
+
 SkinnedMeshGPU VkRenderBackend::create_skinned_mesh(MeshPrimHandle source, const std::vector<SkinVertex>& skin, uint32_t bone_count, const PrimitiveMorphs& morphs, uint32_t morph_count, RTBuildMode rt_build_mode)
 {
     return mesh_manager.create_skinned_mesh(source, skin, bone_count, morphs, morph_count, rt_build_mode);
@@ -940,6 +946,8 @@ bool VkRenderBackend::acquire_next_image(RBFrameHandle frame_handle)
 bool VkRenderBackend::submit_frame(RBFrameHandle frame_handle,
                                   RBCommandList cmd_list)
 {
+    // textures and meshes created while recording the frame
+    immediate_command_pool.flush_uploads();
     return swapchain.submit_frame(frame_handle, cmd_list);
 }
 
@@ -1042,6 +1050,7 @@ void VkRenderBackend::cmd_write_timestamp(
 
 void VkRenderBackend::wait_idle()
 {
+    immediate_command_pool.flush_uploads();
     vkDeviceWaitIdle(instance.get_device());
 }
 

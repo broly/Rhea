@@ -72,6 +72,36 @@ void SceneViewProcessor_Mesh::process()
 
     constexpr RTBuildMode rt_build_mode = render_settings::enable_raytracing ? RTBuildMode::build_blas : RTBuildMode::none;
 
+    // the primitives of new and changed meshes are prepared for their buffers on all cores first (vertex cache
+    // optimization: 1.4 s for the level on one core), the loop below creates them one by one
+    {
+        std::vector<MeshPrimHandle> new_primitives;
+        auto add_mesh = [&] (MeshHandle handle)
+        {
+            const StaticMesh& mesh = handle.get();
+            for (uint32_t geom = 0; geom < mesh.mesh_geometry.size(); ++geom)
+                for (uint32_t prim_index = 0; prim_index < mesh.mesh_geometry[geom].primitives.size(); ++prim_index)
+                    new_primitives.push_back(MeshPrimHandle{ handle, geom, prim_index });
+        };
+        for (const auto& submitted : peek_submission_buffer<SceneViewProxy_Mesh>())
+        {
+            if (submitted.skinning || submitted.render_id.identifier >= meshes.size())
+                continue;
+            const auto& ro = meshes[submitted.render_id.identifier];
+            const bool changed = ro.primitives.empty() || ro.mesh != submitted.mesh || ro.lods != submitted.lods
+                || ro.shadow_proxies != submitted.shadow_proxies;
+            if (!ro.alive || ro.generation != submitted.render_id.generation || !changed)
+                continue;
+            add_mesh(submitted.mesh);
+            for (const MeshLod& lod : submitted.lods)
+                add_mesh(lod.mesh);
+            for (const ShadowProxy& proxy : submitted.shadow_proxies)
+                add_mesh(proxy.mesh);
+        }
+        if (!new_primitives.empty())
+            renderer.get_backend()->prepare_mesh_buffers(new_primitives);
+    }
+
     for (const auto& submitted : read_submission_buffer<SceneViewProxy_Mesh>())
     {
         

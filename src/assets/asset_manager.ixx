@@ -23,7 +23,8 @@ public:
     MeshHandle load_mesh(const std::string& rel_path);
     SkeletalMeshHandle load_skeletal_mesh(const std::string& rel_path);
     AnimationClipHandle load_animation(const std::string& rel_path);
-    TextureHandle load_texture(const std::string& rel_path);
+    // max_size: halved until both sides fit (Texture::shrink_to_fit), 0 keeps the file's size
+    TextureHandle load_texture(const std::string& rel_path, uint32_t max_size = 0);
     AssetSceneInfo load_scene(const std::string& rel_path, const std::string& textures_rel_path);
     CubemapHandle load_cubemap(const std::string& rel_path);
     
@@ -37,6 +38,7 @@ public:
     std::unordered_map<std::string, std::shared_future<TextureHandle>> textures_in_flight;
     std::unordered_map<std::string, std::shared_future<CubemapHandle>> cubemaps_in_flight;
     
+    // material textures: fitted to render.textures.max_size on the loading thread (get_texture_max_size)
     std::shared_future<TextureHandle> load_texture_async(const std::string& path);
     std::shared_future<CubemapHandle> load_cubemap_async(const std::string& path);
 

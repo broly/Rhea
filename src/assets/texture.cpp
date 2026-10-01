@@ -11,6 +11,7 @@ import assertions;
 
 import stb_image;
 import rhobject;
+import cvar;
 import globals;
 import engine;
 import :asset_manager;
@@ -65,6 +66,44 @@ std::optional<Texture> Texture::create_from_file(const std::filesystem::path& pa
     stb::free(pixels);
 
     return texture;
+}
+
+// Uncompressed RGBA8 with mips: a 4096^2 texture takes 85 MB of video memory, the Sponza materials alone ~6 GB
+cvar::Var<int> cv_texture_max_size(
+    "render.textures.max_size", 2048, "Material textures larger than this many texels per side are halved when loaded until they fit (0: no limit)",
+    { .has_range = true, .min = 0.0f, .max = 16384.0f });
+
+uint32_t get_texture_max_size()
+{
+    return uint32_t(std::max(cv_texture_max_size.get(), 0));
+}
+
+bool Texture::shrink_to_fit(uint32_t max_size)
+{
+    const bool rgba8 = format == TextureFormat::RGBA8 || format == TextureFormat::RGBA8_UNORM || format == TextureFormat::RGBA8_SRGB;
+    if (max_size == 0 || std::max(extent.width, extent.height) <= max_size || !rgba8
+        || bulk.size() != size_t(extent.width) * extent.height * 4)
+        return false;
+
+    // in place: texel (x, y) of the half is written before any read of the texels at or after (2x, 2y)
+    auto* texels = reinterpret_cast<uint8_t*>(bulk.data());
+    while (std::max(extent.width, extent.height) > max_size && extent.width >= 2 && extent.height >= 2)
+    {
+        const Extent half(extent.width / 2, extent.height / 2);
+        for (uint32_t y = 0; y < half.height; ++y)
+            for (uint32_t x = 0; x < half.width; ++x)
+                for (uint32_t c = 0; c < 4; ++c)
+                {
+                    const size_t row0 = (size_t(2 * y) * extent.width + 2 * x) * 4 + c;
+                    const size_t row1 = row0 + size_t(extent.width) * 4;
+                    texels[(size_t(y) * half.width + x) * 4 + c] =
+                        uint8_t((uint32_t(texels[row0]) + texels[row0 + 4] + texels[row1] + texels[row1 + 4] + 2) / 4);
+                }
+        extent = half;
+    }
+    bulk.resize(size_t(extent.width) * extent.height * 4);
+    bulk.shrink_to_fit();
+    return true;
 }
 
 bool Texture::save_to_file(const std::filesystem::path& path) const

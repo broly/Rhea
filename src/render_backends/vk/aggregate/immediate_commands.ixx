@@ -9,6 +9,14 @@ import :instance;
 
 namespace vk
 {
+    // staging memory of an upload, written by the CPU and copied from by commands of record_upload
+    struct UploadStaging
+    {
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceSize offset = 0;
+        std::byte* data = nullptr;
+    };
+
     class ImmediateCommandPool
     {
     public:
@@ -17,7 +25,16 @@ namespace vk
         {}
         
         void init();
-        
+
+        // Uploads (textures, meshes) go into a shared batch instead of one submit + wait each: staging memory from
+        // persistent per-batch buffers, the batch is submitted before anything else reaches the graphics queue
+        // (submit, the frame, wait_idle), so whatever runs after sees the data. The CPU waits only when it wraps
+        // around onto a batch the GPU has not finished. allocate_upload, then record_upload of the copies at once
+        // (an allocation may submit the open batch and start the next one).
+        UploadStaging allocate_upload(VkDeviceSize size, VkDeviceSize alignment = 16);
+        void record_upload(const std::function<void(VkCommandBuffer)>& commands);
+        void flush_uploads();
+
         void submit(std::function<void(VkCommandBuffer)>&& commands);
         void submit(std::function<void(VkCommandBuffer)>&& commands, std::optional<RBCommandList> cmd);
         void submit(std::function<void(VkCommandBuffer)>&& commands, std::function<void()> finally);
@@ -63,7 +80,30 @@ namespace vk
         VkFence fence = VK_NULL_HANDLE;
         
         RBCommandList active_main_command_buffer {};
-        
+
         std::map<VkCommandBuffer, std::vector<std::function<void()>>> release_callbacks;
+
+    private:
+        struct UploadBatch
+        {
+            VkCommandBuffer cmd = VK_NULL_HANDLE;
+            VkFence fence = VK_NULL_HANDLE;
+            VkBuffer staging = VK_NULL_HANDLE;
+            VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+            std::byte* mapped = nullptr;
+            VkDeviceSize used = 0;
+            bool recording = false;
+            bool in_flight = false;
+            // uploads larger than the staging buffer, freed when the batch is reused
+            std::vector<std::pair<VkBuffer, VkDeviceMemory>> dedicated;
+        };
+
+        static constexpr uint32_t upload_batch_count = 4;
+        static constexpr VkDeviceSize upload_batch_size = VkDeviceSize(32) << 20;
+
+        UploadBatch& open_upload_batch();
+
+        std::array<UploadBatch, upload_batch_count> upload_batches;
+        uint32_t current_upload_batch = 0;
     };
 }

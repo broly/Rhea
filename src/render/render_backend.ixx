@@ -278,7 +278,11 @@ public:
     virtual void draw_indexed(const RBCommandList& cmd, uint32_t index_count) = 0;
     virtual void draw_fullscreen(RBCommandList cmd) = 0;
     virtual GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode) = 0;
-    
+    // The CPU part of get_or_create_mesh_buffers (vertex cache optimization) for primitives without buffers yet,
+    // on all cores; the next get_or_create_mesh_buffers calls use it. Only a speed-up: the ones left out are
+    // optimized when their buffers are created, the ones not created after all are dropped at the next call
+    virtual void prepare_mesh_buffers(std::span<const MeshPrimHandle> handles) = 0;
+
     // ---- skinning section ----
     
     // Creates a per-instance skinned copy of `source` (output vertices + optional BLAS + mesh table entry).

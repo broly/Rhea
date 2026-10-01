@@ -79,6 +79,8 @@ namespace vk
         
         
         GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode);
+        // RenderBackend::prepare_mesh_buffers: optimized indices of the primitives without buffers, on all cores
+        void prepare_mesh_buffers(std::span<const MeshPrimHandle> handles);
         // same vertex count; the caller makes sure the GPU is idle. False when not uploaded.
         bool update_vertices(MeshPrimHandle handle, std::span<const Vertex> vertices);
         
@@ -111,6 +113,8 @@ namespace vk
         }
 
         std::unordered_map<MeshPrimHandle, MeshGPUData> mesh_map;
+        // prepare_mesh_buffers results, taken by get_or_create_mesh_buffers
+        std::unordered_map<MeshPrimHandle, std::vector<uint32_t>> prepared_indices;
 
         // Vertices and indices of the meshes are sub-allocated from big blocks (one allocation per mesh ran into
         // the allocation count limit). Indexed mesh draws (RenderBackend::get_mesh_index_range) bind an index
@@ -132,7 +136,7 @@ namespace vk
         // block index, byte offset
         std::pair<uint32_t, VkDeviceSize> suballocate(std::vector<BufferBlock>& blocks, VkDeviceSize size,
             VkDeviceSize alignment, VkDeviceSize block_size);
-        // one staging buffer, one submit (waits)
+        // recorded into the shared upload batch (ImmediateCommandPool::allocate_upload)
         void upload(VkBuffer vertex_buffer, VkDeviceSize vertex_offset, const void* vertices, VkDeviceSize vertex_size,
             VkBuffer index_buffer, VkDeviceSize index_offset, const void* indices, VkDeviceSize index_size);
 
