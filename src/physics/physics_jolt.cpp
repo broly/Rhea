@@ -906,6 +906,33 @@ namespace phys
         return state;
     }
 
+    bool PhysicsScene::set_character_height(CharacterId character, float height)
+    {
+        backend->check_not_stepping();
+        PhysicsBackend::CharacterSlot* slot = backend->find_character(character);
+        if (!slot)
+            return false;
+
+        JPH::CharacterVirtual& c = *slot->character;
+        const float radius = slot->radius;
+        const float half_height = std::max(0.5f * height - radius, 0.01f);
+        JPH::RefConst<JPH::Shape> capsule = new JPH::CapsuleShape(half_height, radius);
+
+        // feet stay where they are: the shape moves with its new half height
+        const JPH::Vec3 old_offset = c.GetShapeOffset();
+        c.SetShapeOffset(JPH::Vec3(0.0f, half_height + radius, 0.0f));
+        const QueryBroadPhaseLayerFilter broadphase_filter(slot->blocked_by);
+        const QueryObjectLayerFilter object_layer_filter(slot->blocked_by);
+        const float max_penetration = 1.5f * backend->system.GetPhysicsSettings().mPenetrationSlop;
+        if (!c.SetShape(capsule, max_penetration, broadphase_filter, object_layer_filter, {}, {}, *backend->temp_allocator))
+        {
+            c.SetShapeOffset(old_offset);
+            return false;
+        }
+        c.SetInnerBodyShape(new JPH::CapsuleShape(half_height, std::max(radius - 0.02f, 0.01f)));
+        return true;
+    }
+
     CharacterState PhysicsScene::get_character_state(CharacterId character) const
     {
         PhysicsBackend::CharacterSlot* slot = backend->find_character(character);

@@ -565,14 +565,14 @@
 					"collision": true,
 					// everything else: "simplified" (2 cm)
 					"collision_overrides": {
-						"wood_door": "box",
 						"column_2ndfloor_": "convex_hull",
 						"lamp": "convex_hull",
 						"decals_": "none",
 						"master_material": "none"
 					},
-					// material swatches next to the building (y 0, z 13.4): above the terrain
-					"hidden_meshes": [ "master_material" ],
+					// material swatches next to the building (y 0, z 13.4): above the terrain.
+					// wood_door: the "sponza_door" entity (assets/prefabs/sponza_door.json), it opens
+					"hidden_meshes": [ "master_material", "wood_door" ],
 					"textures_dir": "textures/sponza",
 					"material": {
 						"blend_mode": "masked",
@@ -581,6 +581,18 @@
 						}
 					},
 					"test": { "hello": "yesss" }
+				}
+			}
+		},
+		{
+			// the door of imported_scene (its glTF node wood_door, 1.43 m higher), opens when the character comes close
+			"name": "sponza_door",
+			"prefab": "prefabs/sponza_door.json",
+			"components": {
+				"Transform": {
+					"position": { "x": 19.49186, "y": -0.651869, "z": 0.03165676 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
 				}
 			}
 		},

@@ -67,6 +67,8 @@ set(RHEA_MODULE_DIRS
     src/debug_draw
     src/framework
     src/rhcomponents
+    src/animation
+    src/locomotion
     src/render
     src/world_scripts
     src/terrain

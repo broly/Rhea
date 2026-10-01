@@ -6,7 +6,8 @@ import ecs;
 import framework;
 import glm;
 import rhmath;
-import character_controller;
+import locomotion;
+import animation;
 import character_light_rig;
 import benchmark;
 import reflect;
@@ -72,6 +73,8 @@ public:
     // `camera.look <x> <y> <z> <target x> <y> <z>` (console, RHEA_EXEC automation): free camera at a pose
     std::unique_ptr<cvar::Command> camera_look_command;
     std::optional<std::pair<glm::vec3, glm::vec3>> pending_camera_look;
+    std::unique_ptr<cvar::Command> player_camera_command;
+    std::optional<glm::vec2> pending_player_camera;   // yaw, pitch (radians)
 
     // `bench.run <route> [name] [quit]` (console, tools/bench/run_bench.py): the character runs a route, the
     // camera looks around, every frame is recorded
@@ -89,5 +92,6 @@ public:
 private:
     Transform get_camera_transform() const;
     void set_camera_transform(const Transform& t);
-    CharacterAnimator* get_animator() const;
+    anim::PoseLibrary* get_poses() const;
+    anim::MorphExpressions* get_expressions() const;
 };

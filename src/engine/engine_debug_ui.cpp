@@ -30,6 +30,7 @@ import debug_draw;
 import ecs;
 import terrain;
 import sky_controller;
+import animation;
 
 
 namespace
@@ -46,6 +47,7 @@ namespace
     cvar::Var<bool> cv_window_imgui_demo("ui.windows.imgui_demo", false, "Dear ImGui demo window (widget reference)");
     cvar::Var<bool> cv_window_physics("ui.windows.physics", false, "Physics stats, debug drawing and probes");
     cvar::Var<bool> cv_window_ecs("ui.windows.ecs", false, "ECS: simulation tick, systems, archetypes");
+    cvar::Var<bool> cv_window_animation("ui.windows.animation", false, "Animator of the selected entity: curves, montages, sync groups");
     cvar::Var<bool> cv_window_terrain("ui.windows.terrain", false, "Terrain editor: paint layers, sculpt, save");
     cvar::Var<bool> cv_window_sky("ui.windows.sky", false, "Sky: time of day, weather");
     cvar::Var<bool> cv_terrain_brush("terrain.brush", false,
@@ -354,6 +356,8 @@ void EngineDebugUI::register_console_commands(Engine& engine)
                 names.push_back(name.to_string());
         return names;
     };
+    add("render.dump_frame", "Dumps the intermediate buffers of the next frame (F9) to cache/debug_dump/<buffer>/frame_<N>.exr|png",
+        [&engine] (cvar::Args) { engine.renderer->set_flag("debug_dump_frame", true, false, true); });
     add("render.flag", "Prints / sets a render graph flag, toggles it without a value",
         [&engine] (cvar::Args args) {
             const auto graph = engine.renderer->get_main_render_graph();
@@ -517,6 +521,7 @@ void EngineDebugUI::draw(Engine& engine)
     draw_terrain_window(engine);
     draw_sky_window(engine);
     draw_ecs_window(engine);
+    draw_animation_window(engine);
     if (cv_window_imgui_demo.get())
     {
         bool open = true;
@@ -575,6 +580,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         item("Terrain", cv_window_terrain);
         item("Sky", cv_window_sky);
         item("ECS", cv_window_ecs);
+        item("Animation", cv_window_animation);
         ImGui::Separator();
         item("Hotkeys", cv_window_help);
         item("ImGui Demo", cv_window_imgui_demo);
@@ -1462,6 +1468,39 @@ void EngineDebugUI::draw_world_debug(Engine& engine)
         const ecs::Entity owner{ uint32_t(probe_hit->user_data), uint32_t(probe_hit->user_data >> 32) };
         probe_hit_owner = engine.world->registry.alive(owner) ? get_entity_label(engine.world->registry, owner) : "<destroyed>";
     }
+}
+
+void EngineDebugUI::draw_animation_window(Engine& engine)
+{
+    if (!begin_window("Animation", cv_window_animation, viewport_point(0.02f, 0.40f), viewport_size(0.26f, 0.5f)))
+        return;
+    if (!engine.world)
+    {
+        ImGui::TextDisabled("No world");
+        ImGui::End();
+        return;
+    }
+
+    // the selected entity, else the first animated one
+    ecs::Registry& registry = engine.world->registry;
+    ecs::Entity entity = get_selected(engine);
+    if (!entity || !registry.get<anim::Animator>(entity))
+    {
+        entity = ecs::null_entity;
+        ecs::Query<anim::Animator>(registry).each([&](ecs::Entity e, anim::Animator&) {
+            if (!entity)
+                entity = e;
+        });
+    }
+    if (!entity)
+    {
+        ImGui::TextDisabled("No animated entity");
+        ImGui::End();
+        return;
+    }
+    ImGui::Text("%s", scene::get_name(registry, entity).c_str());
+    anim::draw_animator_debug(*registry.get<anim::Animator>(entity));
+    ImGui::End();
 }
 
 void EngineDebugUI::draw_physics_window(Engine& engine)

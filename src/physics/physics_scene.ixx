@@ -189,6 +189,9 @@ export namespace phys
         CharacterState move_character(CharacterId character, const glm::vec3& velocity, float dt);
 
         CharacterState get_character_state(CharacterId character) const;
+        // New capsule height (crouching), feet in place. False when the taller capsule would hit something
+        // (standing up under a low ceiling): the shape stays as it was.
+        bool set_character_height(CharacterId character, float height);
         void set_character_position(CharacterId character, const glm::vec3& position);     // teleport, feet
         void set_character_rotation(CharacterId character, const glm::quat& rotation);
 

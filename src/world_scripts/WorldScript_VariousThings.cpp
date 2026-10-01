@@ -19,7 +19,8 @@ import sky_controller;
 import ecs;
 import name;
 import framework;
-import character_controller;
+import locomotion;
+import animation;
 import cvar;
 
 constexpr bool DO_NN_SAMPLES = false;
@@ -40,9 +41,14 @@ void WorldScript_VariousThings::set_camera_transform(const Transform& t)
     scene::set_world_transform(world->registry, camera, t);
 }
 
-CharacterAnimator* WorldScript_VariousThings::get_animator() const
+anim::PoseLibrary* WorldScript_VariousThings::get_poses() const
 {
-    return character ? world->registry.get<CharacterAnimator>(character) : nullptr;
+    return character ? world->registry.get<anim::PoseLibrary>(character) : nullptr;
+}
+
+anim::MorphExpressions* WorldScript_VariousThings::get_expressions() const
+{
+    return character ? world->registry.get<anim::MorphExpressions>(character) : nullptr;
 }
 
 bool WorldScript_VariousThings::frame_character(Transform& t, bool face)
@@ -180,6 +186,22 @@ void WorldScript_VariousThings::tick(double dt)
                 pending_camera_look = { glm::vec3(v[0], v[1], v[2]), glm::vec3(v[3], v[4], v[5]) };
             }, "<x> <y> <z> <target x> <target y> <target z>");
     }
+    if (!player_camera_command)
+    {
+        player_camera_command = std::make_unique<cvar::Command>("player.camera",
+            "Third person camera around the player character at a yaw / pitch (degrees)", [this] (cvar::Args args) {
+                float v[2];
+                for (size_t i = 0; i < 2; ++i)
+                {
+                    if (args.size() != 2 || std::from_chars(args[i].data(), args[i].data() + args[i].size(), v[i]).ec != std::errc{})
+                    {
+                        cvar::print("player.camera <yaw degrees> <pitch degrees>", cvar::Output::error);
+                        return;
+                    }
+                }
+                pending_player_camera = glm::radians(glm::vec2(v[0], v[1]));
+            }, "<yaw degrees> <pitch degrees>");
+    }
     if (!bench_command)
     {
         bench_command = std::make_unique<cvar::Command>("bench.run",
@@ -312,13 +334,17 @@ void WorldScript_VariousThings::tick(double dt)
     {
         character_init_attempted = true;
         character = world->find_entity("cosmo_bunny");
-        if (character && init_character(*world, character, "animations/cosmo_bunny/locomotion.json"))
+        if (character && loco::init_locomotion_character(*world, character, "locomotion/als_character.json")
+            && loco::init_locomotion_animation(*world, character))
         {
-            CharacterAnimator& animator = *registry.get<CharacterAnimator>(character);
             const SkinnedMesh& mesh = *registry.get<SkinnedMesh>(character);
-            animator.load_poses("animations/cosmo_bunny/poses.json", mesh.get_skeleton());
-            animator.load_expressions("animations/cosmo_bunny/expressions.json", mesh);
-            registry.add<PlayerControlled>(character);
+            anim::PoseLibrary poses;
+            poses.load("animations/cosmo_bunny/poses.json");
+            registry.add<anim::PoseLibrary>(character, std::move(poses));
+            anim::MorphExpressions expressions;
+            if (expressions.load("animations/cosmo_bunny/expressions.json", mesh.skeletal_mesh.get()))
+                registry.add<anim::MorphExpressions>(character, std::move(expressions));
+            registry.add<loco::LocomotionPlayer>(character);
             pitch = -0.25f;   // look slightly down on the character
         }
         else
@@ -326,7 +352,8 @@ void WorldScript_VariousThings::tick(double dt)
     }
     if (character && !registry.alive(character))
         character = ecs::null_entity;
-    CharacterAnimator* animator = get_animator();
+    anim::PoseLibrary* poses = get_poses();
+    anim::MorphExpressions* expressions = get_expressions();
 
     const bool toggle_down = input->is_key_down(Key::C);
     if (toggle_down && !character_toggle_was_down && character)
@@ -372,35 +399,32 @@ void WorldScript_VariousThings::tick(double dt)
 
     // T: next pose, Shift+T: previous (locomotion is part of the cycle), 0: back to locomotion
     // (LeftShift + 0/1/2 selects the tonemap output mode, see below)
-    if (animator && animator->get_pose_count() > 0)
+    if (poses && poses->count() > 0)
     {
         const bool t_down = input->is_key_down(Key::T);
         if (t_down && !pose_key_was_down)
         {
-            const int32_t count = animator->get_pose_count() + 1;   // + locomotion
+            const int32_t count = poses->count() + 1;   // + locomotion
             const int32_t step = input->is_key_down(Key::LeftShift) ? count - 1 : 1;
-            const int32_t current = animator->active_pose + 1;
-            const int32_t next = (current + step) % count - 1;
-            animator->select_pose(next);
+            poses->select((poses->active + 1 + step) % count - 1);
         }
         pose_key_was_down = t_down;
 
         const bool zero_down = input->is_key_down(Key::_0) && !input->is_key_down(Key::LeftShift);
         if (zero_down && !locomotion_key_was_down)
-            animator->select_pose(-1);
+            poses->select(-1);
         locomotion_key_was_down = zero_down;
     }
 
     // N: next facial expression, Shift+N: previous (neutral is part of the cycle)
-    if (animator && animator->get_expression_count() > 0)
+    if (expressions && expressions->count() > 0)
     {
         const bool n_down = input->is_key_down(Key::N);
         if (n_down && !expression_key_was_down)
         {
-            const int32_t count = animator->get_expression_count() + 1;   // + neutral
+            const int32_t count = expressions->count() + 1;   // + neutral
             const int32_t step = input->is_key_down(Key::LeftShift) ? count - 1 : 1;
-            const int32_t current = animator->active_expression + 1;
-            animator->select_expression((current + step) % count - 1);
+            expressions->select((expressions->active + 1 + step) % count - 1);
         }
         expression_key_was_down = n_down;
     }
@@ -421,18 +445,27 @@ void WorldScript_VariousThings::tick(double dt)
         benchmark.tick(*world, character, yaw, pitch);
     }
 
-    // the character moves in the fixed ticks (character_controller), here only the camera follows it
+    if (pending_player_camera)
+    {
+        yaw = pending_player_camera->x;
+        pitch = pending_player_camera->y;
+        pending_player_camera.reset();
+        character_mode = true;
+    }
+
+    // the character moves in the fixed ticks (module locomotion), here only the camera follows it
     if (character)
     {
-        if (PlayerControlled* player = registry.get<PlayerControlled>(character))
+        if (loco::LocomotionPlayer* player = registry.get<loco::LocomotionPlayer>(character))
         {
             player->enabled = character_mode;
             player->camera_yaw = yaw;
+            player->camera_pitch = pitch;
         }
         if (character_mode)
         {
             pitch = glm::clamp(pitch, -1.2f, 0.5f);
-            set_camera_transform(make_character_camera(*world, character, yaw, pitch));
+            set_camera_transform(loco::make_locomotion_camera(*world, character, yaw, pitch));
         }
     }
 
@@ -591,7 +624,7 @@ void WorldScript_VariousThings::tick(double dt)
         const auto [position, target] = *pending_camera_look;
         pending_camera_look.reset();
         character_mode = false;
-        if (PlayerControlled* player = character ? registry.get<PlayerControlled>(character) : nullptr)
+        if (loco::LocomotionPlayer* player = character ? registry.get<loco::LocomotionPlayer>(character) : nullptr)
             player->enabled = false;
         t.position = position;
         // inverse of from_euler_rotation(pitch, yaw, 0), see frame_character
@@ -644,9 +677,10 @@ void WorldScript_VariousThings::draw_debug_ui()
         }
     }
 
-    if (CharacterAnimator* character_animator = get_animator())
+    anim::PoseLibrary* poses = get_poses();
+    anim::MorphExpressions* expressions = get_expressions();
+    if (poses || expressions)
     {
-        CharacterAnimator& animator = *character_animator;
         ImGui::SeparatorText("Character");
 
         // -1: locomotion / neutral face
@@ -666,12 +700,14 @@ void WorldScript_VariousThings::draw_debug_ui()
             }
         };
 
-        index_combo("Pose (T)", animator.get_pose_count(), animator.active_pose, "Locomotion",
-            [&] (int32_t i) { return animator.get_pose_name(i); },
-            [&] (int32_t i) { animator.select_pose(i); });
-        index_combo("Expression (N)", animator.get_expression_count(), animator.active_expression, "Neutral",
-            [&] (int32_t i) { return animator.get_expression_name(i); },
-            [&] (int32_t i) { animator.select_expression(i); });
+        if (poses)
+            index_combo("Pose (T)", poses->count(), poses->active, "Locomotion",
+                [&] (int32_t i) { return poses->poses[i].name; },
+                [&] (int32_t i) { poses->select(i); });
+        if (expressions)
+            index_combo("Expression (N)", expressions->count(), expressions->active, "Neutral",
+                [&] (int32_t i) { return expressions->expressions[i].name; },
+                [&] (int32_t i) { expressions->select(i); });
     }
 
     if (light_rig)

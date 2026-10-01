@@ -66,6 +66,7 @@ private:
     // Sky controller of the level: time of day, weather presets
     void draw_sky_window(Engine& engine);
     void draw_ecs_window(Engine& engine);
+    void draw_animation_window(Engine& engine);
 
     void draw_viewport_overlay(Engine& engine, const ViewData& view);
     void handle_picking(Engine& engine, const ViewData& view);

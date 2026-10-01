@@ -262,13 +262,24 @@ namespace
         });
     }
 
-    // Static bodies of MeshColliders: shapes cooked on loading threads (pending) or now
+    // Bodies of MeshColliders: shapes cooked on loading threads (pending) or now; kinematic ones follow their entity
     // independent of the render proxies, but both take the Registry
     [[=ecs::system<ecs::Phase::PostLoad>, =ecs::system<ecs::Phase::Late>, =ecs::in_set<MeshColliderSync>,
       =ecs::after<scene::TransformPropagation>, =ecs::ambiguous_with<RenderSync>]]
     void create_mesh_colliders(ecs::Registry& registry, ecs::ResMut<phys::PhysicsScene> physics)
     {
         ecs::Query<MeshCollider, const MeshRenderer>(registry).each([&] (ecs::Entity e, MeshCollider& collider, const MeshRenderer& renderer) {
+            if (collider.body.is_valid() && collider.kinematic)
+            {
+                const Transform world = scene::get_world_transform(registry, e);
+                const phys::BodyTransform target{ world.position.glm(), world.rotation.glm() };
+                if (target.position != collider.body_transform.position || target.rotation != collider.body_transform.rotation)
+                {
+                    physics->move_kinematic(collider.body, target);
+                    collider.body_transform = target;
+                }
+                return;
+            }
             if (collider.body.is_valid() || collider.type == MeshCollision::none)
                 return;
 
@@ -296,10 +307,11 @@ namespace
                 .shape = collider.shape,
                 .position = world.position.glm(),
                 .rotation = world.rotation.glm(),
-                .motion = phys::Motion::fixed,
+                .motion = collider.kinematic ? phys::Motion::kinematic : phys::Motion::fixed,
                 .category = phys::Category::static_world,
                 .user_data = e.bits(),
             });
+            collider.body_transform = { world.position.glm(), world.rotation.glm() };
         });
     }
 }

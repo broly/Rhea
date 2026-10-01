@@ -13,6 +13,8 @@ import log;
 import name;
 import cvar;
 import sky_controller;
+import animation;
+import locomotion;
 
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -53,7 +55,7 @@ namespace
     using Clip = CharacterAnimator::Clip;
     using JumpState = CharacterAnimator::JumpState;
 
-    bool load_clip(const Json::Value& locomotion, const char* role, const Skeleton& skeleton, Clip& clip)
+    bool load_clip(const Json::Value& locomotion, const char* role, Clip& clip)
     {
         if (!locomotion.isMember(role) || !locomotion[role].isObject())
         {
@@ -67,9 +69,7 @@ namespace
         if (!clip.handle.is_valid())
             return false;
 
-        const AnimationClip& anim = clip.handle.get();
-        clip.binding = AnimationBinding::bind(anim, skeleton);
-        clip.duration = anim.duration;
+        clip.duration = clip.handle.get().duration;
         clip.ground_speed = entry["ground_speed"].asFloat();
         clip.name = role;
         return true;
@@ -87,23 +87,13 @@ namespace
     // set_scripted_player_input
     std::optional<CharacterInput> scripted_input;
 
-    cvar::Command teleport_command("player.teleport", "Moves the player character (feet) to a world position",
-        [] (cvar::Args args) {
-            auto parse = [] (const std::string& text, float& value) {
-                return std::from_chars(text.data(), text.data() + text.size(), value).ec == std::errc{};
-            };
-            glm::vec3 position;
-            if (args.size() != 3 || !parse(args[0], position.x) || !parse(args[1], position.y) || !parse(args[2], position.z))
-            {
-                cvar::print("player.teleport <x> <y> <z>", cvar::Output::error);
-                return;
-            }
-            pending_teleport = position;
-        }, "<x> <y> <z>");
+    // Legacy controller (the player is a locomotion character since 2026-10-01): its systems never run on the
+    // entities of the locomotion module (ambiguous_with). The console commands player.teleport / player.input
+    // live there.
 
     // ------------------------------------------------------------------ systems
 
-    [[=ecs::system<ecs::Phase::FixedPre>]]
+    [[=ecs::system<ecs::Phase::FixedPre>, =ecs::ambiguous_with<loco::LocomotionInputSet>, =ecs::ambiguous_with<loco::LocomotionSimulation>]]
     void teleport_player(ecs::Query<CharacterMovement, const PlayerControlled> characters, ecs::ResMut<phys::PhysicsScene> physics)
     {
         if (!pending_teleport)
@@ -220,131 +210,71 @@ namespace
         }
     }
 
-    void sample(const CharacterAnimator& a, const Clip& clip, float time, bool loop, BonePose& pose)
+    // jump / fall / land events of the movement -> jump state machine; moving leaves the pose
+    void update_states(CharacterAnimator& a, const CharacterMovement& m, const CharacterInput* input)
     {
-        pose = a.bind_pose;
-        sample_animation(clip.handle.get(), clip.binding, time, loop, pose);
-    }
-
-    void update_pose(CharacterAnimator& a, const CharacterMovement& m, const CharacterInput* input, float dt)
-    {
-        // moving leaves the pose
         if (input && glm::length(input->move_axis) > 0.0f && a.active_pose >= 0)
             a.select_pose(-1);
 
-        // ---- jump / fall / land events of the movement ----
+        const anim::Transition blend{ .duration = a.jump_blend_time };
+        const anim::Transition quick{ .duration = 0.05f };
+
         if (m.jump_count != a.seen_jump_count)
         {
             a.seen_jump_count = m.jump_count;
-            a.jump_state = JumpState::start;
-            a.jump_time = 0.0f;
+            a.jump.force_transition(JumpState::start, blend);
         }
         if (m.land_count != a.seen_land_count)
         {
             a.seen_land_count = m.land_count;
-            if (a.jump_state != JumpState::none)
-            {
-                a.jump_state = JumpState::land;
-                a.jump_time = 0.0f;
-            }
+            if (!a.jump.in(JumpState::none))
+                a.jump.force_transition(JumpState::land, quick);
         }
         // walked off a ledge
-        if (a.jump_state == JumpState::none && !m.grounded && m.air_time > a.fall_animation_delay)
-        {
-            a.jump_state = JumpState::loop;
-            a.jump_time = 0.0f;
-        }
+        if (a.jump.in(JumpState::none) && !m.grounded && m.air_time > a.fall_animation_delay)
+            a.jump.transition(JumpState::loop, blend);
 
-        // ---- locomotion: idle -> walk -> run ----
-        a.idle_time += dt;
+        if (a.jump.in(JumpState::start) && a.jump_start_player.clip && a.jump_start_player.remaining() <= 0.0f)
+            a.jump.transition(JumpState::loop, quick);
+        if (a.jump.in(JumpState::land) && a.jump_end_player.clip && a.jump_end_player.remaining() <= a.jump_blend_time)
+            a.jump.transition(JumpState::none, blend);
+    }
 
-        if (m.speed <= a.walk.ground_speed)
-        {
-            const float w = m.speed / a.walk.ground_speed;
-            a.locomotion_phase = std::fmod(a.locomotion_phase + dt / a.walk.duration, 1.0f);
-
-            sample(a, a.idle, a.idle_time, true, a.pose_a);
-            sample(a, a.walk, a.locomotion_phase * a.walk.duration, true, a.pose_b);
-            blend_poses(a.pose_a, a.pose_b, w, a.pose_locomotion);
-        }
-        else
-        {
+    // idle -> walk -> run by speed (walk and run phase synchronized), poses over it, jumps over everything
+    anim::PoseRef character_pose(anim::Graph& g, CharacterAnimator& a, const CharacterMovement& m)
+    {
+        auto locomotion = [&] {
+            if (m.speed <= a.walk.ground_speed)
+            {
+                return g.blend(m.speed / a.walk.ground_speed,
+                    [&] { return g.play(a.idle_player, a.idle.handle); },
+                    [&] { return g.play(a.walk_player, a.walk.handle, { .sync = "cycle" }); });
+            }
+            // the cycle length goes from walk to run with the weight: both players run at that rate
             const float w = std::clamp((m.speed - a.walk.ground_speed) / (a.run.ground_speed - a.walk.ground_speed), 0.0f, 1.0f);
             const float cycle = glm::mix(a.walk.duration, a.run.duration, w);
-            a.locomotion_phase = std::fmod(a.locomotion_phase + dt / cycle, 1.0f);
+            return g.blend(w,
+                [&] { return g.play(a.walk_player, a.walk.handle, { .rate = a.walk.duration / cycle, .sync = "cycle" }); },
+                [&] { return g.play(a.run_player, a.run.handle, { .rate = a.run.duration / cycle, .sync = "cycle" }); });
+        };
 
-            sample(a, a.walk, a.locomotion_phase * a.walk.duration, true, a.pose_a);
-            sample(a, a.run, a.locomotion_phase * a.run.duration, true, a.pose_b);
-            blend_poses(a.pose_a, a.pose_b, w, a.pose_locomotion);
-        }
+        auto with_poses = [&] {
+            if (a.poses.empty())
+                return locomotion();
+            return g.blend_list(a.pose_list, a.active_pose + 1, (uint32_t)a.poses.size() + 1, a.pose_blend_time,
+                [&](uint32_t i) { return i == 0 ? locomotion() : g.play(a.pose_players[i - 1], a.poses[i - 1].handle); });
+        };
 
-        // ---- poses (override locomotion, crossfaded) ----
-        if (a.fading_pose >= 0)
-        {
-            a.fading_pose_time += dt;
-            a.fading_pose_weight = move_towards(a.fading_pose_weight, 0.0f, dt / a.pose_blend_time);
-            if (a.fading_pose_weight <= 0.0f)
-                a.fading_pose = -1;
-            else
+        return g.state_machine(a.jump, [&](JumpState s) {
+            switch (s)
             {
-                sample(a, a.poses[a.fading_pose], a.fading_pose_time, true, a.pose_a);
-                blend_poses(a.pose_locomotion, a.pose_a, a.fading_pose_weight, a.pose_locomotion);
+            case JumpState::start: return g.play(a.jump_start_player, a.jump_start.handle, { .loop = false });
+            case JumpState::loop: return g.play(a.jump_loop_player, a.jump_loop.handle);
+            case JumpState::land: return g.play(a.jump_end_player, a.jump_end.handle, { .loop = false });
+            case JumpState::none: break;
             }
-        }
-        if (a.active_pose >= 0)
-        {
-            a.pose_time += dt;
-            a.pose_weight = move_towards(a.pose_weight, 1.0f, dt / a.pose_blend_time);
-            sample(a, a.poses[a.active_pose], a.pose_time, true, a.pose_a);
-            blend_poses(a.pose_locomotion, a.pose_a, a.pose_weight, a.pose_locomotion);
-        }
-
-        // ---- jump overlay ----
-        a.jump_time += dt;
-
-        const Clip* jump_clip = nullptr;
-        bool jump_loop_clip = false;
-
-        switch (a.jump_state)
-        {
-        case JumpState::start:
-            jump_clip = &a.jump_start;
-            if (a.jump_time >= a.jump_start.duration)
-            {
-                a.jump_state = JumpState::loop;
-                a.jump_time = 0.0f;
-                jump_clip = &a.jump_loop;
-                jump_loop_clip = true;
-            }
-            break;
-        case JumpState::loop:
-            jump_clip = &a.jump_loop;
-            jump_loop_clip = true;
-            break;
-        case JumpState::land:
-            jump_clip = &a.jump_end;
-            if (a.jump_time >= a.jump_end.duration)
-            {
-                a.jump_state = JumpState::none;
-                jump_clip = nullptr;
-            }
-            break;
-        case JumpState::none:
-            break;
-        }
-
-        const float target_jump_weight = jump_clip ? 1.0f : 0.0f;
-        a.jump_weight = move_towards(a.jump_weight, target_jump_weight, dt / a.jump_blend_time);
-
-        if (jump_clip && a.jump_weight > 0.0f)
-        {
-            sample(a, *jump_clip, a.jump_time, jump_loop_clip, a.pose_a);
-            blend_poses(a.pose_locomotion, a.pose_a, a.jump_weight, a.pose_final);
-        }
-        else
-        {
-            a.pose_final = a.pose_locomotion;
-        }
+            return with_poses();
+        });
     }
 
     void update_expression(CharacterAnimator& a, SkinnedMesh& mesh, float dt)
@@ -363,7 +293,7 @@ namespace
         mesh.set_morph_weights(a.expression_weights);
     }
 
-    [[=ecs::system<ecs::Phase::Fixed>]]
+    [[=ecs::system<ecs::Phase::Fixed>, =ecs::ambiguous_with<loco::LocomotionSimulation>]]
     void move_characters(ecs::Query<CharacterMovement, const CharacterInput> characters,
         ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
     {
@@ -381,23 +311,27 @@ namespace
             registry.set_resource<CharacterCameraProbe>(physics->create_shape(phys::SphereShape{ camera_probe_radius }));
     }
 
-    [[=ecs::system<ecs::Phase::Update>]]
-    void animate_characters(ecs::Query<CharacterAnimator, SkinnedMesh, const CharacterMovement> characters,
+    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<anim::Evaluate>, =ecs::ambiguous_with<loco::LocomotionPresentation>]]
+    void animate_characters(ecs::Query<anim::Animator, CharacterAnimator, SkinnedMesh, const CharacterMovement> characters,
         ecs::Query<const CharacterInput> inputs, ecs::Res<ecs::FrameTime> time)
     {
         const float dt = std::min((float)time->dt, 0.1f);   // hitches (shader compilation, loading)
         characters.each(
-            [&] (ecs::Entity e, CharacterAnimator& animator, SkinnedMesh& mesh, const CharacterMovement& movement)
+            [&] (ecs::Entity e, anim::Animator& animator, CharacterAnimator& a, SkinnedMesh& mesh, const CharacterMovement& movement)
             {
-                update_pose(animator, movement, inputs.get(e), dt);
-                mesh.set_local_pose(pose_to_local_matrices(animator.pose_final));
-                update_expression(animator, mesh, dt);
+                if (!animator.valid())
+                    return;
+                update_states(a, movement, inputs.get(e));
+                anim::Graph g = animator.begin_update(dt);
+                animator.end_update(g, character_pose(g, a, movement));
+                update_expression(a, mesh, dt);
             });
     }
 
     // Render transform between the last two simulated ticks
     // (the sky controller writes Transform too: of the sun, never of a character)
-    [[=ecs::system<ecs::Phase::Update>, =ecs::ambiguous_with<SkyControl>]]
+    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<CharacterInterpolation>, =ecs::ambiguous_with<SkyControl>,
+      =ecs::ambiguous_with<loco::LocomotionPresentation>]]
     void interpolate_characters(ecs::Query<Transform, const CharacterMovement> characters, ecs::Res<ecs::FrameTime> time)
     {
         const float alpha = (float)time->alpha;
@@ -420,7 +354,7 @@ namespace
 }
 
 
-void CharacterAnimator::load_poses(const std::string& poses_json_path, const Skeleton& skeleton)
+void CharacterAnimator::load_poses(const std::string& poses_json_path)
 {
     std::optional<Json::Value> json = json_utils::load_json_asset(poses_json_path);
     if (!json.has_value() || !(*json)["poses"].isArray())
@@ -435,12 +369,12 @@ void CharacterAnimator::load_poses(const std::string& poses_json_path, const Ske
         clip.handle = AssetManager::get().load_animation(entry["clip"].asString());
         if (!clip.handle.is_valid())
             continue;
-        const AnimationClip& anim = clip.handle.get();
-        clip.binding = AnimationBinding::bind(anim, skeleton);
-        clip.duration = anim.duration;
+        clip.duration = clip.handle.get().duration;
         clip.name = entry["name"].asString();
         poses.push_back(std::move(clip));
     }
+    pose_players.resize(poses.size());
+    pose_list.reset_on_activation = true;   // a pose starts from its beginning
     LogCharacterController.Log("Loaded %zu poses", poses.size());
 }
 
@@ -449,17 +383,8 @@ void CharacterAnimator::select_pose(int32_t pose_index)
     if (pose_index >= (int32_t)poses.size() || pose_index == active_pose)
         return;
 
-    // the current pose fades out while the new one fades in
-    if (active_pose >= 0)
-    {
-        fading_pose = active_pose;
-        fading_pose_time = pose_time;
-        fading_pose_weight = pose_weight;
-    }
-
+    // the graph crossfades from the current pose (or locomotion)
     active_pose = pose_index;
-    pose_time = 0.0f;
-    pose_weight = 0.0f;
 
     if (pose_index >= 0)
         LogCharacterController.Log("Pose %d/%zu: %s", pose_index + 1, poses.size(), poses[pose_index].name.c_str());
@@ -542,19 +467,20 @@ bool init_character(World& world, ecs::Entity e, const std::string& locomotion_j
 
     CharacterAnimator animator;
     const bool loaded =
-        load_clip(*locomotion, "idle", skeleton, animator.idle) &
-        load_clip(*locomotion, "walk", skeleton, animator.walk) &
-        load_clip(*locomotion, "run", skeleton, animator.run) &
-        load_clip(*locomotion, "jump_start", skeleton, animator.jump_start) &
-        load_clip(*locomotion, "jump_loop", skeleton, animator.jump_loop) &
-        load_clip(*locomotion, "jump_end", skeleton, animator.jump_end);
+        load_clip(*locomotion, "idle", animator.idle) &
+        load_clip(*locomotion, "walk", animator.walk) &
+        load_clip(*locomotion, "run", animator.run) &
+        load_clip(*locomotion, "jump_start", animator.jump_start) &
+        load_clip(*locomotion, "jump_loop", animator.jump_loop) &
+        load_clip(*locomotion, "jump_end", animator.jump_end);
 
     if (!loaded || animator.walk.ground_speed <= 0.0f || animator.run.ground_speed <= animator.walk.ground_speed)
     {
         LogCharacterController.Log("Locomotion set '%s' is incomplete", locomotion_json_path.c_str());
         return false;
     }
-    animator.bind_pose = make_bind_pose(skeleton);
+    anim::Animator graph_animator;
+    graph_animator.init(anim::Rig::create(skeleton));
 
     CharacterMovement movement;
     movement.walk_speed = animator.walk.ground_speed;
@@ -589,6 +515,7 @@ bool init_character(World& world, ecs::Entity e, const std::string& locomotion_j
     registry.add<CharacterMovement>(e, movement);
     registry.add<CharacterInput>(e);
     registry.add<CharacterAnimator>(e, std::move(animator));
+    registry.add<anim::Animator>(e, std::move(graph_animator));
     return true;
 }
 

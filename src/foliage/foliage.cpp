@@ -15,6 +15,7 @@ import render_scene;
 import rhcomponents;
 import terrain;
 import character_controller;
+import locomotion;
 import assets;
 import json_utils;
 import paths;
@@ -47,6 +48,7 @@ namespace
       =ecs::ambiguous_with<MeshColliderSync>]]
     void sync_foliage(ecs::Query<const TerrainFoliage, const Terrain> foliage,
         ecs::Query<const CharacterMovement, const WorldTransform> characters,
+        ecs::Query<const loco::LocomotionCharacter, const WorldTransform> locomotion_characters,
         ecs::Res<ecs::FrameTime> time, ecs::ResMut<SceneView> scene_view)
     {
         PROFILE("sync_foliage");
@@ -78,6 +80,9 @@ namespace
         if (!processor.valid || interaction_radius <= 0.0f)
             return;
         characters.each([&] (const CharacterMovement&, const WorldTransform& world) {
+            processor.interactors.push_back({ .position = world.value.position.glm(), .radius = interaction_radius });
+        });
+        locomotion_characters.each([&] (const loco::LocomotionCharacter&, const WorldTransform& world) {
             processor.interactors.push_back({ .position = world.value.position.glm(), .radius = interaction_radius });
         });
     }

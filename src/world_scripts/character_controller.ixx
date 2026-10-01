@@ -15,6 +15,7 @@ import input;
 import rhcomponents;
 import physics;
 import reflect;
+import animation;
 
 // Third person character of a skeletal mesh entity, moved as a physics character capsule
 // (collides with the level, climbs steps, falls from ledges):
@@ -27,10 +28,13 @@ import reflect;
 // Split for the fixed tick (and later the network):
 //   CharacterInput     - the command of one tick: filled from the keyboard for PlayerControlled (FixedPre)
 //   CharacterMovement  - simulation state, advanced by move_characters every fixed tick (Fixed)
-//   CharacterAnimator  - pose from the movement state, every frame (Update); the entity's Transform is
-//                        interpolated between the last two ticks at the same time
+//   CharacterAnimator  - pose from the movement state, every frame (Update, anim::Evaluate) on the entity's
+//                        anim::Animator; the entity's Transform is interpolated between the last two ticks
 export
 {
+    // System set of the interpolation of the characters' Transforms (Update): writes no other Transform
+    struct CharacterInterpolation {};
+
     struct [[=scene::runtime_only]] CharacterInput
     {
         glm::vec2 move_axis{0.0f};   // x: right, y: forward, relative to camera_yaw
@@ -78,12 +82,13 @@ export
         static constexpr float capsule_radius = 0.3f;
     };
 
+    // Pose of the character from its movement state, every frame: an animation graph (module animation) run
+    // on the entity's anim::Animator.
     struct [[=scene::runtime_only]] CharacterAnimator
     {
         struct Clip
         {
             AnimationClipHandle handle;
-            AnimationBinding binding;
             float duration = 0.0f;
             float ground_speed = 0.0f;
             std::string name;
@@ -103,11 +108,6 @@ export
 
         std::vector<Clip> poses;
         [[=rh::edit, =rh::read_only]] int32_t active_pose = -1;      // pose being blended in (or -1)
-        int32_t fading_pose = -1;      // previous pose, blended out
-        float pose_time = 0.0f;
-        float fading_pose_time = 0.0f;
-        float pose_weight = 0.0f;
-        float fading_pose_weight = 0.0f;
 
         std::vector<Expression> expressions;
         [[=rh::edit, =rh::read_only]] int32_t active_expression = -1;
@@ -115,14 +115,13 @@ export
         std::vector<float> expression_weights;  // current weights
         float expression_blend = 1.0f;          // 0..1 from -> target
 
-        BonePose bind_pose;
-        BonePose pose_a, pose_b, pose_locomotion, pose_final;
+        // graph nodes
+        anim::SequencePlayer idle_player, walk_player, run_player;
+        anim::SequencePlayer jump_start_player, jump_loop_player, jump_end_player;
+        std::vector<anim::SequencePlayer> pose_players;
+        anim::BlendList pose_list;              // 0: locomotion, 1 + i: pose i
+        anim::StateMachine<JumpState> jump{JumpState::none};
 
-        float idle_time = 0.0f;
-        [[=rh::edit, =rh::read_only]] float locomotion_phase = 0.0f;  // normalized walk/run cycle
-        JumpState jump_state = JumpState::none;
-        float jump_time = 0.0f;
-        [[=rh::edit, =rh::read_only]] float jump_weight = 0.0f;
         uint32_t seen_jump_count = 0;
         uint32_t seen_land_count = 0;
 
@@ -132,7 +131,7 @@ export
         static constexpr float fall_animation_delay = 0.15f;   // walking off small ledges stays in locomotion
 
         // Optional set of looping poses (poses.json from tools/ue_import), selected by index
-        void load_poses(const std::string& poses_json_path, const Skeleton& skeleton);
+        void load_poses(const std::string& poses_json_path);
         // -1 returns to locomotion. Moving also leaves the pose.
         void select_pose(int32_t pose_index);
         int32_t get_pose_count() const { return (int32_t)poses.size(); }

@@ -39,6 +39,8 @@ static std::map<int, Key> GLFW_KEYS = {
     {GLFW_KEY_Z, Key::Z},
     {GLFW_KEY_SPACE, Key::Space},
     {GLFW_KEY_LEFT_SHIFT, Key::LeftShift},
+    {GLFW_KEY_LEFT_CONTROL, Key::LeftControl},
+    {GLFW_KEY_LEFT_ALT, Key::LeftAlt},
     {GLFW_KEY_F1, Key::F1},
     {GLFW_KEY_F2, Key::F2},
     {GLFW_KEY_F3, Key::F3},

@@ -11,7 +11,7 @@ import glm;
 import rhmath;
 import ecs;
 import framework;
-import character_controller;
+import locomotion;
 import profile;
 import gpu_profile;
 import render;
@@ -86,7 +86,7 @@ bool Benchmark::start(World& world, const std::string& route_asset_path, const s
     // dropped from above the ground: it lands during the warmup
     cvar::execute(std::format("player.teleport {} {} {}", waypoints[0].x, (*route).get("start_height", 1.0f).asFloat(),
         waypoints[0].y));
-    set_scripted_player_input(CharacterInput{});
+    loco::set_scripted_locomotion_input(loco::LocomotionInput{});
 
     const glm::vec2 first_leg = waypoints[1] - waypoints[0];
     travel_yaw = std::atan2(-first_leg.x, -first_leg.y);
@@ -121,10 +121,10 @@ void Benchmark::tick(World& world, ecs::Entity character, float& yaw, float& pit
 {
     if (state == State::idle)
         return;
-    if (!character || !world.registry.get<CharacterMovement>(character))
+    if (!character || !world.registry.get<loco::LocomotionCharacter>(character))
     {
         cvar::print("bench.run: no player character", cvar::Output::error);
-        set_scripted_player_input(std::nullopt);
+        loco::set_scripted_locomotion_input(std::nullopt);
         state = State::idle;
         return;
     }
@@ -156,7 +156,7 @@ void Benchmark::tick(World& world, ecs::Entity character, float& yaw, float& pit
 
 void Benchmark::steer(World& world, ecs::Entity character, float& yaw, float& pitch)
 {
-    const CharacterMovement& movement = *world.registry.get<CharacterMovement>(character);
+    const loco::LocomotionCharacter& movement = *world.registry.get<loco::LocomotionCharacter>(character);
     const double now = world.get_time_seconds();
     const float dt = float(std::min(world.get_delta_seconds(), 0.1));
 
@@ -185,7 +185,7 @@ void Benchmark::steer(World& world, ecs::Entity character, float& yaw, float& pi
         // the loop closes on waypoint 0
         if (next_waypoint == 0 && ++lap >= laps)
         {
-            set_scripted_player_input(CharacterInput{});
+            loco::set_scripted_locomotion_input(loco::LocomotionInput{});
             state = State::draining;
             drain_frames = 0;
             return;
@@ -208,17 +208,17 @@ void Benchmark::steer(World& world, ecs::Entity character, float& yaw, float& pi
     yaw = travel_yaw + sweep * std::sin(2.0f * PI * t / sweep_period);
     pitch = base_pitch + pitch_sweep * std::sin(2.0f * PI * t / pitch_period);
 
-    // the input is relative to the camera (character_controller move_character)
+    // the input is relative to the camera (module locomotion: view yaw of the player's camera)
     const glm::vec2 camera_forward(-std::sin(yaw), -std::cos(yaw));
     const glm::vec2 camera_right(std::cos(yaw), -std::sin(yaw));
-    CharacterInput input;
+    loco::LocomotionInput input;
     input.move_axis = glm::vec2(glm::dot(direction, camera_right), glm::dot(direction, camera_forward));
-    set_scripted_player_input(input);
+    loco::set_scripted_locomotion_input(input);
 }
 
 void Benchmark::open_frame(World& world, ecs::Entity character, float yaw, float pitch)
 {
-    const CharacterMovement& movement = *world.registry.get<CharacterMovement>(character);
+    const loco::LocomotionCharacter& movement = *world.registry.get<loco::LocomotionCharacter>(character);
     frame_wall = std::chrono::steady_clock::now();
 
     Frame& frame = frames.emplace_back();
@@ -284,7 +284,7 @@ void Benchmark::snapshot_scopes(const prof::ProfileNode& node, int32_t parent, i
 void Benchmark::finish()
 {
     state = State::idle;
-    set_scripted_player_input(std::nullopt);
+    loco::set_scripted_locomotion_input(std::nullopt);
     prof::set_is_profiling(false);
     gpuprof::set_enabled(false);
 

@@ -91,10 +91,15 @@ export
     {
         [[=rh::edit, =rh::read_only]] MeshCollision type = MeshCollision::simplified;
         [[=rh::edit, =rh::read_only]] float simplify_error = 0.02f;
+        // moved by code (doors, platforms): the body follows the entity's WorldTransform (by the next physics
+        // step), pushes dynamic bodies, carries characters
+        [[=rh::edit, =rh::read_only]] bool kinematic = false;
 
         [[=rh::transient]] phys::Shape shape;
         [[=rh::transient]] std::shared_ptr<phys::Shape> pending;
         [[=rh::transient]] phys::BodyId body;
+        // kinematic: where the body was last sent
+        [[=rh::transient]] phys::BodyTransform body_transform;
 
         MeshCollisionSettings get_settings() const { return { type, simplify_error }; }
     };
