@@ -328,9 +328,9 @@ namespace
             });
     }
 
-    // Render transform between the last two simulated ticks
+    // Render transform between the last two simulated ticks (spring bones simulate in world space from it)
     // (the sky controller writes Transform too: of the sun, never of a character)
-    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<CharacterInterpolation>, =ecs::ambiguous_with<SkyControl>,
+    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<CharacterInterpolation>, =ecs::before<anim::PostProcess>, =ecs::ambiguous_with<SkyControl>,
       =ecs::ambiguous_with<loco::LocomotionPresentation>]]
     void interpolate_characters(ecs::Query<Transform, const CharacterMovement> characters, ecs::Res<ecs::FrameTime> time)
     {

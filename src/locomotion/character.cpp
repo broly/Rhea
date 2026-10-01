@@ -824,8 +824,8 @@ namespace loco
             });
         }
 
-        // Render transform between the last two simulated ticks
-        [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<LocomotionPresentation>, =ecs::ambiguous_with<SkyControl>]]
+        // Render transform between the last two simulated ticks (spring bones simulate in world space from it)
+        [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<LocomotionPresentation>, =ecs::before<anim::PostProcess>, =ecs::ambiguous_with<SkyControl>]]
         void interpolate_locomotion_characters(ecs::Query<Transform, const LocomotionCharacter> characters, ecs::Res<ecs::FrameTime> time)
         {
             const float alpha = (float)time->alpha;

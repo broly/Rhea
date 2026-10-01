@@ -17,6 +17,7 @@ import rhcomponents;
 import character_controller;
 import locomotion;
 import sky_controller;
+import animation;
 
 #include "logging/log_macro.h"
 #include "ecs/ecs_macros.h"
@@ -107,9 +108,10 @@ namespace
     }
 
     // The sky controller and the character interpolations write Transforms too: of the sun and the characters,
-    // never of an activated object
+    // never of an activated object; spring bones read those of animated characters
     [[=ecs::system<ecs::Phase::Update>, =ecs::after<Activation>, =ecs::ambiguous_with<SkyControl>,
-      =ecs::ambiguous_with<CharacterInterpolation>, =ecs::ambiguous_with<loco::LocomotionPresentation>]]
+      =ecs::ambiguous_with<CharacterInterpolation>, =ecs::ambiguous_with<loco::LocomotionPresentation>,
+      =ecs::ambiguous_with<anim::PostProcess>]]
     void play_activated_motions(ecs::Query<ActivatedMotion, Transform> motions, ecs::Query<const Activator> activators,
                                 ecs::Query<const ChildOf> parents, ecs::Query<const WorldTransform> worlds,
                                 ecs::Query<const MeshRenderer> renderers)

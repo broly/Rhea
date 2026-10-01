@@ -11,3 +11,4 @@ export import :graph;
 export import :ik;
 export import :animator;
 export import :poses;
+export import :spring_bones;

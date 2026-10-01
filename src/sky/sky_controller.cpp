@@ -7,6 +7,7 @@ import name;
 import ecs;
 import framework;
 import rhcomponents;
+import animation;
 
 #include "ecs/ecs_macros.h"
 #include "framework/scene_macros.h"
@@ -119,8 +120,8 @@ namespace
     }
 
     // The sky controllers drive their sky, clouds and the directional light. Before the clouds move: they
-    // take this frame's wind.
-    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<SkyControl>, =ecs::before<CloudWind>]]
+    // take this frame's wind. (Spring bones read Transforms of animated characters, never of a light.)
+    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<SkyControl>, =ecs::before<CloudWind>, =ecs::ambiguous_with<anim::PostProcess>]]
     void update_sky_controllers(ecs::Query<SkyController, SkyAtmosphere> skies, ecs::Query<VolumetricClouds> cloud_layers,
         ecs::Query<VolumetricFog> fog_layers, ecs::Query<const Name, Light, Transform> lights, ecs::Res<ecs::FrameTime> time)
     {
