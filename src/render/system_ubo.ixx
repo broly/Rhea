@@ -41,6 +41,8 @@ export struct DirectionalLight
     glm::vec4 cloud_shadow_u;       // xyz: u axis (world, unit) / size of the map, w: offset
     glm::vec4 cloud_shadow_v;       // the same for v
     glm::vec4 cloud_shadow_params;  // x: strength (0: no cloud shadows), y: size of the map (m), z: dot(camera position, towards the light)
+    // Penumbra of the cascades (shadow.glsl, PCSS): it widens with the distance from the blocker to the receiver
+    glm::vec4 shadow_softness;      // x: tan of the light's angular radius (0: fixed 3x3 PCF), y: largest penumbra radius (texels of a cascade)
 };
 
 export struct alignas(16) LightUBO

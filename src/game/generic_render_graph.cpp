@@ -1854,6 +1854,8 @@ void GenericRenderGraph::write_shadow_cascades(DirectionalLight& light) const
     // before the first shadow pass nothing is in the atlas: lit
     light.cascade_params = glm::vec4(all_valid ? float(shadow_cascade_count) : 0.0f, 0.1f,
         1.0f / float(Constants::shadowmap_extent.width), float(Constants::shadow_atlas_tiles));
+    light.shadow_softness = glm::vec4(std::tan(glm::radians(0.5f * std::max(cv_shadow_sun_angle.get(), 0.0f))),
+        std::max(cv_shadow_max_penumbra.get(), 1.0f), 0.0f, 0.0f);
 }
 
 void GenericRenderGraph::dispatch_skinning(RenderGraphContext& ctx)

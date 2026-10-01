@@ -39,6 +39,15 @@ export cvar::Var<int> cv_shadow_interval_2(
 export cvar::Var<int> cv_shadow_interval_3(
     "render.shadows.interval_3", 4, "Frames between renders of shadow cascade 3 (1: every frame)");
 
+// Soft shadows of the sun (shaders/resources/shadow.glsl, PCSS): the penumbra grows with the distance from the
+// blocker, so a mountain a few km away casts a shadow with an edge tens of metres wide
+export cvar::Var<float> cv_shadow_sun_angle(
+    "render.shadows.sun_angle", 0.53f, "Angular diameter of the sun for the shadow penumbra, degrees (0: fixed 3x3 PCF)",
+    { .has_range = true, .min = 0.0f, .max = 5.0f });
+export cvar::Var<float> cv_shadow_max_penumbra(
+    "render.shadows.max_penumbra", 12.0f, "Largest shadow penumbra radius, texels of a cascade",
+    { .has_range = true, .min = 1.0f, .max = 32.0f });
+
 // Simplified shadow casters (MeshRenderer::shadow_proxies): a cascade draws the coarsest proxy whose error is at
 // most this many of its texels (0: the meshes themselves)
 export cvar::Var<float> cv_shadow_proxy_texels(

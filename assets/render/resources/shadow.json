@@ -13,7 +13,7 @@
 			"shadow_depth_debug": {
 				"variable": "u_shadow_depth_debug",
 				"type": "sampler",
-				"sampler": "shadow",
+				"sampler": "depth",
 				"binding": "BINDING_UBO_SHADOW_DEBUG"
 			},
 			"cloud_shadow": {

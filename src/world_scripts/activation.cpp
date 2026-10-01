@@ -15,6 +15,7 @@ import framework;
 import assets;
 import rhcomponents;
 import character_controller;
+import locomotion;
 import sky_controller;
 
 #include "logging/log_macro.h"
@@ -25,12 +26,15 @@ DEFINE_LOGGER(LogActivation, Log);
 
 namespace
 {
+    // Characters of both controllers (character_controller and locomotion) switch activators on
     [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<Activation>]]
     void update_activators(ecs::Query<Activator, const WorldTransform> activators, ecs::Query<const Name> names,
-                           ecs::Query<const CharacterMovement> characters, ecs::Res<ecs::FrameTime> time)
+                           ecs::Query<const CharacterMovement> characters,
+                           ecs::Query<const loco::LocomotionCharacter> locomotion_characters, ecs::Res<ecs::FrameTime> time)
     {
         std::vector<glm::vec3> feet;
         characters.each([&] (const CharacterMovement& movement) { feet.push_back(movement.position); });
+        locomotion_characters.each([&] (const loco::LocomotionCharacter& character) { feet.push_back(character.position); });
 
         const float dt = float(time->dt);
         activators.each([&] (ecs::Entity e, Activator& activator, const WorldTransform& world) {
@@ -102,10 +106,10 @@ namespace
         return glm::dot(move, to_character) > 0.0f ? -1.0f : 1.0f;
     }
 
-    // The sky controller and the character interpolation write Transforms too: of the sun and the characters,
+    // The sky controller and the character interpolations write Transforms too: of the sun and the characters,
     // never of an activated object
     [[=ecs::system<ecs::Phase::Update>, =ecs::after<Activation>, =ecs::ambiguous_with<SkyControl>,
-      =ecs::ambiguous_with<CharacterInterpolation>]]
+      =ecs::ambiguous_with<CharacterInterpolation>, =ecs::ambiguous_with<loco::LocomotionPresentation>]]
     void play_activated_motions(ecs::Query<ActivatedMotion, Transform> motions, ecs::Query<const Activator> activators,
                                 ecs::Query<const ChildOf> parents, ecs::Query<const WorldTransform> worlds,
                                 ecs::Query<const MeshRenderer> renderers)
