@@ -209,6 +209,26 @@ namespace GeometryDebug
     inline constexpr uint32_t glossy = 8;                // pbr roughness x 0.25: polished level to check SSR / probe reflections
 }
 
+// Temporal anti-aliasing (shaders/taa.frag, pass "TAA" before the tone mapping, game graph only)
+export cvar::Var<bool> cv_taa_enabled(
+    "render.taa.enabled", true, "Temporal anti-aliasing: sub-pixel jittered projection, the frame accumulated over time");
+export cvar::Var<float> cv_taa_feedback(
+    "render.taa.feedback", 0.1f, "TAA: share of the new frame in the result (lower: smoother, more ghosting)",
+    { .has_range = true, .min = 0.02f, .max = 1.0f });
+export cvar::Var<float> cv_taa_gamma(
+    "render.taa.gamma", 1.25f, "TAA: width of the history clipping box in standard deviations of the 3x3 neighbourhood (lower: less ghosting, more flicker)",
+    { .has_range = true, .min = 0.5f, .max = 4.0f });
+
+struct TAAPushConstants
+{
+    glm::vec4 jitter;       // xy: this frame's jitter - the previous frame's (uv)
+    float feedback;
+    float gamma;
+    uint32_t reset;         // 1: no usable history
+    uint32_t pad = 0;
+};
+RH_REGISTER_TYPE(TAAPushConstants)
+
 struct ColorOutputConstants
 {
     uint32_t buffer_index;
@@ -437,8 +457,21 @@ public:
     PipelineObject* wireframe_mesh_pipeline = nullptr;
     PipelineObject* skeleton_pipeline = nullptr;
     PipelineObject* debug_lines_pipeline = nullptr;
+    PipelineObject* taa_pipeline = nullptr;
 
-    
+    // TAA (add_taa_passes): only the graph which presents (GameRenderGraph) jitters its projection
+    bool taa_supported = false;
+    uint32_t taa_frame = 0;
+    glm::vec2 taa_jitter = glm::vec2(0.0f);        // NDC offset of this frame's projection
+    glm::vec2 taa_prev_jitter = glm::vec2(0.0f);   // of the previous frame (its prev_proj)
+    bool taa_history_valid = false;
+    Extent taa_history_extent{};
+    bool taa_enabled() const;
+    // TAA over the finished HDR frame (fog, particles included): INTERMEDIATE, then copied to the history
+    // (ping-pong layer history_index) and back to BASE for the tone mapping
+    void add_taa_passes();
+
+
     std::shared_ptr<PipelineFamily> tonemap_pipeline_family;
     std::shared_ptr<PipelineFamily> shadow_debug_pipeline_family;
     std::shared_ptr<PipelineFamily> wireframe_pipeline_family;
@@ -454,7 +487,8 @@ public:
     std::shared_ptr<PipelineFamily> wireframe_mesh_pipeline_family;
     std::shared_ptr<PipelineFamily> skeleton_pipeline_family;
     std::shared_ptr<PipelineFamily> debug_lines_pipeline_family;
-    
+    std::shared_ptr<PipelineFamily> taa_pipeline_family;
+
     bool use_swapchain_extent;
     
     using PassBatches = std::vector<DrawBatch>;

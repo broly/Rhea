@@ -325,7 +325,9 @@ void GenericRenderGraph::init_resources(const std::map<Name, bool>& parameters)
 
     ssr_pipeline_family = renderer->query_pipeline_family("SSR", ssr_model);
 
-    ssr_composite_pipeline_family = renderer->query_pipeline_family("SSRComposite", ssr_model); 
+    ssr_composite_pipeline_family = renderer->query_pipeline_family("SSRComposite", ssr_model);
+
+    taa_pipeline_family = renderer->query_pipeline_family("TAA", renderer->find_model("taa"));
     
     if constexpr (render_settings::enable_raytracing)
     {
@@ -1463,6 +1465,41 @@ void GenericRenderGraph::rebuild_camera_ubo(RenderGraphContext& ctx)
         current_camera_ubo = make_camera_ubo(ctx, false, 0);
         current_camera_ubo.prev_proj = prev_proj;
         current_camera_ubo.prev_view = prev_view;
+
+        // TAA: the projection moves by a sub-pixel offset every frame (Halton 2, 3, 8 positions). prev_proj is the
+        // previous frame's jittered one: the motion vectors carry the jitter delta, taa.frag takes it off
+        taa_prev_jitter = taa_jitter;
+        taa_jitter = glm::vec2(0.0f);
+        if (taa_enabled())
+        {
+            const auto halton = [] (uint32_t index, uint32_t base)
+            {
+                float result = 0.0f;
+                float fraction = 1.0f;
+                for (; index > 0; index /= base)
+                {
+                    fraction /= float(base);
+                    result += fraction * float(index % base);
+                }
+                return result;
+            };
+            const Extent screen = resolution.is_zero() ? backend->get_swapchain_extent() : resolution;
+            const uint32_t index = taa_frame++ % 8 + 1;
+            taa_jitter = glm::vec2(halton(index, 2) - 0.5f, halton(index, 3) - 0.5f)
+                * 2.0f / glm::vec2(float(std::max(screen.width, 1u)), float(std::max(screen.height, 1u)));
+
+            // offset in NDC after the projection: x' = x + jitter * w
+            glm::mat4 offset(1.0f);
+            offset[3][0] = taa_jitter.x;
+            offset[3][1] = taa_jitter.y;
+            current_camera_ubo.proj = offset * current_camera_ubo.proj;
+            current_camera_ubo.inv_proj = glm::inverse(current_camera_ubo.proj);
+            current_camera_ubo.inv_viewproj = glm::inverse(current_camera_ubo.proj * current_camera_ubo.view);
+        }
+        else
+        {
+            taa_history_valid = false;
+        }
     }
     else
     {
@@ -1489,6 +1526,7 @@ void GenericRenderGraph::on_pso_built()
     skeleton_pipeline = request_pipeline(skeleton_pipeline_family, {});
     debug_lines_pipeline = request_pipeline(debug_lines_pipeline_family, {});
     tonemap_pipeline = request_pipeline(tonemap_pipeline_family, {});
+    taa_pipeline = request_pipeline(taa_pipeline_family, {});
     lighting_pipeline = request_pipeline(lighting_pipeline_family, {});
     skinning_pipeline = skinning_pipeline_family->request_pipeline({});
     nn_denoiser::on_pso_built(nn_denoiser_state);
@@ -2776,6 +2814,77 @@ void GenericRenderGraph::draw_rtxgi(RenderGraphContext& ctx)
     
     ctx.trace_rays(rtx_gi_pipeline, resolution, 1);
 
+}
+
+bool GenericRenderGraph::taa_enabled() const
+{
+    return taa_supported && cv_taa_enabled.get() && !is_debugging();
+}
+
+void GenericRenderGraph::add_taa_passes()
+{
+    const auto enabled = [this] () { return taa_enabled(); };
+
+    add_pass({
+        .name = "TAA",
+        .condition = enabled,
+        .reads = {
+            { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },
+            { hdr_color_history[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },
+            { gbuffer[GBUFFER_SLOTS::DEPTH], RBImageUsageType::SampledFragment },
+            { gbuffer[GBUFFER_SLOTS::MOTION_VECTORS], RBImageUsageType::SampledFragment },
+        },
+        .writes = {
+            { hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE], RBImageUsageType::ColorAttachment, RBLoadOp::DontCare }
+        },
+        .execute = [this] (RenderGraphContext& ctx)
+        {
+            PROFILE("TAA");
+            ctx.backend.update_viewport(ctx.cmd, resolution, use_swapchain_extent);
+
+            // the first frame with TAA on, or a new screen size: the history holds nothing usable
+            const Extent screen = resolution.is_zero() ? backend->get_swapchain_extent() : resolution;
+            const bool reset = !taa_history_valid
+                || screen.width != taa_history_extent.width || screen.height != taa_history_extent.height;
+            taa_history_valid = true;
+            taa_history_extent = screen;
+
+            if (ctx.bind_pipeline(taa_pipeline))
+                ctx.bind(camera_resource, hdr_color_output_resource, gbuffer_resource);
+            // NDC -> uv: half
+            const glm::vec2 jitter_delta = (taa_jitter - taa_prev_jitter) * 0.5f;
+            ctx.push_constants(TAAPushConstants{
+                .jitter = glm::vec4(jitter_delta, 0.0f, 0.0f),
+                .feedback = std::clamp(cv_taa_feedback.get(), 0.02f, 1.0f),
+                .gamma = std::clamp(cv_taa_gamma.get(), 0.5f, 4.0f),
+                .reset = reset ? 1u : 0u,
+            });
+            ctx.draw_fullscreen();
+        },
+    });
+
+    add_copy_pass("COPY_taa_to_history", hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE],
+        hdr_color_history[COLOR_OUTPUT_HDR::BASE], true, enabled);
+
+    add_pass({
+        .name = "COPY_taa_to_hdr_base",
+        .condition = enabled,
+        .reads = {
+            { hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE], RBImageUsageType::TransferSrc }
+        },
+        .writes = {
+            { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::TransferDst, RBLoadOp::Load }
+        },
+        .execute = [this] (RenderGraphContext& ctx)
+        {
+            CopyImageParams params;
+            params.source = get_image(hdr_color_present[COLOR_OUTPUT_HDR::INTERMEDIATE]);
+            params.dest = get_image(hdr_color_present[COLOR_OUTPUT_HDR::BASE]);
+            ctx.copy_img(params);
+        },
+        .num_layers = 1,
+        .type = RenderPassType::transfer
+    });
 }
 
 void GenericRenderGraph::add_copy_pass(Name name, RGTextureHandle src, RGTextureHandle dst, bool ping_pong,

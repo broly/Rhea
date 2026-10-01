@@ -8,6 +8,7 @@
 #include "resources/camera.glsl"
 #include "resources/pbr_material_table.glsl"
 #include "push_constants/model_push_constants.glsl"
+#include "utils/specular_aa.glsl"
 
 // Terrain (material model "terrain", assets/render/schemas/terrain.json): four PBR layers blended by a
 // splat map (RGBA = layer weights, uv = the terrain's 0..1) with height based transitions.
@@ -187,11 +188,34 @@ void main()
     // covers everything; the water is a flat mirror. Slopes stay dry.
     float level = read_texture_or(mat.textures2.w, v_uv, vec4(0.0)).r * or_default(mat.params13.x, 1.0);
     level *= smoothstep(0.90, 0.98, Ng.y);
+    // The water fills the layers by their height from a mip ~16x coarser than the pixel: with the texel heights
+    // the shore breaks into specks of water a pixel or two wide, each mirroring the bright sky next to dark
+    // ground, which shimmer as the camera moves. Blobs ~16 pixels wide with soft edges at any distance (puddles
+    // lie on flat ground: the top projection for every layer). Explicit gradients: sampled in the branch below.
+    const float shore_blur = 16.0;
+    vec2 world_dx = dFdx(v_world_pos.xz) * shore_blur;
+    vec2 world_dy = dFdy(v_world_pos.xz) * shore_blur;
+    vec4 shore_heights = heights;
     if (level > 0.0)
     {
-        // in layer heights: 0 at level 0.3 (the ground is wet by then), above every texel at level 1
-        float depth = (level - 0.3) / 0.7 * 1.25 - dot(heights, blend);
-        float water = smoothstep(0.0, 0.08, depth);
+        for (int i = 0; i < 4; ++i)
+        {
+            float layer_tiling = or_default(tiling[i], 4.0);
+            uint index = layer_textures[i].x;
+            float coarse = textureGrad(u_textures_array[nonuniformEXT(index)], v_world_pos.xz / layer_tiling,
+                world_dx / layer_tiling, world_dy / layer_tiling).a;
+            shore_heights[i] = index == 0u ? 0.5 : coarse;
+        }
+    }
+    // in layer heights: 0 at level 0.3 (the ground is wet by then), above every texel at level 1
+    float puddle_depth = (level - 0.3) / 0.7 * 1.25 - dot(shore_heights, blend);
+    // the shore is at least ~a pixel wide: the texel heights change faster than the pixels far away, a
+    // sharper shore jumps from pixel to pixel as the camera moves (here: derivatives need uniform control flow)
+    float shore_width = max(0.08, 1.5 * fwidth(puddle_depth));
+    if (level > 0.0)
+    {
+        float depth = puddle_depth;
+        float water = smoothstep(0.0, shore_width, depth);
         float wetness = max(smoothstep(0.0, 0.3, level), water);
 
         albedo *= mix(1.0, or_default(mat.params13.z, 0.5), wetness);
@@ -205,6 +229,9 @@ void main()
         ao = mix(ao, 1.0, water);
         metallic *= 1.0 - water;
     }
+
+    // the mirror of a puddle stays a mirror (flat N, no variance), its bumpy shore gets a wider lobe
+    roughness = specular_aa_roughness(N, roughness);
 
     if ((get_debug_index() & GEOMETRY_DEBUG_GLOSSY) != 0u)
         roughness *= 0.25;

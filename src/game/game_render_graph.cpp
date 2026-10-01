@@ -31,6 +31,7 @@ GameRenderGraph::GameRenderGraph()
     capture_dimension = TextureDimension::Tex2D;
     resolution = Constants::zero_extent;
     use_swapchain_extent = true;
+    taa_supported = true;
 }
 
 void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
@@ -42,8 +43,9 @@ void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
 void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
 {
     GenericRenderGraph::build_passes(parameters);
-    
-    
+
+    add_taa_passes();
+
     add_pass({
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },

@@ -14,6 +14,7 @@
 #include "resources/pbr_material_table.glsl"
 #include "push_constants/model_push_constants.glsl"
 #include "utils/hsv.glsl"
+#include "utils/specular_aa.glsl"
 
 
 // ================== INPUTS ==================
@@ -77,6 +78,7 @@ void main()
     vec3 n_ts = n_tx * 2.0 - 1.0;
 
     N = normalize(TBN * n_ts);
+    roughness = specular_aa_roughness(N, roughness);
 
     // ---- outputs ----
 
