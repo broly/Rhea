@@ -34,6 +34,8 @@ public:
     // Debug UI extension points, called while the UI is visible
     virtual void on_debug_ui_menu() {}             // extra menus of the main menu bar
     virtual void on_debug_ui_render_panel() {}     // top of the "Render" window
+    virtual void on_debug_ui_windows_menu() {}     // extra items of the "Windows" menu
+    virtual void on_debug_ui_windows() {}          // extra windows, drawn every frame the UI is visible
 
     platform::window::Window window{};
     std::shared_ptr<Input> input = nullptr;

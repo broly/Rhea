@@ -17,6 +17,7 @@ import name;
 import engine;
 import assets;
 import :generic_render_graph;
+import :post_process;
 #include "object/object_reflection_macro.h"
 
 struct TonemapPushConstants
@@ -43,6 +44,19 @@ public:
     void pass_translucent(RenderGraphContext& ctx);
     void pass_tonemapping(RenderGraphContext& ctx);
     void pass_readback(RenderGraphContext& ctx);
+
+    std::unique_ptr<PostProcessRenderer> post_renderer;
+
+private:
+    // bloom chain and auto exposure between TAA and the tone mapping (PostProcessRenderer)
+    void add_post_process_passes();
+
+    // 1/2 .. 1/64 of the screen
+    std::array<RGTextureHandle, PostProcessRenderer::bloom_levels> bloom_down;
+    // 1/2 .. 1/32: bloom_up[0] is the bloom the tone mapping adds
+    std::array<RGTextureHandle, PostProcessRenderer::bloom_levels - 1> bloom_up;
+    // adapted exposure and the luminance histogram (resources/post_process.glsl)
+    RGTextureHandle exposure;
 
     
     

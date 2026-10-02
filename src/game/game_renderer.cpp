@@ -50,6 +50,7 @@ void GameRenderer::init(RBWindowHandle in_window)
     samplers["surface"] = render_backend->create_sampler(samplers::default_surface());
     samplers["shadow"] = render_backend->create_sampler(samplers::default_shadow());
     samplers["depth"] = render_backend->create_sampler(samplers::default_depth());
+    samplers["linear_clamp"] = render_backend->create_sampler(samplers::linear_clamp());
     
     
     Renderer::init(in_window);

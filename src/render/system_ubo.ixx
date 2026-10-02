@@ -94,6 +94,33 @@ export struct SkyUBO
 };
 RH_REGISTER_TYPE(SkyUBO)
 
+// ---- post processing (game: PostProcessRenderer, shaders/tonemap.slang, shaders/resources/post_process.*) ----
+// Colors are linear unless noted; the grading after the tone curve works in display space.
+export struct PostProcessUBO
+{
+    glm::vec4 exposure;          // x: 1 auto exposure (read from u_pp_exposure), 0 manual, y: manual EV, z: compensation EV, w: 1 draws the luminance histogram
+    glm::vec4 auto_exposure;     // x: min EV, y: max EV, z: log2 of the key (the middle gray the average is exposed to)
+    glm::vec4 histogram;         // x: log2 luminance of the first bin, y: log2 luminance range of the histogram
+    glm::vec4 bloom;             // rgb: tint, w: intensity (share of the blurred frame, 0: off)
+    glm::vec4 balance_r;         // rows of white balance x color filter, applied after the exposure
+    glm::vec4 balance_g;
+    glm::vec4 balance_b;
+    glm::vec4 grade_r;           // rows of hue shift x saturation, applied after the contrast
+    glm::vec4 grade_g;
+    glm::vec4 grade_b;
+    glm::vec4 tone;              // x: contrast (log space, around the middle gray), y: Tonemapper, z: 1 / display gamma, w: posterize levels (0: off)
+    glm::vec4 lift;              // rgb: added to the shadows (display space)
+    glm::vec4 gamma;             // rgb: 1 / gamma of the midtones
+    glm::vec4 gain;              // rgb: multiplier of the highlights
+    glm::vec4 split_shadows;     // rgb: soft light color over the shadows (0.5: neutral, display space), w: balance
+    glm::vec4 split_highlights;  // rgb: over the highlights
+    glm::vec4 vignette;          // rgb: color, w: intensity
+    glm::vec4 lens;              // x: vignette smoothness, y: vignette roundness, z: chromatic aberration (share of the screen at the corners), w: sharpen
+    glm::vec4 grain;             // x: intensity, y: grain size (px), z: response (fades the grain in the highlights), w: frame seed
+    glm::vec4 screen;            // xy: screen size (px), zw: 1 / size
+};
+RH_REGISTER_TYPE(PostProcessUBO)
+
 // ---- reflection probes (game: ReflectionProbeSystem, shaders/resources/reflection.glsl) ----
 
 export constexpr uint32_t kMaxReflectionProbes = 16;

@@ -5,6 +5,7 @@ import reflect;
 import properties;
 import type_id;
 import name;
+import glm;
 
 
 // Console variables: named runtime settings from any module, listed in the debug UI catalog
@@ -144,6 +145,10 @@ export namespace cvar
     namespace detail
     {
         template<typename T>
+        constexpr bool is_float_vector = std::is_same_v<T, glm::vec2> || std::is_same_v<T, glm::vec3>
+            || std::is_same_v<T, glm::vec4>;
+
+        template<typename T>
         std::string value_to_string(const T& value)
         {
             if constexpr (std::is_same_v<T, bool>)
@@ -156,6 +161,14 @@ export namespace cvar
                 return value;
             else if constexpr (std::is_same_v<T, Name>)
                 return value.to_string();
+            else if constexpr (is_float_vector<T>)
+            {
+                // "x y z": components separated by spaces
+                std::string text;
+                for (int i = 0; i < T::length(); ++i)
+                    text += std::format("{}{}", i ? " " : "", value[i]);
+                return text;
+            }
             else
                 return {};
         }
@@ -187,6 +200,24 @@ export namespace cvar
             else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, Name>)
             {
                 value = std::string(text);
+                return true;
+            }
+            else if constexpr (is_float_vector<T>)
+            {
+                // components separated by spaces or commas
+                T parsed = value;
+                const char* it = text.data();
+                const char* end = text.data() + text.size();
+                for (int i = 0; i < T::length(); ++i)
+                {
+                    while (it != end && (*it == ' ' || *it == ',' || *it == '\t'))
+                        ++it;
+                    const auto [next, error] = std::from_chars(it, end, parsed[i]);
+                    if (error != std::errc{})
+                        return false;
+                    it = next;
+                }
+                value = parsed;
                 return true;
             }
             else

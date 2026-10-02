@@ -1,0 +1,96 @@
+#version 450
+
+// One level of the bloom chain going down (PostProcessRenderer, passes "BloomDown<N>"): u_pp_source is the
+// level above (the lit HDR frame for the first one), u_pp_target half its size. The 13 tap filter of
+// Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare" (2014): five overlapping
+// 4 texel boxes, which keeps the result from flickering as bright pixels move between texels.
+// The first level weights each box by 1 / (1 + luma) (Karis average): a single very bright pixel (a sun
+// glint, a firefly of the lighting) cannot blow up into a blinking blob.
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "resources/post_process.glsl"
+
+layout(push_constant) uniform BloomPushConstants
+{
+    vec4 params;    // x: 1 for the first level (Karis average, NaN filter), y: upsample scatter (unused here)
+} pc;
+
+float luma(vec3 c)
+{
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 tap(vec2 uv)
+{
+    return textureLod(u_pp_source, uv, 0.0).rgb;
+}
+
+// the HDR frame can carry Inf / NaN from a broken pixel: the bloom would spread it over the screen
+vec3 sanitize(vec3 c)
+{
+    return any(isnan(c)) || any(isinf(c)) ? vec3(0.0) : min(c, vec3(64000.0));
+}
+
+float karis_weight(vec3 box)
+{
+    return 1.0 / (1.0 + luma(box));
+}
+
+void main()
+{
+    const ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    const ivec2 size = imageSize(u_pp_target);
+    if (any(greaterThanEqual(texel, size)))
+        return;
+
+    const vec2 uv = (vec2(texel) + 0.5) / vec2(size);
+    const vec2 s = 1.0 / vec2(textureSize(u_pp_source, 0));
+
+    // a b c
+    //  j k
+    // d e f
+    //  l m
+    // g h i
+    const vec3 a = tap(uv + s * vec2(-2.0, -2.0));
+    const vec3 b = tap(uv + s * vec2( 0.0, -2.0));
+    const vec3 c = tap(uv + s * vec2( 2.0, -2.0));
+    const vec3 d = tap(uv + s * vec2(-2.0,  0.0));
+    const vec3 e = tap(uv);
+    const vec3 f = tap(uv + s * vec2( 2.0,  0.0));
+    const vec3 g = tap(uv + s * vec2(-2.0,  2.0));
+    const vec3 h = tap(uv + s * vec2( 0.0,  2.0));
+    const vec3 i = tap(uv + s * vec2( 2.0,  2.0));
+    const vec3 j = tap(uv + s * vec2(-1.0, -1.0));
+    const vec3 k = tap(uv + s * vec2( 1.0, -1.0));
+    const vec3 l = tap(uv + s * vec2(-1.0,  1.0));
+    const vec3 m = tap(uv + s * vec2( 1.0,  1.0));
+
+    vec3 result;
+    if (pc.params.x > 0.5)
+    {
+        const vec3 box_center = sanitize((j + k + l + m) * 0.25);
+        const vec3 box_tl = sanitize((a + b + d + e) * 0.25);
+        const vec3 box_tr = sanitize((b + c + e + f) * 0.25);
+        const vec3 box_bl = sanitize((d + e + g + h) * 0.25);
+        const vec3 box_br = sanitize((e + f + h + i) * 0.25);
+
+        const float w_center = 0.5 * karis_weight(box_center);
+        const float w_tl = 0.125 * karis_weight(box_tl);
+        const float w_tr = 0.125 * karis_weight(box_tr);
+        const float w_bl = 0.125 * karis_weight(box_bl);
+        const float w_br = 0.125 * karis_weight(box_br);
+
+        result = (box_center * w_center + box_tl * w_tl + box_tr * w_tr + box_bl * w_bl + box_br * w_br)
+            / max(w_center + w_tl + w_tr + w_bl + w_br, 1e-6);
+    }
+    else
+    {
+        result = e * 0.125
+            + (a + c + g + i) * 0.03125
+            + (b + d + f + h) * 0.0625
+            + (j + k + l + m) * 0.125;
+    }
+
+    imageStore(u_pp_target, texel, vec4(max(result, vec3(0.0)), 1.0));
+}

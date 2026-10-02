@@ -140,6 +140,25 @@ export namespace samplers
         return surface_sampler;
     }
     
+    // bilinear, clamped to the edge texels: screen space buffers sampled near the border (post processing)
+    constexpr SamplerDesc linear_clamp()
+    {
+        SamplerDesc sampler{};
+        sampler.name = "linear_clamp";
+        sampler.min_filter   = SamplerFilter::Linear;
+        sampler.mag_filter   = SamplerFilter::Linear;
+        sampler.mipmap_mode  = SamplerMipMapMode::Nearest;
+
+        sampler.address_u = SamplerAddressMode::ClampToEdge;
+        sampler.address_v = SamplerAddressMode::ClampToEdge;
+        sampler.address_w = SamplerAddressMode::ClampToEdge;
+
+        sampler.anisotropy = false;
+        sampler.comparison = false;
+
+        return sampler;
+    }
+
     constexpr SamplerDesc default_shadow()
     {
         SamplerDesc sampler{};

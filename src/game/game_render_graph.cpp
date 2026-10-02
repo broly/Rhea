@@ -38,6 +38,32 @@ void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
 {
     set_flag(Names::debug_shadow2, false);
     GenericRenderGraph::init_resources(init_params);
+
+    post_renderer = std::make_unique<PostProcessRenderer>();
+    post_renderer->init(*renderer, *backend);
+    for (uint32_t level = 0; level < PostProcessRenderer::bloom_levels; ++level)
+    {
+        bloom_down[level] = create_texture({
+            .name = Name(std::format("bloom_down_{}", level)),
+            .extent_divisor = 2u << level,
+            .format = TextureFormat::RGBA16F,
+            .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+        });
+        if (level + 1 < PostProcessRenderer::bloom_levels)
+            bloom_up[level] = create_texture({
+                .name = Name(std::format("bloom_up_{}", level)),
+                .extent_divisor = 2u << level,
+                .format = TextureFormat::RGBA16F,
+                .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+            });
+    }
+    // RGBA32F: the adaptation moves the exposure by thousandths of an EV per frame
+    exposure = create_texture({
+        .name = "post_exposure",
+        .extent = PostProcessRenderer::exposure_extent,
+        .format = TextureFormat::RGBA32F,
+        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+    });
 }
 
 void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
@@ -45,12 +71,15 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     GenericRenderGraph::build_passes(parameters);
 
     add_taa_passes();
+    add_post_process_passes();
 
     add_pass({
             .name = "ToneMapping",
             .condition = [this] () { return !is_debugging(); },
             .reads = {
                 { hdr_color_present[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },
+                { bloom_up[0], RBImageUsageType::SampledFragment },
+                { exposure, RBImageUsageType::SampledFragment },
                 { hdr_color_history[COLOR_OUTPUT_HDR::BASE], RBImageUsageType::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI], RBImageUsageType::SampledFragment },                
                 { hdr_color_history[COLOR_OUTPUT_HDR::RTXGI_ACCUM], RBImageUsageType::SampledFragment },                
@@ -73,6 +102,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                     {
                         ctx.bind(nn_denoiser_state.resource);
                     }
+                    post_renderer->bind_tonemap(ctx);
                 }
                 const float time = RhGlobals::engine->world->get_time_seconds();
                 const float delta = RhGlobals::engine->world->get_delta_seconds();
@@ -147,7 +177,19 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     hdr_color_output_resource->update_image_array(
         "u_hdr_color_history", get_image_array(hdr_color_history), 
         {.frame = ctx.frame, .layer_index = prev_layer});
-    
+
+    PostProcessRenderer::FrameInputs post_inputs{
+        .scene = get_image(hdr_color_present[COLOR_OUTPUT_HDR::BASE]),
+        .exposure = get_image(exposure),
+        .screen = resolution.is_zero() ? backend->get_swapchain_extent() : resolution,
+        .delta_seconds = (float)RhGlobals::engine->world->get_delta_seconds(),
+    };
+    for (uint32_t level = 0; level < PostProcessRenderer::bloom_levels; ++level)
+        post_inputs.down[level] = get_image(bloom_down[level]);
+    for (uint32_t level = 0; level + 1 < PostProcessRenderer::bloom_levels; ++level)
+        post_inputs.up[level] = get_image(bloom_up[level]);
+    post_renderer->prepare(ctx, post_inputs);
+
     auto shadow_debug_instance = shadow_resource->query_single();
     
     shadow_debug_instance->update_image(
@@ -165,6 +207,79 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
             .frame = ctx.frame
         }
     );
+}
+
+void GameRenderGraph::add_post_process_passes()
+{
+    // the auto exposure meters a level of the down chain: the levels up to it run for either
+    const std::function<bool()> chain_condition = [this] ()
+    {
+        return !is_debugging() && (post_renderer->bloom_enabled() || post_renderer->auto_exposure_enabled());
+    };
+    const std::function<bool()> bloom_condition = [this] () { return !is_debugging() && post_renderer->bloom_enabled(); };
+
+    for (uint32_t level = 0; level < PostProcessRenderer::bloom_levels; ++level)
+    {
+        const RGTextureHandle source = level == 0 ? hdr_color_present[COLOR_OUTPUT_HDR::BASE] : bloom_down[level - 1];
+        add_pass({
+            .name = Name(std::format("BloomDown{}", level)),
+            .condition = level <= PostProcessRenderer::exposure_level ? chain_condition : bloom_condition,
+            .reads = {
+                { source, RBImageUsageType::Sampled },
+            },
+            .writes = {
+                { bloom_down[level], RBImageUsageType::StorageImage }
+            },
+            .execute = [this, level] (RenderGraphContext& ctx)
+            {
+                PROFILE("BloomDown");
+                post_renderer->dispatch_downsample(ctx, level, textures[bloom_down[level].id].desc.extent);
+            },
+            .type = RenderPassType::compute
+        });
+    }
+
+    add_pass({
+        .name = "AutoExposure",
+        .condition = [this] () { return !is_debugging() && post_renderer->auto_exposure_enabled(); },
+        .reads = {
+            { bloom_down[PostProcessRenderer::exposure_level], RBImageUsageType::Sampled },
+        },
+        .writes = {
+            { exposure, RBImageUsageType::StorageImage }
+        },
+        .execute = [this] (RenderGraphContext& ctx)
+        {
+            PROFILE("AutoExposure");
+            post_renderer->dispatch_auto_exposure(ctx);
+        },
+        .type = RenderPassType::compute
+    });
+
+    for (int level = (int)PostProcessRenderer::bloom_levels - 2; level >= 0; --level)
+    {
+        // the smallest up level starts from the smallest down level
+        const RGTextureHandle low = level + 2 == (int)PostProcessRenderer::bloom_levels
+            ? bloom_down[PostProcessRenderer::bloom_levels - 1]
+            : bloom_up[level + 1];
+        add_pass({
+            .name = Name(std::format("BloomUp{}", level)),
+            .condition = bloom_condition,
+            .reads = {
+                { low, RBImageUsageType::Sampled },
+                { bloom_down[level], RBImageUsageType::Sampled },
+            },
+            .writes = {
+                { bloom_up[level], RBImageUsageType::StorageImage }
+            },
+            .execute = [this, level] (RenderGraphContext& ctx)
+            {
+                PROFILE("BloomUp");
+                post_renderer->dispatch_upsample(ctx, (uint32_t)level, textures[bloom_up[level].id].desc.extent);
+            },
+            .type = RenderPassType::compute
+        });
+    }
 }
 
 void GameRenderGraph::pass_shadow_map(RenderGraphContext& ctx)

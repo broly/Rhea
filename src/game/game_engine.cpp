@@ -1,6 +1,7 @@
 module;
 
 #include <imgui.h>
+#include <imgui_stdlib.h>
 
 module game;
 
@@ -14,6 +15,7 @@ import :reflection_probes;
 import :sky_renderer;
 import :gtao_renderer;
 import :generic_render_graph;
+import :post_process;
 import ecs;
 import name;
 import framework;
@@ -21,6 +23,31 @@ import rhcomponents;
 import rhmath;
 import glm;
 import cvar;
+import reflect;
+import properties;
+
+namespace
+{
+    cvar::Var<bool> cv_window_post_process("ui.windows.post_process", false, "Post processing: presets, exposure, bloom, color grading, lens effects");
+
+    // post process presets (assets/render/post_process_presets.json), the description as tooltip
+    void post_process_preset_combo()
+    {
+        const std::string current = cv_post_preset.get();
+        if (ImGui::BeginCombo("Preset", current.c_str()))
+        {
+            for (const post_process::Preset& preset : post_process::get_presets())
+            {
+                if (ImGui::Selectable(preset.name.c_str(), preset.name == current))
+                    post_process::apply_preset(preset.name);
+                if (!preset.description.empty())
+                    ImGui::SetItemTooltip("%s", preset.description.c_str());
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SetItemTooltip("Sets every post process setting (the ones a preset does not list go back to their defaults).\nConsole: post.preset <name>");
+    }
+}
 
 void GameEngine::engine_init()
 {
@@ -80,6 +107,15 @@ void GameEngine::on_debug_ui_render_panel()
     bool show_skeleton = cv_debug_show_skeleton.get();
     if (ImGui::Checkbox("Skeletons", &show_skeleton))
         cv_debug_show_skeleton.set(show_skeleton);
+
+    // ---- post processing: the look of the frame (its settings: Windows > Post Process) ----
+    ImGui::SeparatorText("Post process");
+    ImGui::PushID("post");
+    post_process_preset_combo();
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Settings"))
+        cv_window_post_process.set(true);
+    ImGui::PopID();
 
     auto checkbox = [] (const char* label, cvar::Var<bool>& var, const char* tooltip)
     {
@@ -298,4 +334,250 @@ void GameEngine::on_debug_ui_render_panel()
         ImGui::EndTable();
     }
     ImGui::Text("Faces rendered: %llu", (unsigned long long)probes->get_faces_rendered());
+}
+
+
+/************************************************************************
+ * POST PROCESS WINDOW
+ ***********************************************************************/
+
+namespace
+{
+    // tooltip with the description and the default; right click resets the setting
+    void setting_tooltip(cvar::Entry& entry)
+    {
+        ImGui::SetItemTooltip("%s\nRight click: default (%s)", entry.get_description().c_str(), entry.default_to_string().c_str());
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            entry.reset_to_default();
+    }
+
+    void setting(const char* label, cvar::Var<float>& var, const char* format = "%.3f")
+    {
+        const reflect::PropertyMeta& meta = var.get_property().meta;
+        float value = var.get();
+        if (ImGui::SliderFloat(label, &value, meta.min, meta.max, format))
+            var.set(value);
+        setting_tooltip(var);
+    }
+
+    void setting(const char* label, cvar::Var<int>& var)
+    {
+        const reflect::PropertyMeta& meta = var.get_property().meta;
+        int value = var.get();
+        if (ImGui::SliderInt(label, &value, (int)meta.min, (int)meta.max))
+            var.set(value);
+        setting_tooltip(var);
+    }
+
+    void setting(const char* label, cvar::Var<bool>& var)
+    {
+        bool value = var.get();
+        if (ImGui::Checkbox(label, &value))
+            var.set(value);
+        setting_tooltip(var);
+    }
+
+    void color_setting(const char* label, cvar::Var<glm::vec3>& var)
+    {
+        glm::vec3 value = var.get();
+        if (ImGui::ColorEdit3(label, &value.x, ImGuiColorEditFlags_Float))
+            var.set(value);
+        setting_tooltip(var);
+    }
+
+    void vector_setting(const char* label, cvar::Var<glm::vec3>& var, float min, float max)
+    {
+        glm::vec3 value = var.get();
+        if (ImGui::DragFloat3(label, &value.x, 0.002f, min, max, "%.3f"))
+            var.set(value);
+        setting_tooltip(var);
+    }
+
+    template<typename E>
+    void enum_setting(const char* label, cvar::Var<E>& var)
+    {
+        const E current = var.get();
+        if (ImGui::BeginCombo(label, reflect::enum_name(current).to_string().c_str()))
+        {
+            const reflect::EnumInfo& info = *var.get_property().enum_info;
+            for (size_t i = 0; i < info.names.size(); ++i)
+            {
+                const E value = (E)info.values[i];
+                if (ImGui::Selectable(std::string(info.names[i]).c_str(), value == current))
+                    var.set(value);
+            }
+            ImGui::EndCombo();
+        }
+        setting_tooltip(var);
+    }
+}
+
+void GameEngine::on_debug_ui_windows_menu()
+{
+    if (ImGui::MenuItem("Post Process", nullptr, cv_window_post_process.get()))
+        cv_window_post_process.set(!cv_window_post_process.get());
+}
+
+void GameEngine::on_debug_ui_windows()
+{
+    draw_post_process_window();
+}
+
+void GameEngine::draw_post_process_window()
+{
+    if (!cv_window_post_process.get())
+        return;
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.55f, viewport->WorkPos.y + viewport->WorkSize.y * 0.05f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.22f, viewport->WorkSize.y * 0.8f), ImGuiCond_FirstUseEver);
+    bool keep_open = true;
+    const bool expanded = ImGui::Begin("Post Process", &keep_open);
+    if (!keep_open)
+        cv_window_post_process.set(false);
+    if (!expanded)
+    {
+        ImGui::End();
+        return;
+    }
+
+    // ---- presets: every render.post.* setting below; applying one resets the others to their defaults ----
+    setting("Enabled", cv_post_enabled);
+    ImGui::SameLine();
+    setting("Histogram", cv_post_show_histogram);
+
+    post_process_preset_combo();
+    const std::string current = cv_post_preset.get();
+
+    if (ImGui::Button("Reapply"))
+        post_process::apply_preset(current);
+    ImGui::SetItemTooltip("Throws away the changes made since the preset was applied");
+    ImGui::SameLine();
+    if (ImGui::Button("Reload"))
+        post_process::reload_presets();
+    ImGui::SetItemTooltip("Reloads %s", post_process::get_presets_path().string().c_str());
+    ImGui::SameLine();
+    if (ImGui::Button("Save as..."))
+        ImGui::OpenPopup("save_post_preset");
+    ImGui::SetItemTooltip("Saves the settings that differ from the defaults as a preset");
+
+    if (ImGui::BeginPopup("save_post_preset"))
+    {
+        static std::string name;
+        static std::string description;
+        if (ImGui::IsWindowAppearing())
+        {
+            name = current;
+            const post_process::Preset* preset = post_process::find_preset(current);
+            description = preset ? preset->description : std::string();
+        }
+        ImGui::InputText("Name", &name);
+        ImGui::InputText("Description", &description);
+        const bool exists = post_process::find_preset(name) != nullptr;
+        ImGui::BeginDisabled(name.empty());
+        if (ImGui::Button(exists ? "Replace" : "Save"))
+        {
+            post_process::save_preset(name, description);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        ImGui::EndPopup();
+    }
+
+    // ---- exposure ----
+    if (ImGui::CollapsingHeader("Exposure", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::PushID("exposure");
+        enum_setting("Mode", cv_post_exposure_mode);
+        if (cv_post_exposure_mode.get() == ExposureMode::Manual)
+            setting("EV", cv_post_exposure_ev, "%.2f");
+        setting("Compensation", cv_post_exposure_compensation, "%.2f");
+        if (cv_post_exposure_mode.get() == ExposureMode::Auto)
+        {
+            setting("Min EV", cv_post_exposure_min_ev, "%.2f");
+            setting("Max EV", cv_post_exposure_max_ev, "%.2f");
+            setting("Key", cv_post_exposure_key);
+            setting("Speed up", cv_post_exposure_speed_up, "%.2f");
+            setting("Speed down", cv_post_exposure_speed_down, "%.2f");
+            setting("Low percent", cv_post_exposure_low_percent, "%.2f");
+            setting("High percent", cv_post_exposure_high_percent, "%.2f");
+            setting("Center weight", cv_post_exposure_center_weight, "%.2f");
+        }
+        ImGui::PopID();
+    }
+
+    // ---- bloom ----
+    if (ImGui::CollapsingHeader("Bloom", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::PushID("bloom");
+        setting("Intensity", cv_post_bloom_intensity);
+        setting("Scatter", cv_post_bloom_scatter, "%.2f");
+        color_setting("Tint", cv_post_bloom_tint);
+        ImGui::PopID();
+    }
+
+    // ---- tone curve ----
+    if (ImGui::CollapsingHeader("Tone curve", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::PushID("tone");
+        enum_setting("Tonemapper", cv_post_tonemapper);
+        setting("Display gamma", cv_post_gamma, "%.2f");
+        ImGui::PopID();
+    }
+
+    // ---- color grading ----
+    if (ImGui::CollapsingHeader("Color grading", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::PushID("color");
+        ImGui::SeparatorText("White balance");
+        setting("Temperature", cv_post_temperature, "%.1f");
+        setting("Tint", cv_post_tint, "%.1f");
+        color_setting("Color filter", cv_post_color_filter);
+
+        ImGui::SeparatorText("Tone");
+        setting("Contrast", cv_post_contrast, "%.2f");
+        setting("Saturation", cv_post_saturation, "%.2f");
+        setting("Hue shift", cv_post_hue_shift, "%.1f");
+
+        ImGui::SeparatorText("Lift / gamma / gain");
+        vector_setting("Lift", cv_post_lift, -0.25f, 0.25f);
+        vector_setting("Gamma", cv_post_midtones, 0.2f, 3.0f);
+        vector_setting("Gain", cv_post_gain, 0.0f, 3.0f);
+
+        ImGui::SeparatorText("Split toning");
+        color_setting("Shadows", cv_post_split_shadows);
+        setting("Shadows strength", cv_post_split_shadows_strength, "%.2f");
+        color_setting("Highlights", cv_post_split_highlights);
+        setting("Highlights strength", cv_post_split_highlights_strength, "%.2f");
+        setting("Balance", cv_post_split_balance, "%.2f");
+
+        ImGui::SeparatorText("Stylize");
+        setting("Posterize", cv_post_posterize);
+        ImGui::PopID();
+    }
+
+    // ---- lens ----
+    if (ImGui::CollapsingHeader("Lens", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::PushID("lens");
+        ImGui::SeparatorText("Vignette");
+        setting("Intensity", cv_post_vignette_intensity, "%.2f");
+        setting("Smoothness", cv_post_vignette_smoothness, "%.2f");
+        setting("Roundness", cv_post_vignette_roundness, "%.2f");
+        color_setting("Color", cv_post_vignette_color);
+
+        ImGui::SeparatorText("Image");
+        setting("Chromatic aberration", cv_post_chromatic_aberration, "%.4f");
+        setting("Sharpen", cv_post_sharpen, "%.2f");
+
+        ImGui::SeparatorText("Film grain");
+        ImGui::PushID("grain");
+        setting("Intensity", cv_post_grain_intensity, "%.2f");
+        setting("Size", cv_post_grain_size, "%.2f");
+        setting("Response", cv_post_grain_response, "%.2f");
+        ImGui::PopID();
+        ImGui::PopID();
+    }
+
+    ImGui::End();
 }

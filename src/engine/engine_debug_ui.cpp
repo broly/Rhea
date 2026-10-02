@@ -522,6 +522,7 @@ void EngineDebugUI::draw(Engine& engine)
     draw_sky_window(engine);
     draw_ecs_window(engine);
     draw_animation_window(engine);
+    engine.on_debug_ui_windows();
     if (cv_window_imgui_demo.get())
     {
         bool open = true;
@@ -581,6 +582,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         item("Sky", cv_window_sky);
         item("ECS", cv_window_ecs);
         item("Animation", cv_window_animation);
+        engine.on_debug_ui_windows_menu();
         ImGui::Separator();
         item("Hotkeys", cv_window_help);
         item("ImGui Demo", cv_window_imgui_demo);

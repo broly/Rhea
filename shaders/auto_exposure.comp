@@ -1,0 +1,98 @@
+#version 450
+
+// Eye adaptation (PostProcessRenderer, pass "AutoExposure"), one workgroup: a histogram of the log2
+// luminance of a small bloom level (already a filtered average of the frame), weighted towards the
+// middle of the screen. The pixels between the low and high percentiles are averaged (the darkest
+// corners and the sky or a lamp do not swing the exposure), the exposure that brings that average to
+// the key (middle gray) is clamped to the min / max EV and the adapted exposure moves towards it,
+// exponentially: faster when the scene gets brighter (speed up) than when it gets darker (speed down).
+// Layout of u_pp_exposure_target: resources/post_process.glsl. tonemap.slang reads it the same frame.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+#include "resources/post_process.glsl"
+
+layout(push_constant) uniform AutoExposurePushConstants
+{
+    vec4 range;         // x: min EV, y: max EV, z: log2 of the key, w: frame time (s)
+    vec4 speed;         // x: speed up (EV / s towards a brighter scene), y: speed down, z: low percentile, w: high percentile (0..1)
+    vec4 histogram;     // x: log2 luminance of the first bin, y: log2 luminance range, z: center weight (0..1), w: 1 resets the adaptation
+} pc;
+
+shared uint s_bins[PP_HISTOGRAM_BINS];
+shared float s_max_bin;
+
+void main()
+{
+    const uint thread = gl_LocalInvocationIndex;
+    if (thread < PP_HISTOGRAM_BINS)
+        s_bins[thread] = 0u;
+    barrier();
+
+    const ivec2 size = textureSize(u_pp_source, 0);
+    const float log_min = pc.histogram.x;
+    const float log_range = max(pc.histogram.y, 1.0);
+    for (int y = int(gl_LocalInvocationID.y); y < size.y; y += 16)
+    {
+        for (int x = int(gl_LocalInvocationID.x); x < size.x; x += 16)
+        {
+            const vec3 color = texelFetch(u_pp_source, ivec2(x, y), 0).rgb;
+            const float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+            const float t = (log2(max(luminance, 1e-10)) - log_min) / log_range;
+            const uint bin = uint(clamp(t * float(PP_HISTOGRAM_BINS), 0.0, float(PP_HISTOGRAM_BINS - 1)));
+
+            // center weighted metering: the middle counts up to 4 times as much as the border
+            vec2 d = (vec2(x, y) + 0.5) / vec2(size) - 0.5;
+            d.x *= float(size.x) / float(size.y);
+            const float weight = 1.0 + 3.0 * pc.histogram.z * exp(-dot(d, d) * 8.0);
+            atomicAdd(s_bins[bin], uint(weight * 16.0 + 0.5));
+        }
+    }
+    barrier();
+
+    if (thread == 0u)
+    {
+        float total = 0.0;
+        float max_bin = 1.0;
+        for (int i = 0; i < PP_HISTOGRAM_BINS; ++i)
+        {
+            total += float(s_bins[i]);
+            max_bin = max(max_bin, float(s_bins[i]));
+        }
+        s_max_bin = max_bin;
+
+        // average of the bins between the percentiles (parts of the bins at the ends)
+        const float low = total * clamp(pc.speed.z, 0.0, 0.99);
+        const float high = total * clamp(max(pc.speed.w, pc.speed.z + 0.01), 0.01, 1.0);
+        float before = 0.0;
+        float sum_weight = 0.0;
+        float sum_log = 0.0;
+        for (int i = 0; i < PP_HISTOGRAM_BINS; ++i)
+        {
+            const float count = float(s_bins[i]);
+            const float inside = max(0.0, min(before + count, high) - max(before, low));
+            before += count;
+            const float bin_log = log_min + (float(i) + 0.5) / float(PP_HISTOGRAM_BINS) * log_range;
+            sum_log += inside * bin_log;
+            sum_weight += inside;
+        }
+        const float average_log = sum_weight > 0.0 ? sum_log / sum_weight : pc.range.z;
+        const float target = clamp(pc.range.z - average_log, pc.range.x, pc.range.y);
+
+        const vec4 state = imageLoad(u_pp_exposure_target, ivec2(0, 0));
+        float exposure = state.x;
+        if (pc.histogram.w > 0.5 || state.w < 0.5 || isnan(exposure) || isinf(exposure))
+            exposure = target;
+        else
+        {
+            // a lower target: the scene got brighter
+            const float speed = target < exposure ? pc.speed.x : pc.speed.y;
+            exposure += (target - exposure) * (1.0 - exp(-max(pc.range.w, 0.0) * max(speed, 0.0)));
+        }
+        imageStore(u_pp_exposure_target, ivec2(0, 0), vec4(exposure, target, average_log, 1.0));
+    }
+    barrier();
+
+    if (thread < PP_HISTOGRAM_BINS)
+        imageStore(u_pp_exposure_target, ivec2(thread, 1), vec4(float(s_bins[thread]) / s_max_bin, 0.0, 0.0, 1.0));
+}
