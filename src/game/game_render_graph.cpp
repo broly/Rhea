@@ -64,6 +64,22 @@ void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
         .format = TextureFormat::RGBA32F,
         .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
     });
+
+    jpeg_renderer = std::make_unique<JpegRenderer>();
+    jpeg_renderer->init(*renderer, *backend);
+    // divisor 1: the screen size, kept through resizes (the shakalizer reads the extent)
+    ldr_color = create_texture({
+        .name = "ldr_color",
+        .extent_divisor = 1,
+        .format = TextureFormat::RGBA8_UNORM,
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+    });
+    screen_jpeg_color = create_texture({
+        .name = "screen_jpeg",
+        .extent_divisor = 1,
+        .format = TextureFormat::RGBA8_UNORM,
+        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+    });
 }
 
 void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
@@ -88,7 +104,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
                 { gtao_result, RBImageUsageType::SampledFragment },
             },
             .writes = {
-                { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
+                { ldr_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
             },
             .execute = [this] (RenderGraphContext& ctx)
             {
@@ -120,6 +136,31 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             },
     });
     
+    // full screen JPEG damage (screen_jpeg): only while the player is hurt or hit
+    jpeg_renderer->add_chain(*this, {
+        .name = "ScreenJpeg",
+        .source = ldr_color,
+        .target = screen_jpeg_color,
+        .condition = [this] () { return !is_debugging() && screen_jpeg_state.active; },
+        .settings = [this] () { return screen_jpeg_state.settings; },
+    });
+
+    add_pass({
+        .name = "Present",
+        .condition = [this] () { return !is_debugging(); },
+        .reads = {
+            { ldr_color, RBImageUsageType::SampledFragment },
+            { screen_jpeg_color, RBImageUsageType::SampledFragment },
+        },
+        .writes = {
+            { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
+        },
+        .execute = [this] (RenderGraphContext& ctx)
+        {
+            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f);
+        },
+    });
+
     // wireframe / skeleton on top of the tonemapped image
     add_debug_overlay_pass();
 
@@ -189,6 +230,11 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     for (uint32_t level = 0; level + 1 < PostProcessRenderer::bloom_levels; ++level)
         post_inputs.up[level] = get_image(bloom_up[level]);
     post_renderer->prepare(ctx, post_inputs);
+
+    screen_jpeg::tick((float)RhGlobals::engine->world->get_delta_seconds());
+    screen_jpeg_state = screen_jpeg::evaluate();
+    jpeg_renderer->prepare(ctx, *this);
+    jpeg_renderer->prepare_present(ctx, get_image(ldr_color), get_image(screen_jpeg_color));
 
     auto shadow_debug_instance = shadow_resource->query_single();
     

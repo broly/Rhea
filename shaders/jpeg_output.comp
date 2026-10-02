@@ -1,0 +1,57 @@
+#version 450
+
+// Shakalizer, last pass of a chain (JpegRenderer): u_jpeg_work (after its generations) back to the size of the
+// source in u_jpeg_target.
+//   nearest downscale: every work texel becomes a factor x factor square (hard pixels)
+//   box downscale:     bilinear upscale (soap)
+// Sharpen boosts the work texels against their 4 neighbours: the block edges and the ringing ("mosquitoes")
+// of the JPEG stand out.
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "resources/jpeg.glsl"
+
+vec3 work_texel(ivec2 p)
+{
+    return imageLoad(u_jpeg_work, clamp(p, ivec2(0), pc.extent.xy - 1)).rgb;
+}
+
+vec3 sharpened(ivec2 p)
+{
+    const vec3 center = work_texel(p);
+    const float amount = pc.post.x;
+    if (amount <= 0.0)
+        return center;
+    const vec3 neighbours = work_texel(p + ivec2(0, -1)) + work_texel(p + ivec2(0, 1))
+        + work_texel(p + ivec2(-1, 0)) + work_texel(p + ivec2(1, 0));
+    return clamp(center + amount * (4.0 * center - neighbours), 0.0, 1.0);
+}
+
+void main()
+{
+    const ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(texel, pc.extent.zw)))
+        return;
+
+    const int factor = max(pc.mode.x, 1);
+    vec3 color;
+    if (pc.mode.y == JPEG_FILTER_NEAREST || factor == 1)
+    {
+        color = sharpened(texel / factor);
+    }
+    else
+    {
+        const vec2 position = (vec2(texel) + 0.5) / float(factor) - 0.5;
+        const ivec2 p = ivec2(floor(position));
+        const vec2 f = position - vec2(p);
+        color = mix(
+            mix(sharpened(p), sharpened(p + ivec2(1, 0)), f.x),
+            mix(sharpened(p + ivec2(0, 1)), sharpened(p + ivec2(1, 1)), f.x),
+            f.y);
+    }
+
+    if ((pc.mode.w & JPEG_FLAG_TARGET_LINEAR) != 0)
+        color = jpeg_srgb_to_linear(color);
+
+    imageStore(u_jpeg_target, texel, vec4(color, 1.0));
+}

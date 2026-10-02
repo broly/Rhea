@@ -1,0 +1,43 @@
+#version 450
+
+// Shakalizer, first pass of a chain (JpegRenderer): the source shrunk by the downscale factor into the top left
+// corner of u_jpeg_work, as display encoded 8 bit RGB (what a JPEG encoder gets from a file).
+//   nearest: the texel at the center of each factor x factor cell (hard "pixels")
+//   box:     the average of the cell (soap)
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "resources/jpeg.glsl"
+
+void main()
+{
+    const ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(texel, pc.extent.xy)))
+        return;
+
+    const int factor = max(pc.mode.x, 1);
+    const ivec2 source_max = pc.extent.zw - 1;
+    const ivec2 origin = texel * factor;
+
+    vec3 color;
+    if (pc.mode.y == JPEG_FILTER_NEAREST || factor == 1)
+    {
+        color = texelFetch(u_jpeg_source, min(origin + factor / 2, source_max), 0).rgb;
+    }
+    else
+    {
+        // edge cells are averaged over their texels inside the source
+        const ivec2 cell_end = min(origin + factor, pc.extent.zw);
+        color = vec3(0.0);
+        for (int y = origin.y; y < cell_end.y; ++y)
+            for (int x = origin.x; x < cell_end.x; ++x)
+                color += texelFetch(u_jpeg_source, ivec2(x, y), 0).rgb;
+        const ivec2 cell = cell_end - origin;
+        color /= float(cell.x * cell.y);
+    }
+
+    if ((pc.mode.w & JPEG_FLAG_SOURCE_LINEAR) != 0)
+        color = jpeg_linear_to_srgb(color);
+
+    imageStore(u_jpeg_work, texel, vec4(clamp(color, 0.0, 1.0), 1.0));
+}

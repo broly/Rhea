@@ -1,0 +1,219 @@
+#version 450
+
+// Shakalizer, one JPEG generation (JpegRenderer): u_jpeg_work is encoded and decoded in place, as libjpeg
+// would (baseline, integer math only, so every GPU gives the same bytes):
+//   RGB -> YCbCr (jccolor.c fixed point), chroma subsampled by averaging (4:4:4 / 4:2:2 / 4:2:0 / 4:1:1),
+//   orthonormal 8 x 8 DCT with 13 bit constants (2 extra bits between the passes, as islow), quantization by
+//   the Annex K tables scaled by quality (jcparam.c), dequantization, inverse DCT, chroma replicated back
+//   (no fancy upsampling), YCbCr -> RGB (jdcolor.c).
+//
+// One workgroup per MCU: 8 x 8 pixels times the chroma subsampling (at most 16 x 16 or 32 x 8 = 256 pixels),
+// sub.x * sub.y luma blocks and one block per chroma channel. The block grid starts at -shift (pc.codec.yz):
+// a new generation with another shift cuts the image differently and the artifacts pile up instead of
+// converging. Pixels of an MCU outside the image repeat the edge (as libjpeg pads); every pixel of the
+// image belongs to exactly one MCU, so the in place update is safe.
+
+layout(local_size_x = 256) in;
+
+#include "resources/jpeg.glsl"
+
+// Annex K, natural order (row: vertical frequency)
+const int k_luma_table[64] = int[64](
+    16, 11, 10, 16, 24, 40, 51, 61,
+    12, 12, 14, 19, 26, 58, 60, 55,
+    14, 13, 16, 24, 40, 57, 69, 56,
+    14, 17, 22, 29, 51, 87, 80, 62,
+    18, 22, 37, 56, 68, 109, 103, 77,
+    24, 35, 55, 64, 81, 104, 113, 92,
+    49, 64, 78, 87, 103, 121, 120, 101,
+    72, 92, 95, 98, 112, 100, 103, 99);
+
+const int k_chroma_table[64] = int[64](
+    17, 18, 24, 47, 99, 99, 99, 99,
+    18, 21, 26, 66, 99, 99, 99, 99,
+    24, 26, 56, 99, 99, 99, 99, 99,
+    47, 66, 99, 99, 99, 99, 99, 99,
+    99, 99, 99, 99, 99, 99, 99, 99,
+    99, 99, 99, 99, 99, 99, 99, 99,
+    99, 99, 99, 99, 99, 99, 99, 99,
+    99, 99, 99, 99, 99, 99, 99, 99);
+
+// DCT basis C[u][x] = a(u) cos((2x + 1) u pi / 16) * 2^13, a(0) = sqrt(1/8), a(u > 0) = 1/2; index u * 8 + x
+const int k_dct[64] = int[64](
+    2896, 2896, 2896, 2896, 2896, 2896, 2896, 2896,
+    4017, 3406, 2276, 799, -799, -2276, -3406, -4017,
+    3784, 1567, -1567, -3784, -3784, -1567, 1567, 3784,
+    3406, -799, -4017, -2276, 2276, 4017, 799, -3406,
+    2896, -2896, -2896, 2896, 2896, -2896, -2896, 2896,
+    2276, -4017, 799, 3406, -3406, -799, 4017, -2276,
+    1567, -3784, 3784, -1567, -1567, 3784, -3784, 1567,
+    799, -2276, 3406, -4017, 4017, -3406, 2276, -799);
+
+const int k_max_blocks = 6;     // 4 luma + Cb + Cr
+
+// samples (level shifted), then the dequantized coefficients, then the decoded samples (0..255)
+shared int s_block[k_max_blocks * 64];
+shared int s_temp[k_max_blocks * 64];
+// Cb, Cr of every pixel of the MCU before the subsampling
+shared int s_cb[256];
+shared int s_cr[256];
+
+ivec2 chroma_subsampling(int mode)
+{
+    switch (mode)
+    {
+        case JPEG_CHROMA_422: return ivec2(2, 1);
+        case JPEG_CHROMA_420: return ivec2(2, 2);
+        case JPEG_CHROMA_411: return ivec2(4, 1);
+        default: return ivec2(1, 1);
+    }
+}
+
+// jpeg_quality_scaling + jpeg_add_quant_table of libjpeg, baseline (at most 255)
+int quantizer(bool chroma, int index, int quality)
+{
+    quality = clamp(quality, 1, 100);
+    const int scale = quality < 50 ? 5000 / quality : 200 - quality * 2;
+    const int base = chroma ? k_chroma_table[index] : k_luma_table[index];
+    return clamp((base * scale + 50) / 100, 1, 255);
+}
+
+// rounding shift: >> of int is arithmetic, so negative values round the same way as positive ones
+int descale(int value, int bits)
+{
+    return (value + (1 << (bits - 1))) >> bits;
+}
+
+void main()
+{
+    const int t = int(gl_LocalInvocationIndex);
+    const ivec2 sub = chroma_subsampling(pc.mode.z);
+    const ivec2 mcu = 8 * sub;
+    const int mcu_pixels = mcu.x * mcu.y;
+    const int luma_blocks = sub.x * sub.y;
+    const int blocks = luma_blocks + 2;
+    const ivec2 size = pc.extent.xy;
+    const ivec2 origin = ivec2(gl_WorkGroupID.xy) * mcu - pc.codec.yz;
+
+    // RGB -> YCbCr
+    if (t < mcu_pixels)
+    {
+        const ivec2 local = ivec2(t % mcu.x, t / mcu.x);
+        const ivec2 p = clamp(origin + local, ivec2(0), size - 1);
+        const ivec3 rgb = ivec3(round(clamp(imageLoad(u_jpeg_work, p).rgb, 0.0, 1.0) * 255.0));
+
+        const int y = (19595 * rgb.r + 38470 * rgb.g + 7471 * rgb.b + 32768) >> 16;
+        const int cb = (-11059 * rgb.r - 21709 * rgb.g + 32768 * rgb.b + (128 << 16) + 32767) >> 16;
+        const int cr = (32768 * rgb.r - 27439 * rgb.g - 5329 * rgb.b + (128 << 16) + 32767) >> 16;
+
+        const int block = local.x / 8 + (local.y / 8) * sub.x;
+        s_block[block * 64 + (local.y % 8) * 8 + local.x % 8] = y - 128;
+        s_cb[t] = cb;
+        s_cr[t] = cr;
+    }
+    barrier();
+
+    // chroma subsampling: the average of the pixels of each chroma sample
+    if (t < 64)
+    {
+        const ivec2 c = ivec2(t % 8, t / 8);
+        const int count = sub.x * sub.y;
+        int sum_cb = 0;
+        int sum_cr = 0;
+        for (int dy = 0; dy < sub.y; ++dy)
+        {
+            for (int dx = 0; dx < sub.x; ++dx)
+            {
+                const int i = (c.y * sub.y + dy) * mcu.x + c.x * sub.x + dx;
+                sum_cb += s_cb[i];
+                sum_cr += s_cr[i];
+            }
+        }
+        s_block[luma_blocks * 64 + t] = (sum_cb + count / 2) / count - 128;
+        s_block[(luma_blocks + 1) * 64 + t] = (sum_cr + count / 2) / count - 128;
+    }
+    barrier();
+
+    // forward DCT, rows: temp[y][u] = sum_x C[u][x] f[y][x], 2 extra bits
+    for (int i = t; i < blocks * 64; i += 256)
+    {
+        const int base = i & ~63;
+        const int row = base + ((i & 63) >> 3) * 8;
+        const int u = i & 7;
+        int sum = 0;
+        for (int x = 0; x < 8; ++x)
+            sum += k_dct[u * 8 + x] * s_block[row + x];
+        s_temp[i] = descale(sum, 11);
+    }
+    barrier();
+
+    // forward DCT, columns, then quantization and dequantization: F[v][u] = sum_y C[v][y] temp[y][u]
+    const int quality = pc.codec.x;
+    for (int i = t; i < blocks * 64; i += 256)
+    {
+        const int base = i & ~63;
+        const int v = (i & 63) >> 3;
+        const int u = i & 7;
+        int sum = 0;
+        for (int y = 0; y < 8; ++y)
+            sum += k_dct[v * 8 + y] * s_temp[base + y * 8 + u];
+        // the coefficient with 2 extra bits
+        const int coefficient = descale(sum, 13);
+
+        // quantized as libjpeg does: rounded half away from zero
+        const int q = quantizer(base >= luma_blocks * 64, v * 8 + u, quality);
+        const int divisor = q * 4;
+        const int level = coefficient < 0
+            ? -((-coefficient + divisor / 2) / divisor)
+            : (coefficient + divisor / 2) / divisor;
+        s_block[i] = level * q;
+    }
+    barrier();
+
+    // inverse DCT, rows: temp[v][x] = sum_u C[u][x] F[v][u], 2 extra bits
+    for (int i = t; i < blocks * 64; i += 256)
+    {
+        const int base = i & ~63;
+        const int row = base + ((i & 63) >> 3) * 8;
+        const int x = i & 7;
+        int sum = 0;
+        for (int u = 0; u < 8; ++u)
+            sum += k_dct[u * 8 + x] * s_block[row + u];
+        s_temp[i] = descale(sum, 11);
+    }
+    barrier();
+
+    // inverse DCT, columns: f[y][x] = sum_v C[v][y] temp[v][x]
+    for (int i = t; i < blocks * 64; i += 256)
+    {
+        const int base = i & ~63;
+        const int y = (i & 63) >> 3;
+        const int x = i & 7;
+        int sum = 0;
+        for (int v = 0; v < 8; ++v)
+            sum += k_dct[v * 8 + y] * s_temp[base + v * 8 + x];
+        s_block[i] = clamp(descale(sum, 15) + 128, 0, 255);
+    }
+    barrier();
+
+    // YCbCr -> RGB, chroma replicated over its pixels
+    if (t < mcu_pixels)
+    {
+        const ivec2 local = ivec2(t % mcu.x, t / mcu.x);
+        const ivec2 p = origin + local;
+        if (all(greaterThanEqual(p, ivec2(0))) && all(lessThan(p, size)))
+        {
+            const int block = local.x / 8 + (local.y / 8) * sub.x;
+            const int y = s_block[block * 64 + (local.y % 8) * 8 + local.x % 8];
+            const int chroma = (local.y / sub.y) * 8 + local.x / sub.x;
+            const int cb = s_block[luma_blocks * 64 + chroma] - 128;
+            const int cr = s_block[(luma_blocks + 1) * 64 + chroma] - 128;
+
+            const ivec3 rgb = clamp(ivec3(
+                y + ((91881 * cr + 32768) >> 16),
+                y + ((-22554 * cb - 46802 * cr + 32768) >> 16),
+                y + ((116130 * cb + 32768) >> 16)), ivec3(0), ivec3(255));
+            imageStore(u_jpeg_work, p, vec4(vec3(rgb) / 255.0, 1.0));
+        }
+    }
+}
