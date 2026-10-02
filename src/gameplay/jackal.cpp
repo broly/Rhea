@@ -20,6 +20,7 @@ import rhcomponents;
 import physics;
 import animation;
 import navigation;
+import ai;
 import assets;
 import cvar;
 import json_utils;
@@ -69,7 +70,6 @@ bool JackalClips::load(const std::string& json_path)
 
 namespace
 {
-    cvar::Var<bool> cv_chase("game.jackal.chase", true, "Jackals run at the player (off: they stand still)");
     cvar::Var<std::string> cv_clips("game.jackal.clips", "animations/jackal/locomotion.json", "Gaits and clips of the jackals");
 
     constexpr float gravity = 9.81f;
@@ -95,6 +95,28 @@ namespace
     float smooth(float value, float target, float rate, float dt)
     {
         return glm::mix(value, target, 1.0f - std::exp(-rate * dt));
+    }
+
+    // NaN / Inf guards: a non finite pose skins vertices to infinity (triangles across the screen). Reported a few
+    // times with the inputs that led there, then the jackal falls back to a sane state.
+    int g_invalid_reports = 0;
+    constexpr int max_invalid_reports = 8;
+
+    bool is_finite(const glm::vec3& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
+
+    bool is_finite(const BonePose& pose, uint32_t& bad_bone)
+    {
+        for (uint32_t i = 0; i < pose.size(); ++i)
+        {
+            const BoneTransform& b = pose[i];
+            if (!is_finite(b.translation) || !is_finite(b.scale) || !std::isfinite(b.rotation.x) || !std::isfinite(b.rotation.y)
+                || !std::isfinite(b.rotation.z) || !std::isfinite(b.rotation.w))
+            {
+                bad_bone = i;
+                return false;
+            }
+        }
+        return true;
     }
 
     glm::vec3 forward_of(float heading)
@@ -142,6 +164,9 @@ namespace
     void init_jackal(World& world, ecs::Entity e, const SerializationContext&)
     {
         ecs::Registry& registry = world.registry;
+        if (registry.has<JackalBrain>(e) && !registry.has<ai::BrainDebug>(e))
+            registry.add<ai::BrainDebug>(e);   // what Windows > AI shows
+
         SkinnedMesh* skinned = registry.get<SkinnedMesh>(e);
         if (!skinned || !skinned->skeletal_mesh.is_valid())
         {
@@ -171,8 +196,10 @@ namespace
         const char* tail[] = { "B_Bip001-Tail00", "B_Bip001-Tail01", "B_Bip001-Tail02", "B_Bip001-Tail03", "B_Bip001-Tail04" };
         for (size_t i = 0; i < a.tail.size(); ++i)
             a.tail[i] = rig->find_bone(tail[i]).transform([] (uint32_t b) { return int32_t(b); }).value_or(-1);
-        // model space = below the skeleton's root transform (asset axes and scale)
-        a.up_model = glm::normalize(glm::inverse(glm::mat3(rig->skeleton->root_transform)) * up);
+        // model space = below the skeleton's root transform (asset axes and a uniform scale): the inverse rotation is the
+        // transpose (no inverse of a matrix with a 1e-8 determinant)
+        const glm::vec3 up_model = glm::transpose(glm::mat3(rig->skeleton->root_transform)) * up;
+        a.up_model = glm::length(up_model) > 1e-12f && is_finite(up_model) ? glm::normalize(up_model) : up;
 
         registry.add<anim::Animator>(e, std::move(animator));
         registry.add<JackalAnimation>(e, std::move(a));
@@ -193,34 +220,38 @@ namespace
     {
         glm::vec3 direction{ 0.0f };
         float speed = 0.0f;
-        bool engaged = false;   // the player is in reach: faces it even when standing
+        bool engaged = false;   // has a direction to turn to (also standing: to face something)
     };
 
-    bool wants_to_chase(const Jackal& j, float distance)
-    {
-        return j.chase && cv_chase.get() && distance <= j.aggro_radius;
-    }
-
-    Steering steer(const Jackal& j, const std::optional<glm::vec3>& player, std::span<const glm::vec3> others, const nav::NavAgent* agent)
+    // what the brain asked for (Jackal::move): along the navigation mesh or straight, braking for the end
+    Steering steer(const Jackal& j, std::span<const glm::vec3> others, const nav::NavAgent* agent)
     {
         Steering s;
-        if (!player)
-            return s;
-        glm::vec3 to_player = *player - j.position;
-        to_player.y = 0.0f;
-        const float distance = glm::length(to_player);
-        if (distance < 1e-3f)
-            return s;
-        if (!wants_to_chase(j, distance))
-            return s;   // keeps its heading, stands
+        const JackalMove& m = j.move;
+        if (m.face)
+        {
+            const glm::vec3 to_face(m.face->x - j.position.x, 0.0f, m.face->z - j.position.z);
+            if (glm::length(to_face) > 1e-3f)
+            {
+                s.engaged = true;
+                s.direction = glm::normalize(to_face);
+            }
+        }
+        if (!m.destination)
+            return s;   // stands (facing what it should)
+        glm::vec3 to = *m.destination - j.position;
+        to.y = 0.0f;
+        const float distance = glm::length(to);
+        float remaining = distance - m.arrive_distance;
+        if (distance < 1e-3f || remaining <= 0.0f)
+            return s;   // there
         s.engaged = true;
-        s.direction = to_player / distance;
-        float remaining = distance - j.stop_distance;
+        s.direction = to / distance;
 
         // The way there: along the navigation mesh, around walls, and around the pack and the others (the crowd's
-        // avoidance). Straight at the player in front of it, or without a path (no mesh, off it).
-        const bool on_path = agent && (nav::is_following_path(*agent) || agent->status == nav::NavStatus::planning)
-            && distance > j.stop_distance + 0.5f;
+        // avoidance). Straight when the brain says so (the leap), close to the end, or without a path (no mesh, off it).
+        const bool on_path = !m.direct && agent && (nav::is_following_path(*agent) || agent->status == nav::NavStatus::planning)
+            && remaining > 0.5f;
         if (on_path)
         {
             glm::vec3 way(agent->desired_velocity.x, 0.0f, agent->desired_velocity.z);
@@ -228,16 +259,17 @@ namespace
                 way = glm::vec3(agent->next_corner.x - j.position.x, 0.0f, agent->next_corner.z - j.position.z);
             if (glm::length(way) > 1e-3f)
                 s.direction = glm::normalize(way);
-            // brakes for the end of the path (the closest it gets when the player stands out of reach)
+            // brakes for the end of the path (the closest it gets when the destination is out of reach)
             if (std::isfinite(agent->distance_to_goal))
-                remaining = agent->distance_to_goal - j.stop_distance;
+                remaining = agent->distance_to_goal - m.arrive_distance;
         }
 
-        // brakes in time to stop at stop_distance: v = sqrt(2 a d)
+        // brakes in time to stop at arrive_distance: v = sqrt(2 a d)
+        const float deceleration = m.deceleration > 0.0f ? m.deceleration : j.deceleration;
         if (remaining > 0.0f)
-            s.speed = std::min(j.run_speed, std::sqrt(2.0f * j.deceleration * remaining));
-        if (on_path)
-            return s;   // the crowd keeps the pack apart
+            s.speed = std::min(m.speed, std::sqrt(2.0f * deceleration * remaining));
+        if (on_path || m.direct)
+            return s;   // the crowd keeps the pack apart; the leap goes through
 
         // keeps apart from the pack: pushed away by the ones closer than two bodies
         glm::vec3 push{ 0.0f };
@@ -272,18 +304,21 @@ namespace
             // animals slow down for sharp turns instead of turning on a point at full speed
             const float sharp = std::clamp((std::abs(diff) - glm::radians(45.0f)) / glm::radians(90.0f), 0.0f, 1.0f);
             desired_speed *= glm::mix(1.0f, 0.3f, sharp);
-            // standing in front of the player: turns to face it only past a few degrees
+            // standing: turns to face its target only past a few degrees
             if (steering.speed > 0.0f || std::abs(diff) > glm::radians(20.0f) || std::abs(j.yaw_rate) > 0.1f)
             {
                 const float speed_alpha = std::clamp(j.speed / std::max(j.run_speed, 0.1f), 0.0f, 1.0f);
-                const float max_rate = glm::radians(glm::mix(j.turn_rate, j.turn_rate_at_speed, speed_alpha));
+                const float max_rate = glm::radians(glm::mix(j.turn_rate, j.turn_rate_at_speed, speed_alpha))
+                    * std::clamp(j.move.turn_scale, 0.0f, 1.0f);
                 target_rate = std::clamp(diff * 5.0f, -max_rate, max_rate);
             }
         }
         j.desired_speed = desired_speed;
         j.yaw_rate = move_towards(j.yaw_rate, target_rate, glm::radians(j.turn_acceleration) * dt);
         j.heading = wrap_angle(j.heading + j.yaw_rate * dt);
-        j.speed = move_towards(j.speed, desired_speed, (desired_speed > j.speed ? j.acceleration : j.deceleration) * dt);
+        const float acceleration = j.move.acceleration > 0.0f ? j.move.acceleration : j.acceleration;
+        const float deceleration = j.move.deceleration > 0.0f ? j.move.deceleration : j.deceleration;
+        j.speed = move_towards(j.speed, desired_speed, (desired_speed > j.speed ? acceleration : deceleration) * dt);
 
         // move, sliding along walls (a ray at chest height ahead of the body)
         const glm::vec3 forward = forward_of(j.heading);
@@ -354,15 +389,9 @@ namespace
     // before the weapons aim at the hitboxes, the damage and the physics step
     [[=ecs::system<ecs::Phase::FixedPost>, =ecs::in_set<JackalSimulation>, =ecs::before<WeaponFire>, =ecs::before<DamageResolution>,
       =ecs::before<scene::PhysicsStep>]]
-    void simulate_jackals(ecs::Query<Jackal, const Transform> jackals, ecs::Query<const WorldTransform, ecs::With<Player>> players,
-        ecs::Query<const Dead> dead, ecs::Query<nav::NavAgent> agents, ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
+    void simulate_jackals(ecs::Query<Jackal, const Transform> jackals, ecs::Query<const Dead> dead, ecs::Query<nav::NavAgent> agents,
+        ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
     {
-        std::optional<glm::vec3> player;
-        players.each([&] (const WorldTransform& transform) {
-            if (!player)
-                player = transform.value.position.glm();
-        });
-
         std::vector<glm::vec3> positions;
         jackals.each([&] (Jackal& j, const Transform& transform) {
             if (!j.initialized)
@@ -388,23 +417,33 @@ namespace
                     others.push_back(positions[i]);
             ++index;
 
-            if (player)
-                j.target_distance = glm::length(glm::vec2(player->x - j.position.x, player->z - j.position.z));
             const bool is_dead = dead.get(e) != nullptr;
+            if (is_dead)
+                j.move = {};
 
-            // the crowd plans the way to the player (next tick's NavAgentUpdate); the dead lie in the way of the others
+            // the brain planned the way (nav target, FixedPre); the dead lie in the way of the others
             nav::NavAgent* agent = agents.get(e);
             if (agent)
-            {
-                if (!is_dead && player && wants_to_chase(j, j.target_distance))
-                    nav::move_to(*agent, *player);
-                else
-                    nav::stop(*agent);
                 agent->obstacle = is_dead;
-                agent->max_speed = j.run_speed;
-            }
 
-            simulate(j, steer(j, player, others, agent), is_dead, *physics, dt);
+            const Steering steering = steer(j, others, agent);
+            simulate(j, steering, is_dead, *physics, dt);
+            if (!is_finite(j.position) || !std::isfinite(j.heading) || !std::isfinite(j.speed) || !std::isfinite(j.yaw_rate)
+                || !std::isfinite(j.pitch) || !std::isfinite(j.lean_angle))
+            {
+                if (g_invalid_reports++ < max_invalid_reports)
+                    LogJackal.Log("Jackal %u: non finite simulation: position %f %f %f, heading %f, speed %f, yaw rate %f, pitch %f, lean %f; "
+                        "steering %f %f %f speed %f; agent %s status %d desired %f %f %f distance %f", e.index, j.position.x, j.position.y,
+                        j.position.z, j.heading, j.speed, j.yaw_rate, j.pitch, j.lean_angle, steering.direction.x, steering.direction.y,
+                        steering.direction.z, steering.speed, agent ? "yes" : "no", agent ? int(agent->status) : -1,
+                        agent ? agent->desired_velocity.x : 0.0f, agent ? agent->desired_velocity.y : 0.0f,
+                        agent ? agent->desired_velocity.z : 0.0f, agent ? agent->distance_to_goal : 0.0f);
+                j.position = is_finite(j.previous_position) ? j.previous_position : glm::vec3(0.0f);
+                j.heading = std::isfinite(j.previous_heading) ? j.previous_heading : 0.0f;
+                j.previous_position = j.position;
+                j.previous_heading = j.heading;
+                j.speed = j.yaw_rate = j.pitch = j.previous_pitch = j.lean_angle = j.previous_lean = 0.0f;
+            }
             update_hitbox(e, j, *physics);
             if (agent)
             {
@@ -475,17 +514,33 @@ namespace
         if (std::abs(a.bend) < 1e-4f)
             return;
         rig.to_model(pose.bones, model);
+        auto finite_quat = [] (const glm::quat& q) {
+            return std::isfinite(q.x) && std::isfinite(q.y) && std::isfinite(q.z) && std::isfinite(q.w) && glm::dot(q, q) > 1e-12f;
+        };
         auto apply = [&] (std::span<const int32_t> chain, std::span<const float> shares, float angle) {
             for (size_t c = 0; c < chain.size(); ++c)
             {
                 const int32_t b = chain[c];
-                if (b < 0)
+                if (b < 0 || size_t(b) >= pose.bones.size())
                     continue;
                 const int32_t p = rig.parents[b];
-                const glm::quat parent_rotation = p >= 0 ? model[p].rotation : glm::quat(1, 0, 0, 0);
-                const glm::quat rotation = glm::angleAxis(angle * shares[c], a.up_model) * (parent_rotation * pose.bones[b].rotation);
-                pose.bones[b].rotation = glm::normalize(glm::inverse(parent_rotation) * rotation);
-                model[b].rotation = rotation;   // the next bone of the chain is its child
+                const glm::quat parent_rotation = p >= 0 ? glm::normalize(model[p].rotation) : glm::quat(1, 0, 0, 0);
+                const glm::quat turn = glm::angleAxis(angle * shares[c], a.up_model);
+                const glm::quat rotation = turn * (parent_rotation * pose.bones[b].rotation);
+                const glm::quat local = glm::normalize(glm::conjugate(parent_rotation) * rotation);
+                if (!finite_quat(parent_rotation) || !finite_quat(turn) || !finite_quat(local))
+                {
+                    // never seen in the data offline: tell what went wrong once, leave the bone as animated
+                    if (g_invalid_reports++ < max_invalid_reports)
+                        LogJackal.Log("Jackal bend: bone %d parent %d: parent rotation %f %f %f %f, turn %f %f %f %f (angle %f, up %f %f %f), "
+                            "animated %f %f %f %f, model size %zu, pose size %zu", b, p, parent_rotation.x, parent_rotation.y, parent_rotation.z,
+                            parent_rotation.w, turn.x, turn.y, turn.z, turn.w, angle * shares[c], a.up_model.x, a.up_model.y, a.up_model.z,
+                            pose.bones[b].rotation.x, pose.bones[b].rotation.y, pose.bones[b].rotation.z, pose.bones[b].rotation.w,
+                            model.size(), pose.bones.size());
+                    continue;
+                }
+                pose.bones[b].rotation = local;
+                model[b].rotation = glm::normalize(rotation);   // the next bone of the chain is its child
             }
         };
         static constexpr float spine_shares[] = { 0.1f, 0.15f, 0.2f, 0.2f, 0.2f, 0.15f };
@@ -527,13 +582,35 @@ namespace
                 bend_body(*animator.rig, a, *pose, model);
             animator.end_update(g, std::move(pose));
 
+            if (uint32_t bad_bone = 0; !is_finite(animator.output.bones, bad_bone))
+            {
+                if (g_invalid_reports++ < max_invalid_reports)
+                {
+                    const BoneTransform& b = animator.output.bones[bad_bone];
+                    LogJackal.Log("Jackal %u: non finite pose at bone %u '%s' (t %f %f %f, r %f %f %f %f): state %d, speed %f, yaw rate %f, "
+                        "animation speed %f, moving %f, gait %f, rate %f, bend %f / %f, dt %f, players: idle %f, death %f, gaits %f %f %f %f",
+                        e.index, bad_bone, animator.rig->skeleton->bones[bad_bone].name.c_str(), b.translation.x, b.translation.y,
+                        b.translation.z, b.rotation.x, b.rotation.y, b.rotation.z, b.rotation.w, int(a.states.state()), j.speed, j.yaw_rate,
+                        a.animation_speed, moving, a.gait_position, a.rate, a.bend, a.bend_velocity, dt, a.idle.time, a.death.time,
+                        a.gait_players[0].time, a.gait_players[1].time, a.gait_players[2].time, a.gait_players[3].time);
+                }
+                // start over from a sane state
+                animator.output.bones = animator.rig->bind_pose;
+                a.animation_speed = a.bend = a.bend_velocity = 0.0f;
+                a.moving.reset();
+                animator.sync = {};
+                for (anim::SequencePlayer& player : a.gait_players)
+                    player = {};
+                a.idle = {};
+            }
+
             char line[96];
             std::snprintf(line, sizeof(line), "%.2f m/s (wants %.2f), turn %.0f deg/s", j.speed, j.desired_speed, glm::degrees(j.yaw_rate));
             animator.debug_value("movement", line);
             std::snprintf(line, sizeof(line), "gait %.2f, rate %.2f, moving %.2f, bend %.1f deg", a.gait_position, a.rate, moving,
                 glm::degrees(a.bend));
             animator.debug_value("animation", line);
-            std::snprintf(line, sizeof(line), "%.1f m to the player, pitch %.1f, lean %.1f deg", j.target_distance, glm::degrees(j.pitch),
+            std::snprintf(line, sizeof(line), "%.1f m to the target, pitch %.1f, lean %.1f deg", j.target_distance, glm::degrees(j.pitch),
                 glm::degrees(j.lean_angle));
             animator.debug_value("target", line);
         });

@@ -72,6 +72,7 @@ set(RHEA_MODULE_DIRS
     src/locomotion
     src/render
     src/world_scripts
+    src/ai
     src/gameplay
     src/terrain
     src/trees

@@ -154,6 +154,11 @@ export namespace nav
         // Corners of the path from -> to (both projected onto the mesh). False: none of the mesh is near either;
         // a target that can't be reached gives the path to the closest point and partial = true.
         bool find_path(const glm::vec3& from, const glm::vec3& to, std::vector<glm::vec3>& corners, bool* partial = nullptr) const;
+        // Walks the mesh surface in a straight line from -> to (both projected): true when nothing is in the way;
+        // false and, in hit, the point where a wall or the mesh's edge stops it. False without hit: from is off the mesh.
+        bool raycast(const glm::vec3& from, const glm::vec3& to, glm::vec3* hit = nullptr) const;
+        // A random point of the mesh reachable from center within about radius (wandering, spawn spots)
+        std::optional<glm::vec3> random_point_around(const glm::vec3& center, float radius, uint32_t seed) const;
 
         // ---- crowd (navigation:agents keeps it in sync with the NavAgent components)
 

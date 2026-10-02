@@ -34,7 +34,7 @@ import name;
 // collider bodies of the new entities the same frame.
 export struct SpawnPrefabRequest
 {
-    std::string prefab;                 // e.g. "prefabs/jackal_dummy.json"
+    std::string prefab;                 // e.g. "prefabs/jackal.json"
     // where: the prefab's own Transform is relative to it (its scale kept)
     Transform placement;
     ecs::Entity parent;                 // optional ChildOf

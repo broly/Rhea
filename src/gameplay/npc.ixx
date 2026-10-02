@@ -26,6 +26,9 @@ import rhobject;
 // Off the navigation mesh (not built yet, no NavMeshBounds) it goes straight at the player.
 export
 {
+    // FixedPre set of plan (before the crowd); other brains writing NavAgents order themselves after it
+    struct NpcPlanning {};
+
     struct Npc
     {
         [[=rh::edit, =rh::read_only]] std::string locomotion = "locomotion/als_character.json";   // settings asset

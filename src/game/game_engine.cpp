@@ -26,14 +26,18 @@ import cvar;
 import reflect;
 import properties;
 import navigation;
+import ai;
+import type_id;
 
 namespace
 {
     cvar::Var<bool> cv_window_post_process("ui.windows.post_process", false, "Post processing: presets, exposure, bloom, color grading, lens effects");
     cvar::Var<bool> cv_window_navigation("ui.windows.navigation", false, "Navigation mesh: build state, debug drawing, agents");
+    cvar::Var<bool> cv_window_ai("ui.windows.ai", false, "AI: the brains (mode, action, target, decisions) and what they perceive");
 
-    // Windows > Navigation (bottom of the file)
+    // Windows > Navigation, Windows > AI (bottom of the file)
     void draw_navigation_window(ecs::Registry& registry);
+    void draw_ai_window(ecs::Registry& registry);
 
     // post process presets (assets/render/post_process_presets.json), the description as tooltip
     void post_process_preset_combo()
@@ -423,13 +427,18 @@ void GameEngine::on_debug_ui_windows_menu()
         cv_window_post_process.set(!cv_window_post_process.get());
     if (ImGui::MenuItem("Navigation", nullptr, cv_window_navigation.get()))
         cv_window_navigation.set(!cv_window_navigation.get());
+    if (ImGui::MenuItem("AI", nullptr, cv_window_ai.get()))
+        cv_window_ai.set(!cv_window_ai.get());
 }
 
 void GameEngine::on_debug_ui_windows()
 {
     draw_post_process_window();
     if (world)
+    {
         draw_navigation_window(world->registry);
+        draw_ai_window(world->registry);
+    }
 }
 
 void GameEngine::draw_post_process_window()
@@ -703,6 +712,110 @@ void draw_navigation_window(ecs::Registry& registry)
             });
             ImGui::EndTable();
         }
+    }
+    ImGui::End();
+}
+
+
+/************************************************************************
+ * AI WINDOW
+ ***********************************************************************/
+
+// a bool cvar of a module this file does not import (by name)
+void cvar_checkbox(const char* label, const char* name)
+{
+    cvar::Entry* entry = cvar::find(name);
+    if (!entry || entry->get_property().type != get_type_id<bool>())
+        return;
+    bool* value = static_cast<bool*>(entry->value_ptr());
+    if (ImGui::Checkbox(label, value))
+        entry->notify_changed();
+    ImGui::SetItemTooltip("%s: %s", name, entry->get_description().c_str());
+}
+
+const char* sense_name(ai::Sense sense)
+{
+    switch (sense)
+    {
+    case ai::Sense::sight: return "sight";
+    case ai::Sense::hearing: return "hearing";
+    case ai::Sense::damage: return "blow";
+    case ai::Sense::shared: return "told";
+    }
+    return "?";
+}
+
+void draw_ai_window(ecs::Registry& registry)
+{
+    if (!cv_window_ai.get())
+        return;
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.25f, viewport->WorkPos.y + viewport->WorkSize.y * 0.45f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.3f, viewport->WorkSize.y * 0.45f), ImGuiCond_FirstUseEver);
+    bool keep_open = true;
+    const bool expanded = ImGui::Begin("AI", &keep_open);
+    if (!keep_open)
+        cv_window_ai.set(false);
+    if (!expanded)
+    {
+        ImGui::End();
+        return;
+    }
+
+    cvar_checkbox("Jackal brains", "game.jackal.ai");
+    ImGui::SameLine();
+    cvar_checkbox("Draw perception", "ai.debug.perception");
+    ImGui::SameLine();
+    cvar_checkbox("Draw fights", "game.jackal.debug");
+
+    static ecs::Entity selected;
+    if (ImGui::BeginTable("brains", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV))
+    {
+        ImGui::TableSetupColumn("Entity");
+        ImGui::TableSetupColumn("Mode");
+        ImGui::TableSetupColumn("Action");
+        ImGui::TableSetupColumn("Target");
+        ImGui::TableHeadersRow();
+        ecs::Query<const ai::BrainDebug>(registry).each([&] (ecs::Entity e, const ai::BrainDebug& brain) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            const std::string name = scene::get_name(registry, e);
+            ImGui::PushID(int(e.index));
+            if (ImGui::Selectable(name.c_str(), selected == e, ImGuiSelectableFlags_SpanAllColumns))
+                selected = e;
+            ImGui::PopID();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(brain.mode.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(brain.action.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(brain.target.c_str());
+        });
+        ImGui::EndTable();
+    }
+
+    const ai::BrainDebug* brain = selected ? registry.get<ai::BrainDebug>(selected) : nullptr;
+    if (!brain)
+    {
+        ImGui::TextDisabled("Select a brain: its decisions and what it knows");
+        ImGui::End();
+        return;
+    }
+    ImGui::SeparatorText(scene::get_name(registry, selected).c_str());
+    ImGui::TextWrapped("%s", brain->detail.c_str());
+    if (ImGui::CollapsingHeader("Decisions", ImGuiTreeNodeFlags_DefaultOpen))
+        brain->log.each([] (const ai::DecisionLog::Entry& entry) {
+            ImGui::Text("%8.2f  %s", entry.time, entry.text.c_str());
+        });
+    if (const ai::Perception* perception = registry.get<ai::Perception>(selected);
+        perception && ImGui::CollapsingHeader("Knows", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (perception->known.empty())
+            ImGui::TextDisabled("nothing");
+        for (const ai::KnownTarget& k : perception->known)
+            ImGui::Text("%s: %s%s, awareness %.2f, %.1f m, by %s", scene::get_name(registry, k.entity).c_str(),
+                k.confirmed ? "confirmed" : "suspected", k.visible ? " (seen)" : "", k.awareness, k.distance, sense_name(k.sense));
     }
     ImGui::End();
 }

@@ -99,14 +99,33 @@ static void get_node_trs(const fastgltf::Node& node, glm::vec3& t, glm::quat& r,
         return;
     }
 
-    glm::mat4 m = fastgltf_to_glm(std::get<fastgltf::math::fmat4x4>(node.transform));
-    glm::vec3 skew;
-    glm::vec4 perspective;
-    glm::decompose(m, s, r, t, skew, perspective);
+    // Not glm::decompose: it rejects a 3x3 determinant below float epsilon as singular and leaves the outputs
+    // uninitialized - a node scaling cm to a small creature (0.0022: determinant 1e-8) came out as garbage.
+    // Affine matrices without shear (glTF): scale = column lengths, a mirror goes into the x scale.
+    const glm::mat4 m = fastgltf_to_glm(std::get<fastgltf::math::fmat4x4>(node.transform));
+    t = glm::vec3(m[3]);
+    glm::mat3 rotation(m);
+    s = glm::vec3(glm::length(rotation[0]), glm::length(rotation[1]), glm::length(rotation[2]));
+    if (s.x <= 0.0f || s.y <= 0.0f || s.z <= 0.0f)
+    {
+        r = glm::quat(1, 0, 0, 0);
+        return;
+    }
+    rotation[0] /= s.x;
+    rotation[1] /= s.y;
+    rotation[2] /= s.z;
+    if (glm::determinant(rotation) < 0.0f)
+    {
+        s.x = -s.x;
+        rotation[0] = -rotation[0];
+    }
+    r = glm::normalize(glm::quat_cast(rotation));
 }
 
 static glm::mat4 get_node_matrix(const fastgltf::Node& node)
 {
+    if (const auto* matrix = std::get_if<fastgltf::math::fmat4x4>(&node.transform))
+        return fastgltf_to_glm(*matrix);
     glm::vec3 t, s;
     glm::quat r;
     get_node_trs(node, t, r, s);

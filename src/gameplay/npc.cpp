@@ -73,7 +73,7 @@ namespace
     }
 
     // where to go and how fast
-    [[=ecs::system<ecs::Phase::FixedPre>, =ecs::after<LocomotionAgentSync>, =ecs::before<nav::NavAgentUpdate>]]
+    [[=ecs::system<ecs::Phase::FixedPre>, =ecs::in_set<NpcPlanning>, =ecs::after<LocomotionAgentSync>, =ecs::before<nav::NavAgentUpdate>]]
     void plan_npcs(ecs::Query<Npc, nav::NavAgent, const loco::LocomotionCharacter> npcs,
         ecs::Query<const loco::LocomotionCharacter, ecs::With<Player>> players, ecs::Query<const Dead> dead)
     {

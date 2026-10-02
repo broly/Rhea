@@ -792,41 +792,36 @@
 					"scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
 				},
 				"Npc": { "follow_player": true, "follow_distance": 2.5, "catch_up_distance": 4.0 },
-				"NavAgent": { "radius": 0.35, "height": 1.8, "max_speed": 3.75, "max_acceleration": 12.0 }
+				"NavAgent": { "radius": 0.35, "height": 1.8, "max_speed": 3.75, "max_acceleration": 12.0 },
+				// the jackals hunt it too; it takes the bites without dying until it can fall and get up (A7)
+				"Perceivable": { "team": "player", "center_height": 0.9 },
+				"Health": { "max": 100, "invulnerable": true, "death_jpeg": "" }
 			}
 		},
-		// M0: jackals in front of the player: they run at it (gameplay:jackal, cvar game.jackal.chase; damage.look <amount> [preset])
+		// jackal dens on open meadows away from Sponza (gameplay:jackal JackalDen; spots from
+		// intermediate/ai/find_meadows.py: dense grass, flat, no trees or rocks around). Each keeps its pack:
+		// it rests and wanders there, hunts what comes into its territory, gives up past the leash.
+		// game.jackal.debug draws territories and fights, Windows > AI the brains.
 		{
-			"name": "jackal_0",
-			"prefab": "prefabs/jackal.json",
+			"name": "jackal_den_north",
 			"components": {
 				"Transform": {
-					"position": { "x": 7.7, "y": 0.0, "z": 1.2 },
-					"rotation": { "x": 0, "y": -0.7071, "z": 0, "w": 0.7071 },
-					"scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
-				}
-			}
-		},
-		{
-			"name": "jackal_1",
-			"prefab": "prefabs/jackal.json",
-			"components": {
-				"Transform": {
-					"position": { "x": 6.8, "y": 0.0, "z": 2.8 },
-					"rotation": { "x": 0, "y": -0.7071, "z": 0, "w": 0.7071 },
-					"scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
-				}
+					"position": { "x": 33.0, "y": -1.45, "z": 45.0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
+				},
+				"JackalDen": { "prefab": "prefabs/jackal.json", "count": 4, "territory_radius": 12.0, "leash_radius": 45.0 }
 			}
 		},
 		{
-			"name": "jackal_2",
-			"prefab": "prefabs/jackal.json",
+			"name": "jackal_den_east",
 			"components": {
 				"Transform": {
-					"position": { "x": 8.9, "y": 0.0, "z": -0.4 },
-					"rotation": { "x": 0, "y": -0.7071, "z": 0, "w": 0.7071 },
-					"scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
-				}
+					"position": { "x": 60.0, "y": -1.97, "z": -45.0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
+				},
+				"JackalDen": { "prefab": "prefabs/jackal.json", "count": 5, "territory_radius": 14.0, "leash_radius": 50.0 }
 			}
 		},
 		// light rig around the imported character: positions and colors are driven every frame by

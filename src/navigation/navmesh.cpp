@@ -958,6 +958,71 @@ namespace nav
         return !corners.empty();
     }
 
+    bool NavMesh::raycast(const glm::vec3& from, const glm::vec3& to, glm::vec3* hit) const
+    {
+        NavMeshData& d = *data;
+        if (!d.query)
+            return false;
+        const float start[3] = { from.x, from.y, from.z };
+        dtPolyRef start_ref = 0;
+        float start_point[3];
+        d.query->findNearestPoly(start, target_extents, &d.filter, &start_ref, start_point);
+        if (!start_ref)
+            return false;
+
+        const float end[3] = { to.x, to.y, to.z };
+        float t = 0.0f;
+        float normal[3];
+        std::array<dtPolyRef, 64> path;
+        int path_count = 0;
+        if (dtStatusFailed(d.query->raycast(start_ref, start_point, end, &d.filter, &t, normal, path.data(), &path_count, int(path.size()))))
+            return false;
+        if (t > 1.0f)   // FLT_MAX: reached the end
+            return true;
+        if (hit)
+        {
+            *hit = to_glm(start_point) + (to - to_glm(start_point)) * t;
+            // the ray is 2D: the height of the polygon it stopped on
+            if (path_count > 0)
+            {
+                float h = hit->y;
+                if (dtStatusSucceed(d.query->getPolyHeight(path[size_t(path_count - 1)], &hit->x, &h)))
+                    hit->y = h;
+            }
+        }
+        return false;
+    }
+
+    std::optional<glm::vec3> NavMesh::random_point_around(const glm::vec3& center, float radius, uint32_t seed) const
+    {
+        NavMeshData& d = *data;
+        if (!d.query)
+            return std::nullopt;
+        const float c[3] = { center.x, center.y, center.z };
+        dtPolyRef start_ref = 0;
+        float start_point[3];
+        d.query->findNearestPoly(c, target_extents, &d.filter, &start_ref, start_point);
+        if (!start_ref)
+            return std::nullopt;
+
+        // Detour takes a plain function: the generator of this call (game thread only)
+        static thread_local std::minstd_rand rng;
+        rng.seed(seed | 1u);
+        auto frand = [] { return std::uniform_real_distribution<float>(0.0f, 1.0f)(rng); };
+        // the polygons are picked within the radius, the point inside one: retried when it lands far outside
+        for (int attempt = 0; attempt < 4; ++attempt)
+        {
+            dtPolyRef ref = 0;
+            float p[3];
+            if (dtStatusFailed(d.query->findRandomPointAroundCircle(start_ref, start_point, radius, &d.filter, +frand, &ref, p)) || !ref)
+                return std::nullopt;
+            const glm::vec3 point = to_glm(p);
+            if (glm::length(glm::vec2(point.x - center.x, point.z - center.z)) <= radius * 1.25f)
+                return point;
+        }
+        return std::nullopt;
+    }
+
     // ---------------------------------------------------------------- crowd
 
     int32_t NavMesh::add_agent(const glm::vec3& position, const CrowdAgentParams& params)
