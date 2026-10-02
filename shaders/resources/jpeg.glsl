@@ -114,8 +114,10 @@ layout(push_constant) uniform JpegPushConstants
     ivec4 extent;   // xy: the used part of u_jpeg_work (source / downscale, rounded up), zw: the source and target
     ivec4 mode;     // x: downscale factor, y: JPEG_FILTER_*, z: JPEG_CHROMA_*, w: JPEG_FLAG_*
     ivec4 codec;    // x: quality 1..100, yz: grid shift of this generation (px of u_jpeg_work), w: generation
-    vec4 post;      // x: sharpen, y: present mix of the full screen damage, z: codec with JPEG_FLAG_BLOCK_LIST: quality
-                    // where the mask is weak (pc.codec.x where it is 1), present: 1 shows the hits, w: unused
+    vec4 post;      // x: sharpen, y: downscale: brightness gain, present: mix of the full screen damage,
+                    // z: codec with JPEG_FLAG_BLOCK_LIST: quality where the mask is weak (pc.codec.x where it is 1),
+                    // present: 1 shows the hits, w: downscale: noise amplitude, present: crosshair arm (px)
+                    // codec.y in the downscale: noise seed (frame)
 } pc;
 
 // the channel of u_jpeg_mask a masked chain codes

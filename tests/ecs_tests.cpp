@@ -287,6 +287,34 @@ void ambiguities()
             std::println("  {}", f);
 }
 
+void filters()
+{
+    // With / Without: filter without handing the component out
+    Registry r;
+    Entity a = r.create(); r.add<Position>(a, 1.f, 0.f); r.add<Velocity>(a, 1.f, 0.f);
+    Entity b = r.create(); r.add<Position>(b, 2.f, 0.f); r.add<Dead>(b);
+    Entity c = r.create(); r.add<Position>(c, 3.f, 0.f); r.add<Velocity>(c, 0.f, 1.f); r.add<Dead>(c);
+
+    std::vector<float> alive;
+    Query<const Position, Without<Dead>>(r).each([&](const Position& p) { alive.push_back(p.x); });
+    EXPECT(alive == std::vector<float>{ 1.f });
+
+    std::vector<float> moving_dead;
+    Query<Position, With<Velocity>, With<Dead>>(r).each([&](Entity, Position& p) { moving_dead.push_back(p.x); });
+    EXPECT(moving_dead == std::vector<float>{ 3.f });
+
+    EXPECT((Query<const Position, Without<Velocity>>(r).count() == 1));
+    EXPECT((Query<const Position, With<Dead>, Without<Velocity>>(r).count() == 1));
+    EXPECT((Query<const Position, Without<Dead>>(r).matches(a)));
+    EXPECT((!Query<const Position, Without<Dead>>(r).matches(b)));
+    EXPECT((Query<Position, Without<Dead>>(r).get(a)->x == 1.f));
+
+    // filters are no access: a reader of Position with Without<Dead> conflicts only with Position writers
+    Access access;
+    Query<const Position, Without<Dead>, With<Velocity>>::describe_access(access);
+    EXPECT(access.reads.size() == 1 && access.writes.empty());
+}
+
 struct HitEvent { int id = 0; };
 struct Shout { int frame = 0; };
 struct EarlyListeners {};   // a set
@@ -378,6 +406,7 @@ int main()
     auto_systems();
     ambiguities();
     events();
+    filters();
     stress();
     if (failures)
         std::println("FAILED ({})", failures);

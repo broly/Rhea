@@ -70,12 +70,14 @@ namespace
     }
 
     [[=ecs::system<ecs::Phase::FixedPost>, =ecs::after<DamageResolution>]]
-    void despawn_dead(ecs::Query<Dead, const Health> dead, ecs::Res<ecs::SimTime> time, ecs::Commands& commands)
+    void despawn_dead(ecs::Query<Dead, const Health> dead, ecs::Res<ecs::SimTime> time, ecs::EventWriter<DespawnRequest> despawn)
     {
         dead.each([&] (ecs::Entity e, Dead& state, const Health& health) {
+            const bool due_before = health.despawn_delay >= 0.0f && state.time >= health.despawn_delay;
             state.time += float(time->dt);
-            if (health.despawn_delay >= 0.0f && state.time >= health.despawn_delay)
-                commands.destroy(e);
+            // once (the World destroys it with its children at the next sync point)
+            if (!due_before && health.despawn_delay >= 0.0f && state.time >= health.despawn_delay)
+                despawn.send({ e });
         });
     }
 

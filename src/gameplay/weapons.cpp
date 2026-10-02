@@ -432,8 +432,9 @@ namespace
         });
     }
 
-    // the current weapon's model is visible, the others hidden
-    [[=ecs::system<ecs::Phase::Update>, =ecs::after<WeaponPresentation>]]
+    // the current weapon's model is visible, the others hidden: in Late, before the render proxies are synced (in
+    // Update it would race the systems that read MeshRenderer there)
+    [[=ecs::system<ecs::Phase::Late>, =ecs::before<RenderSync>, =ecs::before<MeshColliderSync>]]
     void show_held_weapon(ecs::Query<MeshRenderer, const HeldWeaponModel, const ChildOf> models,
         ecs::Query<const WeaponHolder> holders)
     {

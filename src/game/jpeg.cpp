@@ -72,6 +72,8 @@ JpegSettings jpeg::clamped(const JpegSettings& settings)
     result.generations = std::clamp(settings.generations, 1, max_generations);
     result.sharpen = std::clamp(settings.sharpen, 0.0f, 1.0f);
     result.mask_quality = std::clamp(settings.mask_quality, 1, 100);
+    result.brightness = std::clamp(settings.brightness, -1.0f, 4.0f);
+    result.noise = std::clamp(settings.noise, 0.0f, 1.0f);
     if ((uint8_t)settings.chroma > (uint8_t)JpegChroma::Yuv411)
         result.chroma = JpegChroma::Yuv420;
     if ((uint8_t)settings.filter > (uint8_t)JpegFilter::Box)
@@ -143,12 +145,14 @@ void JpegRenderer::add_chain(RenderGraph& graph, JpegChainDesc desc)
     const std::string prefix = c->desc.name.to_string();
     std::function<bool()> condition = c->desc.condition;
 
+    // a masked downscale scales its brightness and noise by the mask
+    std::vector<RBImageUsage> downscale_reads = { { c->desc.source, RBImageUsageType::Sampled } };
+    if (c->desc.mask)
+        downscale_reads.push_back({ *c->desc.mask, RBImageUsageType::StorageImage });
     graph.add_pass({
         .name = Name(prefix + "Downscale"),
         .condition = condition,
-        .reads = {
-            { c->desc.source, RBImageUsageType::Sampled },
-        },
+        .reads = std::move(downscale_reads),
         .writes = {
             { c->work, RBImageUsageType::StorageImage }
         },
@@ -222,6 +226,7 @@ void JpegRenderer::prepare(RenderGraphContext& ctx, RenderGraph& graph)
             const RBImageHandle mask = graph.get_image(*chain->desc.mask);
             resource->update_image("u_jpeg_mask", mask, params, chain->blocks_instance);
             resource->update_image("u_jpeg_mask", mask, params, chain->output_instance);
+            resource->update_image("u_jpeg_mask", mask, params, chain->downscale_instance);
         }
     }
 }
@@ -266,7 +271,11 @@ void JpegRenderer::execute_downscale(RenderGraphContext& ctx, Chain& chain)
 {
     PROFILE("JpegRenderer::downscale");
 
-    const JpegPushConstants pc = make_push_constants(ctx.render_graph, chain);
+    JpegPushConstants pc = make_push_constants(ctx.render_graph, chain);
+    // brightness and noise before the codec, the noise new every frame
+    pc.post.y = chain.settings.brightness;
+    pc.post.w = chain.settings.noise;
+    pc.codec.y = int(++noise_frame);
     ctx.bind_pipeline(downscale_pipeline);
     ctx.bind(resource->query_single(chain.downscale_instance));
     ctx.push_constants(pc);

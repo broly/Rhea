@@ -4,10 +4,26 @@
 // corner of u_jpeg_work, as display encoded 8 bit RGB (what a JPEG encoder gets from a file).
 //   nearest: the texel at the center of each factor x factor cell (hard "pixels")
 //   box:     the average of the cell (soap)
+// Before the codec, so the JPEG crushes them too (a spot reads on any surface): brightness gain
+// (1 + pc.post.y) and color noise of amplitude pc.post.w, new every frame (seed pc.codec.y). Masked chains scale
+// both by the strength of their mask channel under the texel (the spot fades out smoothly).
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
 #include "resources/jpeg.glsl"
+
+// 0..1 per channel, stable for a texel and seed
+vec3 noise3(ivec2 p, uint seed)
+{
+    uvec3 h = uvec3(uint(p.x) * 0x8da6b343u, uint(p.y) * 0xd8163841u, seed * 0xcb1ab31fu);
+    h = h.x ^ h.y ^ h.z ^ uvec3(0u, 0x9e3779b9u, 0x7f4a7c15u);
+    h ^= h >> 16;
+    h *= 0x7feb352du;
+    h ^= h >> 15;
+    h *= 0x846ca68bu;
+    h ^= h >> 16;
+    return vec3(h & 0xffffffu) / 16777216.0;
+}
 
 void main()
 {
@@ -38,6 +54,21 @@ void main()
 
     if ((pc.mode.w & JPEG_FLAG_SOURCE_LINEAR) != 0)
         color = jpeg_linear_to_srgb(color);
+
+    const float brightness = pc.post.y;
+    const float noise = pc.post.w;
+    if (brightness != 0.0 || noise > 0.0)
+    {
+        float strength = 1.0;
+        if ((pc.mode.w & JPEG_FLAG_BLOCK_LIST) != 0)
+        {
+            const ivec2 source = min(origin + factor / 2, source_max);
+            const ivec2 block = min(source / JPEG_MASK_BLOCK, imageSize(u_jpeg_mask) - 1);
+            strength = imageLoad(u_jpeg_mask, block)[jpeg_mask_channel()];
+        }
+        color *= 1.0 + brightness * strength;
+        color += (noise3(texel, uint(pc.codec.y)) - 0.5) * 2.0 * noise * strength;
+    }
 
     imageStore(u_jpeg_work, texel, vec4(clamp(color, 0.0, 1.0), 1.0));
 }

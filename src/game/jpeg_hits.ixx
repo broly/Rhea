@@ -24,7 +24,9 @@ export cvar::Var<bool> cv_jpeg_hits_enabled(
  * changes. Missing fields keep the defaults below.
  *   downscale 1..16, filter "nearest" | "box", quality 1..100 (fresh hit), quality_weak (faded hit),
  *   chroma "4:4:4" | "4:2:2" | "4:2:0" | "4:1:1", generations 1..16, sharpen 0..1,
- *   radius (m), lifetime (s), edge (0..1: ragged share of the radius), description
+ *   radius (m), lifetime (s), edge (0..1: ragged share of the radius), description,
+ *   brightness (gain before the codec: 0 none, 1 twice as bright), noise (0..1 color noise before the codec);
+ *   both times the spot's strength
  ***********************************************************************/
 
 export struct JpegHitPreset

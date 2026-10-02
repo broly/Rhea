@@ -88,10 +88,12 @@ void World::tick()
         PROFILE("World::fixed_ticks");
         schedule.run_fixed(registry, dt);
     }
+    process_spawn_requests();
     {
         PROFILE("World::update");
         schedule.run_phase(registry, ecs::Phase::Update);
     }
+    process_spawn_requests();
 
     for (auto& script : scripts)
         script->tick(dt);
@@ -185,6 +187,31 @@ ecs::Entity World::spawn_prefab(std::string_view prefab_path, Name name, std::op
     return e;
 }
 
+ecs::Entity World::spawn_prefab_at(std::string_view prefab_path, const Transform& placement, Name name, ecs::Entity parent)
+{
+    Json::Value desc(Json::objectValue);
+    desc["prefab"] = std::string(prefab_path);
+    if (!name.is_none())
+        desc["name"] = name.to_string();
+
+    SerializationContext context{ &collector, true };
+    context.current_file = std::string(prefab_path);
+
+    std::vector<ecs::Entity> spawned;
+    const ecs::Entity e = spawn_from_json(desc, parent, context, spawned);
+    if (e)
+    {
+        // before PostLoad: static collider bodies are created where the entity is then
+        Transform local = registry.has<Transform>(e) ? *registry.get<Transform>(e) : Transform{};
+        const glm::quat rotation = placement.rotation.glm();
+        local.position = placement.position.glm() + rotation * local.position.glm();
+        local.rotation = glm::normalize(rotation * local.rotation.glm());
+        registry.add<Transform>(e, local);
+    }
+    finish_spawning(spawned, context);
+    return e;
+}
+
 ecs::Entity World::find_entity(Name name) const
 {
     ecs::Entity result = ecs::null_entity;
@@ -193,6 +220,56 @@ ecs::Entity World::find_entity(Name name) const
             result = e;
     });
     return result;
+}
+
+const Json::Value* World::get_prefab_json(const std::string& prefab_path)
+{
+    std::error_code error;
+    const auto time = std::filesystem::last_write_time(paths::get_assets_path() / prefab_path, error);
+    if (error)
+        return nullptr;
+    auto it = prefab_cache.find(prefab_path);
+    if (it != prefab_cache.end() && it->second.time == time)
+        return &it->second.json;
+    std::optional<Json::Value> json = json_utils::load_json_asset(prefab_path);
+    if (!json)
+        return nullptr;
+    CachedPrefab& cached = prefab_cache[prefab_path];
+    cached.json = std::move(*json);
+    cached.time = time;
+    return &cached.json;
+}
+
+void World::process_spawn_requests()
+{
+    PROFILE("World::process_spawn_requests");
+    // copies of the requests: spawning runs PostLoad, whose systems could send more
+    ecs::Events<SpawnPrefabRequest>& spawns = registry.events<SpawnPrefabRequest>();
+    std::vector<SpawnPrefabRequest> requests;
+    for (uint64_t id = std::max(spawn_cursor, spawns.oldest_id()); id < spawns.end_id(); ++id)
+        requests.push_back(spawns.at(id));
+    spawn_cursor = spawns.end_id();
+
+    for (const SpawnPrefabRequest& request : requests)
+    {
+        const ecs::Entity e = spawn_prefab_at(request.prefab, request.placement, request.name, request.parent);
+        if (!e)
+        {
+            LogWorld.Log("Spawn request: could not spawn '%s'", request.prefab.c_str());
+            continue;
+        }
+        if (request.on_spawned)
+            request.on_spawned(registry, e);
+    }
+
+    ecs::Events<DespawnRequest>& despawns = registry.events<DespawnRequest>();
+    std::vector<ecs::Entity> doomed;
+    for (uint64_t id = std::max(despawn_cursor, despawns.oldest_id()); id < despawns.end_id(); ++id)
+        doomed.push_back(despawns.at(id).entity);
+    despawn_cursor = despawns.end_id();
+    for (ecs::Entity e : doomed)
+        if (registry.alive(e))
+            destroy_recursive(e);
 }
 
 void World::destroy_recursive(ecs::Entity e)
@@ -230,7 +307,7 @@ void World::apply_json(ecs::Entity e, const Json::Value& desc, const Serializati
     if (const Json::Value* prefab = desc.find("prefab"))
     {
         checkf(prefab_depth < max_prefab_depth, "Prefab '%s': references nest too deep (a cycle?)", prefab->asString().c_str());
-        if (std::optional<Json::Value> prefab_desc = json_utils::load_json_asset(prefab->asString()))
+        if (const Json::Value* prefab_desc = get_prefab_json(prefab->asString()))
             apply_json(e, *prefab_desc, context, spawned, prefab_depth + 1);
         else
             LogWorld.Log("Prefab '%s' not found", prefab->asString().c_str());

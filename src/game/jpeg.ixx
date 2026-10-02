@@ -64,6 +64,10 @@ export struct JpegSettings
     float sharpen = 0.0f;           // 0..1
     uint32_t seed = 0;              // the grid shifts of the generations
     int mask_quality = 50;          // masked chains: quality where the mask is weak (quality where it is 1)
+    // before the codec (masked chains: times the mask strength): brightness gain (0: none, 1: twice as bright)
+    // and color noise amplitude (0..1)
+    float brightness = 0.0f;
+    float noise = 0.0f;
 };
 
 export namespace jpeg
@@ -188,6 +192,7 @@ private:
     // stable addresses: the passes keep pointers
     std::vector<std::unique_ptr<Chain>> chains;
     uint32_t next_instance = 0;
+    uint32_t noise_frame = 0;
     uint32_t next_block_list = 0;
     std::optional<uint32_t> present_instance;
     std::optional<uint32_t> hit_mask_instance;

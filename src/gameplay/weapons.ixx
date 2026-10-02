@@ -71,7 +71,7 @@ export
         std::string overlay;
     };
 
-    // System set of the Update systems that show the current weapon (model, overlay of the locomotion animation)
+    // System set of the Update system that sets the current weapon's overlay of the locomotion animation
     struct WeaponPresentation {};
 
     // A weapon model held by its parent (ChildOf the WeaponHolder): shown while that weapon is the current one

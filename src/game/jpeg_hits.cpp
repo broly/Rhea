@@ -87,6 +87,8 @@ namespace
             else if (key == "radius" && v.isNumeric()) preset.radius = std::max(v.asFloat(), 0.01f);
             else if (key == "lifetime" && v.isNumeric()) preset.lifetime = std::max(v.asFloat(), 0.01f);
             else if (key == "edge" && v.isNumeric()) preset.edge = std::clamp(v.asFloat(), 0.0f, 1.0f);
+            else if (key == "brightness" && v.isNumeric()) s.brightness = v.asFloat();
+            else if (key == "noise" && v.isNumeric()) s.noise = v.asFloat();
             else if (key == "chroma" && v.isString() && parse_chroma(v.asString())) s.chroma = *parse_chroma(v.asString());
             else if (key == "filter" && v.isString() && parse_filter(v.asString())) s.filter = *parse_filter(v.asString());
             else ok = false;
