@@ -168,8 +168,8 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
     });
 
     // JPEG spots of the hits (jpeg_hits): only while a hit lives, a chain per slot (the preset of a weapon)
-    jpeg_renderer->add_hit_mask_pass(*this, hit_mask, gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], camera_resource,
-        gbuffer_resource, [this] () { return !is_debugging() && hits_frame.any; });
+    jpeg_renderer->add_hit_mask_pass(*this, hit_mask, gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL],
+        camera_resource, gbuffer_resource, [this] () { return !is_debugging() && hits_frame.any; });
     for (uint32_t slot = 0; slot < jpeg_hits::slot_count; ++slot)
     {
         jpeg_renderer->add_chain(*this, {
@@ -198,8 +198,23 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
-            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f, hits_frame.any,
-                hud::crosshair_size());
+            const screen_jpeg::State& damage = screen_jpeg_state;
+            const hud::HealthBar bar = hud::health_bar();
+            jpeg_renderer->draw_present(ctx, {
+                .amount = damage.active ? damage.amount : 0.0f,
+                .vignette_radius = damage.active ? damage.vignette_radius : 10.0f,
+                .vignette_feather = damage.vignette_feather,
+                .block = damage.block,
+                .seed = damage.seed,
+                .tint = damage.tint,
+                .tint_radius = damage.tint_radius,
+                .hits = hits_frame.any,
+                .crosshair = hud::crosshair_size(),
+                .health = bar.health,
+                .health_lag = bar.lag,
+                .health_flash = bar.flash,
+                .health_bar = bar.scale,
+            });
         },
     });
 

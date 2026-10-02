@@ -105,6 +105,7 @@ namespace
             else if (key == "hit_flash" && v.isNumeric()) def.hit_flash = std::max(v.asFloat(), 0.0f);
             else if (key == "hit_flash_color" && parse_vec3(v)) def.hit_flash_color = *parse_vec3(v);
             else if (key == "hit_flash_time" && v.isNumeric()) def.hit_flash_time = std::max(v.asFloat(), 0.0f);
+            else if (key == "body_jpeg_time" && v.isNumeric()) def.body_jpeg_time = std::max(v.asFloat(), 0.0f);
             else ok = false;
             if (!ok)
                 LogWeapons.Log("Weapon %s: unknown field or bad value '%s'", name.c_str(), key.c_str());
@@ -259,6 +260,7 @@ namespace
             .jpeg_preset = shot.def.jpeg,
             .flash = flash_of(shot.def, scale),
             .flash_time = shot.def.hit_flash_time,
+            .body_jpeg_time = shot.def.body_jpeg_time,
         });
         spawn_effect(shot, shot.def.impact_effect, hit.position + hit.normal * 0.02f, hit.normal);
         area_damage(shot, hit.position, amount, target, scale);

@@ -2,7 +2,7 @@
 
 // Shakalizer, last pass of a chain (JpegRenderer): u_jpeg_work (after its generations) back to the size of the
 // source in u_jpeg_target.
-//   nearest downscale: every work texel becomes a factor x factor square (hard pixels)
+//   nearest downscale: every work texel becomes a factor.x x factor.y rectangle (hard pixels)
 //   box downscale:     bilinear upscale (soap)
 // Sharpen boosts the work texels against their 4 neighbours: the block edges and the ringing ("mosquitoes")
 // of the JPEG stand out.
@@ -48,15 +48,15 @@ void main()
             return;
     }
 
-    const int factor = max(pc.mode.x, 1);
+    const ivec2 factor = jpeg_factor();
     vec3 color;
-    if (pc.mode.y == JPEG_FILTER_NEAREST || factor == 1)
+    if (pc.mode.y == JPEG_FILTER_NEAREST || factor == ivec2(1))
     {
         color = sharpened(texel / factor);
     }
     else
     {
-        const vec2 position = (vec2(texel) + 0.5) / float(factor) - 0.5;
+        const vec2 position = (vec2(texel) + 0.5) / vec2(factor) - 0.5;
         const ivec2 p = ivec2(floor(position));
         const vec2 f = position - vec2(p);
         color = mix(

@@ -21,9 +21,13 @@ import rhmath;
 struct JpegPushConstants
 {
     glm::ivec4 extent;  // xy: the used part of the work texture, zw: the source (and target)
-    glm::ivec4 mode;    // x: downscale factor, y: JpegFilter, z: JpegChroma, w: jpeg_flag_*
+    glm::ivec4 mode;    // x: downscale factor (x | y << 8), y: JpegFilter, z: JpegChroma, w: jpeg_flag_*
     glm::ivec4 codec;   // x: quality, yz: grid shift of the generation, w: generation
     glm::vec4 post;     // x: sharpen, y: present mix, z: masked codec: quality of a weak mask, present: hits on
+    // present only (JpegPresentParams)
+    glm::vec4 vignette; // x: inner radius, y: feather, z: block px (0: smooth), w: dither seed
+    glm::vec4 tint;     // rgb: edge color x strength, w: inner radius of the edge tint
+    glm::vec4 hud;      // x: health, y: health lagging behind (the lost chunk), z: hit flash, w: bar scale (0 hidden)
 };
 RH_REGISTER_TYPE(JpegPushConstants)
 
@@ -32,7 +36,7 @@ export struct JpegHitsUBO
 {
     glm::vec4 spheres[64];  // xyz: center (world), w: radius
     glm::vec4 params[64];   // x: strength now (faded by age), y: seed of the ragged edge, z: slot, w: ragged edge
-    glm::uvec4 info;        // x: count
+    glm::uvec4 info;        // x: count, y: slot + 1 of the bodies under a JPEG (jpeg_hits::hold_body; 0: none)
 };
 RH_REGISTER_TYPE(JpegHitsUBO)
 
@@ -57,6 +61,7 @@ export enum class JpegFilter : uint8_t
 export struct JpegSettings
 {
     int downscale = 1;              // 1..jpeg::max_downscale
+    int downscale_x = 0;            // horizontal factor, 1..jpeg::max_downscale; 0: downscale (clamped fills it)
     JpegFilter filter = JpegFilter::Box;
     int quality = 50;               // 1..100, as libjpeg
     JpegChroma chroma = JpegChroma::Yuv420;
@@ -82,6 +87,33 @@ export namespace jpeg
     // one (an ordinary JPEG), 1..7 after it, so every recompression cuts the image elsewhere
     glm::ivec2 grid_shift(uint32_t seed, int generation);
 }
+
+// The pass Present (jpeg_present.frag): how the frame, its shakalized copy and the HUD come together
+export struct JpegPresentParams
+{
+    // share of the shakalized frame over the whole screen, 0..1
+    float amount = 0.0f;
+    // and towards the edges: 0 inside radius (1: the half height of the screen, the horizontal axis squeezed by
+    // sqrt(aspect), so a corner of 16:9 is at 1.67), 1 past radius + feather; radius above 2: off
+    float vignette_radius = 10.0f;
+    float vignette_feather = 0.3f;
+    // > 0: the share is decided per block of this many px, dithered by seed (the edge breaks into blocks);
+    // 0: smooth mix
+    float block = 0.0f;
+    uint32_t seed = 0;
+    // red edges: linear-ish display color x strength, from radius (same units) to the corners
+    glm::vec3 tint{ 0.0f };
+    float tint_radius = 0.6f;
+    // the JPEG spots of the hits (jpeg_hits) are on
+    bool hits = false;
+    // crosshair arm length in px, 0 hidden
+    float crosshair = 0.0f;
+    // health bar: fraction, the lagging fraction, hit flash 0..1, scale (0 hidden)
+    float health = 1.0f;
+    float health_lag = 1.0f;
+    float health_flash = 0.0f;
+    float health_bar = 0.0f;
+};
 
 // A shakalizer chain of a render graph: passes <name>Downscale, <name>Codec, <name>Output
 export struct JpegChainDesc
@@ -135,9 +167,10 @@ public:
     const JpegSettings& get_chain_settings(Name name) const;
 
     // pass JpegHitMask (jpeg_hit_mask.comp): the hit spheres (JpegHitsUBO) -> mask (RGBA8, 1/8 of the screen, a
-    // channel per hit slot) by the depth of the g-buffer. camera, gbuffer: the resources of the graph; depth: the linear depth texture
-    void add_hit_mask_pass(RenderGraph& graph, RGTextureHandle mask, RGTextureHandle depth, RenderResource* camera,
-        RenderResource* gbuffer, std::function<bool()> condition);
+    // channel per hit slot) by the depth of the g-buffer, + the bodies under a JPEG (the level in the shading model
+    // byte of geometry_normal). camera, gbuffer: the resources of the graph; depth: the linear depth texture
+    void add_hit_mask_pass(RenderGraph& graph, RGTextureHandle mask, RGTextureHandle depth, RGTextureHandle geometry_normal,
+        RenderResource* camera, RenderResource* gbuffer, std::function<bool()> condition);
     void prepare_hit_mask(RenderGraphContext& ctx, RBImageHandle mask, const JpegHitsUBO& ubo);
 
     // present pass (jpeg_present.frag): scene, mixed with result by amount, the blocks under hit_mask replaced
@@ -145,8 +178,7 @@ public:
     // draw inside a graphics pass.
     void prepare_present(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result, RBImageHandle hit_result,
         RBImageHandle hit_mask);
-    // crosshair: arm length in px, 0 hidden
-    void draw_present(RenderGraphContext& ctx, float amount, bool hits, float crosshair = 0.0f);
+    void draw_present(RenderGraphContext& ctx, const JpegPresentParams& params);
 
 private:
     struct Chain

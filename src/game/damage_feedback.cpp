@@ -13,6 +13,7 @@ import globals;
 import engine;
 import :screen_jpeg;
 import :jpeg_hits;
+import :hud;
 
 #include "ecs/ecs_macros.h"
 
@@ -63,7 +64,7 @@ namespace
     [[=ecs::system<ecs::Phase::Update>]]
     void jpeg_damage_feedback(ecs::EventReader<DamageEvent> damage, ecs::EventReader<DamageTakenEvent> taken,
         ecs::EventReader<DeathEvent> deaths, ecs::Query<const Health, const Player> players,
-        ecs::Query<const Player> player_tags, ecs::Query<const WorldTransform> transforms)
+        ecs::Query<const Player> player_tags, ecs::Query<const WorldTransform> transforms, ecs::Res<ecs::FrameTime> time)
     {
         float health = 1.0f;
         bool found = false;
@@ -73,14 +74,18 @@ namespace
             found = true;
         });
         screen_jpeg::set_health(health);
+        hud::set_player_health(health, found);
+        hud::tick(float(time->dt));
 
-        // the player's blows shake the full screen JPEG; a quarter of the health at once is the strongest burst
+        // the player's blows: a pulse of the full screen JPEG and red edges; a quarter of the health at once is the
+        // strongest one
         for (const DamageTakenEvent& event : taken.read())
         {
             if (!player_tags.get(event.entity) || event.max <= 0.0f)
                 continue;
             const float lost = (event.health_before - event.health_after) / event.max;
-            screen_jpeg::hit(std::clamp(0.25f + lost * 3.0f, 0.25f, 1.0f));
+            screen_jpeg::hit(std::clamp(0.35f + lost * 2.6f, 0.35f, 1.0f));
+            hud::player_hit();
         }
 
         // spots where the blows land: on the world and the creatures, not on the player's own view

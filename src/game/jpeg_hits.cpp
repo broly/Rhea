@@ -41,6 +41,21 @@ namespace
 
     std::vector<Hit> g_hits;
     uint32_t g_hit_counter = 0;
+
+    // jpeg_hits::hold_body
+    struct Body
+    {
+        std::string preset;
+        size_t preset_index = 0;
+        float lifetime = 0.2f;
+        float age = 0.0f;
+
+        float current_strength() const
+        {
+            return std::clamp(1.0f - age / lifetime, 0.0f, 1.0f);
+        }
+    };
+    std::vector<Body> g_bodies;
     std::optional<jpeg_hits::ShootRequest> g_shoot_request;
     jpeg_hits::Frame g_frame;
     // preset index of each slot last frame (keeps a preset in its slot while it lives)
@@ -80,6 +95,7 @@ namespace
             bool ok = true;
             if (key == "description" && v.isString()) preset.description = v.asString();
             else if (key == "downscale" && v.isNumeric()) s.downscale = v.asInt();
+            else if (key == "downscale_x" && v.isNumeric()) s.downscale_x = v.asInt();
             else if (key == "quality" && v.isNumeric()) s.quality = v.asInt();
             else if (key == "quality_weak" && v.isNumeric()) s.mask_quality = v.asInt();
             else if (key == "generations" && v.isNumeric()) s.generations = v.asInt();
@@ -211,6 +227,8 @@ bool jpeg_hits::reload_presets()
     g_presets = std::move(presets);
     for (Hit& hit : g_hits)
         hit.preset_index = resolve_preset(hit.preset);
+    for (Body& body : g_bodies)
+        body.preset_index = resolve_preset(body.preset);
     g_slot_presets = {};
     LogJpegHits.Log("Loaded %zu JPEG hit presets from %s", g_presets.size(), path.string().c_str());
     return true;
@@ -262,9 +280,26 @@ void jpeg_hits::add(const glm::vec3& center, std::string_view preset_name, float
     *weakest = std::move(hit);
 }
 
+void jpeg_hits::hold_body(std::string_view preset_name, float lifetime)
+{
+    const size_t index = resolve_preset(preset_name);
+    const std::string& name = get_presets()[index].name;
+    lifetime = std::max(lifetime, 0.01f);
+    // one entry per preset: a new blow restarts it
+    for (Body& body : g_bodies)
+        if (body.preset_index == index)
+        {
+            body.age = 0.0f;
+            body.lifetime = std::max(lifetime, body.lifetime - body.age);
+            return;
+        }
+    g_bodies.push_back({ .preset = name, .preset_index = index, .lifetime = lifetime });
+}
+
 void jpeg_hits::clear()
 {
     g_hits.clear();
+    g_bodies.clear();
 }
 
 void jpeg_hits::tick(float delta_seconds)
@@ -285,24 +320,35 @@ void jpeg_hits::tick(float delta_seconds)
     for (Hit& hit : g_hits)
         hit.age += dt;
     std::erase_if(g_hits, [] (const Hit& hit) { return hit.age >= hit.lifetime; });
+    for (Body& body : g_bodies)
+        body.age += dt;
+    std::erase_if(g_bodies, [] (const Body& body) { return body.age >= body.lifetime; });
 }
 
 const jpeg_hits::Frame& jpeg_hits::update()
 {
     const auto& presets = get_presets();
     g_frame = {};
-    if (!cv_jpeg_hits_enabled.get() || g_hits.empty())
+    if (!cv_jpeg_hits_enabled.get() || (g_hits.empty() && g_bodies.empty()))
     {
         g_slot_presets = {};
         return g_frame;
     }
 
-    // the strongest hit of every preset in use
+    // the strongest hit (or body) of every preset in use
     std::map<size_t, float> weights;
     for (const Hit& hit : g_hits)
     {
         float& weight = weights[hit.preset_index];
         weight = std::max(weight, hit.current_strength());
+    }
+    const Body* strongest_body = nullptr;
+    for (const Body& body : g_bodies)
+    {
+        float& weight = weights[body.preset_index];
+        weight = std::max(weight, body.current_strength());
+        if (!strongest_body || body.current_strength() > strongest_body->current_strength())
+            strongest_body = &body;
     }
     std::vector<std::pair<size_t, float>> ranked(weights.begin(), weights.end());
     std::ranges::sort(ranked, std::greater{}, &std::pair<size_t, float>::second);
@@ -359,8 +405,10 @@ const jpeg_hits::Frame& jpeg_hits::update()
         g_frame.ubo.params[count] = glm::vec4(strength, hit.seed, (float)slot_of(hit.preset_index), preset.edge);
         ++count;
     }
-    g_frame.ubo.info = glm::uvec4(count, 0u, 0u, 0u);
-    g_frame.any = count > 0;
+    // the bodies: the channel of the strongest body preset (their level comes from the g-buffer)
+    const uint32_t body_slot = strongest_body ? slot_of(strongest_body->preset_index) + 1u : 0u;
+    g_frame.ubo.info = glm::uvec4(count, body_slot, 0u, 0u);
+    g_frame.any = count > 0 || body_slot > 0;
 
     for (uint32_t s = 0; s < slot_count; ++s)
     {

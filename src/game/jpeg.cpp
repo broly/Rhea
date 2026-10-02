@@ -68,6 +68,7 @@ JpegSettings jpeg::clamped(const JpegSettings& settings)
 {
     JpegSettings result = settings;
     result.downscale = std::clamp(settings.downscale, 1, max_downscale);
+    result.downscale_x = settings.downscale_x > 0 ? std::clamp(settings.downscale_x, 1, max_downscale) : result.downscale;
     result.quality = std::clamp(settings.quality, 1, 100);
     result.generations = std::clamp(settings.generations, 1, max_generations);
     result.sharpen = std::clamp(settings.sharpen, 0.0f, 1.0f);
@@ -250,10 +251,10 @@ JpegPushConstants JpegRenderer::make_push_constants(const RenderGraph& graph, co
 {
     const JpegSettings& s = chain.settings;
     const Extent source = source_extent(graph, chain);
-    const int factor = s.downscale;
+    const glm::ivec2 factor = { s.downscale_x, s.downscale };
     const glm::ivec2 work = {
-        ((int)source.width + factor - 1) / factor,
-        ((int)source.height + factor - 1) / factor,
+        ((int)source.width + factor.x - 1) / factor.x,
+        ((int)source.height + factor.y - 1) / factor.y,
     };
     const int flags = (chain.desc.source_linear ? jpeg_flag_source_linear : 0)
         | (chain.desc.target_linear ? jpeg_flag_target_linear : 0)
@@ -261,7 +262,7 @@ JpegPushConstants JpegRenderer::make_push_constants(const RenderGraph& graph, co
 
     return JpegPushConstants{
         .extent = glm::ivec4(work, (int)source.width, (int)source.height),
-        .mode = glm::ivec4(factor, (int)s.filter, (int)s.chroma, flags),
+        .mode = glm::ivec4(factor.x | factor.y << 8, (int)s.filter, (int)s.chroma, flags),
         .codec = glm::ivec4(s.quality, 0, 0, 0),
         .post = glm::vec4(s.sharpen, 0.0f, (float)s.mask_quality, 0.0f),
     };
@@ -363,7 +364,7 @@ void JpegRenderer::execute_output(RenderGraphContext& ctx, Chain& chain)
     ctx.compute(groups_for({ (uint32_t)pc.extent.z, (uint32_t)pc.extent.w }));
 }
 
-void JpegRenderer::add_hit_mask_pass(RenderGraph& graph, RGTextureHandle mask, RGTextureHandle depth,
+void JpegRenderer::add_hit_mask_pass(RenderGraph& graph, RGTextureHandle mask, RGTextureHandle depth, RGTextureHandle geometry_normal,
     RenderResource* camera, RenderResource* gbuffer, std::function<bool()> condition)
 {
     checkf(!hit_mask_instance.has_value(), "JpegRenderer::add_hit_mask_pass: one hit mask per renderer");
@@ -376,6 +377,7 @@ void JpegRenderer::add_hit_mask_pass(RenderGraph& graph, RGTextureHandle mask, R
         .condition = std::move(condition),
         .reads = {
             { depth, RBImageUsageType::Sampled },
+            { geometry_normal, RBImageUsageType::Sampled },
         },
         .writes = {
             { mask, RBImageUsageType::StorageImage }
@@ -412,7 +414,7 @@ void JpegRenderer::prepare_present(RenderGraphContext& ctx, RBImageHandle scene,
     resource->update_image("u_jpeg_mask_sampled", hit_mask, params, *present_instance);
 }
 
-void JpegRenderer::draw_present(RenderGraphContext& ctx, float amount, bool hits, float crosshair)
+void JpegRenderer::draw_present(RenderGraphContext& ctx, const JpegPresentParams& p)
 {
     PROFILE("JpegRenderer::present");
     checkf(present_instance.has_value(), "JpegRenderer::prepare_present was not called");
@@ -420,6 +422,13 @@ void JpegRenderer::draw_present(RenderGraphContext& ctx, float amount, bool hits
     if (ctx.bind_pipeline(present_pipeline))
         ctx.bind(resource->query_single(*present_instance));
     ctx.push_constants(JpegPushConstants{
-        .post = glm::vec4(0.0f, std::clamp(amount, 0.0f, 1.0f), hits ? 1.0f : 0.0f, std::max(crosshair, 0.0f)) });
+        .post = glm::vec4(0.0f, std::clamp(p.amount, 0.0f, 1.0f), p.hits ? 1.0f : 0.0f, std::max(p.crosshair, 0.0f)),
+        // the seed goes through a float: 24 bits stay exact
+        .vignette = glm::vec4(p.vignette_radius, std::max(p.vignette_feather, 1e-3f), std::max(p.block, 0.0f),
+            (float)(p.seed & 0xffffffu)),
+        .tint = glm::vec4(glm::max(p.tint, glm::vec3(0.0f)), p.tint_radius),
+        .hud = glm::vec4(std::clamp(p.health, 0.0f, 1.0f), std::clamp(p.health_lag, 0.0f, 1.0f),
+            std::clamp(p.health_flash, 0.0f, 1.0f), std::max(p.health_bar, 0.0f)),
+    });
     ctx.draw_fullscreen();
 }

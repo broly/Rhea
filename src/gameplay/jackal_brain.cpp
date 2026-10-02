@@ -8,6 +8,7 @@ import :jackal;
 import :health;
 import :player;
 import :npc;
+import :effects;
 
 import std.compat;
 import glm;
@@ -41,6 +42,8 @@ struct JackalContext
     ai::AttackTokens* tokens = nullptr;
     const ecs::EventWriter<DamageEvent>& damage;
     const ecs::EventWriter<ai::Stimulus>& stimuli;
+    const ecs::EventWriter<JpegSpotEvent>& spots;
+    const ecs::EventWriter<SpawnPrefabRequest>& spawns;
     double now = 0.0;
     float health = 1.0f;                       // share of the max
 
@@ -331,6 +334,19 @@ ai::ActionStatus JackalLunge::tick(JackalContext& c, float dt)
                     .direction = direction,
                 });
                 c.debug.log.add(c.now, std::format("bites {}", target_name(c)));
+
+                // the flash at the muzzle: particles and a short JPEG spot
+                const glm::vec3 forward = forward_of(c.body.heading);
+                const glm::vec3 muzzle = position + forward * 0.55f + up * 0.42f;
+                if (!b.bite_jpeg.empty())
+                    c.spots.send({ .position = muzzle, .preset = b.bite_jpeg });
+                if (!b.bite_effect.empty())
+                {
+                    Transform placement;
+                    placement.position = muzzle;
+                    placement.rotation = glm::angleAxis(c.body.heading, up);
+                    c.spawns.send({ .prefab = b.bite_effect, .placement = placement });
+                }
                 phase = Phase::recover;
                 time = 0.0f;
                 return ai::ActionStatus::running;
@@ -737,7 +753,7 @@ namespace
         ecs::Query<const Health> healths, ecs::Query<const Dead> dead, ecs::Query<const ai::Perceivable> perceivables,
         ecs::Query<const WorldTransform> transforms, ecs::Query<const Player> players, ecs::OptResMut<ai::AttackTokens> tokens,
         ecs::OptRes<nav::NavMesh> navmesh, ecs::EventWriter<DamageEvent> damage, ecs::EventWriter<ai::Stimulus> stimuli,
-        ecs::Res<ecs::SimTime> time)
+        ecs::EventWriter<JpegSpotEvent> spots, ecs::EventWriter<SpawnPrefabRequest> spawns, ecs::Res<ecs::SimTime> time)
     {
         const double now = time->time;
         const float dt = (float)time->dt;
@@ -764,7 +780,8 @@ namespace
             ai::BrainDebug* debug = debugs.get(e);
             nav::NavAgent* agent = agents.get(e);
             JackalContext c{ .self = e, .body = body, .brain = brain, .perception = perception, .debug = debug ? *debug : fallback,
-                .agent = agent, .nav = nav, .tokens = attack_tokens, .damage = damage, .stimuli = stimuli, .now = now };
+                .agent = agent, .nav = nav, .tokens = attack_tokens, .damage = damage, .stimuli = stimuli, .spots = spots,
+                .spawns = spawns, .now = now };
 
             if (!brain.initialized)
             {

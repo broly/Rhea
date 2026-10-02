@@ -16,7 +16,9 @@ import framework;
 //   apply_damage  (FixedPost, set DamageResolution, before the physics step) takes it off the Health of the
 //                 entity or of its nearest ancestor with one (a hit on a child mesh hurts the creature), adds
 //                 Dead and sends DeathEvent when the health runs out
-//   despawn_dead  (FixedPost, after DamageResolution) destroys the dead after Health::despawn_delay
+//   regenerate_health (FixedPost, set HealthRegeneration, after DamageResolution) heals the entities with a
+//                 HealthRegen after HealthRegen::delay s without damage
+//   despawn_dead  (FixedPost, after HealthRegeneration) destroys the dead after Health::despawn_delay
 // Weapons (FixedPost, set WeaponFire) send their DamageEvents before DamageResolution, after the characters
 // moved (Fixed); reactions (effects, sounds, score) read the events in Update.
 //
@@ -50,6 +52,26 @@ export
         float fraction() const { return max > 0.0f ? std::clamp(current / max, 0.0f, 1.0f) : 0.0f; }
     };
 
+    // System set of regenerate_health
+    struct HealthRegeneration {};
+
+    // Health comes back slowly after a while without damage (the player): rate ramps in over ramp s once delay s
+    // passed since the last blow, up to limit x max. The dead do not heal.
+    //
+    //     "HealthRegen": { "delay": 5, "rate": 4, "ramp": 2, "limit": 1 }
+    struct HealthRegen
+    {
+        // s without damage before it starts
+        [[=rh::edit, =rh::speed<0.1f>]] float delay = 5.0f;
+        // health per second at full speed
+        [[=rh::edit, =rh::speed<0.1f>]] float rate = 4.0f;
+        // s from the start to full speed
+        [[=rh::edit, =rh::speed<0.05f>]] float ramp = 2.0f;
+        // share of max it heals up to
+        [[=rh::edit, =rh::speed<0.01f>]] float limit = 1.0f;
+        [[=rh::edit, =rh::read_only]] float since_damage = 0.0f;
+    };
+
     // Added when the health runs out
     struct [[=scene::runtime_only]] Dead
     {
@@ -69,6 +91,9 @@ export
         // flash of the entity hit (HitFlash): linear emission (HDR) fading over flash_time s; 0: none
         glm::vec3 flash{ 0.0f };
         float flash_time = 0.12f;
+        // s the whole entity hit (a creature, not the player) is under the JPEG of jpeg_preset, by its silhouette
+        // (HitFlash -> MeshRenderer::effect.a); 0: only the spot
+        float body_jpeg_time = 0.0f;
     };
 
     // Sent by apply_damage after it applied a DamageEvent (with the entity that has the Health)
@@ -82,11 +107,14 @@ export
     };
 
     // The entity glows for a moment where it was hit (MeshRenderer::effect of it and its children): added for a
-    // DamageTakenEvent whose blow has a flash, fades out quadratically, removed at the end
+    // DamageTakenEvent whose blow has a flash, fades out quadratically, removed at the end. A blow with
+    // body_jpeg_time also puts the whole body under a JPEG (effect.a: the character material writes the level into
+    // the g-buffer, the JPEG hit mask covers those blocks): full for half the time, then fading.
     struct [[=scene::runtime_only]] HitFlash
     {
         glm::vec3 color{ 0.0f };            // linear emission at the start
         float duration = 0.12f;
+        float jpeg_duration = 0.0f;         // s of the body JPEG (0: none)
         [[=rh::edit, =rh::read_only]] float time = 0.0f;
     };
 

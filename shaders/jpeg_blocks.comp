@@ -42,7 +42,7 @@ void main()
     const ivec2 m = ivec2(index % grid.x, index / grid.x);
 
     // source pixels [(m * mcu - 8) * factor, (m + 1) * mcu * factor): mcu * factor is a multiple of 8
-    const int factor = max(pc.mode.x, 1);
+    const ivec2 factor = jpeg_factor();
     const int channel = jpeg_mask_channel();
     const ivec2 mask_size = imageSize(u_jpeg_mask);
     const ivec2 first = max(m * mcu * factor / JPEG_MASK_BLOCK - factor, ivec2(0));

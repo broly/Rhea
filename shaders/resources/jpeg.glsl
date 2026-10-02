@@ -102,7 +102,7 @@ layout(set = SET_JPEG, binding = BINDING_UBO_JPEG_HITS) uniform JpegHitsUBO
     vec4 spheres[JPEG_MAX_HITS];    // xyz: center (world), w: radius
     vec4 params[JPEG_MAX_HITS];     // x: strength now (faded by age), y: seed of the ragged edge, z: slot (mask
                                     // channel), w: ragged edge, share of the radius
-    uvec4 info;                     // x: count
+    uvec4 info;                     // x: count, y: channel + 1 of the bodies under a JPEG (0: none)
 } jpeg_hits_ubo;
 
 layout(set = SET_JPEG, binding = BINDING_SAMPLER_JPEG_RESULT)
@@ -112,13 +112,23 @@ uniform sampler2D u_jpeg_result;
 layout(push_constant) uniform JpegPushConstants
 {
     ivec4 extent;   // xy: the used part of u_jpeg_work (source / downscale, rounded up), zw: the source and target
-    ivec4 mode;     // x: downscale factor, y: JPEG_FILTER_*, z: JPEG_CHROMA_*, w: JPEG_FLAG_*
+    ivec4 mode;     // x: downscale factor (jpeg_factor), y: JPEG_FILTER_*, z: JPEG_CHROMA_*, w: JPEG_FLAG_*
     ivec4 codec;    // x: quality 1..100, yz: grid shift of this generation (px of u_jpeg_work), w: generation
     vec4 post;      // x: sharpen, y: downscale: brightness gain, present: mix of the full screen damage,
                     // z: codec with JPEG_FLAG_BLOCK_LIST: quality where the mask is weak (pc.codec.x where it is 1),
                     // present: 1 shows the hits, w: downscale: noise amplitude, present: crosshair arm (px)
                     // codec.y in the downscale: noise seed (frame)
+    // present only (JpegPresentParams)
+    vec4 vignette;  // x: inner radius, y: feather, z: block px (0: smooth), w: dither seed
+    vec4 tint;      // rgb: red edge color x strength, w: its inner radius
+    vec4 hud;       // x: health, y: health lagging behind, z: hit flash, w: health bar scale (0 hidden)
 } pc;
+
+// the downscale factor per axis (mode.x: x | y << 8)
+ivec2 jpeg_factor()
+{
+    return max(ivec2(pc.mode.x & 0xff, (pc.mode.x >> 8) & 0xff), ivec2(1));
+}
 
 // the channel of u_jpeg_mask a masked chain codes
 int jpeg_mask_channel()

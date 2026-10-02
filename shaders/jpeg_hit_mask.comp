@@ -6,6 +6,9 @@
 // of the channel), so the spot sticks to the surfaces it hit and its border steps from block to block like a
 // damaged file. The outer part of a sphere (params.w of the radius) keeps a random share of its blocks, fewer
 // towards the edge: the border is ragged, not a circle of blocks.
+// Whole bodies: a block whose surface is an instance with a JPEG mask level (MeshRenderer::effect.a written into
+// the shading model byte of g_geometry_normal, a creature hit by a weapon) goes whole into the channel of the body
+// preset (info.y - 1), at the level's strength: the creature's silhouette in blocks.
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -13,6 +16,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 #include "resources/gbuffer.glsl"
 #include "resources/jpeg.glsl"
 #include "utils/gbuffer_position.glsl"
+#include "character/shading_models.glsl"
 
 // 0..1, stable per block and sphere
 float block_noise(ivec2 block, float seed)
@@ -56,6 +60,15 @@ void main()
             if (block_noise(block, params.y) >= keep)
                 continue;
             strength[slot] = params.x;
+        }
+
+        // the bodies under a JPEG
+        const uint body_slot = jpeg_hits_ubo.info.y;
+        if (body_slot > 0u)
+        {
+            const uint level = decode_jpeg_mask_level(texelFetch(u_gbuffer[GBUFFER_SLOT_GEOMETRY_NORMAL], pixel, 0).a);
+            const int slot = clamp(int(body_slot) - 1, 0, 3);
+            strength[slot] = max(strength[slot], float(level) / 3.0);
         }
     }
 

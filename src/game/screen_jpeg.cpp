@@ -3,6 +3,7 @@ module game;
 import :screen_jpeg;
 
 import std.compat;
+import glm;
 
 import cvar;
 import :jpeg;
@@ -10,8 +11,14 @@ import :jpeg;
 namespace
 {
     float g_health = 1.0f;
-    float g_burst = 0.0f;
+    // the JPEG pulse and the red edges of the hits, 0..1
+    float g_pulse = 0.0f;
+    float g_red = 0.0f;
     uint32_t g_hits = 0;
+    uint32_t g_frame = 0;
+
+    // the pulse above which the grid and the dither jump every frame (hit.flicker)
+    constexpr float flicker_pulse = 0.15f;
 
     cvar::Command cmd_hit("render.jpeg.screen.hit", "Simulates a hit for the full screen JPEG damage",
         [] (cvar::Args args)
@@ -22,6 +29,17 @@ namespace
             screen_jpeg::hit(strength);
         },
         "[strength 0..1]");
+
+    float decay(float value, float delta_seconds, float time_constant)
+    {
+        value *= std::exp(-std::clamp(delta_seconds, 0.0f, 0.25f) / std::max(time_constant, 0.01f));
+        return value < 0.001f ? 0.0f : value;
+    }
+
+    int lerp_int(int from, int to, float t)
+    {
+        return (int)std::lround(std::lerp((float)from, (float)to, std::clamp(t, 0.0f, 1.0f)));
+    }
 }
 
 void screen_jpeg::set_health(float health)
@@ -31,17 +49,17 @@ void screen_jpeg::set_health(float health)
 
 void screen_jpeg::hit(float strength)
 {
-    const float burst = std::clamp(strength, 0.0f, 1.0f) * cv_screen_jpeg_hit_strength.get();
-    g_burst = 1.0f - (1.0f - g_burst) * (1.0f - burst);
+    const float s = std::clamp(strength, 0.0f, 1.0f) * cv_screen_jpeg_hit_strength.get();
+    g_pulse = 1.0f - (1.0f - g_pulse) * (1.0f - s);
+    g_red = 1.0f - (1.0f - g_red) * (1.0f - s);
     ++g_hits;
 }
 
 void screen_jpeg::tick(float delta_seconds)
 {
-    const float decay = std::max(cv_screen_jpeg_hit_decay.get(), 0.01f);
-    g_burst *= std::exp(-std::clamp(delta_seconds, 0.0f, 0.25f) / decay);
-    if (g_burst < 0.001f)
-        g_burst = 0.0f;
+    g_pulse = decay(g_pulse, delta_seconds, cv_screen_jpeg_hit_decay.get());
+    g_red = decay(g_red, delta_seconds, cv_screen_jpeg_red_decay.get());
+    ++g_frame;
 }
 
 screen_jpeg::State screen_jpeg::evaluate()
@@ -55,28 +73,44 @@ screen_jpeg::State screen_jpeg::evaluate()
     const float threshold = std::max(cv_screen_jpeg_threshold.get(), 0.01f);
     const float below = std::clamp((threshold - health) / threshold, 0.0f, 1.0f);
     const float severity = below > 0.0f ? std::pow(below, std::max(cv_screen_jpeg_curve.get(), 0.01f)) : 0.0f;
-    const float total = 1.0f - (1.0f - severity) * (1.0f - g_burst);
+    const float pulse = g_pulse;
 
-    state.severity = total;
-    state.active = total > 0.001f;
+    state.health_severity = severity;
+    state.pulse = pulse;
+    state.tint = cv_screen_jpeg_red_color.get() * (g_red * cv_screen_jpeg_red.get());
+    state.tint_radius = cv_screen_jpeg_red_radius.get();
+    state.active = below > 0.0f || pulse > 0.0f;
     if (!state.active)
         return state;
 
-    // fades in over the first few percent: the step from the clean frame to quality_start is not a pop
-    state.amount = std::clamp(total / 0.05f, 0.0f, 1.0f);
-
-    auto lerp_int = [total] (int from, int to)
+    const bool flicker = cv_screen_jpeg_hit_flicker.get() && pulse > flicker_pulse;
+    state.seed = flicker ? g_hits * 7919u + g_frame : g_hits;
+    state.block = (float)std::max(cv_screen_jpeg_block.get(), 0);
+    state.amount = std::clamp(pulse / std::max(cv_screen_jpeg_hit_fade.get(), 0.01f), 0.0f, 1.0f);
+    if (below > 0.0f)
     {
-        return (int)std::lround(std::lerp((float)from, (float)to, total));
-    };
+        state.vignette_radius = std::lerp(cv_screen_jpeg_radius_start.get(), cv_screen_jpeg_radius_min.get(), severity);
+        state.vignette_feather = cv_screen_jpeg_feather.get();
+    }
+
+    // each contribution's parameters; the chain takes the harsher one
+    const bool hurt = below > 0.0f;
+    const bool hit = pulse > 0.0f;
+    const int health_downscale = lerp_int(1, cv_screen_jpeg_downscale_max.get(), severity);
+    const int health_quality = lerp_int(cv_screen_jpeg_quality_start.get(), cv_screen_jpeg_quality_min.get(), severity);
+    const int health_generations = lerp_int(1, cv_screen_jpeg_generations_max.get(), severity);
+    const int hit_quality = lerp_int(cv_screen_jpeg_quality_start.get(), cv_screen_jpeg_hit_quality.get(), pulse);
+
     state.settings = jpeg::clamped({
-        .downscale = lerp_int(1, cv_screen_jpeg_downscale_max.get()),
+        .downscale = std::max(hurt ? health_downscale : 1, lerp_int(1, cv_screen_jpeg_hit_downscale_y.get(), pulse)),
+        .downscale_x = std::max(hurt ? health_downscale : 1, lerp_int(1, cv_screen_jpeg_hit_downscale_x.get(), pulse)),
         .filter = cv_screen_jpeg_filter.get(),
-        .quality = lerp_int(cv_screen_jpeg_quality_start.get(), cv_screen_jpeg_quality_min.get()),
+        .quality = std::min(hurt ? health_quality : 100, hit ? hit_quality : 100),
         .chroma = cv_screen_jpeg_chroma.get(),
-        .generations = lerp_int(1, cv_screen_jpeg_generations_max.get()),
+        .generations = std::max(hurt ? health_generations : 1, lerp_int(1, cv_screen_jpeg_hit_generations.get(), pulse)),
         .sharpen = cv_screen_jpeg_sharpen.get(),
-        .seed = g_hits,
+        .seed = state.seed,
+        .noise = std::max(severity * cv_screen_jpeg_health_noise.get(), pulse * cv_screen_jpeg_hit_noise.get()),
     });
     return state;
 }

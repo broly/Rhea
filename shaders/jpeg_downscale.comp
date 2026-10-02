@@ -1,8 +1,9 @@
 #version 450
 
 // Shakalizer, first pass of a chain (JpegRenderer): the source shrunk by the downscale factor into the top left
-// corner of u_jpeg_work, as display encoded 8 bit RGB (what a JPEG encoder gets from a file).
-//   nearest: the texel at the center of each factor x factor cell (hard "pixels")
+// corner of u_jpeg_work, as display encoded 8 bit RGB (what a JPEG encoder gets from a file). The factor may
+// differ per axis (jpeg_factor: wider cells smear the rows).
+//   nearest: the texel at the center of each factor.x x factor.y cell (hard "pixels")
 //   box:     the average of the cell (soap)
 // Before the codec, so the JPEG crushes them too (a spot reads on any surface): brightness gain
 // (1 + pc.post.y) and color noise of amplitude pc.post.w, new every frame (seed pc.codec.y). Masked chains scale
@@ -31,12 +32,12 @@ void main()
     if (any(greaterThanEqual(texel, pc.extent.xy)))
         return;
 
-    const int factor = max(pc.mode.x, 1);
+    const ivec2 factor = jpeg_factor();
     const ivec2 source_max = pc.extent.zw - 1;
     const ivec2 origin = texel * factor;
 
     vec3 color;
-    if (pc.mode.y == JPEG_FILTER_NEAREST || factor == 1)
+    if (pc.mode.y == JPEG_FILTER_NEAREST || factor == ivec2(1))
     {
         color = texelFetch(u_jpeg_source, min(origin + factor / 2, source_max), 0).rgb;
     }

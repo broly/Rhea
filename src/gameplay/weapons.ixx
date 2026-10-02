@@ -36,7 +36,8 @@ import :health;
 //     muzzle to the hit, ParticleSystem::shape_scale.z = its length), impact_effect (at the hit, along the normal),
 //   projectile (prefab: the shots fly from the muzzle to the point under the crosshair), projectile_speed (m/s),
 //     projectile_gravity (m/s^2); the area damage (radius) then happens where it lands,
-//   hit_flash (emission of the entity hit, HDR), hit_flash_color [r, g, b], hit_flash_time (s)
+//   hit_flash (emission of the entity hit, HDR), hit_flash_color [r, g, b], hit_flash_time (s),
+//   body_jpeg_time (s the whole creature hit is under the jpeg preset, by its silhouette; 0: only the spot)
 //
 // Systems:
 //   read_weapon_input (FixedPre)                    trigger (left mouse), reload (X), slot keys (2..7) and the aim
@@ -88,6 +89,7 @@ export
         float hit_flash = 3.0f;
         glm::vec3 hit_flash_color{ 1.0f };
         float hit_flash_time = 0.12f;
+        float body_jpeg_time = 0.2f;
     };
 
     // A shot in flight (WeaponDef::projectile): moved every fixed tick (move_projectiles), hits like the ray of

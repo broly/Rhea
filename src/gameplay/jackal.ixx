@@ -204,6 +204,8 @@ export
         [[=rh::edit, =rh::speed<0.01f>]] float telegraph_behind = 0.75f;   // s, from outside the target's view
         [[=rh::edit, =rh::speed<0.01f>]] float bite_range = 1.3f;          // m between its feet and the target's: the muzzle reaches
         [[=rh::edit, =rh::speed<0.5f>]] float bite_damage = 12.0f;
+        [[=rh::edit]] std::string bite_effect = "prefabs/effects/jackal_bite.json";   // at the muzzle (empty: none)
+        [[=rh::edit]] std::string bite_jpeg = "bite";                                 // JPEG spot preset at the muzzle (empty: none)
         [[=rh::edit, =rh::speed<0.05f>]] float lunge_cooldown_min = 2.5f;  // s between two leaps
         [[=rh::edit, =rh::speed<0.05f>]] float lunge_cooldown_max = 4.5f;
         [[=rh::edit, =rh::speed<0.01f>]] float feint_chance = 0.15f;       // per s, circling close without a token

@@ -370,6 +370,9 @@ void WorldScript_VariousThings::tick(double dt)
             registry.add<nav::NavAgent>(character, obstacle);
             if (!registry.has<Health>(character))
                 registry.add<Health>(character, Health{ .max = 100.0f, .death_jpeg = "" });
+            // heals slowly after a while without damage
+            if (!registry.has<HealthRegen>(character))
+                registry.add<HealthRegen>(character);
             // the creatures see and hear it (ai:perception)
             if (!registry.has<ai::Perceivable>(character))
                 registry.add<ai::Perceivable>(character, ai::Perceivable{ .team = ai::Team::player, .center_height = 0.9f });
