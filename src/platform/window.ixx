@@ -29,6 +29,8 @@ export namespace platform
         bool window_create(Window& window, int width, int height, const char* title, const WindowCreateOptions& options = {});
         void window_request_close(Window& window);
         void window_poll_events();
+        // hidden cursor locked to the window, unlimited mouse movement (mouse look); raw motion where supported
+        void set_cursor_captured(Window& window, bool captured);
         bool window_should_close(const Window& window);
         void window_destroy(Window& window);
     }

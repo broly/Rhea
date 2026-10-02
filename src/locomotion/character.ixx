@@ -154,8 +154,14 @@ export namespace loco
     // its skeleton (pelvis height) when it has a skinned mesh. Add LocomotionPlayer to drive it from the keyboard.
     bool init_locomotion_character(World& world, ecs::Entity e, const std::string& settings_path);
 
-    // Orbit camera around a locomotion character, pulled in front of walls
-    Transform make_locomotion_camera(World& world, ecs::Entity character, float camera_yaw, float camera_pitch);
+    // Over the shoulder camera of a locomotion character (cvars camera.*): the pivot above the character moves
+    // to the right shoulder, the camera backs off from it; both pulled in front of walls. The middle of the
+    // screen (where the weapons aim) is beside the character, not behind it. aim 0..1 blends to the aiming
+    // camera: closer and tighter on the shoulder (the field of view: camera_fov_scale).
+    Transform make_locomotion_camera(World& world, ecs::Entity character, float camera_yaw, float camera_pitch,
+        float aim = 0.0f);
+    // field of view multiplier of the camera at aim 0..1
+    float camera_fov_scale(float aim);
 
     // Automation: while set, LocomotionPlayer characters take this input instead of the keyboard
     // (view_yaw / pitch still come from the player's camera)

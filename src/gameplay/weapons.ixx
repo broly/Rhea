@@ -27,7 +27,8 @@ import :health;
 //   damage, range (m), cooldown (s between shots), auto (hold to keep firing), spread (degrees, half angle),
 //   pellets, interval, charge_time, min_charge (share of charge_time that fires), radius,
 //   magazine (rounds, 0: no magazine), reload (s), ammo (reserve at start, < 0: infinite),
-//   jpeg (hit preset of assets/jpeg/presets.json for the spots), display_name
+//   jpeg (hit preset of assets/jpeg/presets.json for the spots), display_name,
+//   model (prefab of the model in the hand: MeshRenderer + BoneAttachment; spawn_held_weapon_models)
 //
 // Systems:
 //   read_weapon_input (FixedPre)                    trigger (left mouse), reload (X), slot keys (2..7) and the aim
@@ -65,6 +66,13 @@ export
         float reload = 1.0f;
         int ammo = -1;
         std::string jpeg = "default";
+        std::string model;
+    };
+
+    // A weapon model held by its parent (ChildOf the WeaponHolder): shown while that weapon is the current one
+    struct [[=scene::runtime_only]] HeldWeaponModel
+    {
+        [[=rh::edit, =rh::read_only]] std::string weapon;
     };
 
     // System set of fire_weapons
@@ -115,6 +123,9 @@ export
 
     namespace weapons
     {
+        // the models of every weapon with one, as children of holder (hidden but the current one)
+        void spawn_held_weapon_models(World& world, ecs::Entity holder);
+
         const WeaponDef* find(std::string_view name);
         const std::vector<WeaponDef>& get_all();
         const std::vector<std::string>& get_loadout();

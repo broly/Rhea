@@ -198,7 +198,8 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
-            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f, hits_frame.any);
+            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f, hits_frame.any,
+                hud::crosshair_size());
         },
     });
 

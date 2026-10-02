@@ -22,6 +22,8 @@ import framework;
 import locomotion;
 import animation;
 import gameplay;
+import ui;
+import platform;
 import cvar;
 
 constexpr bool DO_NN_SAMPLES = false;
@@ -301,8 +303,17 @@ void WorldScript_VariousThings::tick(double dt)
     // yaw / pitch edited in the debug UI
     bool handled = yaw != applied_yaw || pitch != applied_pitch;
 
-    // right button too: the left one paints while the Terrain window's brush is on
-    if (input->is_key_down(Key::MouseLeft) || input->is_key_down(Key::MouseRight))
+    // character mode, nothing of the debug UI open: the cursor is captured and the mouse always turns the camera
+    // (the left button fires the weapons). Otherwise a held button turns it (the right one too: the left one
+    // paints while the Terrain window's brush is on).
+    const bool want_mouse_look = character && character_mode && !ui::is_visible() && !ui::is_console_open();
+    if (want_mouse_look != mouse_look)
+    {
+        mouse_look = want_mouse_look;
+        platform::window::set_cursor_captured(RhGlobals::engine->window, mouse_look);
+        rotation_started = false;
+    }
+    if (mouse_look || input->is_key_down(Key::MouseLeft) || input->is_key_down(Key::MouseRight))
     {
         if (!rotation_started)
         {
@@ -353,6 +364,7 @@ void WorldScript_VariousThings::tick(double dt)
             // weapons (assets/weapons/weapons.json): left mouse fires, 2..7 select, X reloads
             registry.add<WeaponHolder>(character);
             registry.add<WeaponInput>(character);
+            weapons::spawn_held_weapon_models(*world, character);
             pitch = -0.25f;   // look slightly down on the character
         }
         else
@@ -472,10 +484,22 @@ void WorldScript_VariousThings::tick(double dt)
                 weapons->enabled = character_mode;
             player->camera_pitch = pitch;
         }
+        // right mouse aims: the shoulder camera moves in and zooms (about 0.15 s)
+        const bool aiming = character_mode && input->is_key_down(Key::MouseRight);
+        aim_blend = glm::clamp(aim_blend + (aiming ? 1.0f : -1.0f) * float(dt) / 0.15f, 0.0f, 1.0f);
+        const float aim = glm::smoothstep(0.0f, 1.0f, aim_blend);
+        if (Camera* camera_component = registry.get<Camera>(camera))
+        {
+            if (!base_camera_fov)
+                base_camera_fov = camera_component->fov;
+            camera_component->fov = *base_camera_fov * (character_mode ? loco::camera_fov_scale(aim) : 1.0f);
+        }
+        hud::set_crosshair_visible(character_mode);
+
         if (character_mode)
         {
             pitch = glm::clamp(pitch, -1.2f, 0.5f);
-            set_camera_transform(loco::make_locomotion_camera(*world, character, yaw, pitch));
+            set_camera_transform(loco::make_locomotion_camera(*world, character, yaw, pitch, aim));
         }
     }
 

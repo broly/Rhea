@@ -29,9 +29,22 @@ namespace loco
 {
     namespace
     {
-        constexpr float camera_distance = 3.2f;
         constexpr float camera_pivot_height = 1.45f;
         constexpr float camera_probe_radius = 0.2f;
+
+        cvar::Var<float> cv_camera_distance("camera.distance", 2.4f, "Distance of the third person camera behind the shoulder, m",
+            { .has_range = true, .min = 0.5f, .max = 8.0f });
+        cvar::Var<float> cv_camera_shoulder("camera.shoulder", 0.55f,
+            "Third person camera: how far right of the character it looks over (negative: the left shoulder), m",
+            { .has_range = true, .min = -1.5f, .max = 1.5f });
+        cvar::Var<float> cv_camera_height("camera.height", 0.15f, "Third person camera: height above the head pivot, m",
+            { .has_range = true, .min = -0.5f, .max = 1.0f });
+        cvar::Var<float> cv_camera_aim_distance("camera.aim.distance", 1.1f, "Aiming camera (right mouse): distance behind the shoulder, m",
+            { .has_range = true, .min = 0.3f, .max = 5.0f });
+        cvar::Var<float> cv_camera_aim_shoulder("camera.aim.shoulder", 0.5f, "Aiming camera: offset right of the character, m",
+            { .has_range = true, .min = -1.5f, .max = 1.5f });
+        cvar::Var<float> cv_camera_aim_fov("camera.aim.fov_scale", 0.75f, "Aiming camera: field of view multiplier (zoom)",
+            { .has_range = true, .min = 0.3f, .max = 1.0f });
 
         constexpr float sprint_hold_time = 0.1f;   // ALS IA_Als_Sprint hold trigger
         constexpr float roll_tap_time = 0.3f;      // ALS IA_Als_Roll tap trigger
@@ -907,7 +920,12 @@ namespace loco
         scripted_input = input;
     }
 
-    Transform make_locomotion_camera(World& world, ecs::Entity character, float camera_yaw, float camera_pitch)
+    float camera_fov_scale(float aim)
+    {
+        return glm::mix(1.0f, cv_camera_aim_fov.get(), std::clamp(aim, 0.0f, 1.0f));
+    }
+
+    Transform make_locomotion_camera(World& world, ecs::Entity character, float camera_yaw, float camera_pitch, float aim)
     {
         ecs::Registry& registry = world.registry;
         const LocomotionCharacter* c = registry.get<LocomotionCharacter>(character);
@@ -915,9 +933,16 @@ namespace loco
         const float scale = c ? c->size_scale : 1.0f;
         // the pivot follows the capsule height (crouching lowers the camera)
         const float pivot_height = camera_pivot_height * scale * (c ? std::clamp(c->capsule_height / c->scaled(c->settings->standing_height), 0.6f, 1.0f) : 1.0f);
-        const glm::vec3 pivot = position + glm::vec3(0.0f, pivot_height, 0.0f);
+        aim = std::clamp(aim, 0.0f, 1.0f);
+        const glm::vec3 pivot = position + glm::vec3(0.0f, pivot_height + cv_camera_height.get() * scale, 0.0f);
         const glm::vec3 back = -camera_forward(camera_yaw, camera_pitch);
+        // the camera's right (yaw only: the shoulder does not tilt with the pitch)
+        const glm::vec3 right(std::cos(camera_yaw), 0.0f, -std::sin(camera_yaw));
+        const float shoulder = glm::mix(cv_camera_shoulder.get(), cv_camera_aim_shoulder.get(), aim) * scale;
+        const float camera_distance = glm::mix(cv_camera_distance.get(), cv_camera_aim_distance.get(), aim) * scale;
 
+        float side = std::abs(shoulder);
+        const glm::vec3 side_direction = shoulder >= 0.0f ? right : -right;
         float distance = camera_distance;
         LocomotionCameraProbe* probe = registry.find_resource<LocomotionCameraProbe>();
         if (!probe && c)
@@ -933,12 +958,16 @@ namespace loco
                 .categories = phys::Category::static_world | phys::Category::voxel,
                 .ignore_bodies = std::span(&body, 1),
             };
-            if (auto hit = physics.sweep(probe->shape, { pivot }, back, camera_distance, filter))
+            // to the shoulder, then back from it
+            if (side > 0.0f)
+                if (auto hit = physics.sweep(probe->shape, { pivot }, side_direction, side, filter))
+                    side = std::max(hit->distance, 0.0f);
+            if (auto hit = physics.sweep(probe->shape, { pivot + side_direction * side }, back, camera_distance, filter))
                 distance = std::max(hit->distance, 0.1f);
         }
 
         Transform t;
-        t.position = pivot + back * distance;
+        t.position = pivot + side_direction * side + back * distance;
         t.rotation = math::from_euler_rotation(glm::vec3(camera_pitch, camera_yaw, 0.0f));
         return t;
     }

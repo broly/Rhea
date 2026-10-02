@@ -37,6 +37,12 @@ public:
 
     bool rotation_started = false;
     glm::vec2 prev_mouse{};
+    // character mode with the debug UI and the console closed: the cursor is captured, the mouse turns the camera
+    bool mouse_look = false;
+    // 0..1, right mouse (aiming): the shoulder camera moves in and zooms
+    float aim_blend = 0.0f;
+    // field of view of the camera before the aim zoom (radians)
+    std::optional<float> base_camera_fov;
 
     // camera angles (radians)
     [[=rh::edit, =rh::degrees]] float yaw = 0.0f;

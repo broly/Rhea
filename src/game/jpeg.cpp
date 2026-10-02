@@ -403,7 +403,7 @@ void JpegRenderer::prepare_present(RenderGraphContext& ctx, RBImageHandle scene,
     resource->update_image("u_jpeg_mask_sampled", hit_mask, params, *present_instance);
 }
 
-void JpegRenderer::draw_present(RenderGraphContext& ctx, float amount, bool hits)
+void JpegRenderer::draw_present(RenderGraphContext& ctx, float amount, bool hits, float crosshair)
 {
     PROFILE("JpegRenderer::present");
     checkf(present_instance.has_value(), "JpegRenderer::prepare_present was not called");
@@ -411,6 +411,6 @@ void JpegRenderer::draw_present(RenderGraphContext& ctx, float amount, bool hits
     if (ctx.bind_pipeline(present_pipeline))
         ctx.bind(resource->query_single(*present_instance));
     ctx.push_constants(JpegPushConstants{
-        .post = glm::vec4(0.0f, std::clamp(amount, 0.0f, 1.0f), hits ? 1.0f : 0.0f, 0.0f) });
+        .post = glm::vec4(0.0f, std::clamp(amount, 0.0f, 1.0f), hits ? 1.0f : 0.0f, std::max(crosshair, 0.0f)) });
     ctx.draw_fullscreen();
 }

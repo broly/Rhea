@@ -7,3 +7,5 @@ export import :debug_view;
 export import :screen_jpeg;
 // JPEG spots where hits land
 export import :jpeg_hits;
+// crosshair (game script: hud::set_crosshair_visible)
+export import :hud;

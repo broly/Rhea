@@ -149,6 +149,17 @@ void platform::window::window_poll_events() {
     glfwPollEvents();
 }
 
+void platform::window::set_cursor_captured(Window& window, bool captured) {
+    if (!window.handle)
+        return;
+    const int mode = captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL;
+    if (glfwGetInputMode(window.handle, GLFW_CURSOR) == mode)
+        return;
+    glfwSetInputMode(window.handle, GLFW_CURSOR, mode);
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window.handle, GLFW_RAW_MOUSE_MOTION, captured ? GLFW_TRUE : GLFW_FALSE);
+}
+
 void platform::window::window_request_close(Window& window) {
     glfwSetWindowShouldClose(window.handle, GLFW_TRUE);
 }

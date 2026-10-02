@@ -22,6 +22,7 @@ import :jpeg;
 import :screen_jpeg;
 import :jpeg_hits;
 import :damage_feedback;
+import :hud;
 import physics;
 #include "object/object_reflection_macro.h"
 

@@ -141,7 +141,8 @@ public:
     // draw inside a graphics pass.
     void prepare_present(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result, RBImageHandle hit_result,
         RBImageHandle hit_mask);
-    void draw_present(RenderGraphContext& ctx, float amount, bool hits);
+    // crosshair: arm length in px, 0 hidden
+    void draw_present(RenderGraphContext& ctx, float amount, bool hits, float crosshair = 0.0f);
 
 private:
     struct Chain

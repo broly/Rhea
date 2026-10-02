@@ -21,6 +21,8 @@ import physics;
 import input;
 import cvar;
 import paths;
+import name;
+import fixed_string;
 
 import log;
 #include "logging/log_macro.h"
@@ -80,6 +82,7 @@ namespace
             else if (key == "reload" && v.isNumeric()) def.reload = std::max(v.asFloat(), 0.0f);
             else if (key == "ammo" && v.isNumeric()) def.ammo = v.asInt();
             else if (key == "jpeg" && v.isString()) def.jpeg = v.asString();
+            else if (key == "model" && v.isString()) def.model = v.asString();
             else ok = false;
             if (!ok)
                 LogWeapons.Log("Weapon %s: unknown field or bad value '%s'", name.c_str(), key.c_str());
@@ -409,6 +412,17 @@ namespace
         });
     }
 
+    // the current weapon's model is visible, the others hidden
+    [[=ecs::system<ecs::Phase::Update>]]
+    void show_held_weapon(ecs::Query<MeshRenderer, const HeldWeaponModel, const ChildOf> models,
+        ecs::Query<const WeaponHolder> holders)
+    {
+        models.each([&] (MeshRenderer& renderer, const HeldWeaponModel& model, const ChildOf& parent) {
+            const WeaponHolder* holder = holders.get(parent.parent);
+            renderer.visible = holder && holder->current == model.weapon;
+        });
+    }
+
     /************************************************************************
      * CONSOLE
      ***********************************************************************/
@@ -454,12 +468,29 @@ namespace
         [] (cvar::Args) { weapons::reload_definitions(); });
 
     ECS_REGISTER()
-    SCENE_REGISTER_COMPONENTS(WeaponHolder, WeaponInput)
+    SCENE_REGISTER_COMPONENTS(WeaponHolder, WeaponInput, HeldWeaponModel)
 }
 
 /************************************************************************
  * DEFINITIONS
  ***********************************************************************/
+
+void weapons::spawn_held_weapon_models(World& world, ecs::Entity holder)
+{
+    for (const WeaponDef& def : get_all())
+    {
+        if (def.model.empty())
+            continue;
+        const ecs::Entity model = world.spawn_prefab(def.model, Name("held_weapon_" + def.name));
+        if (!model)
+        {
+            LogWeapons.Log("Weapon %s: could not spawn its model %s", def.name.c_str(), def.model.c_str());
+            continue;
+        }
+        world.registry.add<ChildOf>(model, ChildOf{ holder });
+        world.registry.add<HeldWeaponModel>(model, HeldWeaponModel{ def.name });
+    }
+}
 
 std::filesystem::path weapons::get_definitions_path()
 {
