@@ -75,6 +75,9 @@ export
         float acceleration = 0.0f;              // m/s2, 0: Jackal::acceleration
         float deceleration = 0.0f;              // m/s2, 0: Jackal::deceleration
         float turn_scale = 1.0f;                // < 1: turns slower (commits to its line)
+        // never closer than keep_away_distance to this point (its target's body: it bites, it does not run through)
+        std::optional<glm::vec3> keep_away_from;
+        float keep_away_distance = 0.0f;
     };
 
     struct Jackal
@@ -196,10 +199,10 @@ export
         [[=rh::edit, =rh::speed<0.05f>]] float ring_radius = 5.5f;         // m from the target
         [[=rh::edit, =rh::speed<0.1f>]] float orbit_speed = 10.0f;         // deg/s the ring turns around the target
         [[=rh::edit, =rh::speed<0.05f>]] float lunge_range = 7.0f;         // m, leaps from this close
-        [[=rh::edit, =rh::speed<0.05f>]] float lunge_stop_short = 0.5f;    // m before where the target will be
+        [[=rh::edit, =rh::speed<0.01f>]] float contact_distance = 0.85f;   // m between its feet and the target's: bodies touch, never closer
         [[=rh::edit, =rh::speed<0.01f>]] float telegraph = 0.45f;          // s staring before the leap, in the target's view
         [[=rh::edit, =rh::speed<0.01f>]] float telegraph_behind = 0.75f;   // s, from outside the target's view
-        [[=rh::edit, =rh::speed<0.01f>]] float bite_range = 1.0f;          // m from the target
+        [[=rh::edit, =rh::speed<0.01f>]] float bite_range = 1.3f;          // m between its feet and the target's: the muzzle reaches
         [[=rh::edit, =rh::speed<0.5f>]] float bite_damage = 12.0f;
         [[=rh::edit, =rh::speed<0.05f>]] float lunge_cooldown_min = 2.5f;  // s between two leaps
         [[=rh::edit, =rh::speed<0.05f>]] float lunge_cooldown_max = 4.5f;

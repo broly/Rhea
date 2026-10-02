@@ -341,6 +341,26 @@ namespace
             }
         }
 
+        // its target's body is a wall too (the crowd's avoidance does not steer the leap): no step into it
+        if (j.move.keep_away_from && j.speed > 0.01f)
+        {
+            glm::vec3 to(j.move.keep_away_from->x - j.position.x, 0.0f, j.move.keep_away_from->z - j.position.z);
+            const float d = glm::length(to);
+            const float reach = j.move.keep_away_distance + glm::length(step);
+            if (d > 1e-3f && d < reach)
+            {
+                to /= d;
+                const float into = glm::dot(step, to);
+                const float allowed = std::max(d - j.move.keep_away_distance, 0.0f);
+                if (into > allowed)
+                {
+                    step -= to * (into - allowed);
+                    // head on: it stops at the body, past its side it keeps going
+                    j.speed *= std::clamp(1.0f - glm::dot(forward, to), 0.2f, 1.0f);
+                }
+            }
+        }
+
         glm::vec3 next = j.position + step;
         constexpr float max_step = 0.45f;   // m, stairs yes, walls no
         if (std::optional<phys::Hit> ground = find_ground(physics, next, max_step))

@@ -288,7 +288,8 @@ ai::ActionStatus JackalLunge::tick(JackalContext& c, float dt)
         if (length < 1e-3f)
             return ai::ActionStatus::failed;
         direction = to / length;
-        aim = position + direction * std::max(length - b.lunge_stop_short, 0.5f);
+        // lands where its body meets the target's (the bite reaches from there)
+        aim = position + direction * std::max(length - b.contact_distance, 0.5f);
         aim.y = predicted.y;
         // not through a wall
         if (c.nav)
@@ -314,7 +315,7 @@ ai::ActionStatus JackalLunge::tick(JackalContext& c, float dt)
         m.turn_scale = 0.2f;
 
         // the bite: the target within reach of the muzzle, in front of it
-        if (!bitten && same_target && c.target_distance <= b.bite_range + 0.35f)
+        if (!bitten && same_target && c.target_distance <= b.bite_range)
         {
             const glm::vec3 to_target = flat(c.target_position - position);
             const float length = glm::length(to_target);
@@ -346,6 +347,8 @@ ai::ActionStatus JackalLunge::tick(JackalContext& c, float dt)
         return ai::ActionStatus::running;
     }
     case Phase::recover:
+        // stops short: from the leap's speed it would slide on for metres
+        m.deceleration = 30.0f;
         if (same_target)
             m.face = c.target_position;
         return time < 0.4f ? ai::ActionStatus::running : ai::ActionStatus::succeeded;
@@ -847,6 +850,12 @@ namespace
                 resolve(c);
             }
             brain.action.tick(c, dt);
+            // whatever it does in a fight, it never walks into its target's body
+            if (c.known && brain.mode == JackalMode::combat && !body.move.keep_away_from)
+            {
+                body.move.keep_away_from = c.target_position;
+                body.move.keep_away_distance = brain.contact_distance;
+            }
 
             // stamina: spent sprinting (the leap aside), back otherwise
             if (body.move.speed > brain.run_speed + 0.05f && !brain.action.is<JackalLunge>())
