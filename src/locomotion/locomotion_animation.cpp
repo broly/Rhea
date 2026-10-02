@@ -101,6 +101,29 @@ namespace loco
         const std::pair<const char*, float> overlay_defs[] = { { "Default", 0.75f }, { "Feminine", 0.5f }, { "Masculine", 1.0f } };
         for (const auto& [name, idle_alpha] : overlay_defs)
             overlays.push_back({ name, clip(("Overlays/Other/A_Als_" + std::string(name) + "_Poses").c_str()), clip("Base/A_Als_Idle"), idle_alpha });
+
+        // weapon overlays: the frames of their poses clips as AB_Als_Rifle / AB_Als_PistolTwoHanded use them
+        auto rifle = std::make_shared<WeaponOverlay>(WeaponOverlay{
+            .relaxed_stand = 0, .relaxed_walk = 1, .relaxed_sprint = -1, .relaxed_crouch = 6,
+            .air = 9, .air_landing = 10,
+            .ready_stand = 2, .ready_walk = 3, .ready_crouch = 7,
+            .aim_stand = 4, .aim_walk = 5, .aim_crouch = 8,
+            .aim_clip = clip("Overlays/Rifle/A_Als_Rifle_Aim"),
+            .aim_crouch_clip = clip("Overlays/Rifle/A_Als_Rifle_Aim_Crouch"),
+            .run_arms = clip("Overlays/Rifle/A_Als_Rifle_Run_Arms"),
+            .sprint_arms = clip("Overlays/Rifle/A_Als_Rifle_Sprint_Arms"),
+        });
+        overlays.push_back({ "Rifle", clip("Overlays/Rifle/A_Als_Rifle_Poses"), clip("Base/A_Als_Idle"), 0.75f, rifle });
+
+        auto pistol = std::make_shared<WeaponOverlay>(WeaponOverlay{
+            .relaxed_stand = 0, .relaxed_walk = 1, .relaxed_sprint = 2, .relaxed_crouch = 7,
+            .ready_stand = 3, .ready_walk = 4, .ready_crouch = 8,
+            .aim_stand = 5, .aim_walk = 6, .aim_crouch = 9,
+            .aim_clip = clip("Overlays/PistolTwoHanded/A_Als_PistolTwoHanded_Aim"),
+            .aim_crouch_clip = clip("Overlays/PistolTwoHanded/A_Als_PistolTwoHanded_Aim_Crouch"),
+        });
+        overlays.push_back({ "PistolTwoHanded", clip("Overlays/PistolTwoHanded/A_Als_PistolTwoHanded_Poses"), clip("Base/A_Als_Idle"),
+            0.75f, pistol });
         return ok;
     }
 

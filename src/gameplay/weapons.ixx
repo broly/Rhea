@@ -28,7 +28,8 @@ import :health;
 //   pellets, interval, charge_time, min_charge (share of charge_time that fires), radius,
 //   magazine (rounds, 0: no magazine), reload (s), ammo (reserve at start, < 0: infinite),
 //   jpeg (hit preset of assets/jpeg/presets.json for the spots), display_name,
-//   model (prefab of the model in the hand: MeshRenderer + BoneAttachment; spawn_held_weapon_models)
+//   model (prefab of the model in the hand: MeshRenderer + BoneAttachment; spawn_held_weapon_models),
+//   overlay (ALS overlay of the character while the weapon is out: "Rifle", "PistolTwoHanded"; empty: its own)
 //
 // Systems:
 //   read_weapon_input (FixedPre)                    trigger (left mouse), reload (X), slot keys (2..7) and the aim
@@ -67,7 +68,11 @@ export
         int ammo = -1;
         std::string jpeg = "default";
         std::string model;
+        std::string overlay;
     };
+
+    // System set of the Update systems that show the current weapon (model, overlay of the locomotion animation)
+    struct WeaponPresentation {};
 
     // A weapon model held by its parent (ChildOf the WeaponHolder): shown while that weapon is the current one
     struct [[=scene::runtime_only]] HeldWeaponModel
@@ -97,6 +102,8 @@ export
         [[=rh::edit]] std::string current = "squeezer";
         [[=rh::edit]] bool infinite_ammo = false;
         [[=rh::transient]] std::map<std::string, State> state;
+        // the overlay the character had before a weapon set its own (-1: not seen yet)
+        [[=rh::transient]] int32_t base_overlay = -1;
     };
 
     // The command of a tick for the WeaponHolder (filled from the keyboard and mouse for the Player)

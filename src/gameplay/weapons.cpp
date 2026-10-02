@@ -21,6 +21,7 @@ import physics;
 import input;
 import cvar;
 import paths;
+import locomotion;
 import name;
 import fixed_string;
 
@@ -83,6 +84,7 @@ namespace
             else if (key == "ammo" && v.isNumeric()) def.ammo = v.asInt();
             else if (key == "jpeg" && v.isString()) def.jpeg = v.asString();
             else if (key == "model" && v.isString()) def.model = v.asString();
+            else if (key == "overlay" && v.isString()) def.overlay = v.asString();
             else ok = false;
             if (!ok)
                 LogWeapons.Log("Weapon %s: unknown field or bad value '%s'", name.c_str(), key.c_str());
@@ -412,8 +414,26 @@ namespace
         });
     }
 
+    // the ALS overlay of the current weapon (Rifle, PistolTwoHanded), the character's own one without
+    [[=ecs::system<ecs::Phase::Update>, =ecs::in_set<WeaponPresentation>, =ecs::before<loco::LocomotionPresentation>]]
+    void select_weapon_overlay(ecs::Query<loco::LocomotionAnimation, WeaponHolder> characters)
+    {
+        characters.each([&] (loco::LocomotionAnimation& animation, WeaponHolder& holder) {
+            if (holder.base_overlay < 0)
+                holder.base_overlay = animation.overlay;
+            int32_t overlay = holder.base_overlay;
+            if (const WeaponDef* def = weapons::find(holder.current); def && !def->overlay.empty())
+            {
+                const int32_t index = loco::find_overlay(animation, def->overlay);
+                if (index >= 0)
+                    overlay = index;
+            }
+            animation.overlay = overlay;
+        });
+    }
+
     // the current weapon's model is visible, the others hidden
-    [[=ecs::system<ecs::Phase::Update>]]
+    [[=ecs::system<ecs::Phase::Update>, =ecs::after<WeaponPresentation>]]
     void show_held_weapon(ecs::Query<MeshRenderer, const HeldWeaponModel, const ChildOf> models,
         ecs::Query<const WeaponHolder> holders)
     {

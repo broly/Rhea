@@ -208,14 +208,36 @@ export namespace loco
         glm::vec3 previous_position{0.0f};
     };
 
-    // Data driven overlays (the ALS overlay graphs that are pose clips + idle secondary motion: Default, Feminine,
-    // Masculine). Poses clip frames: 0 standing, 1 standing walking (and in air), 2 crouching.
+    // States of the weapon overlays (AB_Als_Rifle, AB_Als_PistolTwoHanded): relaxed (carried), ready (raised, for
+    // 3 s after aiming), aiming (right mouse: the weapon follows the view pitch)
+    enum class WeaponOverlayState : uint8_t { relaxed, ready, aiming };
+
+    // A weapon overlay: frames of its poses clip per state, the aim additives, the arms of running / sprinting.
+    // -1: the frame is not used (a fallback is said per field).
+    struct WeaponOverlay
+    {
+        int32_t relaxed_stand = 0;
+        int32_t relaxed_walk = 1;          // walking (and running without run_arms)
+        int32_t relaxed_sprint = -1;       // without sprint_arms; -1: relaxed_walk
+        int32_t relaxed_crouch = 2;
+        int32_t air = -1;                  // in air, far from the ground; -1: the grounded poses
+        int32_t air_landing = -1;          // in air, the ground predicted close
+        int32_t ready_stand = 0, ready_walk = 1, ready_crouch = 2;
+        int32_t aim_stand = 0, aim_walk = 1, aim_crouch = 2;
+        AnimationClipHandle aim_clip, aim_crouch_clip;  // mesh space additives, time = the view's pitch amount
+        AnimationClipHandle run_arms, sprint_arms;      // optional, synced with the "Movement" group
+    };
+
+    // Data driven overlays: the ALS overlay graphs that are pose clips + idle secondary motion (Default, Feminine,
+    // Masculine; poses clip frames: 0 standing, 1 standing walking (and in air), 2 crouching), and the weapon
+    // overlays (weapon set: Rifle, PistolTwoHanded).
     struct OverlayDefinition
     {
         std::string name;
         AnimationClipHandle poses;
         AnimationClipHandle idle;       // local additive secondary motion
         float idle_alpha = 0.75f;
+        std::shared_ptr<const WeaponOverlay> weapon;
     };
 
     struct [[=scene::runtime_only]] LocomotionAnimation
@@ -363,6 +385,13 @@ export namespace loco
             anim::BlendList overlays;
             std::vector<anim::SequencePlayer> overlay_idle;           // per overlay
             std::vector<anim::ScaleBiasClamp> overlay_ground_prediction;
+            struct WeaponNodes
+            {
+                anim::NodeState relevance;
+                anim::StateMachine<WeaponOverlayState> states{ WeaponOverlayState::relaxed };
+                anim::SequencePlayer run_arms, sprint_arms;
+            };
+            std::vector<WeaponNodes> overlay_weapon;                 // per overlay (weapon overlays only)
             anim::NodeState head_relevance;
             anim::BlendSpacePlayer look;
         };

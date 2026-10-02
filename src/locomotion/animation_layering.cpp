@@ -20,6 +20,113 @@ namespace loco
         constexpr float full_weight = 1.0f - 1e-5f;
         constexpr float relevant_weight = 1e-5f;
 
+        // AB_Als_Rifle / AB_Als_PistolTwoHanded: relaxed (the weapon carried; arms swinging when running and sprinting
+        // with the rifle), ready (raised, for 3 s after aiming or until sprinting / in air), aiming (the aim additive
+        // over the view pitch, mesh space). Transitions as the state machine rules of the overlay graphs (the custom
+        // aim in / out curves are cubic here). The locomotion actions (mantle, roll) keep the relaxed pose.
+        anim::PoseRef weapon_overlay_pose(Context& x, uint32_t index)
+        {
+            anim::Graph& g = x.g;
+            LocomotionAnimation& a = x.a;
+            Layering& n = a.layering_nodes;
+            const OverlayDefinition& o = x.k.overlays[index];
+            const WeaponOverlay& w = *o.weapon;
+            Layering::WeaponNodes& wn = n.overlay_weapon[index];
+
+            enter_on_relevance(g, wn.relevance, wn.states, WeaponOverlayState::relaxed);
+            const bool aiming = a.rotation_mode == RotationMode::aiming;
+            const bool in_air = a.locomotion_mode == LocomotionMode::in_air;
+            const bool sprinting = a.pose.gait_sprinting > 0.5f;
+            switch (wn.states.state())
+            {
+                case WeaponOverlayState::relaxed:
+                    if (aiming)
+                        wn.states.transition(WeaponOverlayState::ready, crossfade(0.2f));
+                    break;
+                case WeaponOverlayState::ready:
+                    if (aiming)
+                        wn.states.transition(WeaponOverlayState::aiming, crossfade(0.2f, anim::BlendCurve::cubic));
+                    else if (in_air || sprinting)
+                        wn.states.transition(WeaponOverlayState::relaxed, crossfade(0.2f));
+                    else if (wn.states.state_time >= 3.0f)
+                        wn.states.transition(WeaponOverlayState::relaxed, crossfade(0.75f, anim::BlendCurve::cubic));
+                    break;
+                case WeaponOverlayState::aiming:
+                    if (!aiming)
+                        wn.states.transition(WeaponOverlayState::ready, crossfade(1.0f, anim::BlendCurve::cubic));
+                    break;
+            }
+
+            auto frame = [&](int32_t f) { return g.evaluate_frame(o.poses, f); };
+            auto stances = [&](auto&& stand, auto&& crouch) {
+                const float stance_weights[2] = { a.pose.standing, a.pose.crouching };
+                return g.blend_n(std::span(stance_weights), [&](uint32_t i) { return i == 0 ? stand() : crouch(); });
+            };
+            auto relaxed = [&] {
+                // walking -> running (rifle: the run arms, held as walking when backwards / sideways) -> sprinting
+                auto moving = [&] {
+                    auto sprint = [&] {
+                        if (w.sprint_arms.is_valid())
+                            return g.play(wn.sprint_arms, w.sprint_arms, { .sync = "Movement", .sync_follower = true });
+                        return frame(w.relaxed_sprint >= 0 ? w.relaxed_sprint : w.relaxed_walk);
+                    };
+                    if (!w.run_arms.is_valid())
+                        return g.blend(a.pose.gait_sprinting, [&] { return frame(w.relaxed_walk); }, sprint);
+                    auto run = [&] {
+                        const float directions[4] = { a.grounded.forward, a.grounded.backward, a.grounded.left, a.grounded.right };
+                        return g.blend_n(std::span(directions), [&](uint32_t i) {
+                            return i == 0 ? g.play(wn.run_arms, w.run_arms, { .sync = "Movement", .sync_follower = true }) : frame(w.relaxed_walk);
+                        });
+                    };
+                    return g.blend(a.pose.gait_running, [&] { return frame(w.relaxed_walk); },
+                        [&] { return g.blend(a.pose.gait_sprinting, run, sprint); });
+                };
+                auto grounded = [&] {
+                    return stances([&] { return g.blend(a.pose.gait_walking, [&] { return frame(w.relaxed_stand); }, moving); },
+                        [&] { return frame(w.relaxed_crouch); });
+                };
+                anim::PoseRef pose = w.air < 0 ? grounded() : g.blend(a.pose.in_air, grounded, [&] {
+                    return g.blend(n.overlay_ground_prediction[index].update(a.in_air.ground_prediction, g.dt),
+                        [&] { return frame(w.air); }, [&] { return frame(w.air_landing >= 0 ? w.air_landing : w.air); });
+                });
+                return pose;
+            };
+
+            auto ready = [&] {
+                return stances(
+                    [&] { return g.blend(a.pose.gait_walking, [&] { return frame(w.ready_stand); }, [&] { return frame(w.ready_walk); }); },
+                    [&] { return frame(w.ready_crouch); });
+            };
+
+            auto aim = [&] {
+                // ExplicitTime = PitchAmount (0 down .. 1 up) of clips one second long
+                auto aim_at = [&](const AnimationClipHandle& clip) {
+                    return g.evaluate(clip, a.view.pitch_amount * clip.get().duration);
+                };
+                return stances(
+                    [&] {
+                        anim::PoseRef base = g.blend(a.pose.gait_walking, [&] { return frame(w.aim_stand); }, [&] { return frame(w.aim_walk); });
+                        return g.additive(std::move(base), AdditiveKind::mesh_rotation, 1.0f, [&] { return aim_at(w.aim_clip); });
+                    },
+                    [&] {
+                        return g.additive(frame(w.aim_crouch), AdditiveKind::mesh_rotation, 1.0f, [&] { return aim_at(w.aim_crouch_clip); });
+                    });
+            };
+
+            anim::PoseRef pose = g.state_machine(wn.states, [&](WeaponOverlayState state) -> anim::PoseRef {
+                switch (state)
+                {
+                    case WeaponOverlayState::ready: return ready();
+                    case WeaponOverlayState::aiming: return aim();
+                    default: return relaxed();
+                }
+            });
+            // secondary motion once (its player must not advance twice while two states blend): less while aiming
+            const float idle_alpha = wn.states.in(WeaponOverlayState::aiming) ? 0.5f : 0.75f;
+            return g.additive(std::move(pose), AdditiveKind::local, idle_alpha,
+                [&] { return g.play(n.overlay_idle[index], o.idle, { .sync = "Secondary Motion" }); });
+        }
+
         // the poses clip of an overlay: 0 standing, 1 standing walking (and in air), 2 crouching
         anim::PoseRef overlay_pose(Context& x, uint32_t index)
         {
@@ -27,6 +134,8 @@ namespace loco
             LocomotionAnimation& a = x.a;
             Layering& n = a.layering_nodes;
             const OverlayDefinition& o = x.k.overlays[index];
+            if (o.weapon)
+                return weapon_overlay_pose(x, index);
 
             auto grounded = [&] {
                 const float stance_weights[2] = { a.pose.standing, a.pose.crouching };
@@ -202,6 +311,8 @@ namespace loco
         const size_t overlays = a.clips ? a.clips->overlays.size() : 0;
         n.overlay_idle.resize(overlays);
         n.overlay_ground_prediction.assign(overlays, anim::ScaleBiasClamp{ .interpolate = true, .speed_increasing = 20.0f, .speed_decreasing = 5.0f });
+        n.overlay_weapon.clear();
+        n.overlay_weapon.resize(overlays);
     }
 
     void refresh_layering(LocomotionAnimation& a, const anim::Animator& animator)
