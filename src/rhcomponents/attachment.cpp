@@ -22,7 +22,7 @@ import glm;
 namespace
 {
     // after the animation (Update), before WorldTransform is computed
-    [[=ecs::system<ecs::Phase::Late>, =ecs::before<scene::TransformPropagation>]]
+    [[=ecs::system<ecs::Phase::Late>, =ecs::in_set<BoneAttachments>, =ecs::before<scene::TransformPropagation>]]
     void follow_bones(ecs::Query<Transform, BoneAttachment, const ChildOf> attached, ecs::Query<const SkinnedMesh> skinned)
     {
         attached.each([&] (Transform& transform, BoneAttachment& attachment, const ChildOf& parent) {

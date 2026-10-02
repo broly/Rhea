@@ -19,6 +19,8 @@ layout(location = 3) out vec3 v_world_tangent;
 layout(location = 4) out vec3 v_world_bitangent;
 layout(location = 5) out vec4 v_curr_clip;
 layout(location = 6) out vec4 v_prev_clip;
+// per instance effect of the primitive (GPUPrimitiveInfo::effect)
+layout(location = 7) flat out vec4 v_instance_effect;
 
 
 void main()
@@ -40,6 +42,7 @@ void main()
     vec4 world_prev = transform_prev * vec4(v.position, 1);
     
     v_uv = v.uv;  // in_uv;
+    v_instance_effect = primitive_info.effect;
 
     v_world_pos = world_curr.xyz;
 

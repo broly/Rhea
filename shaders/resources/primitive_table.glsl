@@ -16,6 +16,9 @@ struct GPUPrimitiveInfo
     mat4 prev_transform;
     uint mesh_id;
     uint material_id;
+    uint pad0;
+    uint pad1;
+    vec4 effect;    // per instance (MeshRenderer::effect): rgb emission added on top (hit flash), a: unused
 };
 
 layout(std430, set=SET_PRIMITIVE_TABLE, binding=BINDING_PRIMITIVE_TABLE)

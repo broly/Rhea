@@ -232,6 +232,7 @@ namespace
         glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
         float scale = 1.0f;         // sizes and speeds of the effect are scaled by it
         double time = 0.0;
+        glm::vec3 shape_scale{ 1.0f };  // ParticleSystem::shape_scale
     };
 
     // What moves the particles of an emitter during a step, in the space they are simulated in
@@ -326,7 +327,7 @@ namespace
         const ParticleStart& start = emitter.start;
 
         Particle particle;
-        particle.position = point_in_shape(emitter.shape, random);
+        particle.position = point_in_shape(emitter.shape, random) * frame.shape_scale;
         particle.velocity = direction_in_cone(start.direction.glm(), start.spread, random) * pick(start.speed, random);
         particle.lifetime = std::max(pick(start.lifetime, random), 0.01f);
         particle.size = pick(start.size, random);
@@ -508,6 +509,7 @@ namespace
                 .rotation = world.value.rotation.glm(),
                 .scale = std::max((std::abs(scale.x) + std::abs(scale.y) + std::abs(scale.z)) / 3.0f, 1e-4f),
                 .time = time->time,
+                .shape_scale = system.shape_scale.glm(),
             };
 
             const std::shared_ptr<const ParticleEffect> effect = get_effect(system.effect);

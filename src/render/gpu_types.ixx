@@ -25,4 +25,6 @@ export struct GPUPrimitiveInfo
     uint32_t mesh_id;
     uint32_t material_id;
     [[=rh::padding]] uint32_t pad[2];
+    // per instance effect (MeshRenderer::effect): rgb linear emission added on top (hit flash), a: unused
+    glm::vec4 effect{ 0.0f };
 };

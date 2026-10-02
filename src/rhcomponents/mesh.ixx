@@ -45,6 +45,8 @@ export
 
         // set for skinned meshes (SkinnedMesh)
         std::shared_ptr<SkinningPose> skinning;
+
+        glm::vec4 effect{ 0.0f };   // MeshRenderer::effect
     };
 
     // Renders a mesh at the entity's WorldTransform, one material per material slot of the mesh
@@ -55,6 +57,9 @@ export
         std::vector<MeshLod> lods;
         std::vector<std::shared_ptr<Material>> materials;
         [[=rh::edit]] bool visible = true;
+        // per instance effect, set by game code every frame it changes (hit flash): rgb linear emission added on
+        // top of the materials (HDR), a: unused. Only the primitive table entries are rewritten when it changes.
+        [[=rh::transient]] glm::vec4 effect{ 0.0f };
 
         // by ascending error (level geometry: GltfScene::shadow_proxy_errors)
         [[=rh::transient]] std::vector<ShadowProxy> shadow_proxies;

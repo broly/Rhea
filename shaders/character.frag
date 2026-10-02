@@ -24,6 +24,7 @@ layout(location = 3) in vec3 v_world_tangent;
 layout(location = 4) in vec3 v_world_bitangent;
 layout(location = 5) in vec4 v_curr_clip;
 layout(location = 6) in vec4 v_prev_clip;
+layout(location = 7) flat in vec4 v_instance_effect;   // rgb: emission of the instance (hit flash)
 
 // ================== OUTPUT ==================
 // view normals and positions are not stored: from the world normal and the linear depth (gbuffer.glsl)
@@ -73,7 +74,7 @@ void main()
     vec4 model_data = vec4(mat.params8.rgb, mat.params8.w);
 #else
     uint shading_model = SHADING_MODEL_ID_DEFAULT_LIT;
-    vec4 model_data = vec4(character_emissive(mat, uv), metallic);
+    vec4 model_data = vec4(character_emissive(mat, uv) + v_instance_effect.rgb, metallic);
     if ((get_debug_index() & GEOMETRY_DEBUG_ZERO_EMISSIVE) != 0u)
         model_data.rgb = vec3(0.0);
 #endif

@@ -25,6 +25,7 @@ layout(location = 3) in vec3 v_world_tangent;
 layout(location = 4) in vec3 v_world_bitangent;
 layout(location = 5) in vec4 v_curr_clip;
 layout(location = 6) in vec4 v_prev_clip;
+layout(location = 7) flat in vec4 v_instance_effect;   // rgb: emission of the instance (hit flash)
 
 // ================== OUTPUT ==================
 // Every output has as many components as its attachment format (RGBA8 / RGBA16F targets take vec4):
@@ -57,6 +58,7 @@ void main()
         emissive = vec3(mat.textures0.w != 0u ? 1.0 : 0.0, 0.0, 0.0);
     if ((get_debug_index() & GEOMETRY_DEBUG_SOLID_EMISSIVE) != 0u)
         emissive = vec3(1.0, 0.0, 0.0);
+    emissive += v_instance_effect.rgb;
 
     vec3 orm = get_orm(mat, v_uv);
     float ao        = orm.r;

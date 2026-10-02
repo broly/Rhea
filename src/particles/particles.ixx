@@ -239,6 +239,9 @@ export
         // off: nothing new is spawned, the particles alive play out
         [[=rh::edit]] bool emitting = true;
         [[=rh::edit, =rh::range<0.f, 4.f>]] float time_scale = 1.0f;
+        // stretches the spawn shapes of the emitters (where particles appear), not the particles: a beam from
+        // here to a hit is a line shape scaled to its length along z
+        [[=rh::edit, =rh::speed<0.01f>]] vec3 shape_scale{ 1.0f, 1.0f, 1.0f };
 
         [[=rh::edit, =rh::read_only, =rh::transient]] uint32_t alive = 0;
         [[=rh::transient]] std::shared_ptr<const ParticleEffect> loaded;

@@ -41,6 +41,8 @@ export struct RenderObject_Mesh
     
     // world matrix of the previous frame (motion vectors)
     glm::mat4 prev_world = glm::mat4(1.0f);
+    // per instance effect (SceneViewProxy_Mesh::effect)
+    glm::vec4 effect{ 0.0f };
     // moved this frame: prev_world must be synced once the object stops
     bool moved = false;
 

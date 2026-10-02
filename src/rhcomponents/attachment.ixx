@@ -26,3 +26,6 @@ export struct BoneAttachment
     [[=rh::transient]] std::string resolved_bone;
     [[=rh::transient]] int32_t bone_index = -1;
 };
+
+// System set of follow_bones (Late, before the transform propagation)
+export struct BoneAttachments {};

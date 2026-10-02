@@ -29,7 +29,14 @@ import :health;
 //   magazine (rounds, 0: no magazine), reload (s), ammo (reserve at start, < 0: infinite),
 //   jpeg (hit preset of assets/jpeg/presets.json for the spots), display_name,
 //   model (prefab of the model in the hand: MeshRenderer + BoneAttachment; spawn_held_weapon_models),
-//   overlay (ALS overlay of the character while the weapon is out: "Rifle", "PistolTwoHanded"; empty: its own)
+//   overlay (ALS overlay of the character while the weapon is out: "Rifle", "PistolTwoHanded"; empty: its own),
+//   effects - prefabs with a ParticleSystem and a Lifetime, authored along +z:
+//     muzzle [x, y, z] (end of the barrel in the model's mesh space), muzzle_forward [x, y, z] (the barrel's
+//     direction there, default [-1, 0, 0]), muzzle_effect (a child of the model at the muzzle), tracer (from the
+//     muzzle to the hit, ParticleSystem::shape_scale.z = its length), impact_effect (at the hit, along the normal),
+//   projectile (prefab: the shots fly from the muzzle to the point under the crosshair), projectile_speed (m/s),
+//     projectile_gravity (m/s^2); the area damage (radius) then happens where it lands,
+//   hit_flash (emission of the entity hit, HDR), hit_flash_color [r, g, b], hit_flash_time (s)
 //
 // Systems:
 //   read_weapon_input (FixedPre)                    trigger (left mouse), reload (X), slot keys (2..7) and the aim
@@ -69,6 +76,30 @@ export
         std::string jpeg = "default";
         std::string model;
         std::string overlay;
+
+        glm::vec3 muzzle{ 0.0f };
+        glm::vec3 muzzle_forward{ -1.0f, 0.0f, 0.0f };
+        std::string muzzle_effect;
+        std::string tracer;
+        std::string impact_effect;
+        std::string projectile;
+        float projectile_speed = 40.0f;
+        float projectile_gravity = 0.0f;
+        float hit_flash = 3.0f;
+        glm::vec3 hit_flash_color{ 1.0f };
+        float hit_flash_time = 0.12f;
+    };
+
+    // A shot in flight (WeaponDef::projectile): moved every fixed tick (move_projectiles), hits like the ray of
+    // its weapon where its path meets a surface, then despawns
+    struct [[=scene::runtime_only]] Projectile
+    {
+        ecs::Entity shooter;
+        std::string weapon;
+        glm::vec3 velocity{ 0.0f };
+        [[=rh::edit, =rh::read_only]] float damage = 0.0f;
+        [[=rh::edit, =rh::read_only]] float range_left = 200.0f;
+        float charge = 1.0f;        // charge weapons: share of the full charge (flash, area)
     };
 
     // System set of the Update system that sets the current weapon's overlay of the locomotion animation

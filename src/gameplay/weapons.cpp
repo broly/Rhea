@@ -22,6 +22,7 @@ import input;
 import cvar;
 import paths;
 import locomotion;
+import particles;
 import name;
 import fixed_string;
 
@@ -58,6 +59,13 @@ namespace
         return std::nullopt;
     }
 
+    std::optional<glm::vec3> parse_vec3(const Json::Value& v)
+    {
+        if (!v.isArray() || v.size() != 3 || !v[0].isNumeric() || !v[1].isNumeric() || !v[2].isNumeric())
+            return std::nullopt;
+        return glm::vec3(v[0].asFloat(), v[1].asFloat(), v[2].asFloat());
+    }
+
     WeaponDef parse_weapon(const std::string& name, const Json::Value& value)
     {
         WeaponDef def;
@@ -85,6 +93,18 @@ namespace
             else if (key == "jpeg" && v.isString()) def.jpeg = v.asString();
             else if (key == "model" && v.isString()) def.model = v.asString();
             else if (key == "overlay" && v.isString()) def.overlay = v.asString();
+            else if (key == "muzzle" && parse_vec3(v)) def.muzzle = *parse_vec3(v);
+            else if (key == "muzzle_forward" && parse_vec3(v) && glm::length(*parse_vec3(v)) > 1e-3f)
+                def.muzzle_forward = glm::normalize(*parse_vec3(v));
+            else if (key == "muzzle_effect" && v.isString()) def.muzzle_effect = v.asString();
+            else if (key == "tracer" && v.isString()) def.tracer = v.asString();
+            else if (key == "impact_effect" && v.isString()) def.impact_effect = v.asString();
+            else if (key == "projectile" && v.isString()) def.projectile = v.asString();
+            else if (key == "projectile_speed" && v.isNumeric()) def.projectile_speed = std::max(v.asFloat(), 0.1f);
+            else if (key == "projectile_gravity" && v.isNumeric()) def.projectile_gravity = v.asFloat();
+            else if (key == "hit_flash" && v.isNumeric()) def.hit_flash = std::max(v.asFloat(), 0.0f);
+            else if (key == "hit_flash_color" && parse_vec3(v)) def.hit_flash_color = *parse_vec3(v);
+            else if (key == "hit_flash_time" && v.isNumeric()) def.hit_flash_time = std::max(v.asFloat(), 0.0f);
             else ok = false;
             if (!ok)
                 LogWeapons.Log("Weapon %s: unknown field or bad value '%s'", name.c_str(), key.c_str());
@@ -119,35 +139,169 @@ namespace
         return glm::normalize(direction * cos_theta + (right * std::cos(phi) + side * std::sin(phi)) * sin_theta);
     }
 
+    // what shots hit: the world and the creatures (hitboxes), not the characters' capsules
+    phys::QueryFilter shot_filter()
+    {
+        phys::QueryFilter filter;
+        filter.categories = phys::Category::static_world | phys::Category::dynamic | phys::Category::hitbox
+            | phys::Category::voxel;
+        return filter;
+    }
+
+    // the rotation turning +z (the axis effects are authored along) to `direction`
+    glm::quat rotation_to(const glm::vec3& direction)
+    {
+        const float length = glm::length(direction);
+        if (length < 1e-6f)
+            return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        const glm::vec3 to = direction / length;
+        const float d = to.z;
+        if (d < -0.9999f)
+            return glm::angleAxis(3.14159265f, glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::vec3 c = glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), to);
+        return glm::normalize(glm::quat(1.0f + d, c.x, c.y, c.z));
+    }
+
+    // the end of the barrel of the model in the shooter's hand, world
+    struct Muzzle
+    {
+        ecs::Entity model;
+        glm::vec3 position;
+        glm::vec3 forward;
+    };
+
     struct ShotContext
     {
         ecs::Entity shooter;
         const WeaponDef& def;
         const phys::PhysicsScene& physics;
         const ecs::EventWriter<DamageEvent>& damage;
+        const ecs::EventWriter<SpawnPrefabRequest>& spawns;
+        const ecs::Query<const Health, const WorldTransform>& targets;
         DamageType type;
+        glm::vec3 camera;               // where the aim rays start (the crosshair)
+        std::optional<Muzzle> muzzle;
     };
 
-    std::optional<phys::Hit> shoot_ray(const ShotContext& shot, const glm::vec3& origin, const glm::vec3& direction,
-        float amount)
+    glm::vec3 flash_of(const WeaponDef& def, float scale)
     {
-        phys::QueryFilter filter;
-        filter.categories = phys::Category::static_world | phys::Category::dynamic | phys::Category::hitbox
-            | phys::Category::voxel;
-        std::optional<phys::Hit> hit = shot.physics.raycast(origin, direction, shot.def.range, filter);
-        if (!hit)
-            return std::nullopt;
-        // walls too: no Health, but a JPEG spot
+        return def.hit_flash_color * def.hit_flash * std::max(scale, 0.0f);
+    }
+
+    // a one shot effect in the world, its +z along `direction`; length > 0: its spawn shapes stretched to it
+    void spawn_effect(const ShotContext& shot, const std::string& prefab, const glm::vec3& position, const glm::vec3& direction,
+        float length = 0.0f)
+    {
+        if (prefab.empty())
+            return;
+        Transform placement;
+        placement.position = position;
+        placement.rotation = rotation_to(direction);
+        std::function<void(ecs::Registry&, ecs::Entity)> stretch;
+        if (length > 0.0f)
+            stretch = [length] (ecs::Registry& registry, ecs::Entity e) {
+                if (ParticleSystem* particles = registry.get<ParticleSystem>(e))
+                    particles->shape_scale = vec3(1.0f, 1.0f, length);
+            };
+        shot.spawns.send({ .prefab = prefab, .placement = placement, .on_spawned = std::move(stretch) });
+    }
+
+    // the flash at the muzzle: a child of the model, it moves with the weapon
+    void spawn_muzzle_effect(const ShotContext& shot)
+    {
+        if (!shot.muzzle || shot.def.muzzle_effect.empty())
+            return;
+        Transform placement;
+        placement.position = shot.def.muzzle;
+        placement.rotation = rotation_to(shot.def.muzzle_forward);
+        shot.spawns.send({ .prefab = shot.def.muzzle_effect, .placement = placement, .parent = shot.muzzle->model });
+    }
+
+    // damage around `point` falling off to the edge (`spared`: the one hit directly, the shooter)
+    void area_damage(const ShotContext& shot, const glm::vec3& point, float amount, ecs::Entity spared, float scale)
+    {
+        const float radius = shot.def.radius;
+        if (radius <= 0.0f)
+            return;
+        shot.targets.each([&] (ecs::Entity e, const Health&, const WorldTransform& transform) {
+            if (e == shot.shooter || e == spared)
+                return;
+            const glm::vec3 position = transform.value.position.glm();
+            const float distance = glm::distance(position, point);
+            if (distance >= radius)
+                return;
+            const float falloff = 1.0f - distance / radius;
+            shot.damage.send({
+                .target = e,
+                .source = shot.shooter,
+                .amount = amount * falloff,
+                .type = DamageType::Explosion,
+                .point = position,
+                .direction = distance > 1e-4f ? (position - point) / distance : glm::vec3(0.0f, 1.0f, 0.0f),
+                .flash = flash_of(shot.def, scale * falloff),
+                .flash_time = shot.def.hit_flash_time,
+            });
+        });
+    }
+
+    // a blow where a ray or a projectile meets a surface: damage (walls too: the JPEG spot), the flash of the
+    // entity, the impact effect, the area damage
+    void hit_at(const ShotContext& shot, const phys::Hit& hit, const glm::vec3& direction, float amount, float scale)
+    {
+        const ecs::Entity target = entity_of(hit);
         shot.damage.send({
-            .target = entity_of(*hit),
+            .target = target,
             .source = shot.shooter,
             .amount = amount,
             .type = shot.type,
-            .point = hit->position,
+            .point = hit.position,
             .direction = direction,
             .jpeg_preset = shot.def.jpeg,
+            .flash = flash_of(shot.def, scale),
+            .flash_time = shot.def.hit_flash_time,
         });
-        return hit;
+        spawn_effect(shot, shot.def.impact_effect, hit.position + hit.normal * 0.02f, hit.normal);
+        area_damage(shot, hit.position, amount, target, scale);
+    }
+
+    // one shot along `direction` from the camera (under the crosshair): a ray hitting at once (with a tracer from
+    // the muzzle), or a projectile flying from the muzzle to the point the ray finds. true: the ray hit
+    bool discharge(const ShotContext& shot, const glm::vec3& direction, float amount, float scale)
+    {
+        const std::optional<phys::Hit> hit = shot.physics.raycast(shot.camera, direction, shot.def.range, shot_filter());
+        const glm::vec3 aim_point = hit ? hit->position : shot.camera + direction * shot.def.range;
+        const glm::vec3 start = shot.muzzle ? shot.muzzle->position : shot.camera;
+        const glm::vec3 to_aim = aim_point - start;
+        const float distance = glm::length(to_aim);
+        const glm::vec3 from_muzzle = distance > 1e-3f ? to_aim / distance : direction;
+
+        if (!shot.def.projectile.empty())
+        {
+            Transform placement;
+            placement.position = start;
+            placement.rotation = rotation_to(from_muzzle);
+            const Projectile projectile{
+                .shooter = shot.shooter,
+                .weapon = shot.def.name,
+                .velocity = from_muzzle * shot.def.projectile_speed,
+                .damage = amount,
+                .range_left = shot.def.range,
+                .charge = scale,
+            };
+            shot.spawns.send({
+                .prefab = shot.def.projectile,
+                .placement = placement,
+                .on_spawned = [projectile] (ecs::Registry& registry, ecs::Entity e) { registry.add<Projectile>(e, projectile); },
+            });
+            return false;
+        }
+
+        if (shot.muzzle && distance > 0.05f)
+            spawn_effect(shot, shot.def.tracer, start, from_muzzle, distance);
+        if (!hit)
+            return false;
+        hit_at(shot, *hit, direction, amount, scale);
+        return true;
     }
 
     DamageType damage_type(WeaponMode mode)
@@ -256,8 +410,9 @@ namespace
     [[=ecs::system<ecs::Phase::FixedPost>, =ecs::in_set<WeaponFire>, =ecs::before<DamageResolution>,
         =ecs::before<scene::PhysicsStep>]]
     void fire_weapons(ecs::Query<WeaponHolder, const WeaponInput> holders, ecs::Query<const Health, const WorldTransform> targets,
+        ecs::Query<const HeldWeaponModel, const ChildOf, const WorldTransform> models,
         ecs::Res<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time, ecs::EventWriter<DamageEvent> damage,
-        ecs::EventWriter<WeaponFiredEvent> fired)
+        ecs::EventWriter<WeaponFiredEvent> fired, ecs::EventWriter<SpawnPrefabRequest> spawns)
     {
         const float dt = float(time->dt);
         const std::vector<std::string>& loadout = weapons::get_loadout();
@@ -327,7 +482,15 @@ namespace
             const bool ready = state.reloading <= 0.0f && state.cooldown <= 0.0f && has_round(holder, state, def);
             // shots of one tick spread the same way on every machine
             std::mt19937 rng(uint32_t(time->tick * 2654435761u) ^ shooter.index);
-            const ShotContext shot{ shooter, def, *physics, damage, damage_type(def.mode) };
+            std::optional<Muzzle> muzzle;
+            models.each([&] (ecs::Entity model, const HeldWeaponModel& held, const ChildOf& parent, const WorldTransform& world) {
+                if (parent.parent != shooter || held.weapon != def.name)
+                    return;
+                const glm::mat4 matrix = world.value.matrix();
+                muzzle = Muzzle{ model, glm::vec3(matrix * glm::vec4(def.muzzle, 1.0f)),
+                    glm::normalize(glm::mat3(matrix) * def.muzzle_forward) };
+            });
+            const ShotContext shot{ shooter, def, *physics, damage, spawns, targets, damage_type(def.mode), command.aim_origin, muzzle };
             const glm::vec3 origin = command.aim_origin;
             const glm::vec3 aim = command.aim_direction;
             const float half_angle = glm::radians(def.spread);
@@ -346,8 +509,9 @@ namespace
                         break;
                     const int pellets = def.mode == WeaponMode::Cone ? def.pellets : 1;
                     int hits = 0;
+                    spawn_muzzle_effect(shot);
                     for (int i = 0; i < pellets; ++i)
-                        hits += shoot_ray(shot, origin, spread_direction(aim, half_angle, rng), def.damage) ? 1 : 0;
+                        hits += discharge(shot, spread_direction(aim, half_angle, rng), def.damage, 1.0f) ? 1 : 0;
                     consume_round(holder, state, def);
                     state.cooldown = def.cooldown;
                     report(hits);
@@ -365,8 +529,8 @@ namespace
                     while (state.beam_time >= def.interval && has_round(holder, state, def))
                     {
                         state.beam_time -= def.interval;
-                        const bool hit = shoot_ray(shot, origin, spread_direction(aim, half_angle, rng),
-                            def.damage * def.interval).has_value();
+                        spawn_muzzle_effect(shot);
+                        const bool hit = discharge(shot, spread_direction(aim, half_angle, rng), def.damage * def.interval, 1.0f);
                         consume_round(holder, state, def);
                         report(hit ? 1 : 0);
                     }
@@ -383,34 +547,58 @@ namespace
                     if (!ready || fraction < def.min_charge)
                         break;
 
-                    std::optional<phys::Hit> hit = shoot_ray(shot, origin, aim, def.damage * fraction);
+                    // the area damage (radius) happens in hit_at, where the ray or the projectile lands
+                    spawn_muzzle_effect(shot);
+                    const bool hit = discharge(shot, aim, def.damage * fraction, fraction);
                     consume_round(holder, state, def);
                     state.cooldown = def.cooldown;
                     report(hit ? 1 : 0);
-                    if (!hit || def.radius <= 0.0f)
-                        break;
-
-                    // area damage around the impact, falling off to the edge (the entity hit directly is spared)
-                    const ecs::Entity direct = entity_of(*hit);
-                    targets.each([&] (ecs::Entity e, const Health&, const WorldTransform& transform) {
-                        if (e == shooter || e == direct)
-                            return;
-                        const glm::vec3 position = transform.value.position.glm();
-                        const float distance = glm::distance(position, hit->position);
-                        if (distance >= def.radius)
-                            return;
-                        damage.send({
-                            .target = e,
-                            .source = shooter,
-                            .amount = def.damage * fraction * (1.0f - distance / def.radius),
-                            .type = DamageType::Explosion,
-                            .point = position,
-                            .direction = distance > 1e-4f ? (position - hit->position) / distance : aim,
-                        });
-                    });
                     break;
                 }
             }
+        });
+    }
+
+    // shots in flight: a ray over the step of the tick, the blow of their weapon where it meets a surface
+    [[=ecs::system<ecs::Phase::FixedPost>, =ecs::in_set<WeaponFire>, =ecs::before<DamageResolution>,
+        =ecs::before<scene::PhysicsStep>]]
+    void move_projectiles(ecs::Query<Projectile, Transform> projectiles, ecs::Query<const Health, const WorldTransform> targets,
+        ecs::Res<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time, ecs::EventWriter<DamageEvent> damage,
+        ecs::EventWriter<SpawnPrefabRequest> spawns, ecs::EventWriter<DespawnRequest> despawns)
+    {
+        const float dt = float(time->dt);
+        projectiles.each([&] (ecs::Entity e, Projectile& projectile, Transform& transform) {
+            if (projectile.range_left <= 0.0f)
+                return;     // despawning
+            const WeaponDef* def = weapons::find(projectile.weapon);
+            if (!def)
+            {
+                projectile.range_left = 0.0f;
+                despawns.send({ e });
+                return;
+            }
+            projectile.velocity.y -= def->projectile_gravity * dt;
+            const glm::vec3 position = transform.position.glm();
+            const glm::vec3 step = projectile.velocity * dt;
+            const float length = glm::length(step);
+            if (length > 1e-5f)
+            {
+                const glm::vec3 direction = step / length;
+                if (std::optional<phys::Hit> hit = physics->raycast(position, direction, length, shot_filter()))
+                {
+                    const ShotContext shot{ projectile.shooter, *def, *physics, damage, spawns, targets, damage_type(def->mode),
+                        position, std::nullopt };
+                    hit_at(shot, *hit, direction, projectile.damage, projectile.charge);
+                    projectile.range_left = 0.0f;
+                    despawns.send({ e });
+                    return;
+                }
+                transform.rotation = rotation_to(direction);
+            }
+            transform.position = position + step;
+            projectile.range_left -= length;
+            if (projectile.range_left <= 0.0f)
+                despawns.send({ e });
         });
     }
 
@@ -434,7 +622,7 @@ namespace
 
     // the current weapon's model is visible, the others hidden: in Late, before the render proxies are synced (in
     // Update it would race the systems that read MeshRenderer there)
-    [[=ecs::system<ecs::Phase::Late>, =ecs::before<RenderSync>, =ecs::before<MeshColliderSync>]]
+    [[=ecs::system<ecs::Phase::Late>, =ecs::after<HitFlashes>, =ecs::before<RenderSync>, =ecs::before<MeshColliderSync>]]
     void show_held_weapon(ecs::Query<MeshRenderer, const HeldWeaponModel, const ChildOf> models,
         ecs::Query<const WeaponHolder> holders)
     {
@@ -489,7 +677,7 @@ namespace
         [] (cvar::Args) { weapons::reload_definitions(); });
 
     ECS_REGISTER()
-    SCENE_REGISTER_COMPONENTS(WeaponHolder, WeaponInput, HeldWeaponModel)
+    SCENE_REGISTER_COMPONENTS(WeaponHolder, WeaponInput, HeldWeaponModel, Projectile)
 }
 
 /************************************************************************

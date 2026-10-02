@@ -66,6 +66,9 @@ export
         glm::vec3 direction{ 0.0f };    // world, normalized; 0 when there is none
         // JPEG hit preset of the spot at point (assets/jpeg/presets.json, section "hits"); empty: none
         std::string jpeg_preset;
+        // flash of the entity hit (HitFlash): linear emission (HDR) fading over flash_time s; 0: none
+        glm::vec3 flash{ 0.0f };
+        float flash_time = 0.12f;
     };
 
     // Sent by apply_damage after it applied a DamageEvent (with the entity that has the Health)
@@ -77,6 +80,18 @@ export
         float health_after = 0.0f;
         float max = 0.0f;
     };
+
+    // The entity glows for a moment where it was hit (MeshRenderer::effect of it and its children): added for a
+    // DamageTakenEvent whose blow has a flash, fades out quadratically, removed at the end
+    struct [[=scene::runtime_only]] HitFlash
+    {
+        glm::vec3 color{ 0.0f };            // linear emission at the start
+        float duration = 0.12f;
+        [[=rh::edit, =rh::read_only]] float time = 0.0f;
+    };
+
+    // System set of the Late system that writes the flashes into the MeshRenderers (before the render sync)
+    struct HitFlashes {};
 
     struct DeathEvent
     {

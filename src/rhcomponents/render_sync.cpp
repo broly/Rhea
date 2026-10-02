@@ -63,6 +63,7 @@ namespace
         proxy.materials = renderer.materials;
         if (const SkinnedMesh* skinned = registry.get<SkinnedMesh>(e))
             proxy.skinning = skinned->pose;
+        proxy.effect = renderer.effect;
         return proxy;
     }
 
@@ -70,7 +71,7 @@ namespace
     {
         return same(a.transform, b.transform) && a.mesh == b.mesh && a.lods == b.lods
             && a.shadow_proxies == b.shadow_proxies && a.materials == b.materials
-            && a.skinning == b.skinning;
+            && a.skinning == b.skinning && a.effect == b.effect;
     }
 
     SceneViewProxy_Camera make_proxy(const ecs::Registry&, ecs::Entity, const Camera& camera, const Transform& world)

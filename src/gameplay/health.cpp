@@ -12,6 +12,7 @@ import reflect;
 import rhobject;
 import ecs;
 import framework;
+import rhcomponents;
 
 #include "ecs/ecs_macros.h"
 #include "framework/scene_macros.h"
@@ -81,6 +82,58 @@ namespace
         });
     }
 
+    // a new blow restarts the flash (the stronger color wins while the old one is still bright)
+    [[=ecs::system<ecs::Phase::Update>]]
+    void start_hit_flashes(ecs::EventReader<DamageTakenEvent> taken, ecs::Query<HitFlash> flashes, ecs::Commands& commands)
+    {
+        for (const DamageTakenEvent& event : taken.read())
+        {
+            const DamageEvent& blow = event.damage;
+            if (blow.flash == glm::vec3(0.0f) || blow.flash_time <= 0.0f)
+                continue;
+            if (HitFlash* flash = flashes.get(event.entity))
+            {
+                const float left = 1.0f - std::clamp(flash->time / std::max(flash->duration, 1e-3f), 0.0f, 1.0f);
+                flash->color = glm::max(flash->color * left * left, blow.flash);
+                flash->duration = blow.flash_time;
+                flash->time = 0.0f;
+                continue;
+            }
+            commands.add(event.entity, HitFlash{ .color = blow.flash, .duration = blow.flash_time });
+        }
+    }
+
+    // the flash of an entity goes to its MeshRenderers and those of its descendants (weapon models, child meshes)
+    [[=ecs::system<ecs::Phase::Late>, =ecs::in_set<HitFlashes>, =ecs::before<RenderSync>, =ecs::before<MeshColliderSync>]]
+    void apply_hit_flashes(ecs::Query<HitFlash> flashes, ecs::Query<MeshRenderer> renderers, ecs::Query<const ChildOf> parents,
+        ecs::Res<ecs::FrameTime> time, ecs::Commands& commands)
+    {
+        if (flashes.empty())
+            return;
+        std::unordered_multimap<uint64_t, ecs::Entity> children;
+        parents.each([&] (ecs::Entity e, const ChildOf& child_of) { children.emplace(child_of.parent.bits(), e); });
+
+        flashes.each([&] (ecs::Entity e, HitFlash& flash) {
+            flash.time += float(time->dt);
+            const float left = 1.0f - std::clamp(flash.time / std::max(flash.duration, 1e-3f), 0.0f, 1.0f);
+            const glm::vec4 effect(flash.color * left * left, 0.0f);
+
+            std::vector<ecs::Entity> stack{ e };
+            for (int guard = 0; !stack.empty() && guard < 4096; ++guard)
+            {
+                const ecs::Entity node = stack.back();
+                stack.pop_back();
+                if (MeshRenderer* renderer = renderers.get(node))
+                    renderer->effect = effect;
+                auto [first, last] = children.equal_range(node.bits());
+                for (auto it = first; it != last; ++it)
+                    stack.push_back(it->second);
+            }
+            if (left <= 0.0f)
+                commands.remove<HitFlash>(e);
+        });
+    }
+
     ECS_REGISTER()
-    SCENE_REGISTER_COMPONENTS(Health, Dead)
+    SCENE_REGISTER_COMPONENTS(Health, Dead, HitFlash)
 }

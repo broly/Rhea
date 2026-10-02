@@ -129,6 +129,7 @@ void SceneViewProcessor_Mesh::process()
             ro.shadow_proxies = submitted.shadow_proxies;
             ro.world  = new_world;
             ro.bounds = submitted.bounds;
+            ro.effect = submitted.effect;
 
             checkf(submitted.lods.empty() || !submitted.skinning, "Mesh '%s': skinned meshes have no LODs",
                 submitted.debug_name.to_string().c_str());
@@ -291,6 +292,16 @@ void SceneViewProcessor_Mesh::process()
             continue;
         }
 
+        // the per instance effect (hit flash): only the primitive table entries (with the transform below if it
+        // moved too)
+        if (ro.effect != submitted.effect)
+        {
+            ro.effect = submitted.effect;
+            if (!transform_changed)
+                for (RenderPrimitiveId prim_index : ro.primitives)
+                    write_primitive_info(ro, primitives[prim_index]);
+        }
+
         if (transform_changed)
         {
             // moving meshes: primitive table holds the transforms used by every pass
@@ -311,6 +322,7 @@ void SceneViewProcessor_Mesh::process()
             
             moved_this_frame.push_back(submitted.render_id.identifier);
         }
+
     }
     
     // objects which stopped: previous transform catches up so motion vectors become zero
@@ -366,7 +378,9 @@ void SceneViewProcessor_Mesh::write_primitive_info(const RenderObject_Mesh& ro, 
         ro.world,
         ro.prev_world,
         (uint32_t)rp.mesh_index,
-        rp.primitive_material_id
+        rp.primitive_material_id,
+        { 0u, 0u },
+        ro.effect
     };
     ++primitive_table_version;
 }
