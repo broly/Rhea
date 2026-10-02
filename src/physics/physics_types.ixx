@@ -99,6 +99,26 @@ export namespace phys
         glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
     };
 
+    // Axis aligned box in world space
+    struct Bounds
+    {
+        glm::vec3 min{ 0.0f };
+        glm::vec3 max{ 0.0f };
+
+        bool overlaps(const Bounds& other) const
+        {
+            return min.x <= other.max.x && max.x >= other.min.x && min.y <= other.max.y && max.y >= other.min.y
+                && min.z <= other.max.z && max.z >= other.min.z;
+        }
+    };
+
+    // A fixed body was created, destroyed or moved (then: one change for where it was, one for where it is)
+    struct StaticChange
+    {
+        Bounds bounds;
+        Category category = Category::static_world;
+    };
+
     // Result of a raycast or a shape sweep
     struct Hit
     {

@@ -25,10 +25,15 @@ import glm;
 import cvar;
 import reflect;
 import properties;
+import navigation;
 
 namespace
 {
     cvar::Var<bool> cv_window_post_process("ui.windows.post_process", false, "Post processing: presets, exposure, bloom, color grading, lens effects");
+    cvar::Var<bool> cv_window_navigation("ui.windows.navigation", false, "Navigation mesh: build state, debug drawing, agents");
+
+    // Windows > Navigation (bottom of the file)
+    void draw_navigation_window(ecs::Registry& registry);
 
     // post process presets (assets/render/post_process_presets.json), the description as tooltip
     void post_process_preset_combo()
@@ -416,11 +421,15 @@ void GameEngine::on_debug_ui_windows_menu()
 {
     if (ImGui::MenuItem("Post Process", nullptr, cv_window_post_process.get()))
         cv_window_post_process.set(!cv_window_post_process.get());
+    if (ImGui::MenuItem("Navigation", nullptr, cv_window_navigation.get()))
+        cv_window_navigation.set(!cv_window_navigation.get());
 }
 
 void GameEngine::on_debug_ui_windows()
 {
     draw_post_process_window();
+    if (world)
+        draw_navigation_window(world->registry);
 }
 
 void GameEngine::draw_post_process_window()
@@ -580,4 +589,121 @@ void GameEngine::draw_post_process_window()
     }
 
     ImGui::End();
+}
+
+
+/************************************************************************
+ * NAVIGATION WINDOW
+ ***********************************************************************/
+
+namespace
+{
+    const char* status_name(nav::NavStatus status)
+    {
+        switch (status)
+        {
+        case nav::NavStatus::idle: return "idle";
+        case nav::NavStatus::planning: return "planning";
+        case nav::NavStatus::moving: return "moving";
+        case nav::NavStatus::partial: return "partial path";
+        case nav::NavStatus::unreachable: return "unreachable";
+        case nav::NavStatus::off_mesh: return "off mesh";
+        }
+        return "?";
+    }
+
+void draw_navigation_window(ecs::Registry& registry)
+{
+    if (!cv_window_navigation.get())
+        return;
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.02f, viewport->WorkPos.y + viewport->WorkSize.y * 0.45f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.22f, viewport->WorkSize.y * 0.45f), ImGuiCond_FirstUseEver);
+    bool keep_open = true;
+    const bool expanded = ImGui::Begin("Navigation", &keep_open);
+    if (!keep_open)
+        cv_window_navigation.set(false);
+    if (!expanded)
+    {
+        ImGui::End();
+        return;
+    }
+
+    setting("Enabled", nav::cv_enabled);
+    const nav::NavMesh* mesh = registry.find_resource<nav::NavMesh>();
+    if (!mesh)
+        ImGui::TextDisabled("No navigation mesh: the level has no NavMeshBounds");
+    else
+    {
+        const nav::NavMeshStats stats = mesh->get_stats();
+        ImGui::Text("Tiles: %u in bounds, %u walkable, %u waiting, %u building", stats.tiles, stats.tiles_built, stats.tiles_dirty,
+            stats.tiles_building);
+        ImGui::Text("Polygons: %u, agents: %u", stats.polygons, stats.agents);
+        ImGui::Text("Built %u tiles (last %.1f ms), %u from cache, collect %.2f ms", stats.builds, stats.last_build_ms, stats.cache_hits,
+            stats.collect_ms);
+        if (ImGui::Button("Rebuild"))
+            nav::request_rebuild(false);
+        ImGui::SetItemTooltip("Collects the geometry of every tile again: tiles whose input changed are rebuilt (others come from the cache)");
+        ImGui::SameLine();
+        if (ImGui::Button("Rebuild without cache"))
+            nav::request_rebuild(true);
+        ImGui::SetItemTooltip("Recast builds every tile (console nav.rebuild nocache)");
+    }
+
+    if (ImGui::CollapsingHeader("Debug drawing", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::PushID("draw");
+        setting("Mesh", nav::cv_draw);
+        ImGui::SameLine();
+        setting("Tiles", nav::cv_draw_tiles);
+        ImGui::SameLine();
+        setting("Agents", nav::cv_draw_agents);
+        setting("Distance", nav::cv_draw_distance, "%.0f m");
+        ImGui::PopID();
+    }
+
+    if (ImGui::CollapsingHeader("Build settings"))
+    {
+        ImGui::PushID("build");
+        ImGui::TextWrapped("A change rebuilds every tile (cached tiles of the same input are reused)");
+        setting("Cell size", nav::cv_cell_size, "%.2f m");
+        setting("Cell height", nav::cv_cell_height, "%.2f m");
+        setting("Agent radius", nav::cv_agent_radius, "%.2f m");
+        setting("Agent height", nav::cv_agent_height, "%.2f m");
+        setting("Max climb", nav::cv_agent_climb, "%.2f m");
+        setting("Max slope", nav::cv_agent_slope, "%.0f deg");
+        setting("Tile size", nav::cv_tile_size);
+        setting("Budget", nav::cv_budget, "%.1f ms");
+        ImGui::PopID();
+    }
+
+    if (ImGui::CollapsingHeader("Agents", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (ImGui::BeginTable("agents", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Entity");
+            ImGui::TableSetupColumn("Status");
+            ImGui::TableSetupColumn("Speed");
+            ImGui::TableSetupColumn("To goal");
+            ImGui::TableHeadersRow();
+            ecs::Query<const nav::NavAgent>(registry).each([&] (ecs::Entity e, const nav::NavAgent& agent) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(scene::get_name(registry, e).c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(agent.obstacle ? "obstacle" : status_name(agent.status));
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f / %.2f", glm::length(glm::vec2(agent.desired_velocity.x, agent.desired_velocity.z)), agent.max_speed);
+                ImGui::TableNextColumn();
+                if (std::isfinite(agent.distance_to_goal))
+                    ImGui::Text("%.1f m", agent.distance_to_goal);
+                else
+                    ImGui::TextDisabled("-");
+            });
+            ImGui::EndTable();
+        }
+    }
+    ImGui::End();
+}
 }

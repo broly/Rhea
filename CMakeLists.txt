@@ -65,6 +65,7 @@ set(RHEA_MODULE_DIRS
     src/render_scene
     src/physics
     src/debug_draw
+    src/navigation
     src/framework
     src/rhcomponents
     src/animation
@@ -130,6 +131,7 @@ target_link_libraries(rhea
 		imgui
 		Jolt
 		meshoptimizer
+		recastnavigation
 )
 
 target_compile_definitions(rhea

@@ -12,7 +12,7 @@ import framework;
 
 // Waves of enemies for the M0 prototype (G2): keeps game.waves.alive enemies (game.waves.prefab, the jackal)
 // around the player, one every game.waves.interval seconds, on the ground in a ring of radius_min..radius_max m
-// (a ray down near the player's height; no navmesh: the jackals run straight at the player). Spawned through
+// (a ray down near the player's height; they find their way on the navigation mesh). Spawned through
 // SpawnPrefabRequest, despawned by their Health (despawn_delay).
 //
 // Console: waves.spawn [n] (at once, also when off), waves.clear

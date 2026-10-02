@@ -217,6 +217,18 @@ export namespace phys
         void overlap(const Shape& shape, const BodyTransform& transform,
                      std::vector<BodyId>& out, const QueryFilter& filter = {}) const;
 
+        // ---- static world (data derived from the level geometry: navigation meshes) ----
+
+        // Triangles of the fixed bodies of `categories` near the box, world space, 3 vertices each, counter clockwise
+        // seen from their front ((b - a) x (c - a) points out). Coarse: triangles beside the box may be included.
+        void collect_static_triangles(const Bounds& box, CategoryMask categories, std::vector<glm::vec3>& out) const;
+
+        // Fixed bodies created, destroyed or moved, in order, for any number of readers: each keeps a cursor (0 at
+        // the start); the changes after it are appended to out and the cursor moves past them. False when changes
+        // were dropped since the cursor (the newest few thousand are kept): anything may have changed.
+        // Thread safe.
+        bool read_static_changes(uint64_t& cursor, std::vector<StaticChange>& out) const;
+
         // ---- simulation ----
 
         void step(float dt);

@@ -21,6 +21,7 @@ module;
 #include <Jolt/Physics/Collision/ShapeCast.h>
 #include <Jolt/Physics/Collision/CollideShape.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/TransformedShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
@@ -408,6 +409,34 @@ namespace phys
         bool character_debug = false;
         std::vector<DebugLine> character_lines;
         std::vector<DebugLine> character_lines_shown;
+
+        // fixed bodies created / destroyed / moved (read_static_changes): the newest max_static_changes,
+        // static_changes_first = index of the front one since the start
+        static constexpr size_t max_static_changes = 16384;
+        mutable std::mutex static_changes_mutex;
+        std::deque<StaticChange> static_changes;
+        uint64_t static_changes_first = 0;
+
+        void record_static_change(const JPH::Body& body)
+        {
+            const JPH::AABox box = body.GetWorldSpaceBounds();
+            const StaticChange change{ { to_glm(box.mMin), to_glm(box.mMax) }, get_layer_category(body.GetObjectLayer()) };
+            std::lock_guard lock(static_changes_mutex);
+            static_changes.push_back(change);
+            if (static_changes.size() > max_static_changes)
+            {
+                static_changes.pop_front();
+                ++static_changes_first;
+            }
+        }
+
+        // the body if it is a fixed one
+        void record_static_change(JPH::BodyID id)
+        {
+            JPH::BodyLockRead lock(system.GetBodyLockInterface(), id);
+            if (lock.Succeeded() && lock.GetBody().IsStatic())
+                record_static_change(lock.GetBody());
+        }
     };
 
 
@@ -613,6 +642,8 @@ namespace phys
             LogPhysics.Log<Error>("create_body: out of bodies (max %u)", backend->settings.max_bodies);
             return {};
         }
+        if (desc.motion == Motion::fixed)
+            backend->record_static_change(id);
         return to_phys(id);
     }
 
@@ -622,6 +653,7 @@ namespace phys
         if (!is_valid(body))
             return;
 
+        backend->record_static_change(to_jolt(body));
         JPH::BodyInterface& bodies = backend->body_interface();
         bodies.RemoveBody(to_jolt(body));
         bodies.DestroyBody(to_jolt(body));
@@ -649,8 +681,10 @@ namespace phys
     void PhysicsScene::set_transform(BodyId body, const BodyTransform& transform)
     {
         backend->check_not_stepping();
+        backend->record_static_change(to_jolt(body));     // where it was
         backend->body_interface().SetPositionAndRotation(
             to_jolt(body), to_jolt(transform.position), to_jolt(transform.rotation), JPH::EActivation::Activate);
+        backend->record_static_change(to_jolt(body));     // where it is
     }
 
     void PhysicsScene::move_kinematic(BodyId body, const BodyTransform& target)
@@ -1116,6 +1150,60 @@ namespace phys
             if (std::find(out.begin() + (ptrdiff_t)first, out.end(), id) == out.end())
                 out.push_back(id);
         }
+    }
+
+
+    // ---- static world ----
+
+    namespace
+    {
+        class StaticBodyFilter final : public JPH::BodyFilter
+        {
+        public:
+            bool ShouldCollideLocked(const JPH::Body& body) const override { return body.IsStatic(); }
+        };
+    }
+
+    void PhysicsScene::collect_static_triangles(const Bounds& box, CategoryMask categories, std::vector<glm::vec3>& out) const
+    {
+        backend->check_not_stepping();
+
+        const JPH::AABox jolt_box(to_jolt(box.min), to_jolt(box.max));
+        const QueryBroadPhaseLayerFilter broadphase(categories);
+        const QueryObjectLayerFilter object_layer(categories);
+        const StaticBodyFilter fixed_only;
+
+        JPH::AllHitCollisionCollector<JPH::TransformedShapeCollector> collector;
+        backend->narrow_phase().CollectTransformedShapes(jolt_box, collector, broadphase, object_layer, fixed_only);
+
+        constexpr int batch = 256;
+        static_assert(batch >= JPH::Shape::cGetTrianglesMinTrianglesRequested);
+        std::vector<JPH::Float3> vertices(3 * batch);
+        for (const JPH::TransformedShape& shape : collector.mHits)
+        {
+            JPH::Shape::GetTrianglesContext context;
+            shape.GetTrianglesStart(context, jolt_box, JPH::RVec3::sZero());
+            for (;;)
+            {
+                const int count = shape.GetTrianglesNext(context, batch, vertices.data());
+                if (count <= 0)
+                    break;
+                for (int i = 0; i < 3 * count; ++i)
+                    out.emplace_back(vertices[i].x, vertices[i].y, vertices[i].z);
+            }
+        }
+    }
+
+    bool PhysicsScene::read_static_changes(uint64_t& cursor, std::vector<StaticChange>& out) const
+    {
+        std::lock_guard lock(backend->static_changes_mutex);
+        const uint64_t first = backend->static_changes_first;
+        const uint64_t end = first + backend->static_changes.size();
+        const bool complete = cursor >= first;
+        for (uint64_t i = std::max(cursor, first); i < end; ++i)
+            out.push_back(backend->static_changes[size_t(i - first)]);
+        cursor = end;
+        return complete;
     }
 
 

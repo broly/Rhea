@@ -22,6 +22,7 @@ import framework;
 import locomotion;
 import animation;
 import gameplay;
+import navigation;
 import ui;
 import platform;
 import cvar;
@@ -359,6 +360,13 @@ void WorldScript_VariousThings::tick(double dt)
             registry.add<loco::LocomotionPlayer>(character);
             // game rules: the player and its health (full screen JPEG damage, damage.player)
             registry.add<Player>(character);
+            // an obstacle on the navigation mesh: the companion and the jackals steer around the player
+            const loco::LocomotionCharacter& body = *registry.get<loco::LocomotionCharacter>(character);
+            nav::NavAgent obstacle;
+            obstacle.radius = body.scaled(body.settings->capsule_radius);
+            obstacle.height = body.capsule_height;
+            obstacle.obstacle = true;
+            registry.add<nav::NavAgent>(character, obstacle);
             if (!registry.has<Health>(character))
                 registry.add<Health>(character, Health{ .max = 100.0f, .death_jpeg = "" });
             // weapons (assets/weapons/weapons.json): left mouse fires, 2..7 select, X reloads

@@ -74,16 +74,14 @@ void traverseNode(
                 asset.accessors.at(
                     primitive.findAttribute("POSITION")->accessorIndex);
 
-            const auto* normIt = primitive.findAttribute("NORMAL");
-            const auto* tanIt  = primitive.findAttribute("TANGENT");
-            const auto* uvIt   = primitive.findAttribute("TEXCOORD_0");
-
-            const fastgltf::Accessor* normAcc =
-                normIt ? &asset.accessors[normIt->accessorIndex] : nullptr;
-            const fastgltf::Accessor* tanAcc =
-                tanIt ? &asset.accessors[tanIt->accessorIndex] : nullptr;
-            const fastgltf::Accessor* uvAcc =
-                uvIt ? &asset.accessors[uvIt->accessorIndex] : nullptr;
+            // findAttribute returns attributes.end() (not null) for a missing attribute
+            auto find_accessor = [&](std::string_view name) -> const fastgltf::Accessor* {
+                const auto* it = primitive.findAttribute(name);
+                return it != primitive.attributes.cend() ? &asset.accessors[it->accessorIndex] : nullptr;
+            };
+            const fastgltf::Accessor* normAcc = find_accessor("NORMAL");
+            const fastgltf::Accessor* tanAcc = find_accessor("TANGENT");
+            const fastgltf::Accessor* uvAcc = find_accessor("TEXCOORD_0");
 
             prim.vertices.resize(posAcc.count);
 

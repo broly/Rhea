@@ -19,9 +19,11 @@ import framework;
 import rhcomponents;
 import physics;
 import animation;
+import navigation;
 import assets;
 import cvar;
 import json_utils;
+import fixed_string;
 import log;
 
 #include "logging/log_macro.h"
@@ -71,7 +73,7 @@ namespace
     cvar::Var<std::string> cv_clips("game.jackal.clips", "animations/jackal/locomotion.json", "Gaits and clips of the jackals");
 
     constexpr float gravity = 9.81f;
-    constexpr float pi = glm::pi<float>();
+    constexpr float pi = std::numbers::pi_v<float>;
     constexpr glm::vec3 up{ 0.0f, 1.0f, 0.0f };
 
     float wrap_angle(float a)
@@ -194,7 +196,12 @@ namespace
         bool engaged = false;   // the player is in reach: faces it even when standing
     };
 
-    Steering steer(const Jackal& j, const std::optional<glm::vec3>& player, std::span<const glm::vec3> others)
+    bool wants_to_chase(const Jackal& j, float distance)
+    {
+        return j.chase && cv_chase.get() && distance <= j.aggro_radius;
+    }
+
+    Steering steer(const Jackal& j, const std::optional<glm::vec3>& player, std::span<const glm::vec3> others, const nav::NavAgent* agent)
     {
         Steering s;
         if (!player)
@@ -204,15 +211,33 @@ namespace
         const float distance = glm::length(to_player);
         if (distance < 1e-3f)
             return s;
-        if (!j.chase || !cv_chase.get() || distance > j.aggro_radius)
+        if (!wants_to_chase(j, distance))
             return s;   // keeps its heading, stands
         s.engaged = true;
         s.direction = to_player / distance;
+        float remaining = distance - j.stop_distance;
+
+        // The way there: along the navigation mesh, around walls, and around the pack and the others (the crowd's
+        // avoidance). Straight at the player in front of it, or without a path (no mesh, off it).
+        const bool on_path = agent && (nav::is_following_path(*agent) || agent->status == nav::NavStatus::planning)
+            && distance > j.stop_distance + 0.5f;
+        if (on_path)
+        {
+            glm::vec3 way(agent->desired_velocity.x, 0.0f, agent->desired_velocity.z);
+            if (glm::length(way) < 0.1f && agent->has_corner)
+                way = glm::vec3(agent->next_corner.x - j.position.x, 0.0f, agent->next_corner.z - j.position.z);
+            if (glm::length(way) > 1e-3f)
+                s.direction = glm::normalize(way);
+            // brakes for the end of the path (the closest it gets when the player stands out of reach)
+            if (std::isfinite(agent->distance_to_goal))
+                remaining = agent->distance_to_goal - j.stop_distance;
+        }
 
         // brakes in time to stop at stop_distance: v = sqrt(2 a d)
-        const float remaining = distance - j.stop_distance;
         if (remaining > 0.0f)
             s.speed = std::min(j.run_speed, std::sqrt(2.0f * j.deceleration * remaining));
+        if (on_path)
+            return s;   // the crowd keeps the pack apart
 
         // keeps apart from the pack: pushed away by the ones closer than two bodies
         glm::vec3 push{ 0.0f };
@@ -330,7 +355,7 @@ namespace
     [[=ecs::system<ecs::Phase::FixedPost>, =ecs::in_set<JackalSimulation>, =ecs::before<WeaponFire>, =ecs::before<DamageResolution>,
       =ecs::before<scene::PhysicsStep>]]
     void simulate_jackals(ecs::Query<Jackal, const Transform> jackals, ecs::Query<const WorldTransform, ecs::With<Player>> players,
-        ecs::Query<const Dead> dead, ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
+        ecs::Query<const Dead> dead, ecs::Query<nav::NavAgent> agents, ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
     {
         std::optional<glm::vec3> player;
         players.each([&] (const WorldTransform& transform) {
@@ -365,8 +390,27 @@ namespace
 
             if (player)
                 j.target_distance = glm::length(glm::vec2(player->x - j.position.x, player->z - j.position.z));
-            simulate(j, steer(j, player, others), dead.get(e) != nullptr, *physics, dt);
+            const bool is_dead = dead.get(e) != nullptr;
+
+            // the crowd plans the way to the player (next tick's NavAgentUpdate); the dead lie in the way of the others
+            nav::NavAgent* agent = agents.get(e);
+            if (agent)
+            {
+                if (!is_dead && player && wants_to_chase(j, j.target_distance))
+                    nav::move_to(*agent, *player);
+                else
+                    nav::stop(*agent);
+                agent->obstacle = is_dead;
+                agent->max_speed = j.run_speed;
+            }
+
+            simulate(j, steer(j, player, others, agent), is_dead, *physics, dt);
             update_hitbox(e, j, *physics);
+            if (agent)
+            {
+                agent->position = j.position;
+                agent->velocity = forward_of(j.heading) * j.speed;
+            }
         });
     }
 

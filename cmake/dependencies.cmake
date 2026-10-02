@@ -121,3 +121,35 @@ FetchContent_Declare(
 set(MESHOPT_INSTALL OFF CACHE BOOL "" FORCE)
 set(MESHOPT_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(meshoptimizer)
+
+
+
+# Recast / Detour / DetourCrowd: navigation meshes and crowds (src/navigation). The main branch: Unreal ships
+# a fork of 2014 sources; 1.6.0 (2023) is the last release, main has the fixes since (2026-02-27).
+# Plain C++ library, included only in global module fragments of the navigation implementation units.
+# Its own CMakeLists builds the demo and tests with -Werror: sources only, the target is made here.
+FetchContent_Declare(
+  recastnavigation
+  GIT_REPOSITORY https://github.com/recastnavigation/recastnavigation.git
+  GIT_TAG        9f4ce64458dfae86e1239c525ddc219c4e9e06f1
+  SOURCE_SUBDIR  no_cmake_project
+  EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(recastnavigation)
+
+file(GLOB RECAST_SOURCES CONFIGURE_DEPENDS
+  ${recastnavigation_SOURCE_DIR}/Recast/Source/*.cpp
+  ${recastnavigation_SOURCE_DIR}/Detour/Source/*.cpp
+  ${recastnavigation_SOURCE_DIR}/DetourCrowd/Source/*.cpp
+)
+add_library(recastnavigation STATIC ${RECAST_SOURCES})
+target_include_directories(recastnavigation PUBLIC
+  ${recastnavigation_SOURCE_DIR}/Recast/Include
+  ${recastnavigation_SOURCE_DIR}/Detour/Include
+  ${recastnavigation_SOURCE_DIR}/DetourCrowd/Include
+)
+# 64 bit polygon references: big tiled worlds without running out of tile / polygon / salt bits.
+# PUBLIC: every unit including the Detour headers must agree on dtPolyRef.
+target_compile_definitions(recastnavigation PUBLIC DT_POLYREF64)
+# Tile builds run in the background; at -O0 one tile takes seconds. Optimized in every configuration.
+target_compile_options(recastnavigation PRIVATE $<$<CONFIG:Debug>:-O2>)

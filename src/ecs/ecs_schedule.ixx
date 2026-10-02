@@ -69,6 +69,36 @@ export namespace ecs
         T* ref;
     };
 
+    // System parameters: a resource that may be missing (nullptr until something creates it). Same access as
+    // Res / ResMut; for features whose resource only exists on some levels (the navigation mesh).
+    template<typename T>
+    class OptRes
+    {
+    public:
+        explicit OptRes(const T* r) : ref(r) {}
+        explicit operator bool() const { return ref != nullptr; }
+        const T* get() const { return ref; }
+        const T& operator*() const { return *ref; }
+        const T* operator->() const { return ref; }
+
+    private:
+        const T* ref;
+    };
+
+    template<typename T>
+    class OptResMut
+    {
+    public:
+        explicit OptResMut(T* r) : ref(r) {}
+        explicit operator bool() const { return ref != nullptr; }
+        T* get() const { return ref; }
+        T& operator*() const { return *ref; }
+        T* operator->() const { return ref; }
+
+    private:
+        T* ref;
+    };
+
     // System parameter: sends events of type T (Registry::events<T>). Sent at once, not at the end of the phase:
     // readers later in the phase see them.
     template<typename T>
@@ -158,7 +188,7 @@ export namespace ecs
     template<typename P>
     struct SystemParam
     {
-        static_assert(false, "unsupported system parameter: use Query<...>, Commands&, Res<T>, ResMut<T>, "
+        static_assert(false, "unsupported system parameter: use Query<...>, Commands&, Res<T>, ResMut<T>, OptRes<T>, OptResMut<T>, "
             "EventReader<T>, EventWriter<T> or Registry&");
     };
 
@@ -195,6 +225,20 @@ export namespace ecs
     struct SystemParam<ResMut<T>>
     {
         static ResMut<T> fetch(SystemContext& c) { return ResMut<T>(c.registry.resource<T>()); }
+        static void access(Access& a) { a.resource_writes.push_back({ Registry::resource_key<T>(), detail::type_name<T>() }); }
+    };
+
+    template<typename T>
+    struct SystemParam<OptRes<T>>
+    {
+        static OptRes<T> fetch(SystemContext& c) { return OptRes<T>(c.registry.find_resource<T>()); }
+        static void access(Access& a) { a.resource_reads.push_back({ Registry::resource_key<T>(), detail::type_name<T>() }); }
+    };
+
+    template<typename T>
+    struct SystemParam<OptResMut<T>>
+    {
+        static OptResMut<T> fetch(SystemContext& c) { return OptResMut<T>(c.registry.find_resource<T>()); }
         static void access(Access& a) { a.resource_writes.push_back({ Registry::resource_key<T>(), detail::type_name<T>() }); }
     };
 

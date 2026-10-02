@@ -17,8 +17,10 @@ import framework;
 // The jackal (M0 enemy): a quadruped that runs at the player and stops in front of it.
 //
 //   Jackal           (JSON) movement tuning + simulation state. FixedPost (set JackalSimulation, before the weapons):
-//                    steering towards the player with acceleration, braking distance, a turn rate that drops with the
-//                    speed, slowing down for sharp turns, separation from the other jackals, sliding along walls,
+//                    steering towards the player along the navigation mesh (its nav::NavAgent: the crowd's path and
+//                    avoidance keep the pack apart; straight at the player in front of it or without a mesh) with
+//                    acceleration, braking distance (along the path), a turn rate that drops with the
+//                    speed, slowing down for sharp turns, separation from the other jackals off the mesh, sliding along walls,
 //                    paws on the ground (raycasts), body pitched to the slope; a kinematic hitbox follows it
 //   interpolation    Late, before the transforms are propagated: Transform between the last two ticks, with the
 //                    pitch and the lean into turns (centripetal: atan(v * turn rate / g))
