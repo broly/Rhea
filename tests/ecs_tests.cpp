@@ -287,6 +287,87 @@ void ambiguities()
             std::println("  {}", f);
 }
 
+struct HitEvent { int id = 0; };
+struct Shout { int frame = 0; };
+struct EarlyListeners {};   // a set
+
+void events()
+{
+    // EventWriter / EventReader: every reader sees every event once, in order, across 0..N fixed ticks a frame
+    Registry r;
+    Schedule s;
+    s.fixed_dt = 1.0 / 60.0;
+
+    int next_hit = 0;
+    std::vector<int> update_seen, late_seen, fixed_seen_shouts, update_seen_shouts;
+    int frame_counter = 0;
+
+    s.add(Phase::Fixed, "shoot", [&](EventWriter<HitEvent> hits) { hits.send({ next_hit++ }); });
+    s.add(Phase::Update, "update_reader", [&](EventReader<HitEvent> hits) {
+        for (const HitEvent& h : hits.read())
+            update_seen.push_back(h.id);
+    });
+    s.add(Phase::Late, "late_reader", [&](EventReader<HitEvent> hits) {
+        for (const HitEvent& h : hits.read())
+            late_seen.push_back(h.id);
+    });
+    // per frame events read by a fixed phase system, and by an Update system that runs before the sender
+    s.add(Phase::Update, "shout", [&](EventWriter<Shout> shouts) { shouts.emplace(frame_counter++); })
+        .after.push_back(set_name<EarlyListeners>());
+    s.add(Phase::FixedPre, "fixed_listener", [&](EventReader<Shout> shouts) {
+        for (const Shout& sh : shouts.read())
+            fixed_seen_shouts.push_back(sh.frame);
+    });
+    s.add(Phase::Update, "early_listener", [&](EventReader<Shout> shouts) {
+        for (const Shout& sh : shouts.read())
+            update_seen_shouts.push_back(sh.frame);
+    }).sets.push_back(set_name<EarlyListeners>());   // runs before "shout": sees each shout one frame later
+
+    const double tick = 1.0 / 60.0;
+    // 1 tick, 0 ticks (high frame rate), 4 ticks (a hitch), ...
+    const std::vector<double> frames = { tick, tick * 0.2, tick * 0.2, tick * 0.2, tick * 0.2, tick * 4.0, tick, tick * 0.5,
+        tick * 0.5, tick * 3.0, tick * 0.1, tick };
+    for (double dt : frames)
+        s.run_frame(r, dt);
+
+    std::vector<int> expected_hits(next_hit);
+    std::iota(expected_hits.begin(), expected_hits.end(), 0);
+    EXPECT(next_hit >= 8);
+    EXPECT(update_seen == expected_hits);
+    EXPECT(late_seen == expected_hits);
+
+    std::vector<int> expected_shouts(frame_counter);
+    std::iota(expected_shouts.begin(), expected_shouts.end(), 0);
+    // the fixed listener has not seen the shouts after the last tick yet; the early listener misses the last one
+    EXPECT(update_seen_shouts.size() == expected_shouts.size() - 1);
+    EXPECT(std::ranges::equal(update_seen_shouts, expected_shouts | std::views::take(frame_counter - 1)));
+    EXPECT(!fixed_seen_shouts.empty());
+    EXPECT(std::ranges::equal(fixed_seen_shouts, expected_shouts | std::views::take(fixed_seen_shouts.size())));
+    // 0-tick frames: the shouts of 4 frames waited for the next tick
+    EXPECT(fixed_seen_shouts.size() >= 5);
+
+    // old events go
+    s.run_frame(r, tick * 3.0);
+    s.run_frame(r, tick * 3.0);
+    // the fixed sender keeps sending: only the HitEvents of the last two frames are alive (at most 4 ticks each)
+    EXPECT(r.events<HitEvent>().size() <= 8);
+    EXPECT(r.events<Shout>().size() <= 2);
+
+    // ambiguities: a writer and a reader without an order conflict, two writers do not
+    Schedule a;
+    a.add(Phase::Update, "w1", [](EventWriter<HitEvent>) {});
+    a.add(Phase::Update, "w2", [](EventWriter<HitEvent>) {});
+    a.add(Phase::Update, "rd", [](EventReader<HitEvent>) {});
+    std::vector<std::string> found;
+    for (const Ambiguity& amb : a.find_ambiguities())
+        found.push_back(std::format("{}/{}", amb.first->name, amb.second->name));
+    std::ranges::sort(found);
+    EXPECT(found == std::vector<std::string>{ "w1/rd", "w2/rd" });
+    if (found != std::vector<std::string>{ "w1/rd", "w2/rd" })
+        for (const std::string& f : found)
+            std::println("  {}", f);
+}
+
 int main()
 
 {
@@ -296,6 +377,7 @@ int main()
     schedule();
     auto_systems();
     ambiguities();
+    events();
     stress();
     if (failures)
         std::println("FAILED ({})", failures);

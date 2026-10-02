@@ -21,6 +21,8 @@ import :post_process;
 import :jpeg;
 import :screen_jpeg;
 import :jpeg_hits;
+import :damage_feedback;
+import physics;
 #include "object/object_reflection_macro.h"
 
 struct TonemapPushConstants
@@ -74,8 +76,10 @@ private:
     RGTextureHandle hit_jpeg_work;
     RGTextureHandle hit_jpeg_color;
     jpeg_hits::Frame hits_frame;
-    // render.jpeg.hits.shoot: a hit where the camera looks
-    void shoot_jpeg_hit(const jpeg_hits::ShootRequest& request);
+    // debug commands aimed with the camera (render.jpeg.hits.shoot, damage.look): the first static / dynamic body
+    // through the middle of the screen (the player's capsule is a character: not hit)
+    std::optional<phys::Hit> camera_center_hit() const;
+    void run_camera_commands();
 
     
     

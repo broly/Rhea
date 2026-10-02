@@ -767,6 +767,40 @@
 				}
 			}
 		},
+		// M0: jackal stand-ins in front of the player (gameplay Health; damage.look <amount> [preset])
+		{
+			"name": "jackal_dummy_0",
+			"prefab": "prefabs/jackal_dummy.json",
+			"components": {
+				"Transform": {
+					"position": { "x": 7.7, "y": 0.6, "z": 1.2 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 0.4, "y": 0.6, "z": 0.4 }
+				}
+			}
+		},
+		{
+			"name": "jackal_dummy_1",
+			"prefab": "prefabs/jackal_dummy.json",
+			"components": {
+				"Transform": {
+					"position": { "x": 6.8, "y": 0.6, "z": 2.8 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 0.4, "y": 0.6, "z": 0.4 }
+				}
+			}
+		},
+		{
+			"name": "jackal_dummy_2",
+			"prefab": "prefabs/jackal_dummy.json",
+			"components": {
+				"Transform": {
+					"position": { "x": 8.9, "y": 0.6, "z": -0.4 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 0.4, "y": 0.6, "z": 0.4 }
+				}
+			}
+		},
 		// light rig around the imported character: positions and colors are driven every frame by
 		// CharacterLightRig (src/world_scripts/character_light_rig.cpp), L switches presets.
 		// Off by default (black lights): cvar character.light_rig

@@ -18,6 +18,8 @@ import texture_format;
 import :constants;
 import :names;
 import physics;
+import ecs;
+import gameplay;
 
 #include "render_layout.h"
 #include "common/assertion_macros.h"
@@ -273,8 +275,7 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     const float jpeg_delta = (float)RhGlobals::engine->world->get_delta_seconds();
     screen_jpeg::tick(jpeg_delta);
     screen_jpeg_state = screen_jpeg::evaluate();
-    if (auto request = jpeg_hits::take_shoot_request())
-        shoot_jpeg_hit(*request);
+    run_camera_commands();
     jpeg_hits::tick(jpeg_delta);
     hits_frame = jpeg_hits::update();
     jpeg_renderer->prepare(ctx, *this);
@@ -301,15 +302,41 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     );
 }
 
-void GameRenderGraph::shoot_jpeg_hit(const jpeg_hits::ShootRequest& request)
+std::optional<phys::Hit> GameRenderGraph::camera_center_hit() const
 {
-    // the ray through the middle of the screen; the character's capsule is not in the static / dynamic categories
     const glm::vec3 origin = glm::vec3(current_camera_ubo.camera_pos);
     const glm::vec3 forward = glm::normalize(glm::vec3(current_camera_ubo.inv_view * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
     phys::QueryFilter filter;
     filter.categories = phys::Category::static_world | phys::Category::dynamic;
-    if (auto hit = RhGlobals::engine->world->get_physics().raycast(origin, forward, 500.0f, filter))
-        jpeg_hits::add(hit->position, request.preset, request.strength, request.radius, request.lifetime);
+    return RhGlobals::engine->world->get_physics().raycast(origin, forward, 500.0f, filter);
+}
+
+void GameRenderGraph::run_camera_commands()
+{
+    if (auto request = jpeg_hits::take_shoot_request())
+    {
+        if (auto hit = camera_center_hit())
+            jpeg_hits::add(hit->position, request->preset, request->strength, request->radius, request->lifetime);
+    }
+    if (auto request = damage_feedback::take_look_request())
+    {
+        if (auto hit = camera_center_hit())
+        {
+            // framework convention: BodyDesc::user_data is the owning entity (ecs::Entity::bits), or 0
+            const ecs::Entity target = hit->user_data != 0
+                ? ecs::Entity{ uint32_t(hit->user_data), uint32_t(hit->user_data >> 32) }
+                : ecs::null_entity;
+            const glm::vec3 origin = glm::vec3(current_camera_ubo.camera_pos);
+            RhGlobals::engine->world->registry.events<DamageEvent>().send({
+                .target = target,
+                .amount = request->amount,
+                .type = DamageType::Hitscan,
+                .point = hit->position,
+                .direction = glm::normalize(hit->position - origin),
+                .jpeg_preset = request->preset,
+            });
+        }
+    }
 }
 
 void GameRenderGraph::add_post_process_passes()

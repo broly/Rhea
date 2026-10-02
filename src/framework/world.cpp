@@ -39,7 +39,7 @@ namespace
     // prefabs referencing prefabs
     constexpr int max_prefab_depth = 16;
 
-    [[=ecs::system<ecs::Phase::FixedPost>]]
+    [[=ecs::system<ecs::Phase::FixedPost>, =ecs::in_set<scene::PhysicsStep>]]
     void physics_step(ecs::ResMut<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time)
     {
         PROFILE("World::physics_step");

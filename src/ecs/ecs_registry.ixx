@@ -9,6 +9,7 @@ import assertions;
 
 import :entity;
 import :component;
+import :events;
 
 export namespace ecs
 {
@@ -209,6 +210,29 @@ export namespace ecs
             return &key;
         }
 
+        // --- events: a queue per type (Events<T>), a resource created on first use ---
+
+        template<typename T>
+        Events<T>& events()
+        {
+            if (Events<T>* existing = find_resource<Events<T>>())
+                return *existing;
+            Events<T>& created = set_resource<Events<T>>();
+            event_updaters.push_back([] (Registry& registry, bool tick)
+            {
+                if (Events<T>* e = registry.find_resource<Events<T>>())
+                    e->advance(tick);
+            });
+            return created;
+        }
+
+        // ages every event queue: at the start of a frame (tick = false) and of every fixed tick (Schedule does it)
+        void update_events(bool tick)
+        {
+            for (auto& updater : event_updaters)
+                updater(*this, tick);
+        }
+
         // --- archetypes / queries ---
 
         std::span<const std::unique_ptr<Archetype>> get_archetypes() const { return archetypes; }
@@ -293,6 +317,7 @@ export namespace ecs
         HookTable remove_hooks;
 
         std::unordered_map<const void*, ResourceSlot> resources;
+        std::vector<void (*)(Registry&, bool)> event_updaters;
 
         int32_t iterating = 0;
     };

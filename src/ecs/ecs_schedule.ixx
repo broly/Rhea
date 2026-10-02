@@ -7,6 +7,7 @@ import :component;
 import :registry;
 import :query;
 import :commands;
+import :events;
 
 export namespace ecs
 {
@@ -68,6 +69,83 @@ export namespace ecs
         T* ref;
     };
 
+    // System parameter: sends events of type T (Registry::events<T>). Sent at once, not at the end of the phase:
+    // readers later in the phase see them.
+    template<typename T>
+    class EventWriter
+    {
+    public:
+        explicit EventWriter(Events<T>& e) : events(&e) {}
+        void send(T event) const { events->send(std::move(event)); }
+        template<typename... Args>
+        void emplace(Args&&... args) const { events->emplace(std::forward<Args>(args)...); }
+
+    private:
+        Events<T>* events;
+    };
+
+    // System parameter: the events of type T this system has not read yet (its own cursor), oldest first:
+    //
+    //     void on_damage(EventReader<DamageEvent> damage) { for (const DamageEvent& d : damage.read()) ... }
+    //
+    // read() marks them read; events the system does not read in a run are kept for its next run while they
+    // live (see Events).
+    template<typename T>
+    class EventReader
+    {
+    public:
+        class Range
+        {
+        public:
+            class iterator
+            {
+            public:
+                using value_type = T;
+                using difference_type = std::ptrdiff_t;
+                iterator() = default;
+                iterator(const Events<T>* e, uint64_t i) : events(e), id(i) {}
+                const T& operator*() const { return events->at(id); }
+                const T* operator->() const { return &events->at(id); }
+                iterator& operator++() { ++id; return *this; }
+                iterator operator++(int) { iterator old = *this; ++id; return old; }
+                bool operator==(const iterator& other) const { return id == other.id; }
+
+            private:
+                const Events<T>* events = nullptr;
+                uint64_t id = 0;
+            };
+
+            Range(const Events<T>* e, uint64_t b, uint64_t en) : events(e), first(b), last(en) {}
+            iterator begin() const { return { events, first }; }
+            iterator end() const { return { events, last }; }
+            size_t size() const { return size_t(last - first); }
+            bool empty() const { return first == last; }
+
+        private:
+            const Events<T>* events;
+            uint64_t first;
+            uint64_t last;
+        };
+
+        EventReader(const Events<T>& e, uint64_t& c) : events(&e), cursor(&c) {}
+
+        // the unread events; marks them read
+        Range read() const
+        {
+            const uint64_t first = std::max(*cursor, events->oldest_id());
+            *cursor = events->end_id();
+            return Range(events, first, *cursor);
+        }
+        size_t unread() const { return size_t(events->end_id() - std::max(*cursor, events->oldest_id())); }
+        bool empty() const { return unread() == 0; }
+        // marks every event read without looking at them
+        void clear() const { *cursor = events->end_id(); }
+
+    private:
+        const Events<T>* events;
+        uint64_t* cursor;
+    };
+
     struct SystemContext
     {
         Registry& registry;
@@ -75,10 +153,13 @@ export namespace ecs
     };
 
     // How a system parameter type is fetched and what it accesses. Specialize to add parameter kinds.
+    // A specialization with a `State` type gets one State per system, kept between runs:
+    // `static P fetch(SystemContext&, State&)` instead of `fetch(SystemContext&)`.
     template<typename P>
     struct SystemParam
     {
-        static_assert(false, "unsupported system parameter: use Query<...>, Commands&, Res<T>, ResMut<T> or Registry&");
+        static_assert(false, "unsupported system parameter: use Query<...>, Commands&, Res<T>, ResMut<T>, "
+            "EventReader<T>, EventWriter<T> or Registry&");
     };
 
     template<typename... Ts>
@@ -116,6 +197,61 @@ export namespace ecs
         static ResMut<T> fetch(SystemContext& c) { return ResMut<T>(c.registry.resource<T>()); }
         static void access(Access& a) { a.resource_writes.push_back({ Registry::resource_key<T>(), detail::type_name<T>() }); }
     };
+
+    template<typename T>
+    struct SystemParam<EventWriter<T>>
+    {
+        static EventWriter<T> fetch(SystemContext& c) { return EventWriter<T>(c.registry.events<T>()); }
+        static void access(Access& a)
+        {
+            a.resource_appends.push_back({ Registry::resource_key<Events<T>>(), detail::type_name<Events<T>>() });
+        }
+    };
+
+    template<typename T>
+    struct SystemParam<EventReader<T>>
+    {
+        struct State
+        {
+            // the next event to read; on the first run the oldest alive one
+            uint64_t cursor = 0;
+            bool started = false;
+        };
+        static EventReader<T> fetch(SystemContext& c, State& state)
+        {
+            Events<T>& events = c.registry.events<T>();
+            if (!state.started)
+            {
+                state.cursor = events.oldest_id();
+                state.started = true;
+            }
+            return EventReader<T>(events, state.cursor);
+        }
+        static void access(Access& a)
+        {
+            a.resource_reads.push_back({ Registry::resource_key<Events<T>>(), detail::type_name<Events<T>>() });
+        }
+    };
+
+    namespace detail
+    {
+        template<typename P>
+        concept StatefulParam = requires { typename SystemParam<P>::State; };
+
+        template<typename P>
+        struct param_state { using type = std::monostate; };
+        template<StatefulParam P>
+        struct param_state<P> { using type = typename SystemParam<P>::State; };
+
+        template<typename P>
+        decltype(auto) fetch_param(SystemContext& c, typename param_state<P>::type& state)
+        {
+            if constexpr (StatefulParam<P>)
+                return SystemParam<P>::fetch(c, state);
+            else
+                return SystemParam<P>::fetch(c);
+        }
+    }
 
     namespace detail
     {
@@ -244,9 +380,14 @@ export namespace ecs
         static void bind(System& system, F&& fn, std::type_identity<std::tuple<P...>>)
         {
             (SystemParam<std::remove_cvref_t<P>>::access(system.access), ...);
-            system.run = [fn = std::forward<F>(fn)](SystemContext& c) mutable
+            // per system state of the parameters that keep one (EventReader cursors)
+            using States = std::tuple<typename detail::param_state<std::remove_cvref_t<P>>::type...>;
+            system.run = [fn = std::forward<F>(fn), states = States{}](SystemContext& c) mutable
             {
-                std::invoke(fn, SystemParam<std::remove_cvref_t<P>>::fetch(c)...);
+                std::apply([&] (auto&... state)
+                {
+                    std::invoke(fn, detail::fetch_param<std::remove_cvref_t<P>>(c, state)...);
+                }, states);
             };
         }
 

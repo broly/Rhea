@@ -20,6 +20,9 @@ export namespace ecs
         };
         std::vector<Resource> resource_reads;
         std::vector<Resource> resource_writes;
+        // events sent (EventWriter): conflict with readers of the queue, not with other writers (the events of
+        // two unordered writers come in schedule order, which is deterministic)
+        std::vector<Resource> resource_appends;
         bool exclusive = false;  // takes Registry& - conflicts with everything
     };
 

@@ -7,4 +7,5 @@ export import :component;
 export import :registry;
 export import :query;
 export import :commands;
+export import :events;
 export import :schedule;

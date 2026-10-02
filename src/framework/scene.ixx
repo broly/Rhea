@@ -203,6 +203,10 @@ export
         // [[=ecs::after<scene::TransformPropagation>]]
         struct TransformPropagation {};
 
+        // System set of the FixedPost system that steps the physics: queries of the tick's state (weapons, damage)
+        // run [[=ecs::before<scene::PhysicsStep>]]
+        struct PhysicsStep {};
+
         // World transform composed from the local transforms right now (WorldTransform lags until the Late phase)
         Transform get_world_transform(const ecs::Registry& registry, ecs::Entity e);
 

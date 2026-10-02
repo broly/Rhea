@@ -21,6 +21,7 @@ import name;
 import framework;
 import locomotion;
 import animation;
+import gameplay;
 import cvar;
 
 constexpr bool DO_NN_SAMPLES = false;
@@ -345,6 +346,13 @@ void WorldScript_VariousThings::tick(double dt)
             if (expressions.load("animations/cosmo_bunny/expressions.json", mesh.skeletal_mesh.get()))
                 registry.add<anim::MorphExpressions>(character, std::move(expressions));
             registry.add<loco::LocomotionPlayer>(character);
+            // game rules: the player and its health (full screen JPEG damage, damage.player)
+            registry.add<Player>(character);
+            if (!registry.has<Health>(character))
+                registry.add<Health>(character, Health{ .max = 100.0f, .death_jpeg = "" });
+            // weapons (assets/weapons/weapons.json): left mouse fires, 2..7 select, X reloads
+            registry.add<WeaponHolder>(character);
+            registry.add<WeaponInput>(character);
             pitch = -0.25f;   // look slightly down on the character
         }
         else
@@ -460,6 +468,8 @@ void WorldScript_VariousThings::tick(double dt)
         {
             player->enabled = character_mode;
             player->camera_yaw = yaw;
+            if (WeaponHolder* weapons = registry.get<WeaponHolder>(character))
+                weapons->enabled = character_mode;
             player->camera_pitch = pitch;
         }
         if (character_mode)

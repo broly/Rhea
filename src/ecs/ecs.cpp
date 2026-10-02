@@ -491,6 +491,12 @@ namespace ecs
             for (const Access::Resource& r : b.resource_writes)
                 if (std::ranges::contains(a.resource_reads, r.key, key))
                     add(r.name);
+            for (const Access::Resource& r : a.resource_appends)
+                if (std::ranges::contains(b.resource_reads, r.key, key) || std::ranges::contains(b.resource_writes, r.key, key))
+                    add(r.name);
+            for (const Access::Resource& r : b.resource_appends)
+                if (std::ranges::contains(a.resource_reads, r.key, key) || std::ranges::contains(a.resource_writes, r.key, key))
+                    add(r.name);
             return result;
         }
     }
@@ -629,12 +635,14 @@ namespace ecs
 
         sim->dt = fixed_dt;
         accumulator += real_dt;
+        registry.update_events(false);
 
         uint32_t ticks = 0;
         while (accumulator >= fixed_dt && ticks < max_ticks_per_frame)
         {
             ++sim->tick;
             sim->time = double(sim->tick) * fixed_dt;
+            registry.update_events(true);
             run_phase(registry, Phase::FixedPre);
             run_phase(registry, Phase::Fixed);
             run_phase(registry, Phase::FixedPost);
