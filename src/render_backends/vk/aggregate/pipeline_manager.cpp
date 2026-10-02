@@ -54,23 +54,17 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
 
     std::vector<VkDescriptorSetLayout> vk_layouts;
 
-    std::vector<VkRenderResourceInfo> prepared_info;
-    
-    uint32_t max_index = 0;
-    for (auto& resource_info : desc.resources)
-        max_index = std::max(max_index, resource_info.resource->desc.set_index);
-    
-    for (uint32_t index = 0; index <= max_index; index++)
-        vk_layouts.push_back(get_empty_descriptor_set());
-    
-    
+    // PipelineResourceInfo::set_index numbers the layout's resources 0..N-1
+    std::unordered_map<const RenderResource*, uint32_t> resource_sets;
+    vk_layouts.resize(desc.resources.size(), get_empty_descriptor_set());
     for (auto& resource_info : desc.resources)
     {
-        uint32_t resource_set = resource_info.resource->desc.set_index;
+        checkf(resource_info.set_index < vk_layouts.size(), "set %u of resource %s is out of the layout of %s",
+            resource_info.set_index, resource_info.name.to_string().c_str(), desc.pass.to_string().c_str());
         RBDescriptorSetLayout layout_id = get_or_create_resource_descriptor_set_layout(
             (VkRenderResource*)resource_info.resource);
-        vk_layouts[resource_set] = buffer_manager.get_vk_descriptor_set_layout(layout_id).vk_layout;
-        
+        vk_layouts[resource_info.set_index] = buffer_manager.get_vk_descriptor_set_layout(layout_id).vk_layout;
+        resource_sets[resource_info.resource] = resource_info.set_index;
     }
     
     VkPipelineLayoutCreateInfo plci{
@@ -91,27 +85,11 @@ RBPipelineLayout vk::PipelineManager::create_pipeline_layout(const PipelineLayou
     
     
     
-    uint32_t index = 0;
-    for (auto& vk_layout : vk_layouts)
-    {
-        bool found_res = false;
-        for (auto& resource_info : desc.resources)
-        {
-            if (resource_info.resource->desc.set_index == index)
-            {
-                found_res = true;
-                LogVkPipeline.Log(" * set %i: %s - %p", 
-                    index, resource_info.resource->desc.set.to_string().c_str(), vk_layout);
-            }
-        }
-        if (!found_res)
-        {
-            LogVkPipeline.Log(" * set %i: %s - %p", index, "[PLACEHOLDER]", vk_layout);
-        }
-        index++;
-    }
+    for (auto& resource_info : desc.resources)
+        LogVkPipeline.Log(" * set %i: %s - %p", 
+            resource_info.set_index, resource_info.resource->desc.set.to_string().c_str(), vk_layouts[resource_info.set_index]);
     
-    instance_data[pipeline_layout] = {desc, vk_layouts};
+    instance_data[pipeline_layout] = {desc, vk_layouts, std::move(resource_sets)};
     
     RBPipelineLayout result {pipeline_layout};
     
@@ -242,6 +220,17 @@ void vk::PipelineManager::push_constants(const RBCommandList& cmd, const void* d
         );
     }
     
+}
+
+std::optional<uint32_t> vk::PipelineManager::find_resource_set(const RenderResource* resource) const
+{
+    auto layout_it = instance_data.find(current_pipeline_layout.as<VkPipelineLayout>());
+    if (layout_it == instance_data.end())
+        return std::nullopt;
+    auto it = layout_it->second.resource_sets.find(resource);
+    if (it == layout_it->second.resource_sets.end())
+        return std::nullopt;
+    return it->second;
 }
 
 void vk::PipelineManager::bind_descriptor_set(RBCommandList cmd_list, int set_index, RBDescriptorSet rb_descriptors,

@@ -73,6 +73,9 @@ export
         Name name;
         RenderResource* resource;
         std::vector<ResourceBinding> resource_variable_bindings;
+        // descriptor set of the resource in this pipeline layout: the layout's resources numbered 0..N-1 in the
+        // order of RenderResourceDesc::set_index (global, one per resource; the device allows only 32 sets)
+        uint32_t set_index = 0;
     };
 
     struct PipelineLayoutDesc

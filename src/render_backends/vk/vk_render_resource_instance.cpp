@@ -170,12 +170,10 @@ void VkRenderResourceInstance::bind(RBCommandList command_list, RBFrameHandle fr
         }
         has_set_per_frame = true;
     }
-    if (!set_index.has_value())
-    {
-        vk::VkRenderResourceInfo& pipe_info = resource->backend.pipeline_manager.resources_info.at(resource);
-        
-        set_index = pipe_info.descritor_set_layout_desc.set_index;
-    }
+    // sets are numbered per pipeline layout: the same resource can be set 2 in one pipeline and 7 in another
+    const std::optional<uint32_t> set_index = resource->backend.pipeline_manager.find_resource_set(resource);
+    checkf(set_index.has_value(), "resource %s is not in the layout of the bound pipeline (add it to the pipeline's stage resources)",
+        resource->desc.name.to_string().c_str());
 
     const uint32_t frame_index = usage.frame_index(frame);
 

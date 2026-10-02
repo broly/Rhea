@@ -137,6 +137,11 @@ void PipelineFamily::ctor(Name in_pass_name, std::shared_ptr<MaterialModel> mode
     }
     
     
+    // sets are numbered per layout: the global numbering would need a set index per resource of the renderer
+    std::ranges::sort(layout_desc.resources, {}, [] (const PipelineResourceInfo& info) { return info.resource->desc.set_index; });
+    for (uint32_t index = 0; auto& resource_info : layout_desc.resources)
+        resource_info.set_index = index++;
+    
     size_t cur_offset = 0;
     layout_desc.push_constants.clear();
     for (auto& push_constant_info : config.push_constants)
@@ -333,7 +338,7 @@ PipelineObject* PipelineFamily::request_pipeline(ShaderKey key)
         for (auto& resource : layout_desc.resources)
         {
             const Name resource_set_name = resource.resource->desc.set;
-            const uint16_t resource_set = resource.resource->desc.set_index;
+            const uint16_t resource_set = resource.set_index;
             defines.insert({resource_set_name, resource_set});
         
             for (auto& variable_binding : resource.resource_variable_bindings)

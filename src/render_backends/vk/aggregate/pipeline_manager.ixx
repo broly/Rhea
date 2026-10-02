@@ -17,6 +17,8 @@ namespace vk
     {
         PipelineLayoutDesc desc;
         std::vector<VkDescriptorSetLayout> desc_set_layouts;
+        // set of each resource in this layout (sets are numbered per layout)
+        std::unordered_map<const RenderResource*, uint32_t> resource_sets;
     };
     
     struct VkRenderResourceInfo
@@ -70,6 +72,9 @@ namespace vk
         
         void invalidate_pipeline_layout();
         
+        // set of the resource in the layout of the bound pipeline, nullopt if the layout has no such resource
+        std::optional<uint32_t> find_resource_set(const RenderResource* resource) const;
+
         inline const PipelineLayoutDesc& get_pipeline_layout_desc(RBPipelineLayout layout)
         {
             return instance_data.at(layout).desc;
