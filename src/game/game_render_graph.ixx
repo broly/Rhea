@@ -67,11 +67,13 @@ private:
     // ldr_color through the shakalizer (chain ScreenJpeg): the full screen JPEG damage
     RGTextureHandle screen_jpeg_color;
     screen_jpeg::State screen_jpeg_state;
-    // JPEG spots of the hits (jpeg_hits): strength per 8 x 8 block of the screen (R8F, pass JpegHitMask) and
-    // ldr_color through the masked chain HitJpeg (only the MCUs under the mask are coded)
+    // JPEG spots of the hits (jpeg_hits): strength per 8 x 8 block of the screen and hit slot (RGBA8, pass
+    // JpegHitMask); ldr_color through the masked chains HitJpeg0..3 (a slot each: only the MCUs under its channel
+    // are coded, the blocks it wins written to hit_jpeg_color). The chains share their work texture.
     RGTextureHandle hit_mask;
+    RGTextureHandle hit_jpeg_work;
     RGTextureHandle hit_jpeg_color;
-    bool hits_active = false;
+    jpeg_hits::Frame hits_frame;
     // render.jpeg.hits.shoot: a hit where the camera looks
     void shoot_jpeg_hit(const jpeg_hits::ShootRequest& request);
 

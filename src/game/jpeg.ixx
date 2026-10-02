@@ -31,9 +31,8 @@ RH_REGISTER_TYPE(JpegPushConstants)
 export struct JpegHitsUBO
 {
     glm::vec4 spheres[64];  // xyz: center (world), w: radius
-    glm::vec4 params[64];   // x: strength now (faded by age), y: seed of the ragged edge
+    glm::vec4 params[64];   // x: strength now (faded by age), y: seed of the ragged edge, z: slot, w: ragged edge
     glm::uvec4 info;        // x: count
-    glm::vec4 settings;     // x: ragged edge, share of the radius
 };
 RH_REGISTER_TYPE(JpegHitsUBO)
 
@@ -96,10 +95,15 @@ export struct JpegChainDesc
     bool source_linear = false;
     // the target wants linear color: decoded from sRGB after the codec
     bool target_linear = false;
-    // R8F storage, one texel per 8 x 8 pixels of the source (JpegRenderer::add_hit_mask_pass): only the MCUs
-    // under a set texel are coded (pass <name>Blocks, indirect dispatch), the quality follows the mask
-    // strength (mask_quality -> quality). Forces downscale 1. The rest of the target is the sharpened source.
+    // RGBA8 storage, one texel per 8 x 8 pixels of the source (JpegRenderer::add_hit_mask_pass): only the MCUs
+    // under a set texel of mask_channel are coded (pass <name>Blocks, indirect dispatch), the quality follows its
+    // strength (mask_quality -> quality), and the output writes only the 8 x 8 blocks this channel wins (the
+    // strongest one): masked chains of the different channels share one target.
     std::optional<RGTextureHandle> mask;
+    uint32_t mask_channel = 0;
+    // a work texture shared with other chains (they run one after another; RGBA8_UNORM storage, the size of the
+    // source); empty: the chain creates its own
+    std::optional<RGTextureHandle> work;
 };
 
 // The shakalizer: real JPEG on the GPU (shaders/jpeg_*.comp, resource "jpeg", model "jpeg"). A chain shrinks
@@ -126,8 +130,8 @@ public:
     // the settings a chain uses this frame (after prepare)
     const JpegSettings& get_chain_settings(Name name) const;
 
-    // pass JpegHitMask (jpeg_hit_mask.comp): the hit spheres (JpegHitsUBO) -> mask (R8F, 1/8 of the screen) by
-    // the depth of the g-buffer. camera, gbuffer: the resources of the graph; depth: the linear depth texture
+    // pass JpegHitMask (jpeg_hit_mask.comp): the hit spheres (JpegHitsUBO) -> mask (RGBA8, 1/8 of the screen, a
+    // channel per hit slot) by the depth of the g-buffer. camera, gbuffer: the resources of the graph; depth: the linear depth texture
     void add_hit_mask_pass(RenderGraph& graph, RGTextureHandle mask, RGTextureHandle depth, RenderResource* camera,
         RenderResource* gbuffer, std::function<bool()> condition);
     void prepare_hit_mask(RenderGraphContext& ctx, RBImageHandle mask, const JpegHitsUBO& ubo);

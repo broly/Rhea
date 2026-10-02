@@ -24,6 +24,7 @@ namespace
     constexpr int jpeg_flag_source_linear = 1;
     constexpr int jpeg_flag_target_linear = 2;
     constexpr int jpeg_flag_block_list = 4;
+    constexpr int jpeg_flag_channel_shift = 8;
 
     // local size of jpeg_blocks.comp
     constexpr uint32_t blocks_group = 64;
@@ -130,7 +131,7 @@ void JpegRenderer::add_chain(RenderGraph& graph, JpegChainDesc desc)
         chain->block_list = next_block_list++;
     }
     // the size of the source: a downscale uses its top left corner
-    chain->work = graph.create_texture({
+    chain->work = chain->desc.work ? *chain->desc.work : graph.create_texture({
         .name = Name(std::format("{}_work", chain->desc.name.to_string())),
         .extent = extent,
         .extent_divisor = extent_divisor,
@@ -175,12 +176,14 @@ void JpegRenderer::add_chain(RenderGraph& graph, JpegChainDesc desc)
         .execute = [this, c] (RenderGraphContext& ctx) { execute_codec(ctx, *c); },
         .type = RenderPassType::compute
     });
+    // a masked output writes only the blocks its channel wins
+    std::vector<RBImageUsage> output_reads = { { c->work, RBImageUsageType::StorageImage } };
+    if (c->desc.mask)
+        output_reads.push_back({ *c->desc.mask, RBImageUsageType::StorageImage });
     graph.add_pass({
         .name = Name(prefix + "Output"),
         .condition = condition,
-        .reads = {
-            { c->work, RBImageUsageType::StorageImage },
-        },
+        .reads = std::move(output_reads),
         .writes = {
             { c->desc.target, RBImageUsageType::StorageImage }
         },
@@ -207,9 +210,6 @@ void JpegRenderer::prepare(RenderGraphContext& ctx, RenderGraph& graph)
     for (auto& chain : chains)
     {
         chain->settings = jpeg::clamped(chain->desc.settings());
-        // the mask is in pixels of the source
-        if (chain->desc.mask)
-            chain->settings.downscale = 1;
 
         const RBImageHandle work = graph.get_image(chain->work);
         resource->update_image("u_jpeg_source", graph.get_image(chain->desc.source), params, chain->downscale_instance);
@@ -218,7 +218,11 @@ void JpegRenderer::prepare(RenderGraphContext& ctx, RenderGraph& graph)
         resource->update_image("u_jpeg_work", work, params, chain->output_instance);
         resource->update_image("u_jpeg_target", graph.get_image(chain->desc.target), params, chain->output_instance);
         if (chain->desc.mask)
-            resource->update_image("u_jpeg_mask", graph.get_image(*chain->desc.mask), params, chain->blocks_instance);
+        {
+            const RBImageHandle mask = graph.get_image(*chain->desc.mask);
+            resource->update_image("u_jpeg_mask", mask, params, chain->blocks_instance);
+            resource->update_image("u_jpeg_mask", mask, params, chain->output_instance);
+        }
     }
 }
 
@@ -248,7 +252,7 @@ JpegPushConstants JpegRenderer::make_push_constants(const RenderGraph& graph, co
     };
     const int flags = (chain.desc.source_linear ? jpeg_flag_source_linear : 0)
         | (chain.desc.target_linear ? jpeg_flag_target_linear : 0)
-        | (chain.desc.mask ? jpeg_flag_block_list : 0);
+        | (chain.desc.mask ? jpeg_flag_block_list | (int)(chain.desc.mask_channel & 3u) << jpeg_flag_channel_shift : 0);
 
     return JpegPushConstants{
         .extent = glm::ivec4(work, (int)source.width, (int)source.height),

@@ -6,6 +6,8 @@
 //   box downscale:     bilinear upscale (soap)
 // Sharpen boosts the work texels against their 4 neighbours: the block edges and the ringing ("mosquitoes")
 // of the JPEG stand out.
+// Masked chains (JPEG_FLAG_BLOCK_LIST) share their target: each writes only the 8 x 8 blocks its channel of
+// u_jpeg_mask wins (the strongest channel, the lower one on a tie).
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -32,6 +34,19 @@ void main()
     const ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(texel, pc.extent.zw)))
         return;
+
+    if ((pc.mode.w & JPEG_FLAG_BLOCK_LIST) != 0)
+    {
+        const vec4 mask = imageLoad(u_jpeg_mask, texel / JPEG_MASK_BLOCK);
+        const float strongest = max(max(mask.x, mask.y), max(mask.z, mask.w));
+        if (strongest <= 0.0)
+            return;
+        int winner = 0;
+        while (mask[winner] < strongest)
+            ++winner;
+        if (winner != jpeg_mask_channel())
+            return;
+    }
 
     const int factor = max(pc.mode.x, 1);
     vec3 color;

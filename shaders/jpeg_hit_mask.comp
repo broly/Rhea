@@ -1,10 +1,11 @@
 #version 450
 
 // Pass "JpegHitMask" (GameRenderGraph): the hit spheres of the world (jpeg_hits, jpeg_hits_ubo) -> u_jpeg_mask,
-// one texel per 8 x 8 block of the screen. A block takes the surface under its center pixel: inside a sphere it
-// gets the sphere's strength (the strongest one wins), so the spot sticks to the surfaces it hit and its border
-// steps from block to block like a damaged file. The outer part of a sphere (settings.x of the radius) keeps
-// a random share of its blocks, fewer towards the edge: the border is ragged, not a circle of blocks.
+// one texel per 8 x 8 block of the screen, a channel per hit slot (the preset group of the sphere). A block takes
+// the surface under its center pixel: inside a sphere its channel gets the sphere's strength (the strongest one
+// of the channel), so the spot sticks to the surfaces it hit and its border steps from block to block like a
+// damaged file. The outer part of a sphere (params.w of the radius) keeps a random share of its blocks, fewer
+// towards the edge: the border is ragged, not a circle of blocks.
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
@@ -34,28 +35,29 @@ void main()
     const ivec2 screen = textureSize(u_gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], 0);
     const ivec2 pixel = min(block * JPEG_MASK_BLOCK + JPEG_MASK_BLOCK / 2, screen - 1);
 
-    float strength = 0.0;
+    vec4 strength = vec4(0.0);
     // linear depth 0: the sky
     if (texelFetch(u_gbuffer[GBUFFER_SLOT_LINEAR_DEPTH], pixel, 0).r > 0.0)
     {
         const vec3 position = gbuffer_world_position(pixel);
-        const float edge = clamp(jpeg_hits_ubo.settings.x, 0.0, 1.0);
         const uint count = min(jpeg_hits_ubo.info.x, uint(JPEG_MAX_HITS));
         for (uint i = 0u; i < count; ++i)
         {
             const vec4 sphere = jpeg_hits_ubo.spheres[i];
             const vec4 params = jpeg_hits_ubo.params[i];
-            if (params.x <= strength)
+            const int slot = clamp(int(params.z), 0, 3);
+            if (params.x <= strength[slot])
                 continue;
             const float t = distance(position, sphere.xyz) / max(sphere.w, 1e-3);
             if (t >= 1.0)
                 continue;
+            const float edge = clamp(params.w, 0.0, 1.0);
             const float keep = 1.0 - smoothstep(1.0 - edge, 1.0, t);
             if (block_noise(block, params.y) >= keep)
                 continue;
-            strength = params.x;
+            strength[slot] = params.x;
         }
     }
 
-    imageStore(u_jpeg_mask, block, vec4(strength));
+    imageStore(u_jpeg_mask, block, strength);
 }

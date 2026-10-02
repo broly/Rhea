@@ -1,11 +1,13 @@
 #version 450
 
-// Pass "<chain>Blocks" of a masked shakalizer chain (JpegRenderer): the MCUs under u_jpeg_mask -> u_jpeg_blocks,
-// the indirect dispatch of the codec. Two dispatches with a barrier between them:
+// Pass "<chain>Blocks" of a masked shakalizer chain (JpegRenderer): the MCUs under its channel of u_jpeg_mask ->
+// u_jpeg_blocks, the indirect dispatch of the codec. MCUs are in pixels of the work texture (the source shrunk
+// by the downscale factor), the mask in pixels of the source. Two dispatches with a barrier between them:
 //   pc.codec.w == 0   one thread: the dispatch counts reset (0 MCUs)
 //   pc.codec.w == 1   one thread per MCU of the grid: appended when a mask texel under it is set
 // The codec shifts its grid by up to 7 px per generation (MCU x covers [x * size - shift, (x + 1) * size - shift)):
-// an MCU is tested over [x * size - 8, (x + 1) * size), so every masked pixel is coded whatever the shift.
+// an MCU is tested over [x * size - 8, (x + 1) * size) work pixels, so every masked pixel is coded whatever the
+// shift.
 
 layout(local_size_x = 64) in;
 
@@ -39,13 +41,16 @@ void main()
         return;
     const ivec2 m = ivec2(index % grid.x, index / grid.x);
 
+    // source pixels [(m * mcu - 8) * factor, (m + 1) * mcu * factor): mcu * factor is a multiple of 8
+    const int factor = max(pc.mode.x, 1);
+    const int channel = jpeg_mask_channel();
     const ivec2 mask_size = imageSize(u_jpeg_mask);
-    const ivec2 first = max(m * mcu / JPEG_MASK_BLOCK - 1, ivec2(0));
-    const ivec2 last = min(((m + 1) * mcu - 1) / JPEG_MASK_BLOCK, mask_size - 1);
+    const ivec2 first = max(m * mcu * factor / JPEG_MASK_BLOCK - factor, ivec2(0));
+    const ivec2 last = min(((m + 1) * mcu * factor - 1) / JPEG_MASK_BLOCK, mask_size - 1);
     float strength = 0.0;
     for (int y = first.y; y <= last.y; ++y)
         for (int x = first.x; x <= last.x; ++x)
-            strength = max(strength, imageLoad(u_jpeg_mask, ivec2(x, y)).r);
+            strength = max(strength, imageLoad(u_jpeg_mask, ivec2(x, y))[channel]);
     if (strength <= 0.0)
         return;
 

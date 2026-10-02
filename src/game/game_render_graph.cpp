@@ -81,11 +81,17 @@ void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
         .format = TextureFormat::RGBA8_UNORM,
         .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
     });
-    // one texel per 8 x 8 pixels (JPEG_MASK_BLOCK)
+    // one texel per 8 x 8 pixels (JPEG_MASK_BLOCK), a channel per hit slot
     hit_mask = create_texture({
         .name = "jpeg_hit_mask",
         .extent_divisor = 8,
-        .format = TextureFormat::R8F,
+        .format = TextureFormat::RGBA8_UNORM,
+        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+    });
+    hit_jpeg_work = create_texture({
+        .name = "hit_jpeg_work",
+        .extent_divisor = 1,
+        .format = TextureFormat::RGBA8_UNORM,
         .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
     });
     hit_jpeg_color = create_texture({
@@ -159,18 +165,22 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .settings = [this] () { return screen_jpeg_state.settings; },
     });
 
-    // JPEG spots of the hits (jpeg_hits): only while a hit lives
-    const std::function<bool()> hits_condition = [this] () { return !is_debugging() && hits_active; };
+    // JPEG spots of the hits (jpeg_hits): only while a hit lives, a chain per slot (the preset of a weapon)
     jpeg_renderer->add_hit_mask_pass(*this, hit_mask, gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], camera_resource,
-        gbuffer_resource, hits_condition);
-    jpeg_renderer->add_chain(*this, {
-        .name = "HitJpeg",
-        .source = ldr_color,
-        .target = hit_jpeg_color,
-        .condition = hits_condition,
-        .settings = [] () { return jpeg_hits::chain_settings(); },
-        .mask = hit_mask,
-    });
+        gbuffer_resource, [this] () { return !is_debugging() && hits_frame.any; });
+    for (uint32_t slot = 0; slot < jpeg_hits::slot_count; ++slot)
+    {
+        jpeg_renderer->add_chain(*this, {
+            .name = Name(std::format("HitJpeg{}", slot)),
+            .source = ldr_color,
+            .target = hit_jpeg_color,
+            .condition = [this, slot] () { return !is_debugging() && hits_frame.slot_active[slot]; },
+            .settings = [this, slot] () { return hits_frame.slot_settings[slot]; },
+            .mask = hit_mask,
+            .mask_channel = slot,
+            .work = hit_jpeg_work,
+        });
+    }
 
     add_pass({
         .name = "Present",
@@ -186,7 +196,7 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
-            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f, hits_active);
+            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f, hits_frame.any);
         },
     });
 
@@ -266,9 +276,9 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
     if (auto request = jpeg_hits::take_shoot_request())
         shoot_jpeg_hit(*request);
     jpeg_hits::tick(jpeg_delta);
-    hits_active = jpeg_hits::any();
+    hits_frame = jpeg_hits::update();
     jpeg_renderer->prepare(ctx, *this);
-    jpeg_renderer->prepare_hit_mask(ctx, get_image(hit_mask), jpeg_hits::build_ubo());
+    jpeg_renderer->prepare_hit_mask(ctx, get_image(hit_mask), hits_frame.ubo);
     jpeg_renderer->prepare_present(ctx, get_image(ldr_color), get_image(screen_jpeg_color), get_image(hit_jpeg_color),
         get_image(hit_mask));
 
@@ -299,7 +309,7 @@ void GameRenderGraph::shoot_jpeg_hit(const jpeg_hits::ShootRequest& request)
     phys::QueryFilter filter;
     filter.categories = phys::Category::static_world | phys::Category::dynamic;
     if (auto hit = RhGlobals::engine->world->get_physics().raycast(origin, forward, 500.0f, filter))
-        jpeg_hits::add(hit->position, request.radius, request.strength, request.lifetime);
+        jpeg_hits::add(hit->position, request.preset, request.strength, request.radius, request.lifetime);
 }
 
 void GameRenderGraph::add_post_process_passes()

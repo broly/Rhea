@@ -6,7 +6,8 @@
 //   jpeg_downscale.comp   u_jpeg_source (any size, sampled) -> u_jpeg_work (1 / downscale of it, display 8 bit)
 //   jpeg_codec.comp       u_jpeg_work in place: one JPEG generation (YCbCr, subsampling, DCT, quantization)
 //   jpeg_output.comp      u_jpeg_work -> u_jpeg_target (the size of the source): upscale, sharpen
-//   jpeg_hit_mask.comp    jpeg_hits_ubo (world spheres), the depth -> u_jpeg_mask (R8, one texel per 8 x 8 block)
+//   jpeg_hit_mask.comp    jpeg_hits_ubo (world spheres), the depth -> u_jpeg_mask (RGBA8, one texel per 8 x 8
+//                         block, a channel per hit slot)
 //   jpeg_blocks.comp      u_jpeg_mask -> u_jpeg_blocks (resource jpeg_blocks): the MCUs a masked chain codes
 //   jpeg_present.frag     u_jpeg_source (the frame), u_jpeg_result (its shakalized copy), u_jpeg_hit_result and
 //                         u_jpeg_mask_sampled (the hits) -> the swapchain
@@ -64,7 +65,9 @@
 // JpegPushConstants::mode.w
 #define JPEG_FLAG_SOURCE_LINEAR 1   // the source holds linear color: encoded to sRGB before the codec
 #define JPEG_FLAG_TARGET_LINEAR 2   // the target wants linear color: decoded from sRGB after the codec
-#define JPEG_FLAG_BLOCK_LIST 4      // the codec runs over the MCUs of u_jpeg_blocks (indirect), not the whole image
+#define JPEG_FLAG_BLOCK_LIST 4      // masked chain: the codec runs over the MCUs of u_jpeg_blocks (indirect), the
+                                    // output writes only the blocks its mask channel wins
+#define JPEG_FLAG_CHANNEL_SHIFT 8   // bits 8..9: the channel of u_jpeg_mask of a masked chain
 
 // jpeg_hits::max_hits (src/game/jpeg_hits.ixx)
 #define JPEG_MAX_HITS 64
@@ -82,8 +85,8 @@ uniform image2D u_jpeg_work;
 layout(set = SET_JPEG, binding = BINDING_IMAGE_JPEG_TARGET, rgba8)
 uniform writeonly image2D u_jpeg_target;
 
-// strength of the hits per 8 x 8 block of the screen, 0: none
-layout(set = SET_JPEG, binding = BINDING_IMAGE_JPEG_MASK, r8)
+// strength of the hits per 8 x 8 block of the screen, a channel per hit slot (JpegHitSlots), 0: none
+layout(set = SET_JPEG, binding = BINDING_IMAGE_JPEG_MASK, rgba8)
 uniform image2D u_jpeg_mask;
 #endif
 
@@ -97,9 +100,9 @@ uniform sampler2D u_jpeg_hit_result;
 layout(set = SET_JPEG, binding = BINDING_UBO_JPEG_HITS) uniform JpegHitsUBO
 {
     vec4 spheres[JPEG_MAX_HITS];    // xyz: center (world), w: radius
-    vec4 params[JPEG_MAX_HITS];     // x: strength now (faded by age), y: seed of the ragged edge
+    vec4 params[JPEG_MAX_HITS];     // x: strength now (faded by age), y: seed of the ragged edge, z: slot (mask
+                                    // channel), w: ragged edge, share of the radius
     uvec4 info;                     // x: count
-    vec4 settings;                  // x: ragged edge, share of the radius
 } jpeg_hits_ubo;
 
 layout(set = SET_JPEG, binding = BINDING_SAMPLER_JPEG_RESULT)
@@ -114,6 +117,12 @@ layout(push_constant) uniform JpegPushConstants
     vec4 post;      // x: sharpen, y: present mix of the full screen damage, z: codec with JPEG_FLAG_BLOCK_LIST: quality
                     // where the mask is weak (pc.codec.x where it is 1), present: 1 shows the hits, w: unused
 } pc;
+
+// the channel of u_jpeg_mask a masked chain codes
+int jpeg_mask_channel()
+{
+    return (pc.mode.w >> JPEG_FLAG_CHANNEL_SHIFT) & 3;
+}
 
 // the active MCUs of a masked chain (resource jpeg_blocks, jpeg_blocks.comp); only compute shaders see it
 #ifdef BINDING_SSBO_JPEG_BLOCKS
