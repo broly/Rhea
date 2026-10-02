@@ -23,6 +23,12 @@ namespace
     // jpeg_flag_* of JpegPushConstants::mode.w (JPEG_FLAG_* in shaders/resources/jpeg.glsl)
     constexpr int jpeg_flag_source_linear = 1;
     constexpr int jpeg_flag_target_linear = 2;
+    constexpr int jpeg_flag_block_list = 4;
+
+    // local size of jpeg_blocks.comp
+    constexpr uint32_t blocks_group = 64;
+    // the largest grid shift of a generation + 1 (jpeg::grid_shift)
+    constexpr int max_shift = 8;
 
     ComputeWorkgroups groups_for(Extent extent)
     {
@@ -64,6 +70,7 @@ JpegSettings jpeg::clamped(const JpegSettings& settings)
     result.quality = std::clamp(settings.quality, 1, 100);
     result.generations = std::clamp(settings.generations, 1, max_generations);
     result.sharpen = std::clamp(settings.sharpen, 0.0f, 1.0f);
+    result.mask_quality = std::clamp(settings.mask_quality, 1, 100);
     if ((uint8_t)settings.chroma > (uint8_t)JpegChroma::Yuv411)
         result.chroma = JpegChroma::Yuv420;
     if ((uint8_t)settings.filter > (uint8_t)JpegFilter::Box)
@@ -90,6 +97,8 @@ void JpegRenderer::init(Renderer& in_renderer, RenderBackend& in_backend)
 
     resource = renderer->find_resource("jpeg");
     checkf(resource, "resource 'jpeg' is missing (assets/render/resources/jpeg.json)");
+    blocks_resource = renderer->find_resource("jpeg_blocks");
+    checkf(blocks_resource, "resource 'jpeg_blocks' is missing (assets/render/resources/jpeg_blocks.json)");
 
     auto model = renderer->find_model("jpeg");
     checkf(model, "material model 'jpeg' is missing (assets/render/schemas/jpeg.json)");
@@ -97,6 +106,8 @@ void JpegRenderer::init(Renderer& in_renderer, RenderBackend& in_backend)
     codec_family = renderer->query_pipeline_family("JpegCodec", model);
     output_family = renderer->query_pipeline_family("JpegOutput", model);
     present_family = renderer->query_pipeline_family("JpegPresent", model);
+    blocks_family = renderer->query_pipeline_family("JpegBlocks", model);
+    hit_mask_family = renderer->query_pipeline_family("JpegHitMask", model);
 }
 
 void JpegRenderer::add_chain(RenderGraph& graph, JpegChainDesc desc)
@@ -113,6 +124,11 @@ void JpegRenderer::add_chain(RenderGraph& graph, JpegChainDesc desc)
     chain->downscale_instance = next_instance++;
     chain->codec_instance = next_instance++;
     chain->output_instance = next_instance++;
+    if (chain->desc.mask)
+    {
+        chain->blocks_instance = next_instance++;
+        chain->block_list = next_block_list++;
+    }
     // the size of the source: a downscale uses its top left corner
     chain->work = graph.create_texture({
         .name = Name(std::format("{}_work", chain->desc.name.to_string())),
@@ -138,6 +154,18 @@ void JpegRenderer::add_chain(RenderGraph& graph, JpegChainDesc desc)
         .execute = [this, c] (RenderGraphContext& ctx) { execute_downscale(ctx, *c); },
         .type = RenderPassType::compute
     });
+    if (c->desc.mask)
+    {
+        graph.add_pass({
+            .name = Name(prefix + "Blocks"),
+            .condition = condition,
+            .reads = {
+                { *c->desc.mask, RBImageUsageType::StorageImage },
+            },
+            .execute = [this, c] (RenderGraphContext& ctx) { execute_blocks(ctx, *c); },
+            .type = RenderPassType::compute
+        });
+    }
     graph.add_pass({
         .name = Name(prefix + "Codec"),
         .condition = condition,
@@ -172,11 +200,16 @@ void JpegRenderer::prepare(RenderGraphContext& ctx, RenderGraph& graph)
     codec_pipeline = codec_family->request_pipeline({});
     output_pipeline = output_family->request_pipeline({});
     present_pipeline = present_family->request_pipeline({});
+    blocks_pipeline = blocks_family->request_pipeline({});
+    hit_mask_pipeline = hit_mask_family->request_pipeline({});
 
     const UpdateImageParams params{ .frame = ctx.frame };
     for (auto& chain : chains)
     {
         chain->settings = jpeg::clamped(chain->desc.settings());
+        // the mask is in pixels of the source
+        if (chain->desc.mask)
+            chain->settings.downscale = 1;
 
         const RBImageHandle work = graph.get_image(chain->work);
         resource->update_image("u_jpeg_source", graph.get_image(chain->desc.source), params, chain->downscale_instance);
@@ -184,6 +217,8 @@ void JpegRenderer::prepare(RenderGraphContext& ctx, RenderGraph& graph)
         resource->update_image("u_jpeg_work", work, params, chain->codec_instance);
         resource->update_image("u_jpeg_work", work, params, chain->output_instance);
         resource->update_image("u_jpeg_target", graph.get_image(chain->desc.target), params, chain->output_instance);
+        if (chain->desc.mask)
+            resource->update_image("u_jpeg_mask", graph.get_image(*chain->desc.mask), params, chain->blocks_instance);
     }
 }
 
@@ -212,13 +247,14 @@ JpegPushConstants JpegRenderer::make_push_constants(const RenderGraph& graph, co
         ((int)source.height + factor - 1) / factor,
     };
     const int flags = (chain.desc.source_linear ? jpeg_flag_source_linear : 0)
-        | (chain.desc.target_linear ? jpeg_flag_target_linear : 0);
+        | (chain.desc.target_linear ? jpeg_flag_target_linear : 0)
+        | (chain.desc.mask ? jpeg_flag_block_list : 0);
 
     return JpegPushConstants{
         .extent = glm::ivec4(work, (int)source.width, (int)source.height),
         .mode = glm::ivec4(factor, (int)s.filter, (int)s.chroma, flags),
         .codec = glm::ivec4(s.quality, 0, 0, 0),
-        .post = glm::vec4(s.sharpen, 0.0f, 0.0f, 0.0f),
+        .post = glm::vec4(s.sharpen, 0.0f, (float)s.mask_quality, 0.0f),
     };
 }
 
@@ -233,6 +269,33 @@ void JpegRenderer::execute_downscale(RenderGraphContext& ctx, Chain& chain)
     ctx.compute(groups_for({ (uint32_t)pc.extent.x, (uint32_t)pc.extent.y }));
 }
 
+void JpegRenderer::execute_blocks(RenderGraphContext& ctx, Chain& chain)
+{
+    PROFILE("JpegRenderer::blocks");
+
+    JpegPushConstants pc = make_push_constants(ctx.render_graph, chain);
+    const glm::ivec2 mcu = mcu_size(chain.settings.chroma);
+    const glm::ivec2 grid = (glm::ivec2(pc.extent.x, pc.extent.y) + max_shift - 1 + mcu - 1) / mcu;
+
+    ctx.bind_pipeline(blocks_pipeline);
+    ctx.bind(resource->query_single(chain.blocks_instance));
+    ctx.bind(blocks_resource->query_single(chain.block_list));
+
+    // the codec of the last frame read the list (indirect and in the shader)
+    ctx.backend.cmd_buffer_barrier(ctx.cmd, RenderBackend::BufferBarrier::draw_to_compute);
+    pc.codec.w = 0;
+    ctx.push_constants(pc);
+    ctx.compute({ 1, 1, 1 });
+
+    ctx.backend.cmd_buffer_barrier(ctx.cmd, RenderBackend::BufferBarrier::compute_to_compute);
+    pc.codec.w = 1;
+    ctx.push_constants(pc);
+    ctx.compute({ ((uint32_t)(grid.x * grid.y) + blocks_group - 1) / blocks_group, 1, 1 });
+
+    // the dispatch counts and the list -> the indirect dispatch of the codec
+    ctx.backend.cmd_buffer_barrier(ctx.cmd, RenderBackend::BufferBarrier::compute_to_draw);
+}
+
 void JpegRenderer::execute_codec(RenderGraphContext& ctx, Chain& chain)
 {
     PROFILE("JpegRenderer::codec");
@@ -241,8 +304,11 @@ void JpegRenderer::execute_codec(RenderGraphContext& ctx, Chain& chain)
     const glm::ivec2 mcu = mcu_size(chain.settings.chroma);
     const RBImageHandle work = ctx.render_graph.get_image(chain.work);
 
+    // unmasked chains do not read the list, the layout has it anyway
+    const auto block_list = blocks_resource->query_single(chain.block_list);
     ctx.bind_pipeline(codec_pipeline);
     ctx.bind(resource->query_single(chain.codec_instance));
+    ctx.bind(block_list);
     for (int generation = 0; generation < chain.settings.generations; ++generation)
     {
         // the generations rewrite the work texture in place: each waits for the previous one
@@ -260,6 +326,11 @@ void JpegRenderer::execute_codec(RenderGraphContext& ctx, Chain& chain)
         const glm::ivec2 shift = jpeg::grid_shift(chain.settings.seed, generation);
         pc.codec = glm::ivec4(chain.settings.quality, shift.x, shift.y, generation);
         ctx.push_constants(pc);
+        if (chain.desc.mask)
+        {
+            ctx.compute_indirect(block_list->get_ssbo_handle("u_jpeg_blocks", std::nullopt));
+            continue;
+        }
         // MCUs covering the work area with the grid moved by shift
         ctx.compute({
             (uint32_t)((pc.extent.x + shift.x + mcu.x - 1) / mcu.x),
@@ -279,7 +350,44 @@ void JpegRenderer::execute_output(RenderGraphContext& ctx, Chain& chain)
     ctx.compute(groups_for({ (uint32_t)pc.extent.z, (uint32_t)pc.extent.w }));
 }
 
-void JpegRenderer::prepare_present(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result)
+void JpegRenderer::add_hit_mask_pass(RenderGraph& graph, RGTextureHandle mask, RGTextureHandle depth,
+    RenderResource* camera, RenderResource* gbuffer, std::function<bool()> condition)
+{
+    checkf(!hit_mask_instance.has_value(), "JpegRenderer::add_hit_mask_pass: one hit mask per renderer");
+    hit_mask_instance = next_instance++;
+    hit_mask_camera = camera;
+    hit_mask_gbuffer = gbuffer;
+
+    graph.add_pass({
+        .name = "JpegHitMask",
+        .condition = std::move(condition),
+        .reads = {
+            { depth, RBImageUsageType::Sampled },
+        },
+        .writes = {
+            { mask, RBImageUsageType::StorageImage }
+        },
+        .execute = [this, mask] (RenderGraphContext& ctx)
+        {
+            PROFILE("JpegRenderer::hit_mask");
+            ctx.bind_pipeline(hit_mask_pipeline);
+            ctx.bind(hit_mask_camera, hit_mask_gbuffer);
+            ctx.bind(resource->query_single(*hit_mask_instance));
+            ctx.compute(groups_for(ctx.render_graph.textures[mask.id].desc.extent));
+        },
+        .type = RenderPassType::compute
+    });
+}
+
+void JpegRenderer::prepare_hit_mask(RenderGraphContext& ctx, RBImageHandle mask, const JpegHitsUBO& ubo)
+{
+    checkf(hit_mask_instance.has_value(), "JpegRenderer::add_hit_mask_pass was not called");
+    resource->update_image("u_jpeg_mask", mask, { .frame = ctx.frame }, *hit_mask_instance);
+    resource->update_uniform_buffer("jpeg_hits_ubo", ubo, ctx.frame, *hit_mask_instance);
+}
+
+void JpegRenderer::prepare_present(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result,
+    RBImageHandle hit_result, RBImageHandle hit_mask)
 {
     if (!present_instance)
         present_instance = next_instance++;
@@ -287,15 +395,18 @@ void JpegRenderer::prepare_present(RenderGraphContext& ctx, RBImageHandle scene,
     const UpdateImageParams params{ .frame = ctx.frame };
     resource->update_image("u_jpeg_source", scene, params, *present_instance);
     resource->update_image("u_jpeg_result", result, params, *present_instance);
+    resource->update_image("u_jpeg_hit_result", hit_result, params, *present_instance);
+    resource->update_image("u_jpeg_mask_sampled", hit_mask, params, *present_instance);
 }
 
-void JpegRenderer::draw_present(RenderGraphContext& ctx, float amount)
+void JpegRenderer::draw_present(RenderGraphContext& ctx, float amount, bool hits)
 {
     PROFILE("JpegRenderer::present");
     checkf(present_instance.has_value(), "JpegRenderer::prepare_present was not called");
 
     if (ctx.bind_pipeline(present_pipeline))
         ctx.bind(resource->query_single(*present_instance));
-    ctx.push_constants(JpegPushConstants{ .post = glm::vec4(0.0f, std::clamp(amount, 0.0f, 1.0f), 0.0f, 0.0f) });
+    ctx.push_constants(JpegPushConstants{
+        .post = glm::vec4(0.0f, std::clamp(amount, 0.0f, 1.0f), hits ? 1.0f : 0.0f, 0.0f) });
     ctx.draw_fullscreen();
 }

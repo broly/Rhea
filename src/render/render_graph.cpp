@@ -205,6 +205,13 @@ void RenderGraphContext::compute(const ComputeWorkgroups& workgroups) const
     backend.compute(cmd, workgroups);
 }
 
+void RenderGraphContext::compute_indirect(RBBufferHandle buffer, uint64_t offset) const
+{
+    checkf(render_graph.get_current_pass().type == RenderPassType::compute,
+        "could not dispatch in non-compute pass");
+    backend.compute_indirect(cmd, buffer, frame, offset);
+}
+
 void RenderGraphContext::trace_rays(PipelineObject* pipeline, const Extent& extent, uint32_t depth) const
 {
     checkf(render_graph.get_current_pass().type == RenderPassType::rtx,

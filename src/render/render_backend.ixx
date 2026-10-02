@@ -272,6 +272,9 @@ public:
     }
     
     virtual void compute(RBCommandList cmd, const ComputeWorkgroups& workgroups = {}) = 0;
+    // a VkDispatchIndirectCommand (3 x uint32 workgroup counts) at byte `offset` of the storage buffer `buffer`
+    // (copy of `frame`), written on the GPU: a compute_to_draw buffer barrier must separate it from the writer
+    virtual void compute_indirect(RBCommandList cmd, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset = 0) = 0;
     
     virtual void bind_mesh(const RBCommandList& cmd, MeshPrimHandle mesh, RBFrameHandle frame) = 0;
     virtual void push_constants_impl(const RBCommandList& cmd, const void* data, size_t size) = 0;

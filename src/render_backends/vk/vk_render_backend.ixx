@@ -200,6 +200,7 @@ public:   /// API Section
     void create_command_pool();
     void cleanup_swapchain();
     void compute(RBCommandList cmd, const ComputeWorkgroups& workgroups) override;
+    void compute_indirect(RBCommandList cmd, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset) override;
     
     VkImageSubresourceRange full_subresource_range(RBImageHandle image);
 

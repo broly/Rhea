@@ -12,6 +12,9 @@
 // a new generation with another shift cuts the image differently and the artifacts pile up instead of
 // converging. Pixels of an MCU outside the image repeat the edge (as libjpeg pads); every pixel of the
 // image belongs to exactly one MCU, so the in place update is safe.
+//
+// JPEG_FLAG_BLOCK_LIST (masked chains, the hits): dispatched indirectly, one workgroup per MCU of u_jpeg_blocks
+// (jpeg_blocks.comp); the quality goes from pc.post.z where the mask is weak to pc.codec.x where it is 1.
 
 layout(local_size_x = 256) in;
 
@@ -93,7 +96,23 @@ void main()
     const int luma_blocks = sub.x * sub.y;
     const int blocks = luma_blocks + 2;
     const ivec2 size = pc.extent.xy;
-    const ivec2 origin = ivec2(gl_WorkGroupID.xy) * mcu - pc.codec.yz;
+
+    ivec2 mcu_index = ivec2(gl_WorkGroupID.xy);
+    int quality = pc.codec.x;
+    // a workgroup past the end of a full block list: runs through the barriers, writes nothing
+    bool skip = false;
+#ifdef BINDING_SSBO_JPEG_BLOCKS
+    if ((pc.mode.w & JPEG_FLAG_BLOCK_LIST) != 0)
+    {
+        const uint capacity = uint(u_jpeg_blocks.mcus.length());
+        skip = gl_WorkGroupID.x >= capacity;
+        const uvec2 entry = u_jpeg_blocks.mcus[min(gl_WorkGroupID.x, capacity - 1u)];
+        mcu_index = ivec2(entry.x & 0xffffu, entry.x >> 16);
+        const float strength = clamp(uintBitsToFloat(entry.y), 0.0, 1.0);
+        quality = int(round(mix(pc.post.z, float(pc.codec.x), strength)));
+    }
+#endif
+    const ivec2 origin = mcu_index * mcu - pc.codec.yz;
 
     // RGB -> YCbCr
     if (t < mcu_pixels)
@@ -148,7 +167,6 @@ void main()
     barrier();
 
     // forward DCT, columns, then quantization and dequantization: F[v][u] = sum_y C[v][y] temp[y][u]
-    const int quality = pc.codec.x;
     for (int i = t; i < blocks * 64; i += 256)
     {
         const int base = i & ~63;
@@ -201,7 +219,7 @@ void main()
     {
         const ivec2 local = ivec2(t % mcu.x, t / mcu.x);
         const ivec2 p = origin + local;
-        if (all(greaterThanEqual(p, ivec2(0))) && all(lessThan(p, size)))
+        if (!skip && all(greaterThanEqual(p, ivec2(0))) && all(lessThan(p, size)))
         {
             const int block = local.x / 8 + (local.y / 8) * sub.x;
             const int y = s_block[block * 64 + (local.y % 8) * 8 + local.x % 8];

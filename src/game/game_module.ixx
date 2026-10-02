@@ -5,3 +5,5 @@ export import :engine;
 export import :debug_view;
 // full screen JPEG damage: gameplay reports the health and the hits
 export import :screen_jpeg;
+// JPEG spots where hits land
+export import :jpeg_hits;

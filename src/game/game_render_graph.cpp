@@ -17,6 +17,7 @@ import assets;
 import texture_format;
 import :constants;
 import :names;
+import physics;
 
 #include "render_layout.h"
 #include "common/assertion_macros.h"
@@ -76,6 +77,19 @@ void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
     });
     screen_jpeg_color = create_texture({
         .name = "screen_jpeg",
+        .extent_divisor = 1,
+        .format = TextureFormat::RGBA8_UNORM,
+        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+    });
+    // one texel per 8 x 8 pixels (JPEG_MASK_BLOCK)
+    hit_mask = create_texture({
+        .name = "jpeg_hit_mask",
+        .extent_divisor = 8,
+        .format = TextureFormat::R8F,
+        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
+    });
+    hit_jpeg_color = create_texture({
+        .name = "hit_jpeg",
         .extent_divisor = 1,
         .format = TextureFormat::RGBA8_UNORM,
         .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
@@ -145,19 +159,34 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         .settings = [this] () { return screen_jpeg_state.settings; },
     });
 
+    // JPEG spots of the hits (jpeg_hits): only while a hit lives
+    const std::function<bool()> hits_condition = [this] () { return !is_debugging() && hits_active; };
+    jpeg_renderer->add_hit_mask_pass(*this, hit_mask, gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], camera_resource,
+        gbuffer_resource, hits_condition);
+    jpeg_renderer->add_chain(*this, {
+        .name = "HitJpeg",
+        .source = ldr_color,
+        .target = hit_jpeg_color,
+        .condition = hits_condition,
+        .settings = [] () { return jpeg_hits::chain_settings(); },
+        .mask = hit_mask,
+    });
+
     add_pass({
         .name = "Present",
         .condition = [this] () { return !is_debugging(); },
         .reads = {
             { ldr_color, RBImageUsageType::SampledFragment },
             { screen_jpeg_color, RBImageUsageType::SampledFragment },
+            { hit_jpeg_color, RBImageUsageType::SampledFragment },
+            { hit_mask, RBImageUsageType::SampledFragment },
         },
         .writes = {
             { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
-            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f);
+            jpeg_renderer->draw_present(ctx, screen_jpeg_state.active ? screen_jpeg_state.amount : 0.0f, hits_active);
         },
     });
 
@@ -231,10 +260,17 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
         post_inputs.up[level] = get_image(bloom_up[level]);
     post_renderer->prepare(ctx, post_inputs);
 
-    screen_jpeg::tick((float)RhGlobals::engine->world->get_delta_seconds());
+    const float jpeg_delta = (float)RhGlobals::engine->world->get_delta_seconds();
+    screen_jpeg::tick(jpeg_delta);
     screen_jpeg_state = screen_jpeg::evaluate();
+    if (auto request = jpeg_hits::take_shoot_request())
+        shoot_jpeg_hit(*request);
+    jpeg_hits::tick(jpeg_delta);
+    hits_active = jpeg_hits::any();
     jpeg_renderer->prepare(ctx, *this);
-    jpeg_renderer->prepare_present(ctx, get_image(ldr_color), get_image(screen_jpeg_color));
+    jpeg_renderer->prepare_hit_mask(ctx, get_image(hit_mask), jpeg_hits::build_ubo());
+    jpeg_renderer->prepare_present(ctx, get_image(ldr_color), get_image(screen_jpeg_color), get_image(hit_jpeg_color),
+        get_image(hit_mask));
 
     auto shadow_debug_instance = shadow_resource->query_single();
     
@@ -253,6 +289,17 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
             .frame = ctx.frame
         }
     );
+}
+
+void GameRenderGraph::shoot_jpeg_hit(const jpeg_hits::ShootRequest& request)
+{
+    // the ray through the middle of the screen; the character's capsule is not in the static / dynamic categories
+    const glm::vec3 origin = glm::vec3(current_camera_ubo.camera_pos);
+    const glm::vec3 forward = glm::normalize(glm::vec3(current_camera_ubo.inv_view * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+    phys::QueryFilter filter;
+    filter.categories = phys::Category::static_world | phys::Category::dynamic;
+    if (auto hit = RhGlobals::engine->world->get_physics().raycast(origin, forward, 500.0f, filter))
+        jpeg_hits::add(hit->position, request.radius, request.strength, request.lifetime);
 }
 
 void GameRenderGraph::add_post_process_passes()

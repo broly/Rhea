@@ -142,6 +142,12 @@ void VkRenderBackend::compute(RBCommandList cmd, const ComputeWorkgroups& workgr
     vkCmdDispatch(cmd.as<VkCommandBuffer>(), x, y, z);
 }
 
+void VkRenderBackend::compute_indirect(RBCommandList cmd, RBBufferHandle buffer, RBFrameHandle frame, uint64_t offset)
+{
+    const vk::BufferInfo& info = buffer_manager.get_buffer(buffer, frame);
+    vkCmdDispatchIndirect(cmd.as<VkCommandBuffer>(), info.buffer, offset);
+}
+
 VkImageSubresourceRange VkRenderBackend::full_subresource_range(RBImageHandle image)
 {
     return image_manager.full_subresource_range(image);

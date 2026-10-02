@@ -194,6 +194,8 @@ public:
     }
     
     void compute(const ComputeWorkgroups& workgroups = {}) const;
+    // workgroup counts read from the storage buffer (RenderBackend::compute_indirect)
+    void compute_indirect(RBBufferHandle buffer, uint64_t offset = 0) const;
     
     void trace_rays(PipelineObject* pipeline, const Extent& extent, uint32_t depth) const;
 

@@ -20,6 +20,7 @@ import :generic_render_graph;
 import :post_process;
 import :jpeg;
 import :screen_jpeg;
+import :jpeg_hits;
 #include "object/object_reflection_macro.h"
 
 struct TonemapPushConstants
@@ -66,6 +67,13 @@ private:
     // ldr_color through the shakalizer (chain ScreenJpeg): the full screen JPEG damage
     RGTextureHandle screen_jpeg_color;
     screen_jpeg::State screen_jpeg_state;
+    // JPEG spots of the hits (jpeg_hits): strength per 8 x 8 block of the screen (R8F, pass JpegHitMask) and
+    // ldr_color through the masked chain HitJpeg (only the MCUs under the mask are coded)
+    RGTextureHandle hit_mask;
+    RGTextureHandle hit_jpeg_color;
+    bool hits_active = false;
+    // render.jpeg.hits.shoot: a hit where the camera looks
+    void shoot_jpeg_hit(const jpeg_hits::ShootRequest& request);
 
     
     
