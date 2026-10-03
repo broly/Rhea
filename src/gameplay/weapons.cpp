@@ -49,6 +49,8 @@ namespace
     // console requests, taken by the systems
     std::optional<std::string> g_select_request;
     bool g_refill_request = false;
+    // automation (weapons::set_scripted_trigger): replaces the left mouse button of the players
+    std::optional<bool> g_scripted_trigger;
 
     std::optional<WeaponMode> parse_mode(std::string_view text)
     {
@@ -437,7 +439,7 @@ namespace
         });
 
         players.each([&] (WeaponInput& command, const Player&) {
-            command.trigger = input->is_key_down(Key::MouseLeft);
+            command.trigger = g_scripted_trigger ? *g_scripted_trigger : input->is_key_down(Key::MouseLeft);
 
             // X: R is the shader hot reload
             const bool reload_down = input->is_key_down(Key::X);
@@ -820,4 +822,9 @@ const WeaponDef* weapons::find(std::string_view name)
         if (def.name == name)
             return &def;
     return nullptr;
+}
+
+void weapons::set_scripted_trigger(std::optional<bool> trigger)
+{
+    g_scripted_trigger = trigger;
 }

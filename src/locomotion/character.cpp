@@ -45,6 +45,11 @@ namespace loco
             { .has_range = true, .min = -1.5f, .max = 1.5f });
         cvar::Var<float> cv_camera_aim_fov("camera.aim.fov_scale", 0.75f, "Aiming camera: field of view multiplier (zoom)",
             { .has_range = true, .min = 0.3f, .max = 1.0f });
+        cvar::Var<bool> cv_first_person("camera.first_person", false,
+            "First person camera: at the eyes, a bit in front of the face (the character's own body stays visible)");
+        cvar::Var<float> cv_first_person_forward("camera.first_person.forward", 0.27f,
+            "First person camera: how far in front of the character's axis, m (keeps the head out of the view)",
+            { .has_range = true, .min = 0.0f, .max = 0.6f });
 
         constexpr float sprint_hold_time = 0.1f;   // ALS IA_Als_Sprint hold trigger
         constexpr float roll_tap_time = 0.3f;      // ALS IA_Als_Roll tap trigger
@@ -934,6 +939,15 @@ namespace loco
         // the pivot follows the capsule height (crouching lowers the camera)
         const float pivot_height = camera_pivot_height * scale * (c ? std::clamp(c->capsule_height / c->scaled(c->settings->standing_height), 0.6f, 1.0f) : 1.0f);
         aim = std::clamp(aim, 0.0f, 1.0f);
+        if (cv_first_person.get())
+        {
+            // the eyes: the head pivot, pushed forward along the view (yaw only) out of the head
+            const glm::vec3 flat_forward(-std::sin(camera_yaw), 0.0f, -std::cos(camera_yaw));
+            Transform t;
+            t.position = position + glm::vec3(0.0f, pivot_height + 0.08f * scale, 0.0f) + flat_forward * (cv_first_person_forward.get() * scale);
+            t.rotation = math::from_euler_rotation(glm::vec3(camera_pitch, camera_yaw, 0.0f));
+            return t;
+        }
         const glm::vec3 pivot = position + glm::vec3(0.0f, pivot_height + cv_camera_height.get() * scale, 0.0f);
         const glm::vec3 back = -camera_forward(camera_yaw, camera_pitch);
         // the camera's right (yaw only: the shoulder does not tilt with the pitch)

@@ -223,5 +223,7 @@ export
         const std::vector<std::string>& get_loadout();
         bool reload_definitions();
         std::filesystem::path get_definitions_path();
+        // Automation: while set, the players' trigger is this instead of the left mouse button
+        void set_scripted_trigger(std::optional<bool> trigger);
     }
 }
