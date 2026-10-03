@@ -54,6 +54,8 @@ export namespace audio
         virtual void set_pitch(VoiceId voice, float pitch) = 0;
         // Moves a spatial voice (position, velocity, distances); ignored for 2D ones
         virtual void set_spatial(VoiceId voice, const Spatial& spatial) = 0;
+        // Hz, the cutoff of the voice's low-pass filter (PlayParams::lowpass); 0: none
+        virtual void set_lowpass(VoiceId voice, float cutoff) = 0;
         // Playback position, s from the start of the sound (lip sync follows it)
         virtual float get_cursor(VoiceId voice) const = 0;
 

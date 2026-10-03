@@ -64,8 +64,9 @@ export namespace jpeg_hits
         float radius = 0.0f, float lifetime = 0.0f);
     // Whole bodies under the JPEG of a preset for `lifetime` s (a creature hit by a weapon). The bodies mark
     // themselves in the g-buffer (MeshRenderer::effect.a, gameplay HitFlash); this keeps the preset's chain
-    // running and gives the mask pass its channel. Bodies of several presets at once share the strongest one's.
-    void hold_body(std::string_view preset, float lifetime);
+    // running and gives the mask pass its channel. Bodies of several presets at once share the strongest one's
+    // (strength x the share of the lifetime left: a background JPEG, the infection pulses, holds with less than 1).
+    void hold_body(std::string_view preset, float lifetime, float strength = 1.0f);
     void clear();
 
     // once a frame: ages the hits, drops the dead ones, reloads the presets when the file changed

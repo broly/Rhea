@@ -10,6 +10,8 @@ export import :reflection_capture;
 export import :sky;
 export import :render_sync;
 export import :attachment;
+// AudioSource: a sound where the entity is; the sets of the listener sync and of the sources
+export import :audio;
 export import :scene_view_proxy.camera;
 export import :scene_view_proxy.light;
 export import :scene_view_proxy.mesh;

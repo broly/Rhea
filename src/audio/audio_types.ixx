@@ -87,6 +87,7 @@ export namespace audio
         std::optional<Spatial> spatial;             // none: 2D (music, UI)
         float fade_in = 0.0f;                       // s
         float delay = 0.0f;                         // s from now (the sound of a far explosion)
+        float lowpass = 0.0f;                       // Hz, cutoff of a low-pass filter (muffled behind a wall); 0: none
     };
 
     // The ears: the active camera, usually

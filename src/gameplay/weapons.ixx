@@ -37,14 +37,22 @@ import :health;
 //   projectile (prefab: the shots fly from the muzzle to the point under the crosshair), projectile_speed (m/s),
 //     projectile_gravity (m/s^2); the area damage (radius) then happens where it lands,
 //   hit_flash (emission of the entity hit, HDR), hit_flash_color [r, g, b], hit_flash_time (s),
-//   body_jpeg_time (s the whole creature hit is under the jpeg preset, by its silhouette; 0: only the spot)
+//   body_jpeg_time (s the whole creature hit is under the jpeg preset, by its silhouette; 0: only the spot),
+//   sounds - paths under assets/, a list plays one at random (gameplay:sounds plays them):
+//     "sounds": { "fire": [ ... ], "impact": [ ... ], "impact_creature": [ ... ], "reload": "...", "dry_fire": "...",
+//                 "cycle": "...", "cycle_delay": 0.35, "beam_start": "...", "beam_loop": "...", "beam_stop": "...",
+//                 "volume": 1, "impact_volume": 0.7 }
+//     fire: every shot (beams: leave it out, the loop plays while the rays go), impact / impact_creature: where a
+//     ray or a projectile meets a surface / a creature (hitbox; impact when empty), cycle: cycle_delay s after
+//     every shot (the pump), beam_*: the beam's start, loop and end
 //
 // Systems:
 //   read_weapon_input (FixedPre)                    trigger (left mouse), reload (X), slot keys (2..7) and the aim
 //                                                   ray of the active camera
 //                                                   (the middle of the view) into WeaponInput of the Player
 //   fire_weapons      (FixedPost, set WeaponFire)   cooldowns, magazines, rays -> DamageEvent (before
-//                                                   DamageResolution and the physics step), WeaponFiredEvent
+//                                                   DamageResolution and the physics step), WeaponFiredEvent,
+//                                                   WeaponImpactEvent, WeaponActionEvent
 export
 {
     enum class WeaponMode : uint8_t
@@ -54,6 +62,23 @@ export
         Cone,
         Beam,
         Charge,
+    };
+
+    // What a weapon sounds like (WeaponDef::sounds): paths under assets/, one of a list at random
+    struct WeaponSounds
+    {
+        std::vector<std::string> fire;
+        std::vector<std::string> impact;
+        std::vector<std::string> impact_creature;
+        std::vector<std::string> reload;
+        std::vector<std::string> dry_fire;
+        std::vector<std::string> cycle;
+        float cycle_delay = 0.3f;
+        std::vector<std::string> beam_start;
+        std::vector<std::string> beam_loop;
+        std::vector<std::string> beam_stop;
+        float volume = 1.0f;
+        float impact_volume = 0.7f;
     };
 
     struct WeaponDef
@@ -90,6 +115,7 @@ export
         glm::vec3 hit_flash_color{ 1.0f };
         float hit_flash_time = 0.12f;
         float body_jpeg_time = 0.2f;
+        WeaponSounds sounds;
     };
 
     // A shot in flight (WeaponDef::projectile): moved every fixed tick (move_projectiles), hits like the ray of
@@ -161,6 +187,30 @@ export
         glm::vec3 origin{ 0.0f };
         glm::vec3 direction{ 0.0f };
         int hits = 0;
+    };
+
+    // Where a ray or a projectile of a weapon met a surface (fire_weapons, move_projectiles)
+    struct WeaponImpactEvent
+    {
+        ecs::Entity shooter;
+        std::string weapon;
+        glm::vec3 position{ 0.0f };
+        glm::vec3 normal{ 0.0f, 1.0f, 0.0f };
+        bool creature = false;          // a hitbox
+    };
+
+    enum class WeaponAction : uint8_t
+    {
+        Reload,                         // a reload starts
+        DryFire,                        // the trigger pressed with no round left
+    };
+
+    // What a weapon holder did besides firing (fire_weapons)
+    struct WeaponActionEvent
+    {
+        ecs::Entity shooter;
+        std::string weapon;
+        WeaponAction action = WeaponAction::Reload;
     };
 
     namespace weapons

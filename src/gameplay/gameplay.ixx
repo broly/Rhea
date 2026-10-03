@@ -8,3 +8,5 @@ export import :waves;
 export import :effects;
 export import :jackal;
 export import :npc;
+// what it sounds like: weapons, footsteps, the outdoor ambience
+export import :sounds;

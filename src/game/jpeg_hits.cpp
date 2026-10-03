@@ -49,10 +49,11 @@ namespace
         size_t preset_index = 0;
         float lifetime = 0.2f;
         float age = 0.0f;
+        float strength = 1.0f;
 
         float current_strength() const
         {
-            return std::clamp(1.0f - age / lifetime, 0.0f, 1.0f);
+            return strength * std::clamp(1.0f - age / lifetime, 0.0f, 1.0f);
         }
     };
     std::vector<Body> g_bodies;
@@ -280,20 +281,22 @@ void jpeg_hits::add(const glm::vec3& center, std::string_view preset_name, float
     *weakest = std::move(hit);
 }
 
-void jpeg_hits::hold_body(std::string_view preset_name, float lifetime)
+void jpeg_hits::hold_body(std::string_view preset_name, float lifetime, float strength)
 {
     const size_t index = resolve_preset(preset_name);
     const std::string& name = get_presets()[index].name;
     lifetime = std::max(lifetime, 0.01f);
-    // one entry per preset: a new blow restarts it
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    // one entry per preset: a new blow restarts it (the longer and the stronger of the two)
     for (Body& body : g_bodies)
         if (body.preset_index == index)
         {
-            body.age = 0.0f;
+            body.strength = std::max(body.current_strength(), strength);
             body.lifetime = std::max(lifetime, body.lifetime - body.age);
+            body.age = 0.0f;
             return;
         }
-    g_bodies.push_back({ .preset = name, .preset_index = index, .lifetime = lifetime });
+    g_bodies.push_back({ .preset = name, .preset_index = index, .lifetime = lifetime, .strength = strength });
 }
 
 void jpeg_hits::clear()

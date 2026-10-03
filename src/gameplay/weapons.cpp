@@ -8,6 +8,7 @@ module gameplay;
 import :weapons;
 import :health;
 import :player;
+import :effects;
 
 import std.compat;
 import glm;
@@ -66,6 +67,49 @@ namespace
         return glm::vec3(v[0].asFloat(), v[1].asFloat(), v[2].asFloat());
     }
 
+    // a path or a list of paths
+    std::optional<std::vector<std::string>> parse_paths(const Json::Value& v)
+    {
+        if (v.isString())
+            return std::vector<std::string>{ v.asString() };
+        if (!v.isArray())
+            return std::nullopt;
+        std::vector<std::string> paths;
+        for (const Json::Value& item : v)
+        {
+            if (!item.isString())
+                return std::nullopt;
+            paths.push_back(item.asString());
+        }
+        return paths;
+    }
+
+    WeaponSounds parse_sounds(const std::string& weapon, const Json::Value& value)
+    {
+        WeaponSounds sounds;
+        const std::pair<const char*, std::vector<std::string> WeaponSounds::*> lists[] = {
+            { "fire", &WeaponSounds::fire }, { "impact", &WeaponSounds::impact },
+            { "impact_creature", &WeaponSounds::impact_creature }, { "reload", &WeaponSounds::reload },
+            { "dry_fire", &WeaponSounds::dry_fire }, { "cycle", &WeaponSounds::cycle },
+            { "beam_start", &WeaponSounds::beam_start }, { "beam_loop", &WeaponSounds::beam_loop },
+            { "beam_stop", &WeaponSounds::beam_stop },
+        };
+        for (const std::string& key : value.getMemberNames())
+        {
+            const Json::Value& v = value[key];
+            const auto list = std::ranges::find(lists, std::string_view(key), [] (const auto& l) { return std::string_view(l.first); });
+            bool ok = true;
+            if (list != std::end(lists) && parse_paths(v)) sounds.*list->second = *parse_paths(v);
+            else if (key == "cycle_delay" && v.isNumeric()) sounds.cycle_delay = std::max(v.asFloat(), 0.0f);
+            else if (key == "volume" && v.isNumeric()) sounds.volume = std::max(v.asFloat(), 0.0f);
+            else if (key == "impact_volume" && v.isNumeric()) sounds.impact_volume = std::max(v.asFloat(), 0.0f);
+            else ok = false;
+            if (!ok)
+                LogWeapons.Log("Weapon %s: unknown sound or bad value '%s'", weapon.c_str(), key.c_str());
+        }
+        return sounds;
+    }
+
     WeaponDef parse_weapon(const std::string& name, const Json::Value& value)
     {
         WeaponDef def;
@@ -106,6 +150,7 @@ namespace
             else if (key == "hit_flash_color" && parse_vec3(v)) def.hit_flash_color = *parse_vec3(v);
             else if (key == "hit_flash_time" && v.isNumeric()) def.hit_flash_time = std::max(v.asFloat(), 0.0f);
             else if (key == "body_jpeg_time" && v.isNumeric()) def.body_jpeg_time = std::max(v.asFloat(), 0.0f);
+            else if (key == "sounds" && v.isObject()) def.sounds = parse_sounds(name, v);
             else ok = false;
             if (!ok)
                 LogWeapons.Log("Weapon %s: unknown field or bad value '%s'", name.c_str(), key.c_str());
@@ -178,6 +223,7 @@ namespace
         const phys::PhysicsScene& physics;
         const ecs::EventWriter<DamageEvent>& damage;
         const ecs::EventWriter<SpawnPrefabRequest>& spawns;
+        const ecs::EventWriter<WeaponImpactEvent>& impacts;
         const ecs::Query<const Health, const WorldTransform>& targets;
         DamageType type;
         glm::vec3 camera;               // where the aim rays start (the crosshair)
@@ -263,6 +309,8 @@ namespace
             .body_jpeg_time = shot.def.body_jpeg_time,
         });
         spawn_effect(shot, shot.def.impact_effect, hit.position + hit.normal * 0.02f, hit.normal);
+        shot.impacts.send({ .shooter = shot.shooter, .weapon = shot.def.name, .position = hit.position, .normal = hit.normal,
+            .creature = hit.category == phys::Category::hitbox });
         area_damage(shot, hit.position, amount, target, scale);
     }
 
@@ -414,7 +462,8 @@ namespace
     void fire_weapons(ecs::Query<WeaponHolder, const WeaponInput> holders, ecs::Query<const Health, const WorldTransform> targets,
         ecs::Query<const HeldWeaponModel, const ChildOf, const WorldTransform> models,
         ecs::Res<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time, ecs::EventWriter<DamageEvent> damage,
-        ecs::EventWriter<WeaponFiredEvent> fired, ecs::EventWriter<SpawnPrefabRequest> spawns)
+        ecs::EventWriter<WeaponFiredEvent> fired, ecs::EventWriter<SpawnPrefabRequest> spawns,
+        ecs::EventWriter<WeaponImpactEvent> impacts, ecs::EventWriter<WeaponActionEvent> actions)
     {
         const float dt = float(time->dt);
         const std::vector<std::string>& loadout = weapons::get_loadout();
@@ -479,7 +528,10 @@ namespace
             {
                 state.reloading = def.reload;
                 state.charge = 0.0f;
+                actions.send({ .shooter = shooter, .weapon = def.name, .action = WeaponAction::Reload });
             }
+            else if (pressed && !has_round(holder, state, def))
+                actions.send({ .shooter = shooter, .weapon = def.name, .action = WeaponAction::DryFire });
 
             const bool ready = state.reloading <= 0.0f && state.cooldown <= 0.0f && has_round(holder, state, def);
             // shots of one tick spread the same way on every machine
@@ -492,7 +544,7 @@ namespace
                 muzzle = Muzzle{ model, glm::vec3(matrix * glm::vec4(def.muzzle, 1.0f)),
                     glm::normalize(glm::mat3(matrix) * def.muzzle_forward) };
             });
-            const ShotContext shot{ shooter, def, *physics, damage, spawns, targets, damage_type(def.mode), command.aim_origin, muzzle };
+            const ShotContext shot{ shooter, def, *physics, damage, spawns, impacts, targets, damage_type(def.mode), command.aim_origin, muzzle };
             const glm::vec3 origin = command.aim_origin;
             const glm::vec3 aim = command.aim_direction;
             const float half_angle = glm::radians(def.spread);
@@ -566,7 +618,8 @@ namespace
         =ecs::before<scene::PhysicsStep>]]
     void move_projectiles(ecs::Query<Projectile, Transform> projectiles, ecs::Query<const Health, const WorldTransform> targets,
         ecs::Res<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time, ecs::EventWriter<DamageEvent> damage,
-        ecs::EventWriter<SpawnPrefabRequest> spawns, ecs::EventWriter<DespawnRequest> despawns)
+        ecs::EventWriter<SpawnPrefabRequest> spawns, ecs::EventWriter<DespawnRequest> despawns,
+        ecs::EventWriter<WeaponImpactEvent> impacts)
     {
         const float dt = float(time->dt);
         projectiles.each([&] (ecs::Entity e, Projectile& projectile, Transform& transform) {
@@ -588,8 +641,8 @@ namespace
                 const glm::vec3 direction = step / length;
                 if (std::optional<phys::Hit> hit = physics->raycast(position, direction, length, shot_filter()))
                 {
-                    const ShotContext shot{ projectile.shooter, *def, *physics, damage, spawns, targets, damage_type(def->mode),
-                        position, std::nullopt };
+                    const ShotContext shot{ projectile.shooter, *def, *physics, damage, spawns, impacts, targets,
+                        damage_type(def->mode), position, std::nullopt };
                     hit_at(shot, *hit, direction, projectile.damage, projectile.charge);
                     projectile.range_left = 0.0f;
                     despawns.send({ e });
@@ -624,7 +677,8 @@ namespace
 
     // the current weapon's model is visible, the others hidden: in Late, before the render proxies are synced (in
     // Update it would race the systems that read MeshRenderer there)
-    [[=ecs::system<ecs::Phase::Late>, =ecs::after<HitFlashes>, =ecs::before<RenderSync>, =ecs::before<MeshColliderSync>]]
+    [[=ecs::system<ecs::Phase::Late>, =ecs::after<HitFlashes>, =ecs::after<JpegInfections>, =ecs::before<RenderSync>,
+        =ecs::before<MeshColliderSync>]]
     void show_held_weapon(ecs::Query<MeshRenderer, const HeldWeaponModel, const ChildOf> models,
         ecs::Query<const WeaponHolder> holders)
     {

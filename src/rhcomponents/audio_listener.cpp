@@ -2,6 +2,7 @@ module rhcomponents;
 
 import :camera;
 import :render_sync;
+import :audio;
 
 import std.compat;
 import ecs;
@@ -15,7 +16,7 @@ import glm;
 namespace
 {
     // The ears are where the active camera is (Late: its WorldTransform of this frame)
-    [[=ecs::system<ecs::Phase::Late>, =ecs::after<scene::TransformPropagation>, =ecs::after<RenderSync>,
+    [[=ecs::system<ecs::Phase::Late>, =ecs::in_set<AudioListenerSync>, =ecs::after<scene::TransformPropagation>, =ecs::after<RenderSync>,
       =ecs::after<MeshColliderSync>]]
     void sync_audio_listener(ecs::Query<const Camera, const WorldTransform> cameras, ecs::ResMut<audio::AudioEngine> audio,
         ecs::Res<ecs::FrameTime> time)

@@ -12,16 +12,20 @@ import gameplay;
 
 // Game events -> JPEG hits, besides the spots of the blows (damage_feedback.cpp):
 //   JpegSpotEvent                 a spot where game rules say (a jackal's bite at its muzzle)
+//   JpegBodyEvent                 bodies under a JPEG where game rules say (JpegInfection: the pulses of the infected)
 //   DamageEvent::body_jpeg_time   a creature hit by a weapon: its whole body under the blow's preset for that long
 //                                 (gameplay HitFlash marks the body in the g-buffer, jpeg_hits::hold_body keeps the
 //                                 preset's chain running and gives the bodies their mask channel)
 namespace
 {
     [[=ecs::system<ecs::Phase::Update>]]
-    void jpeg_game_effects(ecs::EventReader<JpegSpotEvent> spots, ecs::EventReader<DamageTakenEvent> taken, ecs::Query<const Player> players)
+    void jpeg_game_effects(ecs::EventReader<JpegSpotEvent> spots, ecs::EventReader<JpegBodyEvent> bodies,
+        ecs::EventReader<DamageTakenEvent> taken, ecs::Query<const Player> players)
     {
         for (const JpegSpotEvent& spot : spots.read())
             jpeg_hits::add(spot.position, spot.preset, spot.strength, spot.radius, spot.lifetime);
+        for (const JpegBodyEvent& body : bodies.read())
+            jpeg_hits::hold_body(body.preset, body.lifetime, body.strength);
 
         for (const DamageTakenEvent& event : taken.read())
         {

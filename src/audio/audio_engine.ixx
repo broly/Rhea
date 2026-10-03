@@ -81,6 +81,8 @@ export namespace audio
         void set_volume(VoiceId voice, float volume) { backend->set_volume(voice, volume); }
         void set_pitch(VoiceId voice, float pitch) { backend->set_pitch(voice, pitch); }
         void set_spatial(VoiceId voice, const Spatial& spatial) { backend->set_spatial(voice, spatial); }
+        // Hz, 0: no filter (PlayParams::lowpass)
+        void set_lowpass(VoiceId voice, float cutoff) { backend->set_lowpass(voice, cutoff); }
         float get_cursor(VoiceId voice) const { return backend->get_cursor(voice); }
 
         void set_listener(const Listener& in_listener);

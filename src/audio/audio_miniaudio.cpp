@@ -91,6 +91,9 @@ namespace
             for (Voice& voice : voices)
                 if (voice.state != VoiceState::free)
                     ma_sound_uninit(voice.sound.get());
+            for (Voice& voice : voices)
+                if (voice.lowpass)
+                    ma_lpf_node_uninit(voice.lowpass.get(), nullptr);
             for (Sound& sound : sounds)
                 release(sound);
             for (auto it = buses.rbegin(); it != buses.rend(); ++it)
@@ -267,6 +270,11 @@ namespace
                 return {};
             }
 
+            voice.group = group;
+            voice.filtered = false;
+            if (params.lowpass > 0.0f)
+                filter(voice, params.lowpass);
+
             ma_sound* s = voice.sound.get();
             ma_sound_set_volume(s, params.volume);
             ma_sound_set_pitch(s, params.pitch);
@@ -335,6 +343,17 @@ namespace
                 apply_spatial(voice->sound.get(), spatial);
         }
 
+        void set_lowpass(VoiceId id, float cutoff) override
+        {
+            Voice* voice = find_voice(id);
+            if (!voice)
+                return;
+            if (cutoff > 0.0f)
+                filter(*voice, cutoff);
+            else if (voice->filtered)
+                filter(*voice, open_cutoff());   // left in the chain, wide open: no click from a re-route
+        }
+
         float get_cursor(VoiceId id) const override
         {
             Voice* voice = const_cast<MiniaudioBackend*>(this)->find_voice(id);
@@ -373,11 +392,54 @@ namespace
         struct Voice
         {
             std::unique_ptr<ma_sound> sound;         // kept while free: no allocation per play
+            // low-pass between the sound and its bus (made the first time the slot's voice is filtered, kept)
+            std::unique_ptr<ma_lpf_node> lowpass;
+            ma_sound_group* group = nullptr;         // its bus
+            bool filtered = false;                   // routed through lowpass
             uint32_t generation = 0;
             VoiceState state = VoiceState::free;
             bool spatial = false;
             ma_uint64 start_frame = 0;               // engine time it begins at (delay)
         };
+
+        static constexpr ma_uint32 lowpass_order = 2;
+
+        // the highest cutoff: the filter does nothing audible
+        float open_cutoff()
+        {
+            return std::min(20000.0f, 0.45f * float(ma_engine_get_sample_rate(&engine)));
+        }
+
+        // routes the voice sound -> its low-pass -> its bus (attaching nodes is safe while the audio thread mixes)
+        // and sets the cutoff. Changing the cutoff of a playing filter only rewrites its coefficients.
+        void filter(Voice& voice, float cutoff)
+        {
+            const ma_uint32 channels = ma_engine_get_channels(&engine);
+            const ma_uint32 rate = ma_engine_get_sample_rate(&engine);
+            const double hz = std::clamp(double(cutoff), 20.0, double(open_cutoff()));
+            if (!voice.lowpass)
+            {
+                voice.lowpass = std::make_unique<ma_lpf_node>();
+                const ma_lpf_node_config config = ma_lpf_node_config_init(channels, rate, hz, lowpass_order);
+                if (const ma_result result = ma_lpf_node_init(ma_engine_get_node_graph(&engine), &config, nullptr, voice.lowpass.get());
+                    result != MA_SUCCESS)
+                {
+                    LogMiniaudio.Log<Warning>("Low-pass filter not created: %s", ma_result_description(result));
+                    voice.lowpass.reset();
+                    return;
+                }
+            }
+            else
+            {
+                const ma_lpf_config config = ma_lpf_config_init(ma_format_f32, channels, rate, hz, lowpass_order);
+                ma_lpf_node_reinit(&config, voice.lowpass.get());
+            }
+            if (voice.filtered)
+                return;
+            ma_node_attach_output_bus(voice.lowpass.get(), 0, voice.group, 0);
+            ma_node_attach_output_bus(voice.sound.get(), 0, voice.lowpass.get(), 0);
+            voice.filtered = true;
+        }
 
         static void apply_spatial(ma_sound* s, const Spatial& spatial)
         {
@@ -400,6 +462,10 @@ namespace
         void free_voice(Voice& voice)
         {
             ma_sound_uninit(voice.sound.get());
+            // an idle filter left on the bus would still be pulled every period
+            if (voice.filtered)
+                ma_node_detach_output_bus(voice.lowpass.get(), 0);
+            voice.filtered = false;
             voice.state = VoiceState::free;
         }
 

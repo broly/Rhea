@@ -90,6 +90,7 @@ namespace
         void set_volume(VoiceId, float) override {}
         void set_pitch(VoiceId, float) override {}
         void set_spatial(VoiceId, const Spatial&) override {}
+        void set_lowpass(VoiceId, float) override {}
         float get_cursor(VoiceId) const override { return 0.0f; }
         void set_listener(const Listener&) override {}
 
