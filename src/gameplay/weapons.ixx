@@ -50,7 +50,13 @@ import :health;
 //   read_weapon_input (FixedPre)                    trigger (left mouse), reload (X), slot keys (2..7) and the aim
 //                                                   ray of the active camera
 //                                                   (the middle of the view) into WeaponInput of the Player
-//   fire_weapons      (FixedPost, set WeaponFire)   cooldowns, magazines, rays -> DamageEvent (before
+//   hold_combat_stance (FixedPre, after the locomotion and weapon inputs)
+//                                                   the trigger puts a locomotion character into the combat stance
+//                                                   for game.weapons.combat_time s: aiming (ALS: the body turns to
+//                                                   the view, the weapon is raised), no sprint
+//   fire_weapons      (FixedPost, set WeaponFire)   a locomotion character fires once the weapon is raised (aiming
+//                                                   for game.weapons.raise_time s, facing the view, no action; a
+//                                                   press is kept until then); cooldowns, magazines, rays -> DamageEvent (before
 //                                                   DamageResolution and the physics step), WeaponFiredEvent,
 //                                                   WeaponImpactEvent, WeaponActionEvent
 export
@@ -165,6 +171,11 @@ export
         [[=rh::transient]] std::map<std::string, State> state;
         // the overlay the character had before a weapon set its own (-1: not seen yet)
         [[=rh::transient]] int32_t base_overlay = -1;
+        // combat stance of a locomotion character (hold_combat_stance): s left, s the weapon has been raised, a
+        // press of the trigger waiting for the weapon to be raised (s left)
+        [[=rh::edit, =rh::read_only, =rh::transient]] float combat = 0.0f;
+        [[=rh::edit, =rh::read_only, =rh::transient]] float raised = 0.0f;
+        [[=rh::transient]] float queued_press = 0.0f;
     };
 
     // The command of a tick for the WeaponHolder (filled from the keyboard and mouse for the Player)

@@ -207,6 +207,7 @@ namespace GeometryDebug
     inline constexpr uint32_t emissive_index_check = 2;  // pbr: emissive = red where the material has an emissive texture
     inline constexpr uint32_t solid_emissive = 4;        // emissive target = solid red (checks the switch reaches the shaders)
     inline constexpr uint32_t glossy = 8;                // pbr roughness x 0.25: polished level to check SSR / probe reflections
+    inline constexpr uint32_t terrain_all_layers = 16;   // terrain samples all 4 layers, also those of weight 0 (A/B of the skip)
 }
 
 // Temporal anti-aliasing (shaders/taa.frag, pass "TAA" before the tone mapping, game graph only)

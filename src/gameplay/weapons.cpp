@@ -52,6 +52,14 @@ namespace
     // automation (weapons::set_scripted_trigger): replaces the left mouse button of the players
     std::optional<bool> g_scripted_trigger;
 
+    // the combat stance of locomotion characters (hold_combat_stance, fire_weapons)
+    cvar::Var<float> cv_combat_time("game.weapons.combat_time", 1.5f,
+        "Seconds a locomotion character stays aiming after the trigger is let go (then the weapon is ready, lowered after 3 s)");
+    cvar::Var<float> cv_raise_time("game.weapons.raise_time", 0.25f,
+        "Seconds of aiming before a locomotion character fires (the weapon raised, the spine turned to the view)");
+    cvar::Var<float> cv_facing_tolerance("game.weapons.facing_tolerance", 10.0f,
+        "Degrees over the aiming yaw limit (the spine's reach) the body may still be turned away from the view and fire");
+
     std::optional<WeaponMode> parse_mode(std::string_view text)
     {
         if (text == "hitscan") return WeaponMode::Hitscan;
@@ -459,9 +467,43 @@ namespace
         });
     }
 
+    // A shot from the hip would leave the muzzle wherever the relaxed pose points it: the trigger raises the weapon
+    // first. A locomotion character with the trigger down (and combat_time s after) aims like with the right mouse
+    // button: ALS turns the body to the view and raises the weapon; sprinting stops. The camera does not zoom (that
+    // stays the right mouse button).
+    [[=ecs::system<ecs::Phase::FixedPre>, =ecs::after<loco::LocomotionInputSet>, =ecs::after<WeaponInputSet>]]
+    void hold_combat_stance(ecs::Query<WeaponHolder, const WeaponInput, loco::LocomotionInput> holders, ecs::Res<ecs::SimTime> time)
+    {
+        const float dt = float(time->dt);
+        holders.each([&] (WeaponHolder& holder, const WeaponInput& command, loco::LocomotionInput& input) {
+            if (holder.enabled && command.trigger && command.has_aim && weapons::find(holder.current))
+                holder.combat = cv_combat_time.get();
+            else
+                holder.combat = std::max(holder.combat - dt, 0.0f);
+            if (holder.combat <= 0.0f && holder.queued_press <= 0.0f)
+                return;
+            input.aim = true;
+            input.sprint = false;
+        });
+    }
+
+    // the weapon of a locomotion character points where the shots go: aiming for raise_time s, the body turned to the
+    // view as far as the spine reaches, no roll or mantle
+    bool is_weapon_raised(WeaponHolder& holder, const loco::LocomotionCharacter* c, float dt)
+    {
+        if (!c)
+            return true;
+        const bool aiming = c->rotation_mode == loco::RotationMode::aiming && c->action == loco::LocomotionAction::none;
+        holder.raised = aiming ? holder.raised + dt : 0.0f;
+        const float limit = c->settings ? c->settings->aiming_yaw_angle_limit : 70.0f;
+        const bool facing = std::abs(loco::unwind_degrees(c->view.yaw - c->yaw)) <= limit + cv_facing_tolerance.get();
+        return aiming && facing && holder.raised >= cv_raise_time.get();
+    }
+
     [[=ecs::system<ecs::Phase::FixedPost>, =ecs::in_set<WeaponFire>, =ecs::before<DamageResolution>,
         =ecs::before<scene::PhysicsStep>]]
     void fire_weapons(ecs::Query<WeaponHolder, const WeaponInput> holders, ecs::Query<const Health, const WorldTransform> targets,
+        ecs::Query<const loco::LocomotionCharacter> characters,
         ecs::Query<const HeldWeaponModel, const ChildOf, const WorldTransform> models,
         ecs::Res<phys::PhysicsScene> physics, ecs::Res<ecs::SimTime> time, ecs::EventWriter<DamageEvent> damage,
         ecs::EventWriter<WeaponFiredEvent> fired, ecs::EventWriter<SpawnPrefabRequest> spawns,
@@ -492,6 +534,7 @@ namespace
                     it->second.reloading = 0.0f;
                 }
                 holder.current = *selected;
+                holder.queued_press = 0.0f;
                 const WeaponDef& def = *weapons::find(holder.current);
                 WeaponHolder::State& state = holder.state[def.name];
                 init_state(state, def);
@@ -535,6 +578,19 @@ namespace
             else if (pressed && !has_round(holder, state, def))
                 actions.send({ .shooter = shooter, .weapon = def.name, .action = WeaponAction::DryFire });
 
+            // the weapon raised first: a click shorter than the raise fires once it is up
+            const bool raised = is_weapon_raised(holder, characters.get(shooter), dt);
+            bool fire_press = false;
+            if (raised)
+            {
+                fire_press = pressed || holder.queued_press > 0.0f;
+                holder.queued_press = 0.0f;
+            }
+            else if (pressed && state.reloading <= 0.0f && has_round(holder, state, def))
+                holder.queued_press = cv_combat_time.get();
+            else
+                holder.queued_press = std::max(holder.queued_press - dt, 0.0f);
+
             const bool ready = state.reloading <= 0.0f && state.cooldown <= 0.0f && has_round(holder, state, def);
             // shots of one tick spread the same way on every machine
             std::mt19937 rng(uint32_t(time->tick * 2654435761u) ^ shooter.index);
@@ -561,7 +617,7 @@ namespace
                 case WeaponMode::Projectile:
                 case WeaponMode::Cone:
                 {
-                    if (!ready || !(def.automatic ? trigger : pressed))
+                    if (!ready || !raised || !(fire_press || (def.automatic && trigger)))
                         break;
                     const int pellets = def.mode == WeaponMode::Cone ? def.pellets : 1;
                     int hits = 0;
@@ -575,9 +631,9 @@ namespace
                 }
                 case WeaponMode::Beam:
                 {
-                    if (!trigger || state.reloading > 0.0f || !has_round(holder, state, def))
+                    if (!trigger || !raised || state.reloading > 0.0f || !has_round(holder, state, def))
                     {
-                        // the next press fires at once
+                        // the next press (or the raised weapon) fires at once
                         state.beam_time = def.interval;
                         break;
                     }
@@ -600,7 +656,8 @@ namespace
                         break;
                     const float fraction = state.charge / def.charge_time;
                     state.charge = 0.0f;
-                    if (!ready || fraction < def.min_charge)
+                    // charged while the weapon was raised; let go before it is up: nothing
+                    if (!ready || !raised || fraction < def.min_charge)
                         break;
 
                     // the area damage (radius) happens in hit_at, where the ray or the projectile lands
@@ -730,6 +787,18 @@ namespace
                     def.name, def.display_name, def.damage, def.cooldown, def.range, def.magazine, def.ammo, def.jpeg));
             }
         });
+
+    cvar::Command cmd_trigger("weapons.trigger", "Holds the players' trigger down (on), up (off) or gives it back to the mouse (auto)",
+        [] (cvar::Args args)
+        {
+            if (args.empty() || (args[0] != "on" && args[0] != "off" && args[0] != "auto"))
+            {
+                cvar::print("weapons.trigger on|off|auto", cvar::Output::error);
+                return;
+            }
+            weapons::set_scripted_trigger(args[0] == "auto" ? std::nullopt : std::optional<bool>(args[0] == "on"));
+        },
+        "on|off|auto");
 
     cvar::Command cmd_reload_defs("weapons.reload_definitions", "Reloads assets/weapons/weapons.json",
         [] (cvar::Args) { weapons::reload_definitions(); });

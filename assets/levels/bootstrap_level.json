@@ -780,11 +780,11 @@
 				}
 			}
 		},
-		// the companion (placeholder: the player's model): a locomotion character driven by the navigation crowd,
-		// follows the player (gameplay:npc; its behaviour is AI6)
+		// the companion (Soviet Scientist, conformed to SK_Als by tools/character_import): a locomotion character
+		// driven by the navigation crowd, follows the player (gameplay:npc; its behaviour is AI6)
 		{
 			"name": "companion",
-			"prefab": "prefabs/cosmo_bunny.json",
+			"prefab": "prefabs/soviet_scientist.json",
 			"components": {
 				"Transform": {
 					"position": { "x": 3.0, "y": 0.0, "z": -2.4 },

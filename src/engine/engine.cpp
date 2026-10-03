@@ -204,8 +204,9 @@ void Engine::run()
     audio_engine->shutdown();
     renderer->get_backend()->shutdown_ui_overlay();
     ui::shutdown();
-    // soak runs override settings (RHEA_SOAK_PROBES...): they must not end up in the user's cvars.json
-    if (soak_seconds <= 0.0)
+    // soak runs override settings (RHEA_SOAK_PROBES...), automated runs set cvars from RHEA_EXEC (debug logs, AI
+    // off, hidden UI): none of it must end up in the user's cvars.json
+    if (soak_seconds <= 0.0 && !std::getenv("RHEA_EXEC"))
         cvar::save();
     
     gpuprof::shutdown();

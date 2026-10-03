@@ -63,16 +63,25 @@ vec3 decode_normal(vec4 texel, float strength)
     return normalize(vec3(n.xy, max(n.z, 1e-3)));
 }
 
+// Layers are sampled inside branches (only those with weight): explicit gradients, taken from the world position
+// before any branch (implicit derivatives are undefined in non-uniform control flow).
+vec4 read_texture_grad_or(uint index, vec2 uv, vec2 ddx, vec2 ddy, vec4 fallback)
+{
+    vec4 texel = textureGrad(u_textures_array[nonuniformEXT(index)], uv, ddx, ddy);
+    return index == 0u ? fallback : texel;
+}
+
 // World space layers tiling along x / z. Tangent frame from the surface normal: T = +x, B = -z on flat ground
 // (uv.v grows along +z, the green of an OpenGL normal map points to -v).
-LayerSample sample_planar(uvec3 textures, vec3 Ng, float tiling, float normal_strength)
+LayerSample sample_planar(uvec3 textures, vec3 Ng, float tiling, float normal_strength, vec3 dpdx, vec3 dpdy)
 {
     vec2 uv = v_world_pos.xz / tiling;
+    vec2 ddx = dpdx.xz / tiling, ddy = dpdy.xz / tiling;
     LayerSample s;
-    s.albedo_height = read_texture_or(textures.x, uv, vec4(0.5, 0.5, 0.5, 0.5));
-    s.orm = read_texture_or(textures.z, uv, vec4(1.0)).rgb;
+    s.albedo_height = read_texture_grad_or(textures.x, uv, ddx, ddy, vec4(0.5, 0.5, 0.5, 0.5));
+    s.orm = read_texture_grad_or(textures.z, uv, ddx, ddy, vec4(1.0)).rgb;
 
-    vec3 n = decode_normal(read_texture_or(textures.y, uv, vec4(0.5, 0.5, 1.0, 1.0)), normal_strength);
+    vec3 n = decode_normal(read_texture_grad_or(textures.y, uv, ddx, ddy, vec4(0.5, 0.5, 1.0, 1.0)), normal_strength);
     vec3 T = normalize(vec3(1.0, 0.0, 0.0) - Ng * Ng.x);
     vec3 B = cross(Ng, T);
     s.normal = normalize(T * n.x + B * n.y + Ng * n.z);
@@ -81,28 +90,32 @@ LayerSample sample_planar(uvec3 textures, vec3 Ng, float tiling, float normal_st
 
 // Projected along x, y and z, blended by the normal (whiteout blend of the normal maps).
 // The side projections keep "up" in the image pointing to +y.
-LayerSample sample_triplanar(uvec3 textures, vec3 Ng, float tiling, float normal_strength, float sharpness)
+LayerSample sample_triplanar(uvec3 textures, vec3 Ng, float tiling, float normal_strength, float sharpness, vec3 dpdx, vec3 dpdy)
 {
     vec3 w = pow(abs(Ng), vec3(sharpness));
     w /= (w.x + w.y + w.z);
 
     vec3 p = v_world_pos / tiling;
+    vec3 px = dpdx / tiling, py = dpdy / tiling;
     vec2 uv_x = vec2(p.z, -p.y);    // tangent x -> +z, y -> +y
     vec2 uv_y = p.xz;               // tangent x -> +x, y -> -z
     vec2 uv_z = vec2(p.x, -p.y);    // tangent x -> +x, y -> +y
+    vec2 dx_x = vec2(px.z, -px.y), dy_x = vec2(py.z, -py.y);
+    vec2 dx_y = px.xz, dy_y = py.xz;
+    vec2 dx_z = vec2(px.x, -px.y), dy_z = vec2(py.x, -py.y);
 
     LayerSample s;
-    s.albedo_height = read_texture_or(textures.x, uv_x, vec4(0.5)) * w.x
-                    + read_texture_or(textures.x, uv_y, vec4(0.5)) * w.y
-                    + read_texture_or(textures.x, uv_z, vec4(0.5)) * w.z;
-    s.orm = read_texture_or(textures.z, uv_x, vec4(1.0)).rgb * w.x
-          + read_texture_or(textures.z, uv_y, vec4(1.0)).rgb * w.y
-          + read_texture_or(textures.z, uv_z, vec4(1.0)).rgb * w.z;
+    s.albedo_height = read_texture_grad_or(textures.x, uv_x, dx_x, dy_x, vec4(0.5)) * w.x
+                    + read_texture_grad_or(textures.x, uv_y, dx_y, dy_y, vec4(0.5)) * w.y
+                    + read_texture_grad_or(textures.x, uv_z, dx_z, dy_z, vec4(0.5)) * w.z;
+    s.orm = read_texture_grad_or(textures.z, uv_x, dx_x, dy_x, vec4(1.0)).rgb * w.x
+          + read_texture_grad_or(textures.z, uv_y, dx_y, dy_y, vec4(1.0)).rgb * w.y
+          + read_texture_grad_or(textures.z, uv_z, dx_z, dy_z, vec4(1.0)).rgb * w.z;
 
     const vec4 flat_normal = vec4(0.5, 0.5, 1.0, 1.0);
-    vec3 n_x = decode_normal(read_texture_or(textures.y, uv_x, flat_normal), normal_strength);
-    vec3 n_y = decode_normal(read_texture_or(textures.y, uv_y, flat_normal), normal_strength);
-    vec3 n_z = decode_normal(read_texture_or(textures.y, uv_z, flat_normal), normal_strength);
+    vec3 n_x = decode_normal(read_texture_grad_or(textures.y, uv_x, dx_x, dy_x, flat_normal), normal_strength);
+    vec3 n_y = decode_normal(read_texture_grad_or(textures.y, uv_y, dx_y, dy_y, flat_normal), normal_strength);
+    vec3 n_z = decode_normal(read_texture_grad_or(textures.y, uv_z, dx_z, dy_z, flat_normal), normal_strength);
 
     // whiteout: tangent xy plus the surface normal in the projection plane, z scaled by the normal's axis
     vec3 t_x = vec3(n_x.x + Ng.z, n_x.y + Ng.y, abs(n_x.z) * Ng.x);
@@ -139,27 +152,48 @@ void main()
     float view_depth = -(camera_ubo.view * vec4(v_world_pos, 1.0)).z;
     float macro_blend = macro_strength * smoothstep(8.0, 60.0, view_depth);
 
+    // Only the layers with weight are sampled: inside the valley ~70% of the texels have one layer, ~30% two,
+    // so most of the ~24 fetches of all four layers (rock alone: 10, triplanar) were for layers that never show.
+    // A layer of no weight never wins the height blend (its key is below top - contrast): skipping it changes
+    // nothing. geometry_debug bit 16 (GEOMETRY_DEBUG_TERRAIN_ALL_LAYERS) samples all of them again (A/B).
+    const float min_layer_weight = 0.002;
+    bool all_layers = (get_debug_index() & GEOMETRY_DEBUG_TERRAIN_ALL_LAYERS) != 0u;
+    vec3 dpdx = dFdx(v_world_pos);
+    vec3 dpdy = dFdy(v_world_pos);
+
     LayerSample layers[4];
-    vec4 heights;
+    vec4 heights = vec4(0.0);
+    bvec4 layer_on = bvec4(false);
     for (int i = 0; i < 4; ++i)
     {
+        layers[i] = LayerSample(vec4(0.0), vec3(0.0), vec3(0.0));
+        layer_on[i] = all_layers || weights[i] > min_layer_weight;
+        if (!layer_on[i])
+            continue;
+
         float layer_tiling = or_default(tiling[i], 4.0);
         if (triplanar[i] != 0.0)
-            layers[i] = sample_triplanar(layer_textures[i], Ng, layer_tiling, normal_strength[i], triplanar_sharpness);
+            layers[i] = sample_triplanar(layer_textures[i], Ng, layer_tiling, normal_strength[i], triplanar_sharpness, dpdx, dpdy);
         else
-            layers[i] = sample_planar(layer_textures[i], Ng, layer_tiling, normal_strength[i]);
+            layers[i] = sample_planar(layer_textures[i], Ng, layer_tiling, normal_strength[i], dpdx, dpdy);
 
-        // far away the layer is mixed with itself at a larger scale: breaks up the repetition
-        vec2 macro_uv = v_world_pos.xz / layer_tiling * macro_scale;
-        vec3 macro = read_texture_or(layer_textures[i].x, macro_uv, layers[i].albedo_height).rgb;
-        layers[i].albedo_height.rgb = mix(layers[i].albedo_height.rgb, 0.5 * (layers[i].albedo_height.rgb + macro), macro_blend);
+        // far away the layer is mixed with itself at a larger scale: breaks up the repetition (not sampled near by)
+        if (macro_blend > 0.0 || all_layers)
+        {
+            float macro_tiling = layer_tiling / macro_scale;
+            vec2 macro_uv = v_world_pos.xz / macro_tiling;
+            vec3 macro = read_texture_grad_or(layer_textures[i].x, macro_uv, dpdx.xz / macro_tiling, dpdy.xz / macro_tiling,
+                layers[i].albedo_height).rgb;
+            layers[i].albedo_height.rgb = mix(layers[i].albedo_height.rgb, 0.5 * (layers[i].albedo_height.rgb + macro), macro_blend);
+        }
 
         heights[i] = layers[i].albedo_height.a;
     }
 
     // height blend: where the weights are close the higher texels win (stones stick out of sand); a layer
-    // with no weight never shows
+    // with no weight never shows (skipped ones are kept out explicitly)
     vec4 keys = weights + heights * height_blend * min(weights * 4.0, vec4(1.0));
+    keys = mix(vec4(-1.0), keys, vec4(layer_on));
     float top = max(max(keys.x, keys.y), max(keys.z, keys.w));
     vec4 blend = max(keys - (top - blend_contrast), vec4(0.0));
     blend /= max(dot(blend, vec4(1.0)), 1e-4);
