@@ -25,6 +25,7 @@ import profile;
 import input;
 import ui;
 import cvar;
+import audio;
 import physics;
 import debug_draw;
 import ecs;
@@ -50,6 +51,7 @@ namespace
     cvar::Var<bool> cv_window_animation("ui.windows.animation", false, "Animator of the selected entity: curves, montages, sync groups");
     cvar::Var<bool> cv_window_terrain("ui.windows.terrain", false, "Terrain editor: paint layers, sculpt, save");
     cvar::Var<bool> cv_window_sky("ui.windows.sky", false, "Sky: time of day, weather");
+    cvar::Var<bool> cv_window_audio("ui.windows.audio", false, "Audio: device, bus volumes, test playback");
     cvar::Var<bool> cv_terrain_brush("terrain.brush", false,
         "Terrain window: the left mouse button paints / sculpts in the viewport (the camera turns with the right one)");
 
@@ -492,6 +494,7 @@ void EngineDebugUI::register_console_commands(Engine& engine)
 
     register_terrain_commands(engine);
     register_sky_commands(engine);
+    register_audio_commands(engine);
 }
 
 ecs::Entity EngineDebugUI::get_selected(Engine& engine)
@@ -522,6 +525,7 @@ void EngineDebugUI::draw(Engine& engine)
     draw_sky_window(engine);
     draw_ecs_window(engine);
     draw_animation_window(engine);
+    draw_audio_window(engine);
     engine.on_debug_ui_windows();
     if (cv_window_imgui_demo.get())
     {
@@ -582,6 +586,7 @@ void EngineDebugUI::draw_main_menu(Engine& engine)
         item("Sky", cv_window_sky);
         item("ECS", cv_window_ecs);
         item("Animation", cv_window_animation);
+        item("Audio", cv_window_audio);
         engine.on_debug_ui_windows_menu();
         ImGui::Separator();
         item("Hotkeys", cv_window_help);
@@ -2088,6 +2093,150 @@ void EngineDebugUI::draw_sky_window(Engine& engine)
         cv_window_inspector.set(true);
     }
     ImGui::SetItemTooltip("Atmosphere and cloud settings the controller does not drive are in the inspector");
+
+    ImGui::End();
+}
+
+/************************************************************************
+ * AUDIO
+ ***********************************************************************/
+
+namespace
+{
+    // test sounds in 3D: this far in front of the listener
+    constexpr float audio_test_distance = 3.0f;
+
+    audio::VoiceId play_test_sound(audio::AudioEngine& audio, const std::string& asset, bool spatial, bool looping)
+    {
+        audio::PlayParams params;
+        params.looping = looping;
+        if (!spatial)
+            return audio.play(asset, params);
+        const audio::Listener& listener = audio.get_listener();
+        return audio.play_at(asset, listener.position + listener.forward * audio_test_distance, params);
+    }
+}
+
+void EngineDebugUI::register_audio_commands(Engine& engine)
+{
+    auto add = [this] (std::string_view name, std::string_view description, cvar::Command::Handler handler,
+        std::string_view usage = {}, cvar::Command::Completer completer = {}) {
+        console_commands.push_back(std::make_unique<cvar::Command>(name, description, std::move(handler), usage,
+            std::move(completer)));
+    };
+
+    add("audio.play", "Plays a sound file of assets/ (sfx bus); 3d: 3 m in front of the camera",
+        [&engine] (cvar::Args args) {
+            if (args.empty())
+            {
+                cvar::print("audio.play <path under assets/> [3d]", cvar::Output::error);
+                return;
+            }
+            const bool spatial = args.size() > 1 && args[1] == "3d";
+            if (!play_test_sound(*engine.audio_engine, args[0], spatial, false).is_valid())
+                cvar::print("Not played (see the log)", cvar::Output::error);
+        }, "<path under assets/> [3d]",
+        [&engine] (size_t arg_index) {
+            if (arg_index == 0)
+                return engine.audio_engine->find_sound_assets();
+            return arg_index == 1 ? std::vector<std::string>{ "3d" } : std::vector<std::string>{};
+        });
+
+    add("audio.stop_all", "Stops every playing sound", [&engine] (cvar::Args) {
+        engine.audio_engine->stop_all();
+    });
+
+    add("audio.status", "Backend, output device, loaded sounds and playing voices", [&engine] (cvar::Args) {
+        const audio::BackendInfo info = engine.audio_engine->get_info();
+        const audio::Stats stats = engine.audio_engine->get_stats();
+        const std::string status = std::format("{} on {}, {} Hz, {} channels; sounds {} ({} loading), voices {}, buses {}",
+            info.backend, info.device, info.sample_rate, info.channels, stats.sounds, stats.sounds_loading,
+            stats.voices, stats.buses);
+        cvar::print(status);
+        // also stdout: automated runs (RHEA_EXEC) read it from there
+        std::printf("audio.status: %s\n", status.c_str());
+    });
+}
+
+void EngineDebugUI::draw_audio_window(Engine& engine)
+{
+    if (!begin_window("Audio", cv_window_audio, viewport_point(0.70f, 0.40f), viewport_size(0.24f, 0.40f)))
+        return;
+
+    audio::AudioEngine& audio = *engine.audio_engine;
+    const audio::BackendInfo info = audio.get_info();
+    const audio::Stats stats = audio.get_stats();
+
+    ImGui::Text("Backend: %s", info.backend.c_str());
+    ImGui::Text("Device: %s", info.device.c_str());
+    ImGui::Text("%u Hz, %u channels", info.sample_rate, info.channels);
+    ImGui::Text("Sounds: %u (%u loading), voices: %u, buses: %u", stats.sounds, stats.sounds_loading, stats.voices, stats.buses);
+    ImGui::SetItemTooltip("Another backend: cvar audio.backend, at the next start");
+
+    if (ImGui::CollapsingHeader("Volume", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (cvar::Entry* mute = cvar::find("audio.mute"))
+            if (ImGui::Checkbox("Mute", static_cast<bool*>(mute->value_ptr())))
+                mute->notify_changed();
+        for (size_t i = 0; i < size_t(audio::Bus::count); ++i)
+        {
+            const std::string_view bus = audio::get_bus_name(audio::Bus(i));
+            cvar::Entry* entry = cvar::find(std::string("audio.volume.") + std::string(bus));
+            if (!entry)
+                continue;
+            const std::string label(bus);
+            if (ImGui::SliderFloat(label.c_str(), static_cast<float*>(entry->value_ptr()), 0.0f, 1.0f, "%.2f"))
+                entry->notify_changed();
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Test", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (!audio_assets_listed || ImGui::Button("Rescan assets"))
+        {
+            audio_assets = audio.find_sound_assets();
+            audio_assets_listed = true;
+            if (audio_asset_index >= int(audio_assets.size()))
+                audio_asset_index = -1;
+        }
+
+        if (audio_assets.empty())
+            ImGui::TextDisabled("No sound files under assets/ (wav, mp3, flac, ogg)");
+        else
+        {
+            const char* preview = audio_asset_index >= 0 ? audio_assets[audio_asset_index].c_str() : "(sound)";
+            if (ImGui::BeginCombo("Sound", preview))
+            {
+                for (int i = 0; i < int(audio_assets.size()); ++i)
+                    if (ImGui::Selectable(audio_assets[i].c_str(), i == audio_asset_index))
+                        audio_asset_index = i;
+                ImGui::EndCombo();
+            }
+            ImGui::Checkbox("3D", &audio_test_spatial);
+            ImGui::SetItemTooltip("%.0f m in front of the camera, where it was when it started", audio_test_distance);
+            ImGui::SameLine();
+            ImGui::Checkbox("Loop", &audio_test_looping);
+
+            ImGui::BeginDisabled(audio_asset_index < 0);
+            if (ImGui::Button("Play"))
+            {
+                audio.stop(audio_test_voice);
+                audio_test_voice = play_test_sound(audio, audio_assets[audio_asset_index], audio_test_spatial, audio_test_looping);
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Stop"))
+                audio.stop(audio_test_voice, 0.2f);
+            ImGui::SameLine();
+            if (ImGui::Button("Stop all"))
+                audio.stop_all();
+
+            if (audio.is_alive(audio_test_voice))
+                ImGui::Text("Playing: %.2f s", audio.get_cursor(audio_test_voice));
+            else
+                ImGui::TextDisabled("Not playing");
+        }
+    }
 
     ImGui::End();
 }

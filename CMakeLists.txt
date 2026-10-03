@@ -12,7 +12,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Must be identical for every target: module BMIs are only importable with matching flags.
-add_compile_options(-freflection-latest)
+# C++ only: C libraries (miniaudio) are compiled with the same toolchain.
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-freflection-latest>)
 
 # x86-64-v3. Jolt Physics is built for these instruction sets and its headers use them in inline
 # functions, so every target gets the same flags (also required for importable module BMIs).
@@ -64,6 +65,7 @@ set(RHEA_MODULE_DIRS
     src/platform
     src/render_scene
     src/physics
+    src/audio
     src/debug_draw
     src/navigation
     src/framework
@@ -133,6 +135,7 @@ target_link_libraries(rhea
 		Jolt
 		meshoptimizer
 		recastnavigation
+		miniaudio
 )
 
 target_compile_definitions(rhea

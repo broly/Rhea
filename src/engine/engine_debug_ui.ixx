@@ -7,13 +7,14 @@ import framework;
 import physics;
 import ecs;
 import cvar;
+import audio;
 
 
 export class Engine;
 
 // Engine windows of the debug UI (ui module, Dear ImGui): main menu, world outliner (entities), inspector of
 // the selected entity, renderer settings, stats, GPU profiler, cvar catalog, world scripts, physics, ECS,
-// terrain editor, sky (time of day, weather).
+// terrain editor, sky (time of day, weather), audio.
 //
 // Game code extends it with Engine::on_debug_ui_menu / on_debug_ui_render_panel and
 // WorldScript::draw_debug_ui.
@@ -30,6 +31,7 @@ public:
     void register_console_commands(Engine& engine);
     void register_terrain_commands(Engine& engine);
     void register_sky_commands(Engine& engine);
+    void register_audio_commands(Engine& engine);
 
     void select(ecs::Entity e);
     // null if nothing is selected or the entity was destroyed
@@ -67,6 +69,8 @@ private:
     void draw_sky_window(Engine& engine);
     void draw_ecs_window(Engine& engine);
     void draw_animation_window(Engine& engine);
+    // Audio: backend, device, bus volumes, test playback of the sound assets
+    void draw_audio_window(Engine& engine);
 
     void draw_viewport_overlay(Engine& engine, const ViewData& view);
     void handle_picking(Engine& engine, const ViewData& view);
@@ -88,6 +92,14 @@ private:
     phys::Shape spawn_box_shape;
     phys::Shape probe_sphere_shape;
     float probe_sphere_radius = 0.0f;
+
+    // audio window: test playback
+    std::vector<std::string> audio_assets;
+    bool audio_assets_listed = false;
+    int audio_asset_index = -1;
+    bool audio_test_spatial = false;
+    bool audio_test_looping = false;
+    audio::VoiceId audio_test_voice;
 
     static constexpr size_t FRAME_TIME_HISTORY = 240;
     std::array<float, FRAME_TIME_HISTORY> frame_times_ms{};

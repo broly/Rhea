@@ -7,6 +7,7 @@ module gameplay;
 import :npc;
 import :player;
 import :health;
+import :weapons;
 
 import std.compat;
 import glm;
@@ -18,6 +19,7 @@ import framework;
 import rhcomponents;
 import locomotion;
 import navigation;
+import ai;
 import fixed_string;
 import log;
 
@@ -59,6 +61,11 @@ namespace
                 .height = c.capsule_height,
                 .max_speed = c.gait_settings.run_forward_speed,
             });
+        // armed (NpcCombat): a weapon command per tick from its brain (the models in the hand: npc_combat)
+        if (registry.has<WeaponHolder>(e) && !registry.has<WeaponInput>(e))
+            registry.add<WeaponInput>(e);
+        if (registry.has<NpcCombat>(e) && !registry.has<ai::BrainDebug>(e))
+            registry.add<ai::BrainDebug>(e);   // Windows > AI
         registry.get<Npc>(e)->initialized = true;
     }
 
@@ -130,14 +137,17 @@ namespace
         });
     }
 
-    // the crowd's steering as the input of the locomotion character
+    // the crowd's steering as the input of the locomotion character; aiming at its target it strafes
     [[=ecs::system<ecs::Phase::FixedPre>, =ecs::after<nav::NavAgentUpdate>, =ecs::after<loco::LocomotionSimulation>,
-      =ecs::before<loco::LocomotionInputSet>]]
-    void drive_npcs(ecs::Query<const Npc, const nav::NavAgent, loco::LocomotionInput, loco::LocomotionCharacter> npcs)
+      =ecs::after<NpcCombatSet>, =ecs::before<loco::LocomotionInputSet>]]
+    void drive_npcs(ecs::Query<const Npc, const nav::NavAgent, loco::LocomotionInput, loco::LocomotionCharacter> npcs,
+        ecs::Query<const NpcCombat> combats)
     {
-        npcs.each([] (const Npc& npc, const nav::NavAgent& agent, loco::LocomotionInput& input, loco::LocomotionCharacter& c) {
+        npcs.each([&] (ecs::Entity e, const Npc& npc, const nav::NavAgent& agent, loco::LocomotionInput& input, loco::LocomotionCharacter& c) {
             if (!npc.initialized)
                 return;
+            const NpcCombat* combat = combats.get(e);
+            const std::optional<float> aim_yaw = combat ? combat->aim_yaw : std::nullopt;
             const float view_yaw = input.view_yaw;
             input = {};
             input.view_yaw = view_yaw;
@@ -156,7 +166,22 @@ namespace
                     move = loco::yaw_to_direction(*npc.face_yaw);   // no mesh: straight at the player
             }
 
-            if (glm::length(move) > 0.05f)
+            if (aim_yaw)
+            {
+                // aims at its target (ALS aiming: faces the view), the way to go relative to it
+                input.aim = true;
+                input.view_yaw = *aim_yaw;
+                input.view_pitch = combat->aim_pitch;
+                input.rotation_mode = loco::RotationMode::view_direction;
+                if (glm::length(move) > 0.05f)
+                {
+                    const glm::vec3 direction = glm::normalize(move);
+                    const glm::vec3 forward = loco::yaw_to_direction(*aim_yaw);
+                    const glm::vec3 right = loco::yaw_to_direction(*aim_yaw + 90.0f);
+                    input.move_axis = { glm::dot(direction, right), glm::dot(direction, forward) };
+                }
+            }
+            else if (glm::length(move) > 0.05f)
             {
                 // runs where it goes
                 input.view_yaw = loco::direction_to_yaw(move);

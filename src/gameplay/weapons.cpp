@@ -361,7 +361,7 @@ namespace
      * SYSTEMS
      ***********************************************************************/
 
-    [[=ecs::system<ecs::Phase::FixedPre>]]
+    [[=ecs::system<ecs::Phase::FixedPre>, =ecs::in_set<WeaponInputSet>]]
     void read_weapon_input(ecs::Query<WeaponInput, const Player> players, ecs::Res<Input> input,
         ecs::Query<const Camera, const WorldTransform> cameras, ecs::Res<ecs::SimTime> time)
     {

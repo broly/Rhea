@@ -16,6 +16,7 @@ import profile;
 import gpu_profile;
 import ui;
 import cvar;
+import audio;
 import paths;
 
 #include "profiling/profile.h"
@@ -113,6 +114,11 @@ void Engine::run()
     world->registry.set_resource_ref(*scene_view);          // ResMut<SceneView>
     world->registry.set_resource_ref(std::as_const(*input)); // Res<Input>
 
+    // backend from the cvar audio.backend; silence (null backend) when no device can be opened
+    audio_engine = std::make_unique<audio::AudioEngine>();
+    audio_engine->init();
+    world->registry.set_resource_ref(*audio_engine);        // ResMut<audio::AudioEngine>
+
     world->add_script<WorldScript_VariousThings>(); // TODO hardcoded
     
     world->init();    
@@ -139,6 +145,11 @@ void Engine::run()
         {
             PROFILE("World::tick");
             world->tick();
+        }
+        {
+            // after Late (the listener follows the camera): bus volumes, finished voices
+            PROFILE("audio");
+            audio_engine->update();
         }
         // RHEA_SOAK_CAP_UNTIL=<s>: soak runs hold ~30 FPS until then, to move the full-load step in time
         static const char* soak_cap_env = std::getenv("RHEA_SOAK_CAP_UNTIL");
@@ -190,6 +201,7 @@ void Engine::run()
         }
         prof::frame_end();
     }
+    audio_engine->shutdown();
     renderer->get_backend()->shutdown_ui_overlay();
     ui::shutdown();
     // soak runs override settings (RHEA_SOAK_PROBES...): they must not end up in the user's cvars.json

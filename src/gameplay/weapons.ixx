@@ -115,6 +115,8 @@ export
 
     // System set of fire_weapons
     struct WeaponFire {};
+    // FixedPre set of read_weapon_input (the player's WeaponInput); NPC brains write theirs after it
+    struct WeaponInputSet {};
 
     // The weapons an entity carries (the player). Runtime state per weapon name in `state`.
     struct WeaponHolder

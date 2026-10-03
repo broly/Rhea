@@ -153,3 +153,37 @@ target_include_directories(recastnavigation PUBLIC
 target_compile_definitions(recastnavigation PUBLIC DT_POLYREF64)
 # Tile builds run in the background; at -O0 one tile takes seconds. Optimized in every configuration.
 target_compile_options(recastnavigation PRIVATE $<$<CONFIG:Debug>:-O2>)
+
+
+
+# miniaudio: one of the backends of the audio module (src/audio/audio_miniaudio.cpp). C library, included only
+# in the global module fragment of that unit, never exported. Its own CMakeLists builds the tools and extras:
+# sources only, the target is made here.
+FetchContent_Declare(
+  miniaudio
+  GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+  GIT_TAG        0.11.25
+  GIT_SHALLOW    TRUE
+  SOURCE_SUBDIR  no_cmake_project
+  EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(miniaudio)
+
+enable_language(C)
+# Ogg Vorbis through stb_vorbis (shipped in extras): miniaudio decodes it when the stb_vorbis declarations come
+# before its implementation
+file(WRITE ${CMAKE_BINARY_DIR}/miniaudio_impl.c [=[
+#define STB_VORBIS_HEADER_ONLY
+#include "extras/stb_vorbis.c"
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+#undef STB_VORBIS_HEADER_ONLY
+#include "extras/stb_vorbis.c"
+]=])
+add_library(miniaudio STATIC ${CMAKE_BINARY_DIR}/miniaudio_impl.c)
+target_include_directories(miniaudio PUBLIC ${miniaudio_SOURCE_DIR})
+# no recording to files; the engine reads assets through its own paths
+target_compile_definitions(miniaudio PUBLIC MA_NO_ENCODING)
+# The mixer runs on the audio thread; at -O0 it can miss the device's deadlines (crackling). Optimized in every
+# configuration.
+target_compile_options(miniaudio PRIVATE $<$<CONFIG:Debug>:-O2> -w)

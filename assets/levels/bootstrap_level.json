@@ -795,7 +795,12 @@
 				"NavAgent": { "radius": 0.35, "height": 1.8, "max_speed": 3.75, "max_acceleration": 12.0 },
 				// the jackals hunt it too; it takes the bites without dying until it can fall and get up (A7)
 				"Perceivable": { "team": "player", "center_height": 0.9 },
-				"Health": { "max": 100, "invulnerable": true, "death_jpeg": "" }
+				"Health": { "max": 100, "invulnerable": true, "death_jpeg": "" },
+				// it sees and hears the creatures (ai:perception) and shoots them (gameplay companion.cpp): the ones
+				// going for the player first; game.companion.fire, Windows > AI
+				"Perception": { "sight_range": 32.0, "field_of_view": 220.0, "near_range": 4.0, "eye_height": 1.5, "awareness_rise": 1.5, "awareness_decay": 0.15 },
+				"NpcCombat": { "engage_range": 22.0, "protect_range": 10.0, "reaction_time": 0.35 },
+				"WeaponHolder": { "current": "blaster", "infinite_ammo": true }
 			}
 		},
 		// jackal dens on open meadows away from Sponza (gameplay:jackal JackalDen; spots from
