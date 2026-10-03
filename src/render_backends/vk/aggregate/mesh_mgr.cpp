@@ -435,6 +435,22 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     get_or_create_mesh_buffers(source, RTBuildMode::none);
     const MeshGPUData& src = mesh_map.at(source);
 
+    // device local buffer filled through the shared upload batch: a submit + wait per buffer stalled the game
+    // thread until the GPU finished the frames in flight (40-55 ms per spawned skinned mesh)
+    auto create_uploaded_buffer = [&] (const void* bytes, VkDeviceSize size, VkBufferUsageFlags usage, VkBuffer& buffer,
+        VkDeviceMemory& memory)
+    {
+        create_buffer(instance.device, instance.physical_device, size, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buffer, memory);
+        const UploadStaging staging = command_pool.allocate_upload(size);
+        std::memcpy(staging.data, bytes, size);
+        command_pool.record_upload([&] (VkCommandBuffer cmd)
+        {
+            const VkBufferCopy copy{ .srcOffset = staging.offset, .dstOffset = 0, .size = size };
+            vkCmdCopyBuffer(cmd, staging.buffer, buffer, 1, &copy);
+        });
+    };
+
     SkinnedMeshGPUData data{};
     data.source = source;
     data.vertex_count = src.vertex_count;
@@ -442,7 +458,7 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     data.bone_count = bone_count;
 
     // ---- skin weights ----
-    buffer_manager.create_device_local_buffer_with_data(
+    create_uploaded_buffer(
         skin.data(),
         skin.size() * sizeof(SkinVertex),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -455,13 +471,13 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
         checkf(morphs.offsets.size() == primitive.vertices.size() + 1, "Morph offsets do not match vertex count");
 
         data.morph_count = morph_count;
-        buffer_manager.create_device_local_buffer_with_data(
+        create_uploaded_buffer(
             morphs.offsets.data(),
             morphs.offsets.size() * sizeof(uint32_t),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
             data.morph_offsets_buffer,
             data.morph_offsets_memory);
-        buffer_manager.create_device_local_buffer_with_data(
+        create_uploaded_buffer(
             morphs.deltas.data(),
             morphs.deltas.size() * sizeof(MorphDelta),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -470,7 +486,7 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     }
 
     // ---- skinned output vertices, initialized with bind pose ----
-    buffer_manager.create_device_local_buffer_with_data(
+    create_uploaded_buffer(
         primitive.vertices.data(),
         primitive.vertices.size() * sizeof(Vertex),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
