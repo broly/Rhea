@@ -1,0 +1,38 @@
+{
+	"resource": {
+		"name": "foliage",
+		"usage": "frame",
+		"allowed_stages": [
+			"compute",
+			"vertex",
+			"fragment"
+		],
+		"parameters": {
+			"table": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_FOLIAGE_TABLE",
+				"variable": "u_foliage",
+				"initial_buffer_size": 65536
+			},
+			"heights": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_FOLIAGE_HEIGHTS",
+				"variable": "u_foliage_heights",
+				"initial_buffer_size": 4194304
+			},
+			"mask": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_foliage_mask",
+				"binding": "BINDING_SAMPLER_FOLIAGE_MASK"
+			},
+			"buckets": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_FOLIAGE_BUCKETS",
+				"variable": "u_foliage_buckets",
+				"initial_buffer_size": 65536
+			}
+		},
+		"set": "SET_FOLIAGE"
+	}
+}

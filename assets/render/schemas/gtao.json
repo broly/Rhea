@@ -1,0 +1,76 @@
+{
+	"model_name": "gtao",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "GTAO",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "gtao.comp",
+				"resources": [
+					"camera",
+					"gbuffer",
+					"gtao_main"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "GTAOPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "GTAODenoise1",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "gtao_denoise.comp",
+				"resources": [
+					"gtao_denoise_1"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "GTAODenoisePushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "GTAODenoise2",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "gtao_denoise.comp",
+				"resources": [
+					"gtao_denoise_2"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "GTAODenoisePushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		}
+	]
+}

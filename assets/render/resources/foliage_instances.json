@@ -1,0 +1,27 @@
+{
+	"resource": {
+		"name": "foliage_instances",
+		"usage": "persistent",
+		"allowed_stages": [
+			"compute",
+			"vertex"
+		],
+		"parameters": {
+			"instances": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_FOLIAGE_INSTANCES",
+				"variable": "u_foliage_instances",
+				"initial_buffer_size": 16777216,
+				"device_local": true
+			},
+			"draws": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_FOLIAGE_ARGS",
+				"variable": "u_foliage_draws",
+				"initial_buffer_size": 32768,
+				"device_local": true
+			}
+		},
+		"set": "SET_FOLIAGE_INSTANCES"
+	}
+}

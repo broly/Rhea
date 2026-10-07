@@ -1,0 +1,37 @@
+{
+	"resource": {
+		"name": "probe_capture",
+		"usage": "frame",
+		"allowed_stages": [
+			"vertex",
+			"fragment"
+		],
+		"parameters": {
+			"capture": {
+				"variable": "probe_capture_ubo",
+				"type": "uniform",
+				"ubo": "ProbeCaptureUBO",
+				"binding": "BINDING_UBO_PROBE_CAPTURE"
+			},
+			"source": {
+				"variable": "u_probe_source",
+				"type": "sampler",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_PROBE_SOURCE"
+			},
+			"scratch_specular": {
+				"variable": "u_probe_scratch_specular",
+				"type": "sampler",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_PROBE_SCRATCH_SPECULAR"
+			},
+			"scratch_irradiance": {
+				"variable": "u_probe_scratch_irradiance",
+				"type": "sampler",
+				"sampler": "default",
+				"binding": "BINDING_SAMPLER_PROBE_SCRATCH_IRRADIANCE"
+			}
+		},
+		"set": "SET_PROBE_CAPTURE"
+	}
+}

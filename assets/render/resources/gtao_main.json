@@ -1,0 +1,16 @@
+{
+	"resource": {
+		"name": "gtao_main",
+		"usage": "frame",
+		"allowed_stages": ["compute"],
+		"parameters": {
+			"target": {
+				"type": "image",
+				"sampler": "default",
+				"variable": "u_gtao_raw_target",
+				"binding": "BINDING_IMAGE_GTAO_RAW_TARGET"
+			}
+		},
+		"set": "SET_GTAO_MAIN"
+	}
+}

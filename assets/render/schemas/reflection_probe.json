@@ -1,0 +1,234 @@
+{
+	"model_name": "reflection_probe",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "ProbeCapture",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "probe_capture.vert",
+					"resources": [
+						"probe_capture",
+						"mesh_table",
+						"primitive_table",
+						"draw_list"
+					]
+				},
+				"fragment": {
+					"shader": "probe_capture.frag",
+					"resources": [
+						"probe_capture",
+						"light",
+						"shadow",
+						"reflection",
+						"pbr_material_table",
+						"textures",
+						"draw_list"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"depth_test": true,
+			"depth_write": true,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "ProbeSky",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "probe_sky.frag",
+					"resources": [
+						"probe_capture",
+						"sky"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "ProbeFacePushConstants",
+					"name": "probe_face",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "ProbePrefilter",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "probe_prefilter.frag",
+					"resources": [
+						"probe_capture"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "ProbeFacePushConstants",
+					"name": "probe_face",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "ProbeIrradiance",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "probe_irradiance.frag",
+					"resources": [
+						"probe_capture"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "ProbeFacePushConstants",
+					"name": "probe_face",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "ProbeBlend",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "probe_blend.frag",
+					"resources": [
+						"probe_capture"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B"
+					],
+					"translucent": true
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "ProbeFacePushConstants",
+					"name": "probe_face",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		}
+	]
+}

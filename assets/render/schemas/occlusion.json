@@ -1,0 +1,56 @@
+{
+	"model_name": "occlusion",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "HZBBuild",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "hzb_build.comp",
+				"resources": [
+					"occlusion",
+					"occlusion_depth"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "HZBPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "OcclusionCull",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "occlusion_cull.comp",
+				"resources": [
+					"camera",
+					"draw_list",
+					"occlusion"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "OcclusionCullPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		}
+	]
+}

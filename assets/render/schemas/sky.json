@@ -1,0 +1,214 @@
+{
+	"model_name": "sky",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "SkyMarch",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "sky_march.comp",
+				"resources": [
+					"camera",
+					"gbuffer",
+					"sky",
+					"sky_buffers",
+					"sky_targets"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "SkyMarchPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "Sky",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "sky.frag",
+					"resources": [
+						"camera",
+						"gbuffer",
+						"sky",
+						"sky_buffers"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "CloudShadow",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "cloud_shadow.frag",
+					"resources": [
+						"light",
+						"sky"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "CloudShadowPushConstants",
+					"name": "pc",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "FogMarch",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "fog_march.frag",
+					"resources": [
+						"camera",
+						"gbuffer",
+						"light",
+						"shadow",
+						"reflection",
+						"sky",
+						"fog_buffers"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "FogMarchPushConstants",
+					"name": "pc",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "Fog",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "fog.frag",
+					"resources": [
+						"gbuffer",
+						"fog_buffers"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B"
+					],
+					"translucent": true
+				}
+			],
+			"depth_test": false,
+			"depth_write": false,
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "FogPushConstants",
+					"name": "pc",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		}
+	]
+}

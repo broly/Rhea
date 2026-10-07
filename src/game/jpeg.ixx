@@ -23,11 +23,10 @@ struct JpegPushConstants
     glm::ivec4 extent;  // xy: the used part of the work texture, zw: the source (and target)
     glm::ivec4 mode;    // x: downscale factor (x | y << 8), y: JpegFilter, z: JpegChroma, w: jpeg_flag_*
     glm::ivec4 codec;   // x: quality, yz: grid shift of the generation, w: generation
-    glm::vec4 post;     // x: sharpen, y: present mix, z: masked codec: quality of a weak mask, present: hits on
-    // present only (JpegPresentParams)
+    glm::vec4 post;     // x: sharpen, y: composite mix, z: masked codec: quality of a weak mask, composite: hits on
+    // composite only (JpegCompositeParams)
     glm::vec4 vignette; // x: inner radius, y: feather, z: block px (0: smooth), w: dither seed
     glm::vec4 tint;     // rgb: edge color x strength, w: inner radius of the edge tint
-    glm::vec4 hud;      // x: health, y: health lagging behind (the lost chunk), z: hit flash, w: bar scale (0 hidden)
 };
 RH_REGISTER_TYPE(JpegPushConstants)
 
@@ -88,8 +87,8 @@ export namespace jpeg
     glm::ivec2 grid_shift(uint32_t seed, int generation);
 }
 
-// The pass Present (jpeg_present.frag): how the frame, its shakalized copy and the HUD come together
-export struct JpegPresentParams
+// The pass JpegComposite (jpeg_composite.comp): how the frame and its shakalized copies come together
+export struct JpegCompositeParams
 {
     // share of the shakalized frame over the whole screen, 0..1
     float amount = 0.0f;
@@ -106,13 +105,6 @@ export struct JpegPresentParams
     float tint_radius = 0.6f;
     // the JPEG spots of the hits (jpeg_hits) are on
     bool hits = false;
-    // crosshair arm length in px, 0 hidden
-    float crosshair = 0.0f;
-    // health bar: fraction, the lagging fraction, hit flash 0..1, scale (0 hidden)
-    float health = 1.0f;
-    float health_lag = 1.0f;
-    float health_flash = 0.0f;
-    float health_bar = 0.0f;
 };
 
 // A shakalizer chain of a render graph: passes <name>Downscale, <name>Codec, <name>Output
@@ -173,12 +165,12 @@ public:
         RenderResource* camera, RenderResource* gbuffer, std::function<bool()> condition);
     void prepare_hit_mask(RenderGraphContext& ctx, RBImageHandle mask, const JpegHitsUBO& ubo);
 
-    // present pass (jpeg_present.frag): scene, mixed with result by amount, the blocks under hit_mask replaced
-    // by hit_result, to the bound color attachment. Descriptors from prepare_present (prepare_resources), the
-    // draw inside a graphics pass.
-    void prepare_present(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result, RBImageHandle hit_result,
-        RBImageHandle hit_mask);
-    void draw_present(RenderGraphContext& ctx, const JpegPresentParams& params);
+    // composite pass (jpeg_composite.comp): scene, mixed with result by amount, the blocks under hit_mask replaced
+    // by hit_result, red edges, to target (RGBA8 storage, the size of the scene). Descriptors from
+    // prepare_composite (prepare_resources), the dispatch inside a compute pass.
+    void prepare_composite(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result, RBImageHandle hit_result,
+        RBImageHandle hit_mask, RBImageHandle target);
+    void dispatch_composite(RenderGraphContext& ctx, const JpegCompositeParams& params, Extent extent);
 
 private:
     struct Chain
@@ -211,13 +203,13 @@ private:
     std::shared_ptr<PipelineFamily> downscale_family;
     std::shared_ptr<PipelineFamily> codec_family;
     std::shared_ptr<PipelineFamily> output_family;
-    std::shared_ptr<PipelineFamily> present_family;
+    std::shared_ptr<PipelineFamily> composite_family;
     std::shared_ptr<PipelineFamily> blocks_family;
     std::shared_ptr<PipelineFamily> hit_mask_family;
     PipelineObject* downscale_pipeline = nullptr;
     PipelineObject* codec_pipeline = nullptr;
     PipelineObject* output_pipeline = nullptr;
-    PipelineObject* present_pipeline = nullptr;
+    PipelineObject* composite_pipeline = nullptr;
     PipelineObject* blocks_pipeline = nullptr;
     PipelineObject* hit_mask_pipeline = nullptr;
 
@@ -226,7 +218,7 @@ private:
     uint32_t next_instance = 0;
     uint32_t noise_frame = 0;
     uint32_t next_block_list = 0;
-    std::optional<uint32_t> present_instance;
+    std::optional<uint32_t> composite_instance;
     std::optional<uint32_t> hit_mask_instance;
     RenderResource* hit_mask_camera = nullptr;
     RenderResource* hit_mask_gbuffer = nullptr;

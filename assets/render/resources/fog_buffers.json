@@ -1,0 +1,22 @@
+{
+	"resource": {
+		"name": "fog_buffers",
+		"usage": "frame",
+		"allowed_stages": ["fragment"],
+		"parameters": {
+			"fog": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_fog",
+				"binding": "BINDING_SAMPLER_FOG"
+			},
+			"history": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_fog_history",
+				"binding": "BINDING_SAMPLER_FOG_HISTORY"
+			}
+		},
+		"set": "SET_FOG_BUFFERS"
+	}
+}

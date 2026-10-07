@@ -673,6 +673,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         });
     }
 
+    add_extension_passes(RenderStage::after_gbuffer);
+
     // emissive watch ring (see EMISSIVE_RING_SIZE): g_emissive as the base pass left it
     if (emissive_diagnostics_enabled())
     add_pass({
@@ -1170,6 +1172,8 @@ void GenericRenderGraph::build_passes(const std::map<Name, bool>& parameters)
         });
     }
 
+    add_extension_passes(RenderStage::after_lighting);
+
     if (readback_nn && render_settings::enable_raytracing)
     {
         add_exr_dump_pass({
@@ -1359,6 +1363,24 @@ void GenericRenderGraph::prepare_resources(RenderGraphContext& ctx)
     if constexpr (render_settings::enable_nn_denoiser)
     {
         nn_denoiser::prepare_resources(nn_denoiser_state, ctx);
+    }
+
+    for (RenderGraphExtension* extension : built_extensions)
+    {
+        PROFILE("RenderGraphExtension::prepare");
+        extension->prepare(ctx, *this);
+    }
+}
+
+void GenericRenderGraph::add_extension_passes(RenderStage stage)
+{
+    if (!runs_extensions)
+        return;
+    const std::function<bool()> active = [this] () { return !is_debugging(); };
+    for (RenderGraphExtension* extension : RenderGraphExtension::of_stage(stage))
+    {
+        extension->build(*this, active);
+        built_extensions.push_back(extension);
     }
 }
 

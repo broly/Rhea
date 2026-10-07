@@ -460,6 +460,12 @@ public:
     PipelineObject* debug_lines_pipeline = nullptr;
     PipelineObject* taa_pipeline = nullptr;
 
+    // RenderGraphExtension: only the graph which presents (GameRenderGraph) runs them. add_extension_passes adds
+    // the passes of a stage (from build_passes), prepare_resources prepares the extensions it added.
+    bool runs_extensions = false;
+    std::vector<RenderGraphExtension*> built_extensions;
+    void add_extension_passes(RenderStage stage);
+
     // TAA (add_taa_passes): only the graph which presents (GameRenderGraph) jitters its projection
     bool taa_supported = false;
     uint32_t taa_frame = 0;

@@ -1,0 +1,28 @@
+{
+	"resource": {
+		"name": "sky_buffers",
+		"usage": "frame",
+		"allowed_stages": ["fragment", "compute"],
+		"parameters": {
+			"atmosphere": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_atmosphere",
+				"binding": "BINDING_SAMPLER_ATMOSPHERE"
+			},
+			"clouds": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_clouds",
+				"binding": "BINDING_SAMPLER_CLOUDS"
+			},
+			"history": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_clouds_history",
+				"binding": "BINDING_SAMPLER_CLOUDS_HISTORY"
+			}
+		},
+		"set": "SET_SKY_BUFFERS"
+	}
+}

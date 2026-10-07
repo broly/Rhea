@@ -1,0 +1,16 @@
+{
+	"resource": {
+		"name": "present",
+		"usage": "frame",
+		"set": "SET_PRESENT",
+		"allowed_stages": ["fragment"],
+		"parameters": {
+			"source": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_present_source",
+				"binding": "BINDING_SAMPLER_PRESENT_SOURCE"
+			}
+		}
+	}
+}

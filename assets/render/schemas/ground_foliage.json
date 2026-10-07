@@ -1,0 +1,123 @@
+{
+	"model_name": "ground_foliage",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "FoliageCull",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "foliage_cull.comp",
+				"resources": [
+					"camera",
+					"foliage",
+					"foliage_instances",
+					"occlusion"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "FoliageCullPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "GroundFoliage",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "ground_foliage.vert",
+					"resources": [
+						"camera",
+						"mesh_table",
+						"foliage",
+						"foliage_instances"
+					]
+				},
+				"fragment": {
+					"shader": "ground_foliage.frag",
+					"resources": [
+						"camera",
+						"pbr_material_table",
+						"textures"
+					]
+				}
+			},
+			"depth_write": true,
+			"depth_test": true,
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				},
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				},
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				},
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				},
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				},
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [],
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		}
+	]
+}

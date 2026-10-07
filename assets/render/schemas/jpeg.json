@@ -1,0 +1,141 @@
+{
+	"model_name": "jpeg",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "JpegDownscale",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "jpeg_downscale.comp",
+				"resources": [
+					"jpeg"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "JpegPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "JpegCodec",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "jpeg_codec.comp",
+				"resources": [
+					"jpeg",
+					"jpeg_blocks"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "JpegPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "JpegOutput",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "jpeg_output.comp",
+				"resources": [
+					"jpeg"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "JpegPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "JpegBlocks",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "jpeg_blocks.comp",
+				"resources": [
+					"jpeg",
+					"jpeg_blocks"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "JpegPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "JpegHitMask",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "jpeg_hit_mask.comp",
+				"resources": [
+					"camera",
+					"gbuffer",
+					"jpeg"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "JpegPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "JpegComposite",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "jpeg_composite.comp",
+				"resources": [
+					"jpeg"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "JpegPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		}
+	]
+}

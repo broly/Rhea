@@ -1,0 +1,28 @@
+{
+	"resource": {
+		"name": "draw_list",
+		"usage": "frame",
+		"allowed_stages": ["vertex", "fragment", "compute"],
+		"parameters": {
+			"records": {
+				"type": "ssbo",
+				"binding": "BINDING_DRAW_RECORDS",
+				"variable": "u_draw_records",
+				"initial_buffer_size": 1048576
+			},
+			"commands": {
+				"type": "ssbo",
+				"binding": "BINDING_DRAW_COMMANDS",
+				"variable": "u_draw_commands",
+				"initial_buffer_size": 1048576
+			},
+			"bounds": {
+				"type": "ssbo",
+				"binding": "BINDING_DRAW_BOUNDS",
+				"variable": "u_draw_bounds",
+				"initial_buffer_size": 2097152
+			}
+		},
+		"set": "SET_DRAW_LIST"
+	}
+}

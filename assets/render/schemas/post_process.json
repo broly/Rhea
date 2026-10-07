@@ -1,0 +1,74 @@
+{
+	"model_name": "post_process",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "BloomDownsample",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "bloom_downsample.comp",
+				"resources": [
+					"post_process"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "BloomPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "BloomUpsample",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "bloom_upsample.comp",
+				"resources": [
+					"post_process"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "BloomPushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Compute",
+			"pass": "AutoExposure",
+			"requirements": "",
+			"enum_white_list": {},
+			"shader_stage": {
+				"shader": "auto_exposure.comp",
+				"resources": [
+					"post_process"
+				]
+			},
+			"push_constants": [
+				{
+					"type": "AutoExposurePushConstants",
+					"name": "pc",
+					"stages": [
+						"compute"
+					]
+				}
+			]
+		}
+	]
+}

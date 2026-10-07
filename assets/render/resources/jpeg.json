@@ -1,0 +1,61 @@
+{
+	"resource": {
+		"name": "jpeg",
+		"usage": "frame",
+		"set": "SET_JPEG",
+		"allowed_stages": [
+			"fragment",
+			"compute"
+		],
+		"parameters": {
+			"source": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_jpeg_source",
+				"binding": "BINDING_SAMPLER_JPEG_SOURCE"
+			},
+			"work": {
+				"type": "image",
+				"sampler": "linear_clamp",
+				"variable": "u_jpeg_work",
+				"binding": "BINDING_IMAGE_JPEG_WORK"
+			},
+			"target": {
+				"type": "image",
+				"sampler": "linear_clamp",
+				"variable": "u_jpeg_target",
+				"binding": "BINDING_IMAGE_JPEG_TARGET"
+			},
+			"result": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_jpeg_result",
+				"binding": "BINDING_SAMPLER_JPEG_RESULT"
+			},
+			"hits": {
+				"type": "uniform",
+				"ubo": "JpegHitsUBO",
+				"binding": "BINDING_UBO_JPEG_HITS",
+				"variable": "jpeg_hits_ubo"
+			},
+			"mask": {
+				"type": "image",
+				"sampler": "linear_clamp",
+				"variable": "u_jpeg_mask",
+				"binding": "BINDING_IMAGE_JPEG_MASK"
+			},
+			"mask_sampled": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_jpeg_mask_sampled",
+				"binding": "BINDING_SAMPLER_JPEG_MASK"
+			},
+			"hit_result": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_jpeg_hit_result",
+				"binding": "BINDING_SAMPLER_JPEG_HIT_RESULT"
+			}
+		}
+	}
+}

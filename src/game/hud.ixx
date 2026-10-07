@@ -4,7 +4,7 @@ import std.compat;
 import cvar;
 
 // The few things the game draws over the frame before there is a game UI (E11), drawn by the pass Present
-// (jpeg_present.frag), so they show with the debug UI hidden too:
+// (present.frag), so they show with the debug UI hidden too:
 //   - the crosshair in the middle of the screen (where the weapons aim: the ray of the camera's center)
 //   - the health bar in the bottom left corner: the health, the chunk just lost (holds, then drains) and a flash
 //     on hits

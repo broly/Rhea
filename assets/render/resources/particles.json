@@ -1,0 +1,16 @@
+{
+	"resource": {
+		"name": "particles",
+		"usage": "frame",
+		"allowed_stages": ["vertex", "fragment"],
+		"parameters": {
+			"particles": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_PARTICLES",
+				"variable": "u_particles",
+				"initial_buffer_size": 2097152
+			}
+		},
+		"set": "SET_PARTICLES"
+	}
+}

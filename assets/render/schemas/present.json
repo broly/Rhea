@@ -1,0 +1,56 @@
+{
+	"model_name": "present",
+	"enums": {},
+	"uniform_buffers": {},
+	"permutations": {
+		"flags": {},
+		"enums": {}
+	},
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "Present",
+			"requirements": "",
+			"stages": {
+				"vertex": {
+					"shader": "fullscreen.vert",
+					"resources": []
+				},
+				"fragment": {
+					"shader": "present.frag",
+					"resources": [
+						"present"
+					]
+				}
+			},
+			"color_attachments": [
+				{
+					"write_mask": [
+						"R",
+						"G",
+						"B",
+						"A"
+					],
+					"translucent": false
+				}
+			],
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "greater",
+			"push_constants": [
+				{
+					"type": "PresentPushConstants",
+					"name": "pc",
+					"stages": [
+						"fragment"
+					]
+				}
+			],
+			"translucent": false,
+			"depth_test": false,
+			"depth_write": false,
+			"topology": "triangle_list",
+			"vertex_layouts": []
+		}
+	]
+}

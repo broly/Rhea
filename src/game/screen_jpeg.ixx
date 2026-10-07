@@ -134,7 +134,7 @@ export namespace screen_jpeg
         bool active = false;
         // share of the shakalized frame over the whole screen (the hit pulse), 0..1
         float amount = 0.0f;
-        // the health vignette (JpegPresentParams); radius above 2: off
+        // the health vignette (JpegCompositeParams); radius above 2: off
         float vignette_radius = 10.0f;
         float vignette_feather = 0.3f;
         float block = 0.0f;

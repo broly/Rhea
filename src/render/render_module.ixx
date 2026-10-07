@@ -2,6 +2,7 @@
 
 export import :renderer;
 export import :render_graph;
+export import :graph_extension;
 export import :render_backend;
 export import :handle_types;
 export import :pipeline_object;

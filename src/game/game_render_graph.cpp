@@ -29,7 +29,8 @@ import gameplay;
 GameRenderGraph::GameRenderGraph()
 {
     allow_shadow_debug = false;
-    
+    runs_extensions = true;
+
     num_pass_instances = 1;
     capture_dimension = TextureDimension::Tex2D;
     resolution = Constants::zero_extent;
@@ -68,40 +69,20 @@ void GameRenderGraph::init_resources(const std::map<Name, bool>& init_params)
         .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
     });
 
-    jpeg_renderer = std::make_unique<JpegRenderer>();
-    jpeg_renderer->init(*renderer, *backend);
-    // divisor 1: the screen size, kept through resizes (the shakalizer reads the extent)
+    // divisor 1: the screen size, kept through resizes (the shakalizer reads the extent). Extensions of
+    // RenderStage::after_tonemap may copy their result back into it
     ldr_color = create_texture({
         .name = "ldr_color",
         .extent_divisor = 1,
         .format = TextureFormat::RGBA8_UNORM,
-        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled,
+        .usage = RenderTextureUsage::ColorAttachment | RenderTextureUsage::Sampled | RenderTextureUsage::TransferDst,
     });
-    screen_jpeg_color = create_texture({
-        .name = "screen_jpeg",
-        .extent_divisor = 1,
-        .format = TextureFormat::RGBA8_UNORM,
-        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
-    });
-    // one texel per 8 x 8 pixels (JPEG_MASK_BLOCK), a channel per hit slot
-    hit_mask = create_texture({
-        .name = "jpeg_hit_mask",
-        .extent_divisor = 8,
-        .format = TextureFormat::RGBA8_UNORM,
-        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
-    });
-    hit_jpeg_work = create_texture({
-        .name = "hit_jpeg_work",
-        .extent_divisor = 1,
-        .format = TextureFormat::RGBA8_UNORM,
-        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
-    });
-    hit_jpeg_color = create_texture({
-        .name = "hit_jpeg",
-        .extent_divisor = 1,
-        .format = TextureFormat::RGBA8_UNORM,
-        .usage = RenderTextureUsage::Storage | RenderTextureUsage::Sampled,
-    });
+
+    present_resource = renderer->find_resource("present");
+    checkf(present_resource, "resource 'present' is missing (assets/render/resources/present.json)");
+    auto present_model = renderer->find_model("present");
+    checkf(present_model, "material model 'present' is missing (assets/render/schemas/present.json)");
+    present_family = renderer->query_pipeline_family("Present", present_model);
 }
 
 void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
@@ -158,65 +139,35 @@ void GameRenderGraph::build_passes(const std::map<Name, bool>& parameters)
             },
     });
     
-    // full screen JPEG damage (screen_jpeg): only while the player is hurt or hit
-    jpeg_renderer->add_chain(*this, {
-        .name = "ScreenJpeg",
-        .source = ldr_color,
-        .target = screen_jpeg_color,
-        .condition = [this] () { return !is_debugging() && screen_jpeg_state.active; },
-        .settings = [this] () { return screen_jpeg_state.settings; },
-    });
-
-    // JPEG spots of the hits (jpeg_hits): only while a hit lives, a chain per slot (the preset of a weapon)
-    jpeg_renderer->add_hit_mask_pass(*this, hit_mask, gbuffer[GBUFFER_SLOTS::LINEAR_DEPTH], gbuffer[GBUFFER_SLOTS::GEOMETRY_NORMAL],
-        camera_resource, gbuffer_resource, [this] () { return !is_debugging() && hits_frame.any; });
-    for (uint32_t slot = 0; slot < jpeg_hits::slot_count; ++slot)
-    {
-        jpeg_renderer->add_chain(*this, {
-            .name = Name(std::format("HitJpeg{}", slot)),
-            .source = ldr_color,
-            .target = hit_jpeg_color,
-            .condition = [this, slot] () { return !is_debugging() && hits_frame.slot_active[slot]; },
-            .settings = [this, slot] () { return hits_frame.slot_settings[slot]; },
-            .mask = hit_mask,
-            .mask_channel = slot,
-            .work = hit_jpeg_work,
-        });
-    }
+    // the JPEG screen effects (jpeg_extension.cpp) and whatever else works on the tone mapped frame
+    add_extension_passes(RenderStage::after_tonemap);
 
     add_pass({
         .name = "Present",
         .condition = [this] () { return !is_debugging(); },
         .reads = {
             { ldr_color, RBImageUsageType::SampledFragment },
-            { screen_jpeg_color, RBImageUsageType::SampledFragment },
-            { hit_jpeg_color, RBImageUsageType::SampledFragment },
-            { hit_mask, RBImageUsageType::SampledFragment },
         },
         .writes = {
             { swapchain_color, RBImageUsageType::ColorAttachment, RBLoadOp::Clear }
         },
         .execute = [this] (RenderGraphContext& ctx)
         {
-            const screen_jpeg::State& damage = screen_jpeg_state;
+            PROFILE("Present");
+            if (!ctx.bind_pipeline(present_pipeline))
+                return;
+            ctx.bind(present_resource);
             const hud::HealthBar bar = hud::health_bar();
-            jpeg_renderer->draw_present(ctx, {
-                .amount = damage.active ? damage.amount : 0.0f,
-                .vignette_radius = damage.active ? damage.vignette_radius : 10.0f,
-                .vignette_feather = damage.vignette_feather,
-                .block = damage.block,
-                .seed = damage.seed,
-                .tint = damage.tint,
-                .tint_radius = damage.tint_radius,
-                .hits = hits_frame.any,
-                .crosshair = hud::crosshair_size(),
-                .health = bar.health,
-                .health_lag = bar.lag,
-                .health_flash = bar.flash,
-                .health_bar = bar.scale,
+            ctx.push_constants(PresentPushConstants{
+                .hud = glm::vec4(std::clamp(bar.health, 0.0f, 1.0f), std::clamp(bar.lag, 0.0f, 1.0f),
+                    std::clamp(bar.flash, 0.0f, 1.0f), std::max(bar.scale, 0.0f)),
+                .crosshair = glm::vec4(std::max(hud::crosshair_size(), 0.0f), 0.0f, 0.0f, 0.0f),
             });
+            ctx.draw_fullscreen();
         },
     });
+
+    add_extension_passes(RenderStage::overlay);
 
     // wireframe / skeleton on top of the tonemapped image
     add_debug_overlay_pass();
@@ -288,16 +239,12 @@ void GameRenderGraph::prepare_resources(RenderGraphContext& ctx)
         post_inputs.up[level] = get_image(bloom_up[level]);
     post_renderer->prepare(ctx, post_inputs);
 
-    const float jpeg_delta = (float)RhGlobals::engine->world->get_delta_seconds();
-    screen_jpeg::tick(jpeg_delta);
-    screen_jpeg_state = screen_jpeg::evaluate();
+    // the hits it adds show from the next frame (the JPEG screen effects took this frame's in prepare)
     run_camera_commands();
-    jpeg_hits::tick(jpeg_delta);
-    hits_frame = jpeg_hits::update();
-    jpeg_renderer->prepare(ctx, *this);
-    jpeg_renderer->prepare_hit_mask(ctx, get_image(hit_mask), hits_frame.ubo);
-    jpeg_renderer->prepare_present(ctx, get_image(ldr_color), get_image(screen_jpeg_color), get_image(hit_jpeg_color),
-        get_image(hit_mask));
+
+    // pipelines are requested every frame: hot reload drops the PSO cache
+    present_pipeline = present_family->request_pipeline({});
+    present_resource->update_image("u_present_source", get_image(ldr_color), { .frame = ctx.frame });
 
     auto shadow_debug_instance = shadow_resource->query_single();
     

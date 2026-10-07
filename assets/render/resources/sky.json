@@ -1,0 +1,28 @@
+{
+	"resource": {
+		"name": "sky",
+		"usage": "frame",
+		"allowed_stages": ["fragment", "compute"],
+		"parameters": {
+			"sky": {
+				"type": "uniform",
+				"ubo": "SkyUBO",
+				"binding": "BINDING_UBO_SKY",
+				"variable": "sky_ubo"
+			},
+			"cloud_shape": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_cloud_shape",
+				"binding": "BINDING_SAMPLER_CLOUD_SHAPE"
+			},
+			"cloud_detail": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_cloud_detail",
+				"binding": "BINDING_SAMPLER_CLOUD_DETAIL"
+			}
+		},
+		"set": "SET_SKY"
+	}
+}

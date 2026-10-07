@@ -311,6 +311,22 @@ public:
     void compile();
     void execute(RBCommandList cmd, RBFrameHandle frame, const RenderGraphParameters& params, RGPostRenderCallback callback);
     
+    // a texture by the name it was created with (create_textures: "<name>[<element>]")
+    std::optional<RGTextureHandle> find_texture(Name name) const
+    {
+        for (uint32_t id = 0; id < textures.size(); ++id)
+            if (textures[id].desc.name == name)
+                return RGTextureHandle{ id, name };
+        return std::nullopt;
+    }
+
+    RGTextureHandle texture(Name name) const
+    {
+        const std::optional<RGTextureHandle> found = find_texture(name);
+        checkf(found.has_value(), "The render graph has no texture '%s'", name.to_string().c_str());
+        return *found;
+    }
+
     std::optional<RBImageHandle> get_image_by_name(Name name)
     {
         for (auto& texture : textures)

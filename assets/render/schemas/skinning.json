@@ -1,0 +1,26 @@
+{
+    "model_name": "skinning",
+    "permutations": {
+        "flags": {},
+        "enums": {}
+    },
+    "pipelines": [
+        {
+            "__type__": "PipelineInfo_Compute",
+            "pass": "Skinning",
+            "shader_stage": {
+                "shader": "skinning.comp",
+                "resources": []
+            },
+            "push_constants": [
+                {
+                    "type": "SkinningPushConstants",
+                    "name": "skinning",
+                    "stages": [
+                        "compute"
+                    ]
+                }
+            ]
+        }
+    ]
+}

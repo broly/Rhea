@@ -18,8 +18,6 @@ import engine;
 import assets;
 import :generic_render_graph;
 import :post_process;
-import :jpeg;
-import :screen_jpeg;
 import :jpeg_hits;
 import :damage_feedback;
 import :hud;
@@ -34,6 +32,14 @@ struct TonemapPushConstants
     uint32_t view_mode;   // DebugViewMode
 };
 RH_REGISTER_TYPE(TonemapPushConstants)
+
+// shaders/present.frag
+struct PresentPushConstants
+{
+    glm::vec4 hud;          // x: health, y: health lagging behind, z: hit flash, w: health bar scale (0 hidden)
+    glm::vec4 crosshair;    // x: arm length (px), 0 hidden
+};
+RH_REGISTER_TYPE(PresentPushConstants)
 
 
 class GameRenderGraph : public GenericRenderGraph
@@ -52,7 +58,6 @@ public:
     void pass_readback(RenderGraphContext& ctx);
 
     std::unique_ptr<PostProcessRenderer> post_renderer;
-    std::unique_ptr<JpegRenderer> jpeg_renderer;
 
 private:
     // bloom chain and auto exposure between TAA and the tone mapping (PostProcessRenderer)
@@ -65,18 +70,13 @@ private:
     // adapted exposure and the luminance histogram (resources/post_process.glsl)
     RGTextureHandle exposure;
 
-    // the tone mapped frame (display encoded): pass Present copies it to the swapchain, mixed with screen_jpeg_color
+    // the tone mapped frame (display encoded): the extensions of RenderStage::after_tonemap work on it (the JPEG
+    // screen effects, jpeg_extension.cpp), pass Present copies it to the swapchain with the HUD (present.frag)
     RGTextureHandle ldr_color;
-    // ldr_color through the shakalizer (chain ScreenJpeg): the full screen JPEG damage
-    RGTextureHandle screen_jpeg_color;
-    screen_jpeg::State screen_jpeg_state;
-    // JPEG spots of the hits (jpeg_hits): strength per 8 x 8 block of the screen and hit slot (RGBA8, pass
-    // JpegHitMask); ldr_color through the masked chains HitJpeg0..3 (a slot each: only the MCUs under its channel
-    // are coded, the blocks it wins written to hit_jpeg_color). The chains share their work texture.
-    RGTextureHandle hit_mask;
-    RGTextureHandle hit_jpeg_work;
-    RGTextureHandle hit_jpeg_color;
-    jpeg_hits::Frame hits_frame;
+    RenderResource* present_resource = nullptr;
+    std::shared_ptr<PipelineFamily> present_family;
+    PipelineObject* present_pipeline = nullptr;
+
     // debug commands aimed with the camera (render.jpeg.hits.shoot, damage.look): the first static / dynamic body
     // through the middle of the screen (the player's capsule is a character: not hit)
     std::optional<phys::Hit> camera_center_hit() const;

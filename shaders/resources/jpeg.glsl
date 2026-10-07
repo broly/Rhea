@@ -9,8 +9,8 @@
 //   jpeg_hit_mask.comp    jpeg_hits_ubo (world spheres), the depth -> u_jpeg_mask (RGBA8, one texel per 8 x 8
 //                         block, a channel per hit slot)
 //   jpeg_blocks.comp      u_jpeg_mask -> u_jpeg_blocks (resource jpeg_blocks): the MCUs a masked chain codes
-//   jpeg_present.frag     u_jpeg_source (the frame), u_jpeg_result (its shakalized copy), u_jpeg_hit_result and
-//                         u_jpeg_mask_sampled (the hits) -> the swapchain
+//   jpeg_composite.comp   u_jpeg_source (the frame), u_jpeg_result (its shakalized copy), u_jpeg_hit_result and
+//                         u_jpeg_mask_sampled (the hits) -> u_jpeg_target
 //
 // u_jpeg_work holds display encoded 8 bit RGB in its top left corner (the rest is unused): a JPEG encoder
 // sees the same values a JPEG file of the frame would hold.
@@ -77,7 +77,7 @@
 layout(set = SET_JPEG, binding = BINDING_SAMPLER_JPEG_SOURCE)
 uniform sampler2D u_jpeg_source;
 
-// the fragment shader of the present pass defines JPEG_NO_IMAGES: it neither reads nor writes storage images
+// a fragment shader may define JPEG_NO_IMAGES: it neither reads nor writes storage images
 #ifndef JPEG_NO_IMAGES
 layout(set = SET_JPEG, binding = BINDING_IMAGE_JPEG_WORK, rgba8)
 uniform image2D u_jpeg_work;
@@ -114,14 +114,13 @@ layout(push_constant) uniform JpegPushConstants
     ivec4 extent;   // xy: the used part of u_jpeg_work (source / downscale, rounded up), zw: the source and target
     ivec4 mode;     // x: downscale factor (jpeg_factor), y: JPEG_FILTER_*, z: JPEG_CHROMA_*, w: JPEG_FLAG_*
     ivec4 codec;    // x: quality 1..100, yz: grid shift of this generation (px of u_jpeg_work), w: generation
-    vec4 post;      // x: sharpen, y: downscale: brightness gain, present: mix of the full screen damage,
+    vec4 post;      // x: sharpen, y: downscale: brightness gain, composite: mix of the full screen damage,
                     // z: codec with JPEG_FLAG_BLOCK_LIST: quality where the mask is weak (pc.codec.x where it is 1),
-                    // present: 1 shows the hits, w: downscale: noise amplitude, present: crosshair arm (px)
+                    // composite: 1 shows the hits, w: downscale: noise amplitude
                     // codec.y in the downscale: noise seed (frame)
-    // present only (JpegPresentParams)
+    // composite only (JpegCompositeParams)
     vec4 vignette;  // x: inner radius, y: feather, z: block px (0: smooth), w: dither seed
     vec4 tint;      // rgb: red edge color x strength, w: its inner radius
-    vec4 hud;       // x: health, y: health lagging behind, z: hit flash, w: health bar scale (0 hidden)
 } pc;
 
 // the downscale factor per axis (mode.x: x | y << 8)

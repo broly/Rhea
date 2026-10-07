@@ -1,0 +1,22 @@
+{
+	"resource": {
+		"name": "gtao_denoise_1",
+		"usage": "frame",
+		"allowed_stages": ["compute"],
+		"parameters": {
+			"source": {
+				"type": "sampler",
+				"sampler": "default",
+				"variable": "u_gtao_denoise_source",
+				"binding": "BINDING_SAMPLER_GTAO_DENOISE_SOURCE"
+			},
+			"target": {
+				"type": "image",
+				"sampler": "default",
+				"variable": "u_gtao_denoise_target",
+				"binding": "BINDING_IMAGE_GTAO_DENOISE_TARGET"
+			}
+		},
+		"set": "SET_GTAO_DENOISE"
+	}
+}

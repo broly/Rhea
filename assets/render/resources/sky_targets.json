@@ -1,0 +1,22 @@
+{
+	"resource": {
+		"name": "sky_targets",
+		"usage": "frame",
+		"allowed_stages": ["compute"],
+		"parameters": {
+			"atmosphere": {
+				"type": "image",
+				"sampler": "default",
+				"variable": "u_atmosphere_target",
+				"binding": "BINDING_IMAGE_ATMOSPHERE_TARGET"
+			},
+			"clouds": {
+				"type": "image",
+				"sampler": "default",
+				"variable": "u_clouds_target",
+				"binding": "BINDING_IMAGE_CLOUDS_TARGET"
+			}
+		},
+		"set": "SET_SKY_TARGETS"
+	}
+}

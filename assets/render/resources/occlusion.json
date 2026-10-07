@@ -1,0 +1,31 @@
+{
+	"resource": {
+		"name": "occlusion",
+		"usage": "persistent",
+		"allowed_stages": ["compute"],
+		"parameters": {
+			"visibility": {
+				"type": "ssbo",
+				"binding": "BINDING_OCCLUSION_VISIBILITY",
+				"variable": "u_visibility",
+				"initial_buffer_size": 262144,
+				"device_local": true
+			},
+			"commands": {
+				"type": "ssbo",
+				"binding": "BINDING_OCCLUSION_COMMANDS",
+				"variable": "u_cull_commands",
+				"initial_buffer_size": 2097152,
+				"device_local": true
+			},
+			"hzb": {
+				"type": "ssbo",
+				"binding": "BINDING_OCCLUSION_HZB",
+				"variable": "u_hzb",
+				"initial_buffer_size": 8388608,
+				"device_local": true
+			}
+		},
+		"set": "SET_OCCLUSION"
+	}
+}

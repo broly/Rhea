@@ -1,0 +1,135 @@
+{
+	"model_name": "foliage",
+
+	"supports_masked": true,
+
+	"permutations": {
+		"flags": {
+			"USE_BASE_COLOR": "base_color",
+			"USE_NORMAL_MAP": "normal",
+			"USE_ORM": "orm"
+		},
+		"enums": {
+			"blend_mode": {
+				"opaque": "BLEND_MODE_OPAQUE",
+				"masked": "BLEND_MODE_MASKED",
+				"translucent": "BLEND_MODE_TRANSLUCENT"
+			}
+		}
+	},
+
+	"material_info": {
+		"structure": "GPUMaterial",
+		"params": {
+			"blend_mode":        { "type": "definition", "definition": "blend_mode" },
+
+			"base_color_factor": { "type": "float", "member": "params0", "offset": 0 },
+			"emissive_factor":   { "type": "float", "member": "params0", "offset": 1 },
+			"opacity_clip":      { "type": "float", "member": "params0", "offset": 2 },
+			"normal_strength":   { "type": "float", "member": "params0", "offset": 3 },
+
+			"roughness_factor":  { "type": "float", "member": "params1", "offset": 0 },
+			"metallic_factor":   { "type": "float", "member": "params1", "offset": 1 },
+			"occlusion_factor":  { "type": "float", "member": "params1", "offset": 2 },
+
+			"transmission":      { "type": "vec4", "member": "params2", "offset": 0 },
+
+			"base_color":        { "type": "texture", "member": "textures0", "offset": 0 },
+			"normal":            { "type": "texture", "member": "textures0", "offset": 1 },
+			"orm":               { "type": "texture", "member": "textures0", "offset": 2 }
+		}
+	},
+
+	"pipelines": [
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "GeometryBase",
+			"requirements": "blend_mode != translucent",
+			"stages": {
+				"vertex": {
+					"shader": "geometry.vert",
+					"resources": ["camera", "mesh_table", "primitive_table", "draw_list"]
+				},
+				"fragment": {
+					"shader": "foliage.frag",
+					"resources": ["camera", "light", "shadow", "reflection", "pbr_material_table", "textures", "draw_list"]
+				}
+			},
+			"depth_write": true,
+			"depth_test": true,
+
+			"color_attachments": [
+				{ "write_mask": ["R", "G", "B", "A"], "translucent": false },
+				{ "write_mask": ["R", "G", "B", "A"], "translucent": false },
+				{ "write_mask": ["R", "G", "B", "A"], "translucent": false },
+				{ "write_mask": ["R", "G", "B", "A"], "translucent": false },
+				{ "write_mask": ["R", "G", "B", "A"], "translucent": false },
+				{ "write_mask": ["R", "G", "B", "A"], "translucent": false }
+			],
+
+			"cull_mode": "none",
+			"front_face": "CW",
+			"compare_op": "less_or_equal",
+			"push_constants": [
+				{
+					"type": "ModelPushConstants",
+					"name": "model",
+					"stages": ["vertex", "fragment"]
+				}
+			],
+			"topology": "triangle_list",
+			"vertex_layouts": [
+				{
+					"vertex_type": "Vertex",
+					"attributes": []
+				}
+			]
+		},
+		{
+			"__type__": "PipelineInfo_Graphics",
+			"pass": "shadowmap",
+			"requirements": "blend_mode != translucent",
+			"stages": {
+				"vertex": {
+					"shader": "foliage_shadow.vert",
+					"resources": ["light", "primitive_table", "mesh_table", "draw_list"]
+				},
+				"fragment": {
+					"shader": "foliage_shadow.frag",
+					"resources": ["light", "pbr_material_table", "textures", "draw_list"]
+				}
+			},
+			"depth_write": true,
+			"depth_test": true,
+			"cull_mode": "none",
+			"front_face": "CCW",
+			"compare_op": "less",
+			"color_attachments": [
+				{
+					"write_mask": ["R", "G", "B", "A"],
+					"translucent": false
+				}
+			],
+			"push_constants": [
+				{
+					"type": "ModelPushConstants",
+					"name": "model",
+					"stages": ["vertex", "fragment"]
+				}
+			],
+			"depth_bias": {
+				"enable": true,
+				"constant_factor": 0.1,
+				"slope_factor": 1.0,
+				"clamp": 0
+			},
+			"topology": "triangle_list",
+			"vertex_layouts": [
+				{
+					"vertex_type": "Vertex",
+					"attributes": []
+				}
+			]
+		}
+	]
+}

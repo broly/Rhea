@@ -17,7 +17,7 @@ import texture_format;
 
 namespace
 {
-    // local size of jpeg_downscale.comp and jpeg_output.comp
+    // local size of jpeg_downscale.comp, jpeg_output.comp and jpeg_composite.comp
     constexpr uint32_t group = 8;
 
     // jpeg_flag_* of JpegPushConstants::mode.w (JPEG_FLAG_* in shaders/resources/jpeg.glsl)
@@ -109,7 +109,7 @@ void JpegRenderer::init(Renderer& in_renderer, RenderBackend& in_backend)
     downscale_family = renderer->query_pipeline_family("JpegDownscale", model);
     codec_family = renderer->query_pipeline_family("JpegCodec", model);
     output_family = renderer->query_pipeline_family("JpegOutput", model);
-    present_family = renderer->query_pipeline_family("JpegPresent", model);
+    composite_family = renderer->query_pipeline_family("JpegComposite", model);
     blocks_family = renderer->query_pipeline_family("JpegBlocks", model);
     hit_mask_family = renderer->query_pipeline_family("JpegHitMask", model);
 }
@@ -207,7 +207,7 @@ void JpegRenderer::prepare(RenderGraphContext& ctx, RenderGraph& graph)
     downscale_pipeline = downscale_family->request_pipeline({});
     codec_pipeline = codec_family->request_pipeline({});
     output_pipeline = output_family->request_pipeline({});
-    present_pipeline = present_family->request_pipeline({});
+    composite_pipeline = composite_family->request_pipeline({});
     blocks_pipeline = blocks_family->request_pipeline({});
     hit_mask_pipeline = hit_mask_family->request_pipeline({});
 
@@ -401,34 +401,34 @@ void JpegRenderer::prepare_hit_mask(RenderGraphContext& ctx, RBImageHandle mask,
     resource->update_uniform_buffer("jpeg_hits_ubo", ubo, ctx.frame, *hit_mask_instance);
 }
 
-void JpegRenderer::prepare_present(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result,
-    RBImageHandle hit_result, RBImageHandle hit_mask)
+void JpegRenderer::prepare_composite(RenderGraphContext& ctx, RBImageHandle scene, RBImageHandle result,
+    RBImageHandle hit_result, RBImageHandle hit_mask, RBImageHandle target)
 {
-    if (!present_instance)
-        present_instance = next_instance++;
+    if (!composite_instance)
+        composite_instance = next_instance++;
 
     const UpdateImageParams params{ .frame = ctx.frame };
-    resource->update_image("u_jpeg_source", scene, params, *present_instance);
-    resource->update_image("u_jpeg_result", result, params, *present_instance);
-    resource->update_image("u_jpeg_hit_result", hit_result, params, *present_instance);
-    resource->update_image("u_jpeg_mask_sampled", hit_mask, params, *present_instance);
+    resource->update_image("u_jpeg_source", scene, params, *composite_instance);
+    resource->update_image("u_jpeg_result", result, params, *composite_instance);
+    resource->update_image("u_jpeg_hit_result", hit_result, params, *composite_instance);
+    resource->update_image("u_jpeg_mask_sampled", hit_mask, params, *composite_instance);
+    resource->update_image("u_jpeg_target", target, params, *composite_instance);
 }
 
-void JpegRenderer::draw_present(RenderGraphContext& ctx, const JpegPresentParams& p)
+void JpegRenderer::dispatch_composite(RenderGraphContext& ctx, const JpegCompositeParams& p, Extent extent)
 {
-    PROFILE("JpegRenderer::present");
-    checkf(present_instance.has_value(), "JpegRenderer::prepare_present was not called");
+    PROFILE("JpegRenderer::composite");
+    checkf(composite_instance.has_value(), "JpegRenderer::prepare_composite was not called");
 
-    if (ctx.bind_pipeline(present_pipeline))
-        ctx.bind(resource->query_single(*present_instance));
+    if (!ctx.bind_pipeline(composite_pipeline))
+        return;
+    ctx.bind(resource->query_single(*composite_instance));
     ctx.push_constants(JpegPushConstants{
-        .post = glm::vec4(0.0f, std::clamp(p.amount, 0.0f, 1.0f), p.hits ? 1.0f : 0.0f, std::max(p.crosshair, 0.0f)),
+        .post = glm::vec4(0.0f, std::clamp(p.amount, 0.0f, 1.0f), p.hits ? 1.0f : 0.0f, 0.0f),
         // the seed goes through a float: 24 bits stay exact
         .vignette = glm::vec4(p.vignette_radius, std::max(p.vignette_feather, 1e-3f), std::max(p.block, 0.0f),
             (float)(p.seed & 0xffffffu)),
         .tint = glm::vec4(glm::max(p.tint, glm::vec3(0.0f)), p.tint_radius),
-        .hud = glm::vec4(std::clamp(p.health, 0.0f, 1.0f), std::clamp(p.health_lag, 0.0f, 1.0f),
-            std::clamp(p.health_flash, 0.0f, 1.0f), std::max(p.health_bar, 0.0f)),
     });
-    ctx.draw_fullscreen();
+    ctx.compute(groups_for(extent));
 }

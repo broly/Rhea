@@ -1,0 +1,19 @@
+{
+	"resource": {
+		"name": "jpeg_blocks",
+		"usage": "persistent",
+		"set": "SET_JPEG_BLOCKS",
+		"allowed_stages": [
+			"compute"
+		],
+		"parameters": {
+			"blocks": {
+				"type": "ssbo",
+				"binding": "BINDING_SSBO_JPEG_BLOCKS",
+				"variable": "u_jpeg_blocks",
+				"initial_buffer_size": 1048576,
+				"device_local": true
+			}
+		}
+	}
+}

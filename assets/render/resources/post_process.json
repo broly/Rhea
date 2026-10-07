@@ -1,0 +1,52 @@
+{
+	"resource": {
+		"name": "post_process",
+		"usage": "frame",
+		"set": "SET_POST_PROCESS",
+		"allowed_stages": ["fragment", "compute"],
+		"parameters": {
+			"post_process": {
+				"type": "uniform",
+				"ubo": "PostProcessUBO",
+				"binding": "BINDING_UBO_POST_PROCESS",
+				"variable": "post_process_ubo"
+			},
+			"source": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_pp_source",
+				"binding": "BINDING_SAMPLER_PP_SOURCE"
+			},
+			"source_add": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_pp_source_add",
+				"binding": "BINDING_SAMPLER_PP_SOURCE_ADD"
+			},
+			"target": {
+				"type": "image",
+				"sampler": "linear_clamp",
+				"variable": "u_pp_target",
+				"binding": "BINDING_IMAGE_PP_TARGET"
+			},
+			"exposure_target": {
+				"type": "image",
+				"sampler": "linear_clamp",
+				"variable": "u_pp_exposure_target",
+				"binding": "BINDING_IMAGE_PP_EXPOSURE_TARGET"
+			},
+			"bloom": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_pp_bloom",
+				"binding": "BINDING_SAMPLER_PP_BLOOM"
+			},
+			"exposure": {
+				"type": "sampler",
+				"sampler": "linear_clamp",
+				"variable": "u_pp_exposure",
+				"binding": "BINDING_SAMPLER_PP_EXPOSURE"
+			}
+		}
+	}
+}
