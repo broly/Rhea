@@ -253,6 +253,38 @@ void VkRenderBackend::wait_for_frame(RBFrameHandle frame_handle)
     PROFILE("wait_for_frame");
     swapchain.wait_for_frame(frame_handle);
     frame_epoch[frame_handle]++;
+    run_deferred_releases();
+}
+
+void VkRenderBackend::defer_release(std::function<void()> release)
+{
+    // requested while frame `submitted_frames` is not recorded yet: it may still read the resource too. That frame is
+    // done when its slot is waited for again, kRenderMaxFramesInFlight frames later (one more for the frames reset to
+    // slot 0 when the main graph runs several times)
+    deferred_releases.push_back({ submitted_frames + kRenderMaxFramesInFlight + 1, std::move(release) });
+}
+
+void VkRenderBackend::run_deferred_releases()
+{
+    PROFILE(__FUNCTION__);
+    while (!deferred_releases.empty() && deferred_releases.front().after <= submitted_frames)
+    {
+        // a release may defer more
+        std::function<void()> release = std::move(deferred_releases.front().release);
+        deferred_releases.pop_front();
+        release();
+    }
+}
+
+void VkRenderBackend::release_mesh_buffers(MeshPrimHandle mesh)
+{
+    if (std::optional<MeshGPUData> data = mesh_manager.take_mesh_buffers(mesh))
+        defer_release([this, data = *data] { mesh_manager.free_mesh_buffers(data); });
+}
+
+void VkRenderBackend::release_skinned_mesh(uint32_t instance_id)
+{
+    defer_release([this, instance_id] { mesh_manager.free_skinned_mesh(instance_id); });
 }
 
 void VkRenderBackend::flush_frame_garbage(RBFrameHandle frame)
@@ -267,6 +299,7 @@ void VkRenderBackend::reset_frame_fence(RBFrameHandle frame)
 
 void VkRenderBackend::advance_frame()
 {
+    ++submitted_frames;
     swapchain.advance_frame();
 }
 

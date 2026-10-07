@@ -7,6 +7,7 @@ import assertions;
 import fixed_string;
 import assets;
 import :material_manager;
+import :render_backend;
 import log;
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -27,6 +28,16 @@ MaterialInstance::MaterialInstance(const std::shared_ptr<const Material>& in_mat
     
     material_id = material_manager->allocate_material();
 
+}
+
+MaterialInstance::~MaterialInstance()
+{
+    if (!renderer || !material_manager)
+        return;
+    renderer->get_backend()->defer_release([manager = material_manager, id = material_id]
+    {
+        manager->free_material(id);
+    });
 }
 
 void MaterialInstance::apply_material_parameters()

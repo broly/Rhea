@@ -20,6 +20,7 @@ import enum_helpers;
 import :material_manager;
 import cvar;
 import texture_format;
+import assets;
 #include "common/assertion_macros.h"
 #include "profiling/profile.h"
 
@@ -57,7 +58,9 @@ void Renderer::init(RBWindowHandle in_window)
 void Renderer::execute()
 {
     checkf(main_render_graph != nullptr, "RenderGraph not initialized. Please create and initialize RenderGraph in your GameRenderer::init");
-    
+
+    process_releases();
+
     for (uint8_t i = 0; i < main_render_graph_num_runs; i++)
     {
         RenderGraphParameters params;
@@ -407,6 +410,80 @@ RBImageHandle Renderer::get_texture(TextureHandle handle)
         return it->second;
 
     return create_texture_from_asset(handle);
+}
+
+void Renderer::release_mesh(MeshHandle handle)
+{
+    if (handle.is_valid())
+        mesh_releases.push_back(handle);
+}
+
+void Renderer::release_texture(TextureHandle handle)
+{
+    if (handle.is_valid() && !handle.is_pending())
+        texture_releases.push_back(handle);
+}
+
+void Renderer::process_releases()
+{
+    PROFILE("Renderer::process_releases");
+    AssetManager& assets = AssetManager::get();
+
+    for (MeshHandle mesh : mesh_releases)
+    {
+        const StaticMesh& data = mesh.get();
+        for (uint32_t geom = 0; geom < data.mesh_geometry.size(); ++geom)
+            for (uint32_t prim = 0; prim < data.mesh_geometry[geom].primitives.size(); ++prim)
+                render_backend->release_mesh_buffers(MeshPrimHandle{ mesh, geom, prim });
+        assets.forget_mesh(mesh);
+    }
+    mesh_releases.clear();
+
+    // the materials that sampled the textures go first: their instances write the ids into the material table
+    if (material_collection_requested || !texture_releases.empty())
+        collect_unused_materials();
+    material_collection_requested = false;
+
+    RenderResource* textures = find_resource("textures");
+    for (TextureHandle texture : texture_releases)
+    {
+        std::optional<RBImageHandle> image;
+        if (auto it = texture_cache.find(texture); it != texture_cache.end())
+        {
+            image = it->second;
+            texture_cache.erase(it);
+        }
+        assets.forget_texture(texture);
+        // the slot points at the null texture before the image goes and the id is handed out again
+        render_backend->defer_release([this, textures, image, id = texture.id]
+        {
+            if (textures)
+                textures->update_image("u_textures_array", null_texture_image, { .array_index = id });
+            if (image)
+                render_backend->destroy_image(*image, false);
+            AssetManager::get().recycle_texture_id(id);
+        });
+    }
+    texture_releases.clear();
+}
+
+void Renderer::collect_unused_materials()
+{
+    PROFILE("Renderer::collect_unused_materials");
+    // references the renderer holds itself: the map key and MaterialInstance::material, per pass
+    std::map<const Material*, long> own_references;
+    std::set<const Material*> drawn;
+    for (const auto& [key, instance] : material_instances)
+    {
+        own_references[key.first.get()] += 2;
+        if (instance.use_count() > 1)
+            drawn.insert(key.first.get());
+    }
+    std::erase_if(material_instances, [&] (const auto& entry)
+    {
+        const Material* material = entry.first.first.get();
+        return !drawn.contains(material) && entry.first.first.use_count() <= own_references[material];
+    });
 }
 
 RBImageHandle Renderer::get_cubemap(CubemapHandle handle)

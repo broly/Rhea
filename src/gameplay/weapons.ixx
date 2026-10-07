@@ -38,6 +38,7 @@ import :health;
 //     projectile_gravity (m/s^2); the area damage (radius) then happens where it lands,
 //   hit_flash (emission of the entity hit, HDR), hit_flash_color [r, g, b], hit_flash_time (s),
 //   body_jpeg_time (s the whole creature hit is under the jpeg preset, by its silhouette; 0: only the spot),
+//   voxelize (a hit within `radius` m of a VoxelDestructible turns it into its voxel copy: gameplay:voxel_destructible),
 //   sounds - paths under assets/, a list plays one at random (gameplay:sounds plays them):
 //     "sounds": { "fire": [ ... ], "impact": [ ... ], "impact_creature": [ ... ], "reload": "...", "dry_fire": "...",
 //                 "cycle": "...", "cycle_delay": 0.35, "beam_start": "...", "beam_loop": "...", "beam_stop": "...",
@@ -121,6 +122,7 @@ export
         glm::vec3 hit_flash_color{ 1.0f };
         float hit_flash_time = 0.12f;
         float body_jpeg_time = 0.2f;
+        bool voxelize = false;
         WeaponSounds sounds;
     };
 

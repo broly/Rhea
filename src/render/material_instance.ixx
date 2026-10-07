@@ -12,9 +12,13 @@ export class MaterialInstance
 {
 public:
     
-    MaterialInstance(const std::shared_ptr<const Material>& in_material, std::shared_ptr<Renderer> renderer, 
+    MaterialInstance(const std::shared_ptr<const Material>& in_material, std::shared_ptr<Renderer> renderer,
         Name pass_name);
-    
+    // gives the material table slot back once the frames in flight are done (Renderer::collect_unused_materials)
+    ~MaterialInstance();
+    MaterialInstance(const MaterialInstance&) = delete;
+    MaterialInstance& operator=(const MaterialInstance&) = delete;
+
     std::shared_ptr<const Material> material;
 
     void apply_material_parameters();

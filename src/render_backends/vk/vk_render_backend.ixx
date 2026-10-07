@@ -131,6 +131,9 @@ public:   /// API Section
     virtual void flush_frame_garbage(RBFrameHandle frame) override;
     virtual void reset_frame_fence(RBFrameHandle frame) override;
     virtual void advance_frame() override;
+    virtual void defer_release(std::function<void()> release) override;
+    virtual void release_mesh_buffers(MeshPrimHandle mesh) override;
+    virtual void release_skinned_mesh(uint32_t instance_id) override;
 
     virtual void init_ui_overlay() override;
     virtual void shutdown_ui_overlay() override;
@@ -255,6 +258,16 @@ private:
     };
     std::vector<PendingReadbackEntry> pending_readbacks;
     uint64_t next_pending_id = 1;
+
+    // defer_release: run once `submitted_frames` passed `after`
+    struct DeferredRelease
+    {
+        uint64_t after = 0;
+        std::function<void()> release;
+    };
+    std::deque<DeferredRelease> deferred_releases;
+    uint64_t submitted_frames = 0;
+    void run_deferred_releases();
 
     std::array<uint64_t, vk::MAX_FRAMES_IN_FLIGHT> frame_epoch{}; // 0,0
     std::array<uint64_t, vk::MAX_FRAMES_IN_FLIGHT> frame_epoch_at_record{};

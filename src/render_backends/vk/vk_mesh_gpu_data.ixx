@@ -15,16 +15,19 @@ export struct MeshGPUData
     VkBuffer index_buffer = VK_NULL_HANDLE;
     VkDeviceSize index_offset = 0;
     VkDeviceAddress index_address = 0;
+    // blocks of the ranges (MeshManager::release_mesh_buffers gives them back)
+    uint32_t vertex_block = 0;
+    uint32_t index_block = 0;
     uint32_t index_count = 0;
     uint32_t vertex_count = 0;
     RBDescriptorSet descriptor_set;
     
     // BLAS
-    VkAccelerationStructureKHR blas;
-    VkDeviceMemory blas_memory;
-    VkBuffer blas_buffer;
-    VkDeviceAddress blas_address;
-    
-    
-    uint32_t mesh_table_index;
+    VkAccelerationStructureKHR blas = VK_NULL_HANDLE;
+    VkDeviceMemory blas_memory = VK_NULL_HANDLE;
+    VkBuffer blas_buffer = VK_NULL_HANDLE;
+    VkDeviceAddress blas_address = 0;
+
+
+    uint32_t mesh_table_index = 0;
 };

@@ -53,15 +53,42 @@ void SceneViewProcessor_Mesh::unregister_proxy(RenderId render_id)
 
 void SceneViewProcessor_Mesh::retire_primitives(RenderObject_Mesh& ro)
 {
+    if (ro.primitives.empty())
+        return;
+    // null while the engine shuts down: nothing is released then
+    Renderer* renderer = RhGlobals::engine ? RhGlobals::engine->renderer.get() : nullptr;
     for (RenderPrimitiveId prim_index : ro.primitives)
     {
         RenderPrimitive& rp = primitives[prim_index];
+        if (rp.skinned && renderer)
+            renderer->get_backend()->release_skinned_mesh(rp.skinned->instance_id);
+        rp.skinned.reset();
         rp.passes.clear();
         rp.info_by_pass.clear();
         rp.skinning.reset();
         rp.shadow_proxies.clear();
+        rp.primitive_material.reset();
+        free_primitive_ids.push_back(prim_index);
     }
     ro.primitives.clear();
+    if (renderer)
+        renderer->request_material_collection();
+}
+
+RenderPrimitiveId SceneViewProcessor_Mesh::add_primitive(RenderPrimitive&& rp)
+{
+    if (free_primitive_ids.empty())
+    {
+        rp.id = render_primitive_id_counter++;
+        checkf(rp.id == primitives.size(), "Render primitive ids out of step with their slots");
+        primitives.push_back(std::move(rp));
+        return primitives.back().id;
+    }
+    const RenderPrimitiveId slot = free_primitive_ids.back();
+    free_primitive_ids.pop_back();
+    rp.id = slot;
+    primitives[slot] = std::move(rp);
+    return slot;
 }
 
 
@@ -274,16 +301,15 @@ void SceneViewProcessor_Mesh::process()
                             shadow_it->second.material_index = mat_instance_TODO_EXACT_PASS->material_id;
                         
                         rp.primitive_material_id = mat_instance_TODO_EXACT_PASS->material_id;
-                        
-                        rp.debug_texture_name = 
-                        rp.id = render_primitive_id_counter++;
-                        primitives.push_back(rp);
-                    
+                        rp.primitive_material = mat_instance_TODO_EXACT_PASS;
+
+                        const RenderPrimitiveId slot = add_primitive(std::move(rp));
+
                         ro.prev_world = ro.world;
-                        write_primitive_info(ro, rp);
-                    
-                        
-                        ro.primitives.push_back(primitives.size() - 1);
+                        write_primitive_info(ro, primitives[slot]);
+
+
+                        ro.primitives.push_back(slot);
                     }
                 }
             }

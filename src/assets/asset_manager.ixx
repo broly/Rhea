@@ -33,6 +33,12 @@ public:
     
     MeshHandle store_mesh(StaticMesh&& mesh);
     CubemapHandle store_cubemap(Cubemap&& mesh);
+
+    // Drop the CPU copy of a runtime asset (Renderer::release_mesh / release_texture free the GPU copies and call
+    // these). A texture id is a slot of the bindless texture array: recycled only once no frame reads the slot.
+    void forget_mesh(MeshHandle handle);
+    void forget_texture(TextureHandle handle);
+    void recycle_texture_id(uint32_t id);
     
     std::mutex mutex;
     std::unordered_map<std::string, std::shared_future<TextureHandle>> textures_in_flight;
@@ -77,4 +83,9 @@ public:
     uint32_t animations_counter = 0;
     uint32_t textures_counter;
     uint32_t cubemaps_counter;
+
+private:
+    // under `mutex`: a recycled id first, the array stays small
+    uint32_t allocate_texture_id();
+    std::vector<uint32_t> free_texture_ids;
 };

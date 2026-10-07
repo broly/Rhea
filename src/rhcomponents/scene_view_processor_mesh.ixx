@@ -72,8 +72,9 @@ export struct RenderPrimitive
     uint64_t mesh_index;
     // its indices in the shared index blocks (indexed draws)
     MeshIndexRange indices;
-    // material written into the primitive table
+    // material written into the primitive table, and its instance (kept: its slot is reused once it is gone)
     uint32_t primitive_material_id = 0;
+    std::shared_ptr<MaterialInstance> primitive_material;
     uint32_t debug_texture_id;
     std::string debug_texture_name;
     
@@ -189,8 +190,11 @@ public:
     std::deque<RenderObject_Mesh> meshes;
     std::vector<RenderId> vacated_mesh_ids;
 
-    // Stops drawing the object's primitives (their slots stay allocated: ids index the primitive table)
+    // Stops drawing the object's primitives: their slots (ids index the primitive table) are taken by the next new
+    // ones, their skinned copies and materials are released
     void retire_primitives(RenderObject_Mesh& ro);
+    // a free slot of `primitives` (or a new one) holding `rp`, whose id is the slot
+    RenderPrimitiveId add_primitive(RenderPrimitive&& rp);
     // Distance ranges of the object's primitives from its LOD distances and scale
     void update_lod_ranges(RenderObject_Mesh& ro);
     

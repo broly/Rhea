@@ -756,6 +756,20 @@
 				"SnapToTerrain": {}
 			}
 		},
+		// a voxel house (gameplay:voxel_destructible): the house cannon turns it into its voxel copy. On a flat
+		// meadow south of the gate (intermediate/houses/find_house_spot.py), the porch facing the road.
+		{
+			"name": "wooden_house",
+			"prefab": "prefabs/houses/wooden_house.json",
+			"components": {
+				"Transform": {
+					"position": { "x": 24.0, "y": -1.15, "z": -27.0 },
+					"rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+					"scale": { "x": 1, "y": 1, "z": 1 }
+				},
+				"SnapToTerrain": { "offset": -0.05 }
+			}
+		},
 		{
 			// navigation mesh (module navigation): the valley floor inside the ring of mountains, Sponza, the
 			// meadows; built in the background from the collision of the level (cache/navmesh), nav.debug.draw shows it

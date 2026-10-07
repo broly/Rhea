@@ -77,6 +77,17 @@ public:  // public API
     RBImageHandle create_cubemap_from_asset(CubemapHandle handle);
     RBImageHandle get_texture(TextureHandle handle);
     RBImageHandle get_cubemap(CubemapHandle handle);
+
+    // Runtime assets the game is done with (rebuilt voxel chunks): nothing may draw them any more (their
+    // MeshRenderers changed or are gone). Taken at the next execute, after the scene extraction dropped the
+    // primitives; the GPU copies are freed once the frames in flight are done, the assets are forgotten.
+    void release_mesh(MeshHandle handle);
+    void release_texture(TextureHandle handle);
+    // Drops the material instances (and their material table slots) of materials nobody holds any more: no
+    // primitive draws them, no component or asset keeps the Material
+    void collect_unused_materials();
+    // the scene dropped primitives: collect_unused_materials at the next execute
+    void request_material_collection() { material_collection_requested = true; }
     RenderResource* find_resource(Name resource_name) const;
     RenderResource& find_resource_checked(Name resource_name) const;
     std::shared_ptr<RenderResourceInfo> find_resource_info(Name resource_name) const;
@@ -141,6 +152,11 @@ protected:  // textures
     std::map<TextureHandle, RBImageHandle> texture_cache;
     std::map<CubemapHandle, RBImageHandle> cubemap_cache;
     RBImageHandle null_texture_image;
+
+    std::vector<MeshHandle> mesh_releases;
+    std::vector<TextureHandle> texture_releases;
+    bool material_collection_requested = false;
+    void process_releases();
 
     struct RenderGraphJob
     {

@@ -121,6 +121,15 @@ public:
     virtual void reset_frame_fence(RBFrameHandle frame) = 0;
     virtual void advance_frame() = 0;
 
+    // --- resource release ------------------------------------------------------
+    // Runs `release` once the GPU is done with every frame submitted so far, and the one recorded next (resources
+    // they may still read: freed between the scene extraction and the frame that no longer draws them)
+    virtual void defer_release(std::function<void()> release) = 0;
+    // Frees the buffers (and BLAS) of get_or_create_mesh_buffers, deferred; its mesh table index is reused
+    virtual void release_mesh_buffers(MeshPrimHandle mesh) = 0;
+    // Frees a create_skinned_mesh copy, deferred; its instance id and mesh table index are reused
+    virtual void release_skinned_mesh(uint32_t instance_id) = 0;
+
     // --- Debug UI overlay (Dear ImGui draw data of the current frame) ----------
     // The ImGui context and the platform backend are owned by the ui module; the render
     // backend only uploads and draws ImGui::GetDrawData() over the swapchain image.

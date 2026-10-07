@@ -31,6 +31,8 @@ export namespace glm
     using glm::vec4;
     using glm::ivec4;
     using glm::ivec2;
+    using glm::ivec3;
+    using glm::floor;
     using glm::uvec2;
     using glm::uvec3;
     using glm::uvec4;

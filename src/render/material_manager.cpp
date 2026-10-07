@@ -22,18 +22,34 @@ void MaterialManager::ctor(const std::shared_ptr<Renderer>& in_renderer)
 
 uint32_t MaterialManager::allocate_material()
 {
-    const uint32_t index = (uint32_t)materials_cpu.size();
-
     GPUMaterial material{
         glm::vec4{0.0f},
         glm::vec4{0.0f},
         glm::uvec4(0)
     };
-    materials_cpu.push_back(material);
+
+    uint32_t index;
+    if (!free_materials.empty())
+    {
+        index = free_materials.back();
+        free_materials.pop_back();
+        materials_cpu[index] = material;
+    }
+    else
+    {
+        index = (uint32_t)materials_cpu.size();
+        materials_cpu.push_back(material);
+    }
 
     dirty = true;
 
     return index;
+}
+
+void MaterialManager::free_material(uint32_t index)
+{
+    checkf(index < materials_cpu.size(), "Material %u was never allocated", index);
+    free_materials.push_back(index);
 }
 
 void MaterialManager::update_material(uint32_t index, const GPUMaterial& material)

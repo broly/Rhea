@@ -160,6 +160,7 @@ namespace
             else if (key == "hit_flash_color" && parse_vec3(v)) def.hit_flash_color = *parse_vec3(v);
             else if (key == "hit_flash_time" && v.isNumeric()) def.hit_flash_time = std::max(v.asFloat(), 0.0f);
             else if (key == "body_jpeg_time" && v.isNumeric()) def.body_jpeg_time = std::max(v.asFloat(), 0.0f);
+            else if (key == "voxelize" && v.isBool()) def.voxelize = v.asBool();
             else if (key == "sounds" && v.isObject()) def.sounds = parse_sounds(name, v);
             else ok = false;
             if (!ok)

@@ -59,7 +59,9 @@ public:
     
     
     uint32_t allocate_material();
-    
+    // the slot is handed out again (no frame may read it any more: MaterialInstance defers this)
+    void free_material(uint32_t index);
+
     void update_material(uint32_t index, const GPUMaterial& material);
     
     void upload();
@@ -67,7 +69,8 @@ public:
     const GPUMaterial& get_gpu_material(uint32_t index);
     
     std::vector<GPUMaterial> materials_cpu;
-    
+    std::vector<uint32_t> free_materials;
+
     bool dirty;
     
     // capacity of the material SSBO (from the resource description)

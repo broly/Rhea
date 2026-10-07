@@ -65,6 +65,7 @@ set(RHEA_MODULE_DIRS
     src/platform
     src/render_scene
     src/physics
+    src/voxel
     src/audio
     src/debug_draw
     src/navigation
@@ -263,3 +264,11 @@ target_sources(rhea_ecs_tests
 target_include_directories(rhea_ecs_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(rhea_ecs_tests PRIVATE rhea_std)
 target_compile_options(rhea_ecs_tests PRIVATE -Wno-format-security)
+
+
+# Tests of the voxel module: it depends only on std and glm
+add_executable(rhea_voxel_tests tests/voxel_tests.cpp)
+add_module_dir(rhea_voxel_tests src/voxel)
+add_module_dir(rhea_voxel_tests src/glm_wrap)
+target_include_directories(rhea_voxel_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${Stb_INCLUDE_DIR})
+target_link_libraries(rhea_voxel_tests PRIVATE rhea_std)

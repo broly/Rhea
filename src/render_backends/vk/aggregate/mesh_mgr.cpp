@@ -54,11 +54,9 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
 
     MeshGPUData data{};
 
-    uint32_t mesh_index = gpu_mesh_table.size();
     data.index_count =
         static_cast<uint32_t>(primitive.indices.size());
     data.vertex_count = primitive.vertices.size();
-    data.mesh_table_index = mesh_index;
 
     // triangles in the order that reuses the most transformed vertices (indexed draws, post transform cache)
     std::vector<uint32_t> indices;
@@ -79,6 +77,8 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     // sub-allocated: one allocation per mesh ran into the allocation count limit (4096 on NVIDIA)
     const auto [vertex_block, vertex_offset] = suballocate(vertex_blocks, vertex_size, sizeof(Vertex), vertex_block_size);
     const auto [index_block, index_offset] = suballocate(index_blocks, index_size, sizeof(uint32_t), index_block_size);
+    data.vertex_block = vertex_block;
+    data.index_block = index_block;
     data.vertex_buffer = vertex_blocks[vertex_block].buffer;
     data.vertex_offset = vertex_offset;
     data.vertex_address = vertex_blocks[vertex_block].address + vertex_offset;
@@ -93,26 +93,91 @@ GPUMesh vk::MeshManager::get_or_create_mesh_buffers(MeshPrimHandle handle, RTBui
     if (rt_mode == RTBuildMode::build_blas)
         build_blas(data, data.vertex_address, data.index_address);
 
-    mesh_map.emplace(handle, data);
-
-    checkf(index_ranges.size() == mesh_index, "Index ranges out of step with the mesh table");
-    index_ranges.push_back({
+    GPUMesh gpu{};
+    gpu.vertex_address = data.vertex_address;
+    gpu.index_address = data.index_address;
+    gpu.index_count = data.index_count;
+    data.mesh_table_index = add_mesh_table_entry(gpu, {
         .block = index_block,
         .first_index = uint32_t(index_offset / sizeof(uint32_t)),
         .index_count = data.index_count,
     });
 
-    GPUMesh gpu{};
-    gpu.vertex_address = data.vertex_address;
-    gpu.index_address = data.index_address;
-    gpu.index_count = data.index_count;
+    mesh_map.emplace(handle, data);
+
+    return gpu_mesh_table[data.mesh_table_index];
+}
+
+uint32_t vk::MeshManager::add_mesh_table_entry(GPUMesh gpu, const MeshIndexRange& range)
+{
+    checkf(index_ranges.size() == gpu_mesh_table.size(), "Index ranges out of step with the mesh table");
+    uint32_t mesh_index;
+    if (!free_mesh_table_slots.empty())
+    {
+        mesh_index = free_mesh_table_slots.back();
+        free_mesh_table_slots.pop_back();
+    }
+    else
+    {
+        mesh_index = uint32_t(gpu_mesh_table.size());
+        gpu_mesh_table.emplace_back();
+        index_ranges.emplace_back();
+    }
     gpu.mesh_index = mesh_index;
+    gpu_mesh_table[mesh_index] = gpu;
+    index_ranges[mesh_index] = range;
+    mesh_table_dirty = true;
+    return mesh_index;
+}
 
-    gpu_mesh_table.push_back(gpu);
+std::optional<MeshGPUData> vk::MeshManager::take_mesh_buffers(MeshPrimHandle handle)
+{
+    prepared_indices.erase(handle);
+    auto it = mesh_map.find(handle);
+    if (it == mesh_map.end())
+        return std::nullopt;
+    MeshGPUData data = it->second;
+    mesh_map.erase(it);
+    return data;
+}
 
+void vk::MeshManager::free_mesh_buffers(const MeshGPUData& data)
+{
+    release_range(vertex_blocks[data.vertex_block], data.vertex_offset, VkDeviceSize(data.vertex_count) * sizeof(Vertex));
+    release_range(index_blocks[data.index_block], data.index_offset, VkDeviceSize(data.index_count) * sizeof(uint32_t));
+    if (data.blas != VK_NULL_HANDLE)
+        vk_ext::vkDestroyAccelerationStructureKHR(instance.device, data.blas, nullptr);
+    destroy_buffer(instance.device, data.blas_buffer, data.blas_memory);
+    // an empty entry: nothing draws it until the slot is taken again
+    gpu_mesh_table[data.mesh_table_index] = GPUMesh{};
+    index_ranges[data.mesh_table_index] = MeshIndexRange{};
+    free_mesh_table_slots.push_back(data.mesh_table_index);
+    mesh_table_dirty = true;
+}
+
+void vk::MeshManager::free_skinned_mesh(uint32_t instance_id)
+{
+    checkf(instance_id < skinned_meshes.size(), "Invalid skinned mesh instance %u", instance_id);
+    SkinnedMeshGPUData& data = skinned_meshes[instance_id];
+    destroy_buffer(instance.device, data.skin_buffer, data.skin_memory);
+    destroy_buffer(instance.device, data.vertex_buffer, data.vertex_memory);
+    destroy_buffer(instance.device, data.morph_offsets_buffer, data.morph_offsets_memory);
+    destroy_buffer(instance.device, data.morph_deltas_buffer, data.morph_deltas_memory);
+    if (data.bones_mapped)
+        vkUnmapMemory(instance.device, data.bones_memory);
+    destroy_buffer(instance.device, data.bones_buffer, data.bones_memory);
+    if (data.blas != VK_NULL_HANDLE)
+        vk_ext::vkDestroyAccelerationStructureKHR(instance.device, data.blas, nullptr);
+    destroy_buffer(instance.device, data.blas_buffer, data.blas_memory);
+    destroy_buffer(instance.device, data.blas_scratch_buffer, data.blas_scratch_memory);
+
+    gpu_mesh_table[data.mesh_table_index] = GPUMesh{};
+    index_ranges[data.mesh_table_index] = MeshIndexRange{};
+    free_mesh_table_slots.push_back(data.mesh_table_index);
     mesh_table_dirty = true;
 
-    return gpu;
+    data = SkinnedMeshGPUData{};
+    free_skinned_ids.push_back(instance_id);
 }
 
 void vk::MeshManager::prepare_mesh_buffers(std::span<const MeshPrimHandle> handles)
@@ -164,10 +229,32 @@ void vk::MeshManager::prepare_mesh_buffers(std::span<const MeshPrimHandle> handl
 std::pair<uint32_t, VkDeviceSize> vk::MeshManager::suballocate(std::vector<BufferBlock>& blocks, VkDeviceSize size,
     VkDeviceSize alignment, VkDeviceSize block_size)
 {
+    auto align = [alignment] (VkDeviceSize offset) { return (offset + alignment - 1) / alignment * alignment; };
+
+    // freed ranges first (first fit), what is left of the range stays free
     for (uint32_t index = 0; index < blocks.size(); ++index)
     {
         BufferBlock& block = blocks[index];
-        const VkDeviceSize offset = (block.used + alignment - 1) / alignment * alignment;
+        for (auto it = block.free_ranges.begin(); it != block.free_ranges.end(); ++it)
+        {
+            const auto [start, range_size] = *it;
+            const VkDeviceSize offset = align(start);
+            const VkDeviceSize end = start + range_size;
+            if (offset + size > end)
+                continue;
+            block.free_ranges.erase(it);
+            if (offset > start)
+                block.free_ranges.emplace(start, offset - start);
+            if (offset + size < end)
+                block.free_ranges.emplace(offset + size, end - (offset + size));
+            return { index, offset };
+        }
+    }
+
+    for (uint32_t index = 0; index < blocks.size(); ++index)
+    {
+        BufferBlock& block = blocks[index];
+        const VkDeviceSize offset = align(block.used);
         if (offset + size <= block.capacity)
         {
             block.used = offset + size;
@@ -184,6 +271,44 @@ std::pair<uint32_t, VkDeviceSize> vk::MeshManager::suballocate(std::vector<Buffe
     block.address = buffer_manager.get_buffer_device_address(block.buffer);
     block.used = size;
     return { uint32_t(blocks.size() - 1), 0 };
+}
+
+void vk::MeshManager::release_range(BufferBlock& block, VkDeviceSize offset, VkDeviceSize size)
+{
+    if (size == 0)
+        return;
+    VkDeviceSize start = offset;
+    VkDeviceSize end = offset + size;
+    checkf(end <= block.used, "Mesh block range %llu + %llu is not allocated", (unsigned long long)offset,
+        (unsigned long long)size);
+
+    // merged with the free neighbours
+    auto next = block.free_ranges.lower_bound(start);
+    if (next != block.free_ranges.begin())
+    {
+        auto previous = std::prev(next);
+        checkf(previous->first + previous->second <= start, "Mesh block range freed twice");
+        if (previous->first + previous->second == start)
+        {
+            start = previous->first;
+            block.free_ranges.erase(previous);
+        }
+    }
+    if (next != block.free_ranges.end())
+    {
+        checkf(end <= next->first, "Mesh block range freed twice");
+        if (next->first == end)
+        {
+            end += next->second;
+            block.free_ranges.erase(next);
+        }
+    }
+
+    // the end of the used part: the bump allocation takes it back
+    if (end == block.used)
+        block.used = start;
+    else
+        block.free_ranges.emplace(start, end - start);
 }
 
 void vk::MeshManager::upload(VkBuffer vertex_buffer, VkDeviceSize vertex_offset, const void* vertices, VkDeviceSize vertex_size,
@@ -587,20 +712,27 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
     }
 
     // ---- mesh table entry: skinned vertices + shared indices ----
-    data.mesh_table_index = (uint32_t)gpu_mesh_table.size();
-
     GPUMesh gpu{};
     gpu.vertex_address = vertex_address;
     gpu.index_address = index_address;
     gpu.index_count = data.index_count;
-    gpu.mesh_index = data.mesh_table_index;
-    gpu_mesh_table.push_back(gpu);
     // the skinned copy has the vertices of its source, in the same order: same indices
-    index_ranges.push_back(index_ranges[src.mesh_table_index]);
-    mesh_table_dirty = true;
+    data.mesh_table_index = add_mesh_table_entry(gpu, index_ranges[src.mesh_table_index]);
+
+    uint32_t instance_id;
+    if (!free_skinned_ids.empty())
+    {
+        instance_id = free_skinned_ids.back();
+        free_skinned_ids.pop_back();
+    }
+    else
+    {
+        instance_id = uint32_t(skinned_meshes.size());
+        skinned_meshes.emplace_back();
+    }
 
     SkinnedMeshGPU& info = data.info;
-    info.instance_id = (uint32_t)skinned_meshes.size();
+    info.instance_id = instance_id;
     info.mesh_index = data.mesh_table_index;
     info.src_vertex_address = src.vertex_address;
     info.skin_address = buffer_manager.get_buffer_device_address(data.skin_buffer);
@@ -614,7 +746,7 @@ SkinnedMeshGPU vk::MeshManager::create_skinned_mesh(MeshPrimHandle source, const
         info.morph_count = data.morph_count;
     }
 
-    skinned_meshes.push_back(data);
+    skinned_meshes[instance_id] = data;
 
     LogVkMeshManager.Log("Created skinned mesh instance %u (%u vertices, %u bones, %zu morph deltas)",
         info.instance_id, info.vertex_count, bone_count, data.morph_count > 0 ? morphs.deltas.size() : size_t(0));

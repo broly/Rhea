@@ -119,7 +119,7 @@ TextureHandle AssetManager::load_texture(const std::string& rel_path, uint32_t m
     std::scoped_lock<std::mutex> lock(mutex);
     
     texture.name = rel_path;
-    const uint32_t texture_id = ++textures_counter;
+    const uint32_t texture_id = allocate_texture_id();
     texture.id = texture_id;
     
     const TextureHandle texture_handle {texture_id};
@@ -175,7 +175,7 @@ TextureHandle AssetManager::register_external_texture(Texture&& tex)
 {
     // textures load on worker threads (load_texture) and share the id counter
     std::scoped_lock<std::mutex> lock(mutex);
-    const uint32_t texture_id = ++textures_counter;
+    const uint32_t texture_id = allocate_texture_id();
     tex.id = texture_id;
     
     TextureHandle texture_handle {texture_id};
@@ -193,6 +193,35 @@ MeshHandle AssetManager::store_mesh(StaticMesh&& mesh)
     loaded_meshes.insert({mesh_handle, std::move(mesh)});
 
     return mesh_handle;
+}
+
+void AssetManager::forget_mesh(MeshHandle handle)
+{
+    loaded_meshes.erase(handle);
+    std::erase_if(mesh_by_path, [&] (const auto& entry) { return entry.second == handle; });
+}
+
+void AssetManager::forget_texture(TextureHandle handle)
+{
+    std::scoped_lock<std::mutex> lock(mutex);
+    loaded_textures.erase(handle);
+    std::erase_if(texture_by_path, [&] (const auto& entry) { return entry.second.id == handle.id; });
+}
+
+void AssetManager::recycle_texture_id(uint32_t id)
+{
+    std::scoped_lock<std::mutex> lock(mutex);
+    checkf(id != 0 && !loaded_textures.contains(TextureHandle{id}), "Texture id %u is still in use", id);
+    free_texture_ids.push_back(id);
+}
+
+uint32_t AssetManager::allocate_texture_id()
+{
+    if (free_texture_ids.empty())
+        return ++textures_counter;
+    const uint32_t id = free_texture_ids.back();
+    free_texture_ids.pop_back();
+    return id;
 }
 
 CubemapHandle AssetManager::store_cubemap(Cubemap&& cubemap)

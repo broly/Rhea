@@ -79,6 +79,13 @@ namespace vk
         
         
         GPUMesh get_or_create_mesh_buffers(MeshPrimHandle handle, RTBuildMode rt_build_mode);
+        // Forgets the buffers of a primitive (the next get_or_create_mesh_buffers makes new ones) and returns them
+        // for free_mesh_buffers, once the frames that read them are done
+        std::optional<MeshGPUData> take_mesh_buffers(MeshPrimHandle handle);
+        void free_mesh_buffers(const MeshGPUData& data);
+        // Destroys a skinned copy: its buffers, BLAS, mesh table entry and instance id are reused afterwards.
+        // The frames that read it must be done
+        void free_skinned_mesh(uint32_t instance_id);
         // RenderBackend::prepare_mesh_buffers: optimized indices of the primitives without buffers, on all cores
         void prepare_mesh_buffers(std::span<const MeshPrimHandle> handles);
         // same vertex count; the caller makes sure the GPU is idle. False when not uploaded.
@@ -104,7 +111,9 @@ namespace vk
         }
         
         std::vector<SkinnedMeshGPUData> skinned_meshes;
-        
+        // freed skinned_meshes slots (free_skinned_mesh)
+        std::vector<uint32_t> free_skinned_ids;
+
         const MeshGPUData& get_mesh_gpu_data(MeshPrimHandle handle)
         {
             auto data_it = mesh_map.find(handle);
@@ -126,6 +135,8 @@ namespace vk
             VkDeviceAddress address = 0;
             VkDeviceSize capacity = 0;
             VkDeviceSize used = 0;
+            // freed ranges below `used`: offset -> size, coalesced
+            std::map<VkDeviceSize, VkDeviceSize> free_ranges;
         };
         static constexpr VkDeviceSize vertex_block_size = 256ull << 20;   // bigger meshes get a block of their own
         static constexpr VkDeviceSize index_block_size = 64ull << 20;
@@ -136,6 +147,7 @@ namespace vk
         // block index, byte offset
         std::pair<uint32_t, VkDeviceSize> suballocate(std::vector<BufferBlock>& blocks, VkDeviceSize size,
             VkDeviceSize alignment, VkDeviceSize block_size);
+        static void release_range(BufferBlock& block, VkDeviceSize offset, VkDeviceSize size);
         // recorded into the shared upload batch (ImmediateCommandPool::allocate_upload)
         void upload(VkBuffer vertex_buffer, VkDeviceSize vertex_offset, const void* vertices, VkDeviceSize vertex_size,
             VkBuffer index_buffer, VkDeviceSize index_offset, const void* indices, VkDeviceSize index_size);
@@ -148,6 +160,9 @@ namespace vk
         void bind_index_block(VkCommandBuffer cmd, uint32_t block) const;
 
         std::vector<GPUMesh> gpu_mesh_table;
+        // freed entries of the mesh table (and index_ranges), taken before the table grows: it is a fixed size buffer
+        std::vector<uint32_t> free_mesh_table_slots;
+        uint32_t add_mesh_table_entry(GPUMesh gpu, const MeshIndexRange& range);
         RBBufferHandle mesh_table_buffer;
         bool mesh_table_dirty = false;
     };
