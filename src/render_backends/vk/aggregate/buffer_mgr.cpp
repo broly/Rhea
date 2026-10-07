@@ -223,6 +223,10 @@ RBDescriptorSetLayout vk::BufferManager::create_descriptor_set_layout(
         VkDescriptorBindingFlags flags = {
             VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT
         };
+        // sampler arrays (bindless textures): slots are written while the frames in flight use the set, slots they
+        // read are only rewritten once those frames are done (Renderer::release_texture)
+        if (vk.descriptorCount > 1 && vk.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            flags |= VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
         binding_flags.push_back(flags);
         binding_validation_infp.push_back({vk.descriptorCount});
     }

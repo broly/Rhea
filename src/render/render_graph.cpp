@@ -1103,6 +1103,8 @@ void RenderGraph::recompile()
         pass.pass_barriers.clear();
     }
     
+    // once for all of them: the frames in flight may still read the images
+    backend->wait_idle();
     for (auto& tex : textures)
     {
         if (tex.image && tex.should_create_image())
@@ -1118,7 +1120,9 @@ void RenderGraph::destroy_texture_image(RGTexture& tex) const
     ensure(tex.image.has_value());
     if (tex.image.has_value())
     {
-        destroy_texture_image(tex);
+        // the caller waited for the GPU (recompile)
+        backend->destroy_image(*tex.image, false);
+        tex.image.reset();
     }
 }
 

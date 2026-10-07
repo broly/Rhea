@@ -17,7 +17,9 @@ import :helpers;
 
 import :device_extension_api;
 import log;
+import assertions;
 #include "render_backends/vk/vk_macro.h"
+#include "common/assertion_macros.h"
 
 #include "logging/log_macro.h"
 
@@ -220,7 +222,19 @@ void vk::Instance::init(GLFWwindow* in_window)
     features12.runtimeDescriptorArray = VK_TRUE;
     // features12.descriptorBindingVariableDescriptorCount = VK_TRUE;
     features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-    // features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    // sampler arrays (the bindless textures) take new slots while frames in flight use the set
+    // (BufferManager::create_descriptor_set_layout)
+    {
+        VkPhysicalDeviceVulkan12Features supported12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+        VkPhysicalDeviceFeatures2 supported{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+        supported.pNext = &supported12;
+        vkGetPhysicalDeviceFeatures2(physical_device, &supported);
+        checkf(supported12.descriptorBindingSampledImageUpdateAfterBind && supported12.descriptorBindingUpdateUnusedWhilePending,
+            "The GPU does not support updating bindless textures after bind (descriptorBindingSampledImageUpdateAfterBind, "
+            "descriptorBindingUpdateUnusedWhilePending)");
+    }
+    features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    features12.descriptorBindingUpdateUnusedWhilePending = VK_TRUE;
     // features12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
     features12.descriptorBindingPartiallyBound = VK_TRUE;
     features12.hostQueryReset = VK_TRUE;                 // vkResetQueryPool from the host (GPU profiler pools)
