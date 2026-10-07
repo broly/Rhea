@@ -13,6 +13,11 @@
 
 layout(location = 0) out vec2 v_uv;
 layout(location = 1) out vec3 v_world_normal;
+#if INSTANCE_DISSOLVE
+// character_shadow.frag discards the dissolved parts like character.frag
+layout(location = 2) out vec3 v_object_pos;
+layout(location = 3) flat out float v_dissolve;
+#endif
 
 void main()
 {
@@ -24,6 +29,10 @@ void main()
     mat4 transform_curr = primitive_info.current_transform;
 
     v_uv = vertex.uv;
+#if INSTANCE_DISSOLVE
+    v_object_pos = vertex.position;
+    v_dissolve = primitive_info.tint.a;
+#endif
     v_world_normal = normalize(transpose(inverse(mat3(transform_curr))) * vertex.normal);
 
     // the push constants carry the cascade (GenericRenderGraph::draw_scene_shadow)

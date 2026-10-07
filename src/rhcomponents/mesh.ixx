@@ -47,6 +47,8 @@ export
         std::shared_ptr<SkinningPose> skinning;
 
         glm::vec4 effect{ 0.0f };   // MeshRenderer::effect
+        glm::vec4 tint{ 1.0f, 1.0f, 1.0f, 0.0f };      // MeshRenderer::tint, a: MeshRenderer::dissolve
+        glm::vec4 dissolve_edge{ 0.0f };                // MeshRenderer::dissolve_edge_color, a: dissolve_edge_width
     };
 
     // Renders a mesh at the entity's WorldTransform, one material per material slot of the mesh
@@ -58,14 +60,32 @@ export
         std::vector<std::shared_ptr<Material>> materials;
         [[=rh::edit]] bool visible = true;
         // per instance effect, set by game code every frame it changes (hit flash): rgb linear emission added on
-        // top of the materials (HDR), a: unused. Only the primitive table entries are rewritten when it changes.
+        // top of the materials (HDR), a: JPEG mask level (characters). Only the primitive table entries are
+        // rewritten when it changes.
         [[=rh::transient]] glm::vec4 effect{ 0.0f };
+        // Per instance look, without a material of its own (pbr and character models). Changes rewrite only the
+        // primitive table entries, except dissolve going from 0 to more or back: the primitives switch to the
+        // shader variant that discards (INSTANCE_DISSOLVE), which only dissolving instances pay for.
+        //   tint       multiplies the base color (linear)
+        //   dissolve   0..1: the share of the surface gone, in noisy blobs over the mesh (its own space, so the
+        //              pattern sticks to it), shadows included; 1: invisible
+        //   dissolve_edge_color, dissolve_edge_width: emission (linear, HDR) along the edge of the holes, its width
+        //              a share of the noise range (0..1)
+        [[=rh::edit]] glm::vec3 tint{ 1.0f };
+        [[=rh::edit, =rh::speed<0.01f>]] float dissolve = 0.0f;
+        [[=rh::edit]] glm::vec3 dissolve_edge_color{ 6.0f, 1.5f, 0.3f };
+        [[=rh::edit, =rh::speed<0.01f>]] float dissolve_edge_width = 0.06f;
 
         // by ascending error (level geometry: GltfScene::shadow_proxy_errors)
         [[=rh::transient]] std::vector<ShadowProxy> shadow_proxies;
         // built on a loading thread: stored as shadow_proxies (with their errors) in PostLoad
         [[=rh::transient]] std::shared_ptr<std::vector<std::pair<StaticMesh, float>>> pending_shadow_proxies;
     };
+
+    // A texture of one material slot of this instance only (a degraded copy, a texture of a state): the slot gets
+    // a copy of its material with the texture, the other instances keep theirs. The primitives are rebuilt with
+    // it; a replaced copy goes once nothing draws it (Renderer::collect_unused_materials). Not for every frame.
+    void set_instance_texture(MeshRenderer& renderer, uint32_t slot, Name parameter, TextureHandle texture);
 
     // Simplified copy of `mesh` for the shadow maps (ShadowProxy): every primitive simplified until its surface
     // moved max_error (mesh units), parts smaller than that removed (a primitive may lose all its triangles).

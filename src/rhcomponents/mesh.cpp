@@ -17,6 +17,11 @@ import render;
 import physics;
 import glm;
 import log;
+import rhobject;
+import name;
+import cvar;
+import framework;
+import globals;
 
 #include "common/assertion_macros.h"
 #include "logging/log_macro.h"
@@ -259,4 +264,108 @@ void init_skinned_mesh(ecs::Registry& registry, ecs::Entity e)
         LogSkinnedMesh.Log("Skinned mesh '%s': %zu materials provided, mesh has %zu primitives",
             skeletal.name.c_str(), renderer.materials.size(), num_primitives);
     registry.add<MeshRenderer>(e, std::move(renderer));
+}
+
+void set_instance_texture(MeshRenderer& renderer, uint32_t slot, Name parameter, TextureHandle texture)
+{
+    checkf(slot < renderer.materials.size() && renderer.materials[slot], "set_instance_texture: no material in slot %u", slot);
+    const Material& source = *renderer.materials[slot];
+    // a new object every time: the scene notices the change by the pointer and rebuilds the primitives
+    std::shared_ptr<Material> copy = new_object<Material>();
+    copy->model = source.model;
+    copy->parameters = source.parameters;
+    copy->parameters[parameter] = texture;
+    renderer.materials[slot] = std::move(copy);
+}
+
+namespace
+{
+    // the MeshRenderers of an entity and its ChildOf descendants
+    std::vector<MeshRenderer*> renderers_under(ecs::Registry& registry, ecs::Entity root)
+    {
+        std::vector<ecs::Entity> entities{ root };
+        for (size_t i = 0; i < entities.size(); ++i)
+            ecs::Query<const ChildOf>(registry).each([&] (ecs::Entity child, const ChildOf& child_of)
+            {
+                if (child_of.parent == entities[i])
+                    entities.push_back(child);
+            });
+        std::vector<MeshRenderer*> result;
+        for (ecs::Entity e : entities)
+            if (MeshRenderer* renderer = registry.get<MeshRenderer>(e))
+                result.push_back(renderer);
+        return result;
+    }
+
+    bool parse_floats(cvar::Args args, size_t first, std::span<float> out)
+    {
+        if (args.size() < first + out.size())
+            return false;
+        for (size_t i = 0; i < out.size(); ++i)
+        {
+            const std::string& arg = args[first + i];
+            if (std::from_chars(arg.data(), arg.data() + arg.size(), out[i]).ec != std::errc{})
+                return false;
+        }
+        return true;
+    }
+
+    cvar::Command cmd_instance("render.instance",
+        "Sets the per instance look of an entity's meshes (and its children's): tint <r g b>, dissolve <0..1>, "
+        "edge <r g b width> (MeshRenderer::tint / dissolve / dissolve_edge_*), texture <slot> <parameter> <path> (set_instance_texture)",
+        [] (cvar::Args args)
+        {
+            constexpr std::string_view usage = "render.instance <entity> tint <r g b> | dissolve <0..1> | edge <r g b width> | texture <slot> <parameter> <path>";
+            if (args.size() < 3 || !RhGlobals::engine || !RhGlobals::engine->world)
+            {
+                cvar::print(usage, cvar::Output::error);
+                return;
+            }
+            World& world = *RhGlobals::engine->world;
+            const ecs::Entity e = world.find_entity(Name(args[0]));
+            if (!e)
+            {
+                cvar::print(std::format("No entity '{}'", args[0]), cvar::Output::error);
+                return;
+            }
+            const std::vector<MeshRenderer*> renderers = renderers_under(world.registry, e);
+            float v[4];
+            const std::string& what = args[1];
+            if (what == "tint" && parse_floats(args, 2, std::span(v, 3)))
+                for (MeshRenderer* r : renderers)
+                    r->tint = glm::vec3(v[0], v[1], v[2]);
+            else if (what == "dissolve" && parse_floats(args, 2, std::span(v, 1)))
+                for (MeshRenderer* r : renderers)
+                    r->dissolve = v[0];
+            else if (what == "edge" && parse_floats(args, 2, std::span(v, 4)))
+                for (MeshRenderer* r : renderers)
+                {
+                    r->dissolve_edge_color = glm::vec3(v[0], v[1], v[2]);
+                    r->dissolve_edge_width = v[3];
+                }
+            else if (what == "texture" && args.size() >= 5)
+            {
+                uint32_t slot = 0;
+                if (std::from_chars(args[2].data(), args[2].data() + args[2].size(), slot).ec != std::errc{})
+                {
+                    cvar::print(usage, cvar::Output::error);
+                    return;
+                }
+                const TextureHandle texture = AssetManager::get().load_texture(args[4], get_texture_max_size());
+                if (!texture.is_valid())
+                {
+                    cvar::print(std::format("Texture '{}' not loaded", args[4]), cvar::Output::error);
+                    return;
+                }
+                for (MeshRenderer* r : renderers)
+                    if (slot < r->materials.size() && r->materials[slot])
+                        set_instance_texture(*r, slot, Name(args[3]), texture);
+            }
+            else
+            {
+                cvar::print(usage, cvar::Output::error);
+                return;
+            }
+            cvar::print(std::format("{}: {} mesh renderers", args[0], renderers.size()));
+        }, "<entity> tint <r g b> | dissolve <0..1> | edge <r g b width> | texture <slot> <parameter> <path>");
 }

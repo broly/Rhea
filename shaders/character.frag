@@ -14,6 +14,7 @@
 #include "push_constants/model_push_constants.glsl"
 #include "character/shading_models.glsl"
 #include "character/character_material.glsl"
+#include "instance_dissolve.glsl"
 
 
 // ================== INPUTS ==================
@@ -25,6 +26,11 @@ layout(location = 4) in vec3 v_world_bitangent;
 layout(location = 5) in vec4 v_curr_clip;
 layout(location = 6) in vec4 v_prev_clip;
 layout(location = 7) flat in vec4 v_instance_effect;   // rgb: emission of the instance (hit flash), a: its JPEG mask
+layout(location = 8) flat in vec4 v_instance_tint;     // rgb: tint of the base color, a: dissolved share
+#if INSTANCE_DISSOLVE
+layout(location = 9) flat in vec4 v_instance_dissolve_edge;
+layout(location = 10) in vec3 v_object_pos;
+#endif
 
 // ================== OUTPUT ==================
 // view normals and positions are not stored: from the world normal and the linear depth (gbuffer.glsl)
@@ -38,6 +44,14 @@ layout(location = 5) out vec4 out_g_emissive;
 
 void main()
 {
+#if INSTANCE_DISSOLVE
+    const float dissolve_noise = instance_dissolve_noise(v_object_pos);
+    if (instance_dissolved(dissolve_noise, v_instance_tint.a))
+        discard;
+    const vec3 dissolve_edge = instance_dissolve_edge(dissolve_noise, v_instance_tint.a, v_instance_dissolve_edge);
+#else
+    const vec3 dissolve_edge = vec3(0.0);
+#endif
     GPUMaterial mat = get_material(get_material_index());
 
     vec2 uv = v_uv;
@@ -58,13 +72,20 @@ void main()
 
     vec3 N = normalize(TBN * character_normal_ts(mat, uv));
 
-    vec3 albedo = character_base_color(mat, uv);
+    vec3 albedo = character_base_color(mat, uv) * v_instance_tint.rgb;
     vec3 orm = character_orm(mat, uv);
     float ao = orm.r;
     float roughness = clamp(orm.g, 0.0, 1.0);
     float metallic = clamp(orm.b, 0.0, 1.0);
 
     // ---- shading model data ----
+    // skin and hair keep model data in the emissive slot: the dissolve edge shows in their albedo instead
+#if SHADING_MODEL_HAIR || SHADING_MODEL_SKIN
+    const float edge_strength = max(dissolve_edge.r, max(dissolve_edge.g, dissolve_edge.b));
+    if (edge_strength > 0.0)
+        albedo = mix(albedo, dissolve_edge / edge_strength, clamp(edge_strength, 0.0, 1.0));
+#endif
+
 #if SHADING_MODEL_HAIR
     uint shading_model = SHADING_MODEL_ID_HAIR;
     vec3 hair_tangent = normalize(TBN * character_hair_tangent_ts(mat, uv));
@@ -74,7 +95,7 @@ void main()
     vec4 model_data = vec4(mat.params8.rgb, mat.params8.w);
 #else
     uint shading_model = SHADING_MODEL_ID_DEFAULT_LIT;
-    vec4 model_data = vec4(character_emissive(mat, uv) + v_instance_effect.rgb, metallic);
+    vec4 model_data = vec4(character_emissive(mat, uv) + v_instance_effect.rgb + dissolve_edge, metallic);
     if ((get_debug_index() & GEOMETRY_DEBUG_ZERO_EMISSIVE) != 0u)
         model_data.rgb = vec3(0.0);
 #endif

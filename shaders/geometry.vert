@@ -21,6 +21,13 @@ layout(location = 5) out vec4 v_curr_clip;
 layout(location = 6) out vec4 v_prev_clip;
 // per instance effect of the primitive (GPUPrimitiveInfo::effect)
 layout(location = 7) flat out vec4 v_instance_effect;
+// rgb: tint of the base color, a: dissolved share (GPUPrimitiveInfo::tint)
+layout(location = 8) flat out vec4 v_instance_tint;
+#if INSTANCE_DISSOLVE
+layout(location = 9) flat out vec4 v_instance_dissolve_edge;
+// the noise of the dissolve follows the mesh's own space
+layout(location = 10) out vec3 v_object_pos;
+#endif
 
 
 void main()
@@ -43,6 +50,11 @@ void main()
     
     v_uv = v.uv;  // in_uv;
     v_instance_effect = primitive_info.effect;
+    v_instance_tint = primitive_info.tint;
+#if INSTANCE_DISSOLVE
+    v_instance_dissolve_edge = primitive_info.dissolve_edge;
+    v_object_pos = v.position;
+#endif
 
     v_world_pos = world_curr.xyz;
 

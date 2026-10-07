@@ -15,6 +15,7 @@
 #include "push_constants/model_push_constants.glsl"
 #include "utils/hsv.glsl"
 #include "utils/specular_aa.glsl"
+#include "instance_dissolve.glsl"
 
 
 // ================== INPUTS ==================
@@ -26,6 +27,11 @@ layout(location = 4) in vec3 v_world_bitangent;
 layout(location = 5) in vec4 v_curr_clip;
 layout(location = 6) in vec4 v_prev_clip;
 layout(location = 7) flat in vec4 v_instance_effect;   // rgb: emission of the instance (hit flash)
+layout(location = 8) flat in vec4 v_instance_tint;     // rgb: tint of the base color, a: dissolved share
+#if INSTANCE_DISSOLVE
+layout(location = 9) flat in vec4 v_instance_dissolve_edge;
+layout(location = 10) in vec3 v_object_pos;
+#endif
 
 // ================== OUTPUT ==================
 // Every output has as many components as its attachment format (RGBA8 / RGBA16F targets take vec4):
@@ -44,13 +50,18 @@ layout(location = 5) out vec4 out_g_emissive;
 void main()
 {
 #if !BLEND_MODE_TRANSLUCENT
+#if INSTANCE_DISSOLVE
+    const float dissolve_noise = instance_dissolve_noise(v_object_pos);
+    if (instance_dissolved(dissolve_noise, v_instance_tint.a))
+        discard;
+#endif
     uint material_id = get_material_index();
     GPUMaterial mat = get_material(material_id);
 
     vec4 base_tx = get_base_color(mat, v_uv);
 
-    vec3 albedo = pow(base_tx.rgb, vec3(2.2));
-    
+    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * v_instance_tint.rgb;
+
     vec3 emissive = get_emissive(mat, v_uv).rgb;
     if ((get_debug_index() & GEOMETRY_DEBUG_ZERO_EMISSIVE) != 0u)
         emissive = vec3(0.0);
@@ -59,6 +70,9 @@ void main()
     if ((get_debug_index() & GEOMETRY_DEBUG_SOLID_EMISSIVE) != 0u)
         emissive = vec3(1.0, 0.0, 0.0);
     emissive += v_instance_effect.rgb;
+#if INSTANCE_DISSOLVE
+    emissive += instance_dissolve_edge(dissolve_noise, v_instance_tint.a, v_instance_dissolve_edge);
+#endif
 
     vec3 orm = get_orm(mat, v_uv);
     float ao        = orm.r;

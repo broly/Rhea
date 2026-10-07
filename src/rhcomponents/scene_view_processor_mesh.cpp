@@ -141,8 +141,11 @@ void SceneViewProcessor_Mesh::process()
         dirty = true;
 
         bool is_new = ro.primitives.empty();
+        // the materials (set_instance_texture) and the dissolving variant are baked into the primitives too
+        const bool dissolving = submitted.tint.a > 0.0f;
         bool mesh_changed = ro.mesh != submitted.mesh || ro.lods != submitted.lods
-            || ro.shadow_proxies != submitted.shadow_proxies;
+            || ro.shadow_proxies != submitted.shadow_proxies || ro.materials != submitted.materials
+            || ro.dissolving != dissolving;
 
         glm::mat4 new_world = submitted.transform.matrix();
         bool transform_changed = ro.world != new_world;
@@ -154,9 +157,13 @@ void SceneViewProcessor_Mesh::process()
             ro.mesh   = submitted.mesh;
             ro.lods   = submitted.lods;
             ro.shadow_proxies = submitted.shadow_proxies;
+            ro.materials = submitted.materials;
+            ro.dissolving = dissolving;
             ro.world  = new_world;
             ro.bounds = submitted.bounds;
             ro.effect = submitted.effect;
+            ro.tint = submitted.tint;
+            ro.dissolve_edge = submitted.dissolve_edge;
 
             checkf(submitted.lods.empty() || !submitted.skinning, "Mesh '%s': skinned meshes have no LODs",
                 submitted.debug_name.to_string().c_str());
@@ -237,7 +244,9 @@ void SceneViewProcessor_Mesh::process()
                             rp.passes.emplace(pass_name);
                             auto& info = rp.info_by_pass[pass_name];
                             info.pipeline_family = geom_pipeline_family;
-                            info.shader_key = geom_pipeline_family->make_shader_key(pass_name, instance->material);
+                            // INSTANCE_DISSOLVE: the variant that discards (models without it ignore the constant)
+                            info.shader_key = geom_pipeline_family->make_shader_key(pass_name, instance->material, {},
+                                dissolving ? std::map<Name, uint32_t>{ { Name("INSTANCE_DISSOLVE"), 1u } } : std::map<Name, uint32_t>{});
                             info.pipeline = geom_pipeline_family->request_pipeline(info.shader_key);
                             info.material_instance = instance;
                             if (pass_name != "shadowmap")
@@ -318,11 +327,13 @@ void SceneViewProcessor_Mesh::process()
             continue;
         }
 
-        // the per instance effect (hit flash): only the primitive table entries (with the transform below if it
-        // moved too)
-        if (ro.effect != submitted.effect)
+        // the per instance effect (hit flash), tint, dissolve share and edge: only the primitive table entries (with
+        // the transform below if it moved too)
+        if (ro.effect != submitted.effect || ro.tint != submitted.tint || ro.dissolve_edge != submitted.dissolve_edge)
         {
             ro.effect = submitted.effect;
+            ro.tint = submitted.tint;
+            ro.dissolve_edge = submitted.dissolve_edge;
             if (!transform_changed)
                 for (RenderPrimitiveId prim_index : ro.primitives)
                     write_primitive_info(ro, primitives[prim_index]);
@@ -406,7 +417,9 @@ void SceneViewProcessor_Mesh::write_primitive_info(const RenderObject_Mesh& ro, 
         (uint32_t)rp.mesh_index,
         rp.primitive_material_id,
         { 0u, 0u },
-        ro.effect
+        ro.effect,
+        ro.tint,
+        ro.dissolve_edge
     };
     ++primitive_table_version;
 }

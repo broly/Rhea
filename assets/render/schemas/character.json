@@ -24,6 +24,12 @@
 				"skin": "SHADING_MODEL_SKIN",
 				"hair": "SHADING_MODEL_HAIR"
 			}
+		},
+		"variants": {
+			"INSTANCE_DISSOLVE": {
+				"values": [0, 1],
+				"default_index": 0
+			}
 		}
 	},
 

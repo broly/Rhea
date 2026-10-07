@@ -41,8 +41,13 @@ export struct RenderObject_Mesh
     
     // world matrix of the previous frame (motion vectors)
     glm::mat4 prev_world = glm::mat4(1.0f);
-    // per instance effect (SceneViewProxy_Mesh::effect)
+    // per instance effect, tint and dissolve (SceneViewProxy_Mesh)
     glm::vec4 effect{ 0.0f };
+    glm::vec4 tint{ 1.0f, 1.0f, 1.0f, 0.0f };
+    glm::vec4 dissolve_edge{ 0.0f };
+    // the primitives were built with these (a change rebuilds them, as one of the shader variant: dissolving)
+    std::vector<std::shared_ptr<Material>> materials;
+    bool dissolving = false;
     // moved this frame: prev_world must be synced once the object stops
     bool moved = false;
 

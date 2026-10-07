@@ -64,6 +64,9 @@ namespace
         if (const SkinnedMesh* skinned = registry.get<SkinnedMesh>(e))
             proxy.skinning = skinned->pose;
         proxy.effect = renderer.effect;
+        proxy.tint = glm::vec4(glm::max(renderer.tint, glm::vec3(0.0f)), std::clamp(renderer.dissolve, 0.0f, 1.0f));
+        proxy.dissolve_edge = glm::vec4(glm::max(renderer.dissolve_edge_color, glm::vec3(0.0f)),
+            std::clamp(renderer.dissolve_edge_width, 0.0f, 1.0f));
         return proxy;
     }
 
@@ -71,7 +74,7 @@ namespace
     {
         return same(a.transform, b.transform) && a.mesh == b.mesh && a.lods == b.lods
             && a.shadow_proxies == b.shadow_proxies && a.materials == b.materials
-            && a.skinning == b.skinning && a.effect == b.effect;
+            && a.skinning == b.skinning && a.effect == b.effect && a.tint == b.tint && a.dissolve_edge == b.dissolve_edge;
     }
 
     SceneViewProxy_Camera make_proxy(const ecs::Registry&, ecs::Entity, const Camera& camera, const Transform& world)

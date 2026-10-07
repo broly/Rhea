@@ -19,6 +19,7 @@ layout(location = 1) in vec3 v_world_normal;
 layout(location = 2) in vec2 v_uv;
 layout(location = 3) in vec3 v_world_tangent;
 layout(location = 4) in vec3 v_world_bitangent;
+layout(location = 8) flat in vec4 v_instance_tint;     // rgb: tint of the base color, a: dissolved share (fades it)
 
 layout(location = 0) out vec4 out_color;
 
@@ -29,11 +30,11 @@ void main()
 
     vec4 base_tx = get_base_color(mat, v_uv);
 
-    float alpha = base_tx.a;
+    float alpha = base_tx.a * (1.0 - v_instance_tint.a);
     if (alpha <= 0.001)
         discard;
 
-    vec3 albedo = pow(base_tx.rgb, vec3(2.2));
+    vec3 albedo = pow(base_tx.rgb, vec3(2.2)) * v_instance_tint.rgb;
     
     out_color = vec4(albedo, alpha);
 

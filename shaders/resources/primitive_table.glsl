@@ -19,6 +19,8 @@ struct GPUPrimitiveInfo
     uint pad0;
     uint pad1;
     vec4 effect;    // per instance (MeshRenderer::effect): rgb emission added on top (hit flash), a: JPEG mask (character)
+    vec4 tint;      // rgb: multiplies the base color (MeshRenderer::tint), a: dissolved share 0..1 (MeshRenderer::dissolve)
+    vec4 dissolve_edge; // rgb: linear emission of the dissolve edge, a: its width (share of the noise range)
 };
 
 layout(std430, set=SET_PRIMITIVE_TABLE, binding=BINDING_PRIMITIVE_TABLE)

@@ -21,6 +21,12 @@
 				"masked": "BLEND_MODE_MASKED",
 				"translucent": "BLEND_MODE_TRANSLUCENT"
 			}
+		},
+		"variants": {
+			"INSTANCE_DISSOLVE": {
+				"values": [0, 1],
+				"default_index": 0
+			}
 		}
 	},
 	

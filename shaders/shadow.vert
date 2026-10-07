@@ -13,6 +13,12 @@
 #define DRAW_RECORD_NO_VARYING
 #include "push_constants/model_push_constants.glsl"
 
+#if INSTANCE_DISSOLVE
+// shadow.frag discards the dissolved parts like geometry.frag
+layout(location = 0) out vec3 v_object_pos;
+layout(location = 1) flat out float v_dissolve;
+#endif
+
 void main()
 {
     forward_draw_record();
@@ -22,7 +28,11 @@ void main()
     uint prim_id = get_primitive_index();
     GPUPrimitiveInfo primitive_info = get_primitive_info(prim_id);
     mat4 transform_curr = primitive_info.current_transform;
-    
+#if INSTANCE_DISSOLVE
+    v_object_pos = vertex.position;
+    v_dissolve = primitive_info.tint.a;
+#endif
+
     // the push constants carry the cascade (GenericRenderGraph::draw_scene_shadow)
     gl_Position = light_ubo.dir_light.cascade_vp[get_debug_index()] * transform_curr * vec4(vertex.position, 1.0);
 }
